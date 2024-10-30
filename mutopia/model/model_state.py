@@ -11,17 +11,6 @@ from scipy.special import logsumexp
 from functools import cache, wraps, reduce
 from collections import defaultdict
 
-def set_model_attrs(
-    model, 
-    mutation_rate=True,
-):
-    @wraps(model)
-    def wrapped_f(*args, **kwargs):
-        return model(*args, **kwargs)
-    
-    wrapped_f.mutation_rate = mutation_rate
-    return wrapped_f
-
 
 class ModelState:
     '''
@@ -59,80 +48,13 @@ class ModelState:
             'locals' : self.locals_model,
         }
     
-
-    def update(self,
-               corpuses,
-               *,
-               parallel_context,
-               context_sstats,
-               mutation_sstats,
-               theta_sstats,
-               locals_sstats,
-               learning_rate=1.,
-               update_prior=True,
-            ):
-        
-        
-        if update_prior:
-            self.locals_model.partial_fit(locals_sstats, learning_rate)
-
-        component_updates = partial(
-            self.get_component_update_fns,
-            corpuses=corpuses,
-            learning_rate=learning_rate,
-            context_sstats=context_sstats,
-            mutation_sstats=mutation_sstats,
-            theta_sstats=theta_sstats,
-        )
-
-        for _ in parallel_context(
-            delayed(update)() 
-            for update in
-            chain.from_iterable(component_updates(k) for k in range(self.n_components))
-        ):
-            pass
-
-        return self
-    
-
-    def get_component_update_fns(self, 
-            k, 
-            corpuses,
-            *,
-            context_sstats,
-            mutation_sstats,
-            theta_sstats,
-            learning_rate=1.,
-            **kw,
-        ):
-
-        log_mutation_rates = [
-            self.get_propto_log_mutation_rate(k, corpus) \
-            for corpus in corpuses
-        ]
-
-        kw = dict(
-            k=k, 
-            corpuses=corpuses, 
-            log_mutation_rates=log_mutation_rates, 
-            learning_rate=learning_rate,
-        )
-        
-        yield from chain.from_iterable([
-            self.context_model.partial_fit(context_sstats, **kw),
-            self.theta_model.partial_fit(theta_sstats, **kw),
-            self.mutation_model.partial_fit(mutation_sstats, **kw)
-        ])
-
-
-    def update_normalizer(self, corpus, learning_rate=1., subsample_rate=1.):
-        norm = self._normalizers[corpus.attrs['name']]
-        for k in range(self.n_components):
-            norm[k] = np.log(subsample_rate) + _svi_update_fn(
-                norm[k],
-                -logsumexp(self.get_propto_log_mutation_rate(k, corpus).data),
-                learning_rate
-            )
+    @property
+    def nonlocals(self):
+        return {
+            model_name : model
+            for model_name, model in self.models.items()
+            if model_name != 'locals'
+        }
 
 
     def get_normalizers(self, corpus):
@@ -176,7 +98,7 @@ class ModelState:
         }
     
 
-    """def get_exp_offsets_dict(self, 
+    def get_exp_offsets_dict(self, 
         corpuses,*,
         parallel_context,
         norm_update_fn,
@@ -219,7 +141,7 @@ class ModelState:
 
         model_predictions = {
             model_name : model.predict(k, corpus)
-            for model_name, model in self.models.items()
+            for model_name, model in self.nonlocals.items()
             if model.requires_normalization
         }
 
@@ -227,63 +149,87 @@ class ModelState:
             warnings.simplefilter("ignore")
 
             log_mutation_rate = reduce(
-                lambda x,y : x+y,
+                lambda x,y: x+y, 
                 model_predictions.values(),  # sum over models
                 np.log(corpus.regions.exposures) \
                     + np.log(corpus.regions.context_frequencies)  # start with the background rates
             )
 
-        '''
-        To get the exp offsets for a model, you need to know the contribution of
-        every other model to the log mutation rate - this way the other models are treated
-        as fixed effects.
+            '''
+            To get the exp offsets for a model, you need to know the contribution of
+            every other model to the log mutation rate - this way the other models are treated
+            as fixed effects.
 
-        IF the model "requires normalization" - or is part of the mutation rate estimation,
-        then we need to subtract the model's prediction from the total prediction. This
-        yields the sum of predictions from every other model.
-        '''
-        exp_offsets = {
-            model_name : model.get_exp_offset(
-                (log_mutation_rate - model_predictions[model_name]) \
-                    if model.requires_normalization else log_mutation_rate,
+            IF the model "requires normalization" - or is part of the mutation rate estimation,
+            then we need to subtract the model's prediction from the total prediction. This
+            yields the sum of predictions from every other model.
+            '''
+            exp_offsets = defaultdict(
+                lambda : None, 
+                {
+                    model_name : model.get_exp_offset(
+                        log_mutation_rate - model_predictions[model_name],
+                        corpus
+                    )
+                    for model_name, model in self.nonlocals.items()
+                    if model.requires_normalization
+                }
             )
-            for model_name, model in self.models.items()
-        }
             
-        return (
-            -logsumexp(log_mutation_rate.data),
-            exp_offsets
-        )
+            return (
+                -logsumexp(log_mutation_rate.data),
+                exp_offsets
+            )
     
 
-    def get_update_fns(self, 
-            offsets, 
-            sstats,
-            learning_rate=1.,
-        ):
-        
-        for k in range(self.n_components):
-            
-            for model_name, model in self.models.items():
-                
-                yield from model.partial_fit(
-                    k,
-                    sstats[model_name + '_sstats'],
-                    offsets[model_name + '_offsets'],
-                    learning_rate=learning_rate,
+    def init_normalizers(self, corpuses):
+        for corpus in corpuses:
+            for k in range(self.n_components):
+                self._update_normalizer(
+                    k, corpus, 
+                    -logsumexp(self.get_propto_log_mutation_rate(k, corpus).data)
                 )
 
-
-    def update_normalizer(self, 
+    def _update_normalizer(self, 
             k, corpus, logsum_mutation_rate, 
             learning_rate=1., 
             subsample_rate=1.
         ):
         
-        norm = self._normalizers[corpus.attrs['name']][k]
+        norm = self._normalizers[corpus.attrs['name']]
         
-        norm = np.log(subsample_rate) + _svi_update_fn(
-            norm,
-            logsum_mutation_rate,
-            learning_rate
-        )"""
+        norm[k] = _svi_update_fn(
+                norm[k],
+                np.log(subsample_rate) + logsum_mutation_rate,
+                learning_rate
+            )
+        
+
+    def Mstep(self,
+            sstats,
+            offsets,
+            corpuses,
+            *,
+            parallel_context,
+            learning_rate=1.,
+            subsample_rate=1.,
+            update_prior=True,
+        ):
+
+        if update_prior:
+            self.locals_model.partial_fit(sstats['locals_sstats'], learning_rate=learning_rate)
+
+        update_fns = chain.from_iterable((
+            model.partial_fit(
+                    k,
+                    sstats[model_name + '_sstats'],
+                    offsets[model_name + '_offsets'],
+                    corpuses,
+                    learning_rate=learning_rate,
+                )
+            for k in range(self.n_components)
+            for model_name, model in self.nonlocals.items()
+        ))
+
+        for _ in parallel_context(delayed(fn)() for fn in update_fns):
+            pass

@@ -1,7 +1,18 @@
 
 from .corpus_state import CorpusState as CS
 from functools import reduce, partial
-from joblib import delayed
+from joblib import Parallel, delayed
+from contextlib import contextmanager
+
+@contextmanager
+def ParContext(n_jobs, verbose=0):
+    yield Parallel(
+        n_jobs=n_jobs, 
+        backend='threading', 
+        return_as='generator', 
+        verbose=verbose,
+        pre_dispatch='n_jobs',
+    )
 
 
 def Estep(
@@ -70,22 +81,6 @@ def Estep(
     return sstats, elbo
 
 
-def Mstep(
-    model_state,
-    corpuses,
-    sstats,
-    learning_rate=1.,
-    update_prior=True,
-    parallel_context=None,
-):
-    model_state.update(
-        corpuses,
-        **sstats,
-        learning_rate=learning_rate,
-        update_prior=update_prior,
-        parallel_context=parallel_context
-    )
-
 
 def score(
     model_state,
@@ -123,21 +118,31 @@ def VI_step(
     update_prior=True,
 ):
     
-    for corpus in corpuses:
-        model_state.update_normalizer(corpus)
-    
     args = dict(
-        model_state=model_state,
         corpuses=corpuses,
         parallel_context=parallel_context,
     )
-
-    stats, elbo = Estep(**args)
     
-    Mstep(sstats=stats,
-          update_prior=update_prior,
-          **args,
-         )
+    offsets = model_state.get_exp_offsets_dict(
+        **args,
+        norm_update_fn=model_state._update_normalizer
+    )
+
+    # calculate the bound here because the mutations rates
+    # have just been re-normalized during the offset calculation
+    elbo = score(model_state, corpuses)
+    
+    stats, _ = Estep(
+        model_state=model_state,
+        **args
+    )
+    
+    model_state.Mstep(
+        offsets=offsets,
+        sstats=stats,
+        update_prior=update_prior,
+        **args,
+    )
 
     for corpus in corpuses:
         CS.update_corpusstate(corpus, model_state)
@@ -154,38 +159,42 @@ def SVI_step(
     batch_generator,
     learning_rate,
     subsample_rate,
-):
+):    
+
+    # The normalizer only matters for the E-step, so update it here.
+    offsets = model_state.get_exp_offsets_dict(
+        corpuses=corpuses,
+        parallel_context=parallel_context,
+        norm_update_fn=model_state._update_normalizer
+    )
+
+    # calculate the bound here because the mutations rates
+    # have just been re-normalized during the offset calculation
+    elbo = score(model_state, corpuses)
 
     #use "batch_generator" to slice or subsample the corpuses
     #args = (model_state, batch_generator(*corpuses))
     slices = batch_generator(*corpuses)
 
-    # The normalizer only matters for the E-step, so update it here.
-    for slice in slices:
-        model_state.update_normalizer(
-            slice,
-            learning_rate=learning_rate
-        )
-
     args = dict(
-        model_state=model_state,
         corpuses=slices,
         parallel_context=parallel_context,
         learning_rate=learning_rate,
-    )
-
-    sstats, elbo = Estep(
-        **args, 
         subsample_rate=subsample_rate,
     )
 
-    Mstep(
-        sstats=sstats,
+    stats, _ = Estep(
+        model_state=model_state,
+        **args
+    )
+    
+    model_state.Mstep(
+        offsets=offsets,
+        sstats=stats,
         update_prior=update_prior,
         **args,
     )
 
-    # Update the corpus states in the ORIGINAL corpuses
     for corpus in corpuses:
         CS.update_corpusstate(corpus, model_state)
 

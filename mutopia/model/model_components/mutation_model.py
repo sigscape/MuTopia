@@ -1,7 +1,8 @@
 from .base import get_reg_params, _svi_update_fn, RateModel
 from ._strand_transformer import MutationStrandEncoder
 #from ._poisson_elastic_net import make_optimizer, SklearnWrapper, simple_ridge
-from ._glm_compiled import make_optimizer, setup_mixed_solver, get_lsqr_solver
+from ._glm_compiled import make_optimizer, setup_mixed_solver, \
+    get_lsqr_solver, ls_partial_solver
 from ._fast_eln import get_eln_solver
 from functools import partial
 from sklearn.base import clone
@@ -42,23 +43,30 @@ class MutationModel(RateModel):
             random_state=random_state,
         ) # f(X) -> f(z, w, beta) -> beta
 
-        ridge_solver = partial(
+        '''ridge_solver = partial(
             get_lsqr_solver,
             tol=tol,
             alpha=conditioning_alpha,
-        ) # f(X) -> f(z, w, beta) -> beta
+        ) # f(X) -> f(z, w, beta) -> beta'''
 
-        mixed_solver = partial(
-            setup_mixed_solver(X, is_regularized), # f(X) -> f( f(X) -> f(z, w, beta) -> beta, f(X) -> f(z, w, beta) -> beta ) -> f(z, w, beta) -> beta
-            eln_solver, # f(X) -> f(z, w, beta) -> beta
-            ridge_solver, # f(X) -> f(z, w, beta) -> beta
-        ) # f() -> f(z, w, beta) -> beta
+        ridge_solver = partial(
+            ls_partial_solver,
+            group_mask = np.array([True]*3 + [False]*(is_regularized.sum()-3)),
+            tol=tol,
+            max_iter=10000,
+        )
+
+        # f(X) -> f( f(X) -> f(z, w, beta) -> beta, f(X) -> f(z, w, beta) -> beta ) -> f(z, w, beta) -> beta
+        mixed_solver = setup_mixed_solver(X, is_regularized)(
+                            eln_solver, # f(X) -> f(z, w, beta) -> beta
+                            ridge_solver, # f(X) -> f(z, w, beta) -> beta
+                        ) # f(z, w, beta) -> beta
  
         self.mutation_models = [
             [
                 partial(
                     make_optimizer(X, tol=tol, max_iter=max_iter), # f(X) -> f( f(z, w, beta) -> beta ) -> f(y, weight) -> f(beta) -> beta
-                    mixed_solver(), # f( solver, solver ) -> f(z, w, beta) -> beta
+                    mixed_solver, # f(z, w, beta) -> beta
                 ) # f(y, weight) -> f(beta) -> beta
                 for _ in range(self.context_dim)
             ]
@@ -76,7 +84,10 @@ class MutationModel(RateModel):
                 corpuses[0].modality().load_components(*init_components)
             )
 
-    
+    @property
+    def requires_normalization(self):
+        return False
+
     def init_from_signatures(self, signatures):
 
         k = signatures.shape[0]
@@ -169,17 +180,24 @@ class MutationModel(RateModel):
             model(y, sample_weight)(update_vec),
             learning_rate=learning_rate
         )
-    
-    
-    def partial_fit(self,sstats, k,*_, learning_rate=1., **kw):
 
-        names = list(sstats.keys())
 
+    @staticmethod
+    def get_exp_offset(offsets, corpus):
+        return None
+        
+    
+    def partial_fit(self, 
+                    k,
+                    sstats,
+                    exp_offsets, 
+                    corpuses, 
+                    learning_rate=1.,
+                ):
+
+        corpus_names = [state.attrs['name'] for state in corpuses]
         # CxSxM
-        stats_reduced = reduce(
-            lambda x,y : x+y,
-            [sstats[name][k] for name in names]
-        )
+        stats_reduced = reduce(sum, [sstats[n][k] for n in corpus_names])
 
         for c, model in enumerate(self.mutation_models[k]):
             

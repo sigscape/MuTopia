@@ -25,11 +25,21 @@ class RateModel(PrimitiveModel, ABC):
         return inspect.getfullargspec(cls.__init__).args[1:]
     
     @abstractmethod
-    def partial_fit(self, sstats, k, corpuses, log_mutation_rates, learning_rate=1.):
+    def partial_fit(self, k, sstats, exp_offsets, corpuses, learning_rate=1.):
         raise NotImplementedError
     
     @abstractmethod
     def predict(self, k, corpus):
+        raise NotImplementedError
+    
+    @staticmethod
+    @abstractmethod
+    def get_exp_offset(offsets, corpus):
+        raise NotImplementedError
+    
+    @property
+    @abstractmethod
+    def requires_normalization(self):
         raise NotImplementedError
 
 
@@ -129,6 +139,20 @@ def transpose_weighted_csr_matmul(X, w, B):
     for j, (s, e) in enumerate(zip(ptr[:-1], ptr[1:])):
         for i in range(s, e):
             out[j] += data[i] * B[idx[i]] * w[idx[i]]
+
+    return out
+
+
+
+@njit
+def design_csr(X, B):
+
+    (ptr, idx, _) = X
+
+    out = np.zeros(len(ptr) - 1)
+    for j, (s, e) in enumerate(zip(ptr[:-1], ptr[1:])):
+        for i in range(s, e):
+            out[j] += B[idx[i]]
 
     return out
 

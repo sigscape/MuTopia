@@ -2,11 +2,12 @@
 import numpy as np
 from numba import njit
 from functools import partial
-from scipy.sparse.linalg import lsqr, cg
+from scipy.sparse.linalg import lsqr
 from scipy.sparse.linalg import LinearOperator
 from scipy.sparse import issparse
 from .base import sp2tup, weighted_csr_matmul, \
-    transpose_weighted_csr_matmul, csr_matmul
+    transpose_weighted_csr_matmul, csr_matmul, \
+    design_csr
 from sklearn.linear_model import ElasticNet
 from sklearn import set_config
 set_config(skip_parameter_validation=True)
@@ -28,35 +29,14 @@ def get_sklearn_solver(X, model):
 
     return _get_sklearn_solver    
 
-
-##
-# Elastic net interior solver
-##
-def get_eln_solver(
-    X,
-    alpha=1e-3,
-    l1_ratio=0.95,
-    tol=1e-6,
-    random_state=None,
-): # f(X) -> f(z, w, beta) -> beta
-    return get_sklearn_solver(
-        X,
-        ElasticNet(
-            fit_intercept=False,
-            warm_start=True,
-            alpha=alpha,
-            l1_ratio=l1_ratio,
-            tol=tol,
-            selection='random',
-            random_state=random_state,
-        )
-    )
-
-
 ##
 # Ridge regression interior solver
 ##
-def get_CSR_linop(X): # f(X) -> f(w) -> LinearOperator(b) -> yhat
+def get_CSR_linop(
+    X,
+    matvec = weighted_csr_matmul,
+    rmatvec = transpose_weighted_csr_matmul,
+): # f(X) -> f(w) -> LinearOperator(b) -> yhat
     '''
     Precomputes matrix and matrix-transpose
     '''
@@ -68,11 +48,12 @@ def get_CSR_linop(X): # f(X) -> f(w) -> LinearOperator(b) -> yhat
         return LinearOperator(
             dtype=X.dtype,
             shape=X.shape,
-            matvec = partial(weighted_csr_matmul, sp2tup(X), weights),
-            rmatvec = partial(transpose_weighted_csr_matmul, sp2tup(X_T), weights),
+            matvec = partial(matvec, sp2tup(X), weights),
+            rmatvec = partial(rmatvec, sp2tup(X_T), weights),
         )
     
     return _get_CSR_linop
+
 
 
 def get_lsqr_solver(
@@ -90,6 +71,70 @@ def get_lsqr_solver(
     return interior_solver
 
 
+
+@njit
+def _iterative_partial_ls(
+        X1, X1T,
+        X2, X2T,
+        group_mask,
+        z, w, beta,
+        tol=1e-4, 
+        max_iter=10,
+        alpha=1e-4,
+    ):
+
+    X2_denom = design_csr(X2T, w) + np.sum(w)*alpha
+    X1_denom = design_csr(X1T, w) + np.sum(w)*alpha
+    
+    for i in range(max_iter):
+    
+        beta_old = beta.copy()
+        r = z - design_csr(X1, beta[group_mask])
+        beta[~group_mask] = design_csr(X2T, r*w)/X2_denom
+
+        r = z - design_csr(X2, beta[~group_mask])
+        beta[group_mask] = design_csr(X1T, r*w)/X1_denom
+
+        if np.linalg.norm(beta-beta_old) < tol:
+            break
+
+    return beta
+
+
+def ls_partial_solver(
+    X,
+    max_iter=10,
+    tol=1e-4,
+    alpha=1e-4,
+    *,
+    group_mask, # at most two groups okay...
+):
+    '''
+    Partial derivative solver for the least squares problem.
+    If the feature matrix is separable into two (or more, but this is not implemented) groups
+    such that within that group, each feature behaves as an intercept, then we can solve the
+    optimal coefficient in one step.
+
+    This solver iterates between updating the coefficients of two groups of features
+    until convergence, and does this without QR decomposition or any matrix inversion.
+    '''
+    
+    def tup_X_XT(X):
+        return  sp2tup(X.tocsr()), sp2tup(X.T.tocsr())
+
+    X.eliminate_zeros()
+    X = X.tocsc()
+
+    return partial(
+        _iterative_partial_ls,
+        *tup_X_XT(X[:, group_mask]),
+        *tup_X_XT(X[:, ~group_mask]),
+        group_mask,
+        max_iter=max_iter,
+        alpha=alpha,
+        tol=tol,
+    )
+
 ##
 # Mixed solver - some weights are regularized, some are not
 ##
@@ -97,6 +142,10 @@ def setup_mixed_solver(
         X, 
         is_regularized,
     ): # -> f(X) -> f(solver, solver) -> f(z, w, beta) -> beta
+    '''
+    Sets up a solver where some of the coefficients are optimized
+    by one model, and the rest are optimized by another model.
+    '''
 
     if not issparse(X):
         raise ValueError('X must be a sparse matrix')

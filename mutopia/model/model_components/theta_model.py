@@ -71,6 +71,9 @@ class ThetaModel(RateModel):
             for _ in range(n_components)
         ]
 
+    @property
+    def requires_normalization(self):
+        return True
 
     def _get_baseline_prediction(self, corpus):
         return np.zeros(
@@ -140,26 +143,23 @@ class ThetaModel(RateModel):
             CS.fetch_val(state, 'locus_features').data
             for state in corpuses
         ])
-    
-
-    def partial_fit(self, k, sstats, learning_rate, *corpuses):
-        raise NotImplementedError
 
 
     def _make_model(self, **kw):
         raise NotImplementedError
-
-
-    def _get_targets(self, k, sstats, corpuses, log_mutation_rates):
-
-        target = np.concatenate([sstats[state.attrs['name']][k] for state in corpuses])
-        
-        eta = np.concatenate([
-            np.exp(lmr - self.predict(k, state))\
+    
+    @staticmethod
+    def get_exp_offset(offsets, corpus):
+        return np.exp(offsets)\
                 .sum(dim=('context','configuration'))\
                 .data
-            for state, lmr in zip(corpuses, log_mutation_rates)
-        ])
+
+
+    def _get_targets(self, k, sstats, exp_offsets, corpuses):
+
+        corpus_names = [corpus.attrs['name'] for corpus in corpuses]
+        target = np.concatenate([sstats[n][k] for n in corpus_names])
+        eta = np.concatenate([exp_offsets[n][k] for n in corpus_names])
 
         current_prediction = np.concatenate([
             CS.fetch_val(state, 'log_locus_distribution')[k].data for state in corpuses
@@ -169,6 +169,10 @@ class ThetaModel(RateModel):
             *get_poisson_targets_weights(target, eta), 
             current_prediction
         )
+    
+
+    def partial_fit(self, k, sstats, exp_offsets, corpuses, learning_rate=1.):
+        raise NotImplementedError
 
 
 class LinearThetaModel(ThetaModel):
@@ -314,12 +318,12 @@ class GBTThetaModel(ThetaModel):
 
 
     def partial_fit(self, 
-                    sstats,
-                    k,
-                    corpuses, 
-                    log_mutation_rates,
-                    learning_rate=1.,
-                ):
+            k, 
+            sstats, 
+            exp_offsets, 
+            corpuses,
+            learning_rate=1.
+        ):
         
         intercept_idx = self._get_intercept_idx(*corpuses)
         X = self._fetch_feature_matrix(*corpuses)
@@ -327,7 +331,7 @@ class GBTThetaModel(ThetaModel):
         rate_model = self.rate_models[k]
 
         (y, sample_weights, lograte_prediction) = \
-            self._get_targets(k, sstats, corpuses, log_mutation_rates)
+            self._get_targets(k, sstats, exp_offsets, corpuses)
         
         try:
             n_fit_trees = rate_model.n_iter_

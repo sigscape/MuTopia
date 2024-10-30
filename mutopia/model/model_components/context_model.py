@@ -68,16 +68,16 @@ class ContextModel(RateModel):
             alpha=conditioning_alpha,
         ) # f(X) -> f(z, w, beta) -> beta
 
-        mixed_solver = partial(
-            setup_mixed_solver(X, ~is_intercept), # f(X) -> f( f(X) -> f(z, w, beta) -> beta, f(X) -> f(z, w, beta) -> beta ) -> f(z, w, beta) -> beta
-            eln_solver, # f(X) -> f(z, w, beta) -> beta
-            ridge_solver, # f(X) -> f(z, w, beta) -> beta
-        ) # f() -> f(z, w, beta) -> beta
+        
+        mixed_solver = setup_mixed_solver(X, ~is_intercept)( 
+                            eln_solver, # f(X) -> f(z, w, beta) -> beta
+                            ridge_solver, # f(X) -> f(z, w, beta) -> beta
+                        ) # f(z, w, beta) -> beta
  
         self.context_models = [
             partial(
                 make_optimizer(X, tol=tol, max_iter=max_iter), # f(X) -> f( f(z, w, beta) -> beta ) -> f(y, weight) -> f(beta) -> beta
-                mixed_solver(), # f( solver, solver ) -> f(z, w, beta) -> beta
+                mixed_solver, # f( solver, solver ) -> f(z, w, beta) -> beta
             ) # f(y, weight) -> f(beta) -> beta    
             for _ in range(n_components)
         ]
@@ -111,6 +111,10 @@ class ContextModel(RateModel):
             )
             for _ in range(n_components)
         ]'''
+    
+    @property
+    def requires_normalization(self):
+        return True
     
 
     def init_from_signatures(self, signatures):
@@ -222,16 +226,11 @@ class ContextModel(RateModel):
             model(y, sample_weight)(update_vec),
             learning_rate=learning_rate
         )
-    
 
-    def partial_fit(self, 
-                    sstats,
-                    k, 
-                    corpuses, 
-                    log_mutation_rates,
-                    learning_rate=1.,
-                ):
 
+    @staticmethod
+    def get_exp_offset(offsets, corpus):
+        
         def aggregate_by_design(arr, design_matrix):
             #       SxL @ (LxC) => (SxC) => (CxS) => (C*S)
             return (design_matrix @ arr.T).T.ravel()
@@ -239,17 +238,26 @@ class ContextModel(RateModel):
         def get_design(state, key):
             return CS.fetch_val(state, key).data.to_scipy_sparse().tocsc().T
 
-        def get_context_exposure(state, log_mutation_rate):
-            
-            exp_offsets = np.exp(log_mutation_rate - self.predict(k, state))\
-                            .transpose('configuration','context','locus')\
-                            .data
-            
-            return aggregate_by_design(exp_offsets[0], get_design(state, 'plus_strand_design')) \
-                + aggregate_by_design(exp_offsets[1], get_design(state, 'minus_strand_design'))
-                
-        eta = reduce(lambda x,y : x+y, (get_context_exposure(state, lmr) for state, lmr in zip(corpuses, log_mutation_rates)) ) # I*C*S
-        target = reduce(lambda x,y : x+y, (sstats[state.attrs['name']][k].ravel() for state in corpuses) )
+        exp_offsets = np.exp(offsets)\
+                        .transpose('configuration','context','locus')\
+                        .data
+        
+        return aggregate_by_design(exp_offsets[0], get_design(corpus, 'plus_strand_design')) \
+            + aggregate_by_design(exp_offsets[1], get_design(corpus, 'minus_strand_design'))
+
+
+    def partial_fit(self, 
+                    k,
+                    sstats,
+                    exp_offsets, 
+                    corpuses, 
+                    learning_rate=1.,
+                ):
+
+        corpus_names = [state.attrs['name'] for state in corpuses]
+
+        eta = reduce(sum, (exp_offsets[n][k].ravel() for n in corpus_names))
+        target = reduce(sum, (sstats[n][k].ravel() for n in corpus_names))
 
         yield partial(
             self._run_regression,
