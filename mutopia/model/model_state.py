@@ -18,15 +18,15 @@ class ModelState:
     def __init__(self,
                 corpuses,
                 *,
-                context_model,
-                mutation_model,
-                theta_model,
                 locals_model,
+                **models,
                 ):
-        self.context_model = context_model
-        self.theta_model = theta_model
-        self.mutation_model = mutation_model
+
         self.locals_model = locals_model
+        self._models = {}
+
+        for model_name, model in models.items():
+            self._models[model_name] = model
         
         self._normalizers = {
             corpus.attrs['name'] : np.zeros(self.n_components)
@@ -35,32 +35,26 @@ class ModelState:
 
     @property
     def n_components(self):
-        return self.context_model.n_components
+        return next(iter(self._models.values())).n_components
     
 
     @property
     def models(self):
         return {
-            'context' : self.context_model,
-            'mutation' : self.mutation_model,
-            'theta' : self.theta_model,
             'locals' : self.locals_model,
+            **self._models
         }
     
     @property
     def nonlocals(self):
-        return {
-            model_name : model
-            for model_name, model in self.models.items()
-            if model_name != 'locals'
-        }
+        return self._models
 
 
     def get_normalizers(self, corpus):
         return self._normalizers[corpus.attrs['name']]
         
         
-    def format_counterfactual(self, k):
+    '''def format_counterfactual(self, k):
         return dict(zip(
                     self.context_model.transformer.feature_names_out,
                     np.exp(
@@ -68,12 +62,12 @@ class ModelState:
                             + np.log(self.context_model.context_distribution_[None,:,None]) \
                             + self.mutation_model.format_counterfactual(k)
                     )
-                ))
+                ))'''
     
 
     def get_propto_log_mutation_rate(self, k, corpus):
 
-        with warnings.catch_warnings():
+        '''with warnings.catch_warnings():
             warnings.simplefilter("ignore")
 
             un_normalized = (
@@ -81,7 +75,21 @@ class ModelState:
                             + np.log(corpus.regions.context_frequencies) \
                             + self.theta_model.predict(k, corpus) \
                             + self.context_model.predict(k, corpus)
-                          )
+                          )'''
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+
+            un_normalized = reduce(
+                lambda x,y: x+y, 
+                (
+                    model.predict(k, corpus)
+                    for model in self.nonlocals.values()
+                    if model.requires_normalization
+                ),  # sum over models
+                np.log(corpus.regions.exposures) \
+                    + np.log(corpus.regions.context_frequencies)  # start with the background rates
+            )
 
         return un_normalized
     
@@ -304,12 +312,13 @@ class ModelState:
                     gamma_new
                 )
                 
-                # After every sample, we update the suffstats
-                for stat, vals in sstats.items():
-                    getattr(latent_vars_model.reducer, f'reduce_{stat}')(
-                        vals[corpus.attrs['name']],
-                        corpus=corpus,
-                        **suffstats
-                    )
+                for model_name, model in self.models.items():
+                    sstats[model_name + '_sstats'][corpus.attrs['name']] = \
+                        model.reduce_sparse_sstats(
+                            sstats[model_name + '_sstats'][corpus.attrs['name']],
+                            corpus=corpus,
+                            **suffstats
+                        )
+
 
         return sstats, elbo

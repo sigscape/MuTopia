@@ -10,14 +10,21 @@ class SparseSuffStatReducer(Reducer):
     def reduce_context_sstats(
         context_sstats, corpus,*,
         weighted_posterior,
-        configuration,
         locus,
         context,
         **kw,
     ):
 
-        strand_states = CS.fetch_val(corpus, 'strand_idx').data\
+        '''strand_states = CS.fetch_val(corpus, 'strand_idx').data\
                             [configuration, locus]
+
+        # Use numpy advanced indexing to update context_sstats
+        np.add.at(context_sstats, (slice(None), context, strand_states), weighted_posterior)
+
+        return context_sstats'''
+
+        strand_states = CS.fetch_val(corpus, 'strand_idx').data\
+                            [locus]
 
         # Use numpy advanced indexing to update context_sstats
         np.add.at(context_sstats, (slice(None), context, strand_states), weighted_posterior)

@@ -58,6 +58,7 @@ class DataMode(BaseAccessor):
     def __call__(self):
         return DTYPE_MAP[self._xrds.attrs['dtype']]
 
+
 @xr.register_dataarray_accessor("is_loaded")
 class IsLoaded(BaseAccessor):
     def __call__(self):
@@ -69,26 +70,29 @@ class OnDiskCoo(BaseAccessor):
 
     def __call__(
         self,
+        data_var='data',
     ):
 
-        self._validate(self, ['mutation_attrs'], {'indices' : None, 'data' : None})
+        self._validate(self, ['obs_indices'], {'indices' : None, 'data' : None})
 
         indices = self._xrds['indices'].data.astype(int)
-        data = self._xrds['data'].data
+        data = self._xrds[data_var].data
         shape = self._xrds.attrs['shape']
+        dims = tuple(list(self._xrds.coords['obs_indices'].values))
+        compress = dims.index('locus')
 
         sparsified_data = sparse.GCXS(
             sparse.COO(
-                (indices[0], indices[1], indices[2], indices[3]),
+                indices,
                 data,
                 shape=shape,
             ),
-            compressed_axes=(3,),
+            compressed_axes=(compress,),
         )
 
         return xr.DataArray(
             sparsified_data,
-            dims=('configuration', 'context', 'mutation', 'locus'),
+            dims=dims,
             attrs={k : v 
                    for k,v in self._xrds.attrs.items() 
                    if not k in ('shape', 'format')
@@ -103,7 +107,7 @@ class OnDiskSparse(BaseAccessor):
         self,
     ):
 
-        self._validate(self, ['configuration', 'context', 'mutation', 'locus'], None)
+        #self._validate(self, ['configuration', 'context', 'mutation', 'locus'], None)
 
         sparse_matrix : sparse.GCXS = self._xrds.data
 
@@ -111,15 +115,15 @@ class OnDiskSparse(BaseAccessor):
             {
                 'indices' : xr.DataArray(
                     sparse_matrix.tocoo().coords,
-                    dims=['mutation_attrs', 'n_mutations'],
+                    dims=['obs_indices', 'n_observations'],
                 ),
                 'data' : xr.DataArray(
                     sparse_matrix.data,
-                    dims=('n_mutations'),
+                    dims=('n_observations'),
                 ),
             },
             coords={
-                    "mutation_attrs" : ["configuration", "context", "mutation", "locus"],
+                    "obs_indices" : list(self._xrds.dims),
                 },
             attrs = {
                 "shape" : sparse_matrix.shape,
@@ -261,15 +265,15 @@ def load_old_format(corpus):
                                 np.array([
                                     sample.cardinality, sample.context, sample.mutation, sample.locus
                                 ]),
-                                dims=("mutation_attrs", "n_mutations"),
+                                dims=("obs_indices", "n_observations"),
                             ),
                         "data" : xr.DataArray(
                                 data=sample.weight,
-                                dims=("n_mutations",),
+                                dims=("n_observations",),
                         )
                     },
                     coords={
-                        "mutation_attrs" : ["configuration", "context", "mutation", "locus"],
+                        "obs_indices" : ["configuration", "context", "mutation", "locus"],
                     },
                     attrs = {
                         "shape" : (

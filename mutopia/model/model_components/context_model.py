@@ -10,14 +10,15 @@ from sklearn.base import clone
 from ._glm_compiled import make_optimizer, setup_mixed_solver, get_lsqr_solver
 from ._fast_eln import get_eln_solver
 from ..corpus_state import CorpusState as CS
-from .base import get_reg_params, get_poisson_targets_weights, _svi_update_fn, RateModel
+from .base import get_reg_params, get_poisson_targets_weights, _svi_update_fn, \
+    RateModel, dims_except_for
 from ._strand_transformer import StrandEncoder
 
 import logging
 logger = logging.getLogger(' LocusRegressor')
 
 
-class ContextModel(RateModel):
+class StrandedContextModel(RateModel):
      
     def __init__(self,
             corpuses,
@@ -31,10 +32,17 @@ class ContextModel(RateModel):
             n_components : int,
             random_state,
         ):
+
+        if not all(d in corpuses[0].dims for d in self.requires_dims):
+            raise ValueError(
+                f'Corpus must have dimensions {self.requires_dims}! '
+                f'You\'re missing: {",".join(set(self.requires_dims).difference(corpuses[0].dims))}'
+            )
+        
         self.n_corpuses = len(corpuses)
         self.n_components = n_components
         self.context_dim = corpuses[0].dims['context']
-        self.context_names = corpuses[0].modality().CONTEXTS
+        self.context_names = corpuses[0].modality().coords()['context']
         
         self.transformer = StrandEncoder(self.context_dim)\
                                     .fit(corpuses)
@@ -42,9 +50,12 @@ class ContextModel(RateModel):
 
         self._coefs = self._init_params(random_state, n_components, self.context_dim, dtype)
 
-        self._context_distribution = corpuses[0].regions.context_frequencies\
-                                        .sum(dim=('locus','configuration'))\
-                                        .data + 1
+        corpus=corpuses[0] # just grab the first one to use for initialization
+        self._context_distribution = \
+            corpus.regions.context_frequencies\
+            .sum(dim=dims_except_for(corpus.regions.context_frequencies.dims, 'context'))\
+            .data + 1
+        
         self._context_distribution/=self._context_distribution.sum()
 
         if not init_components is None:
@@ -87,6 +98,41 @@ class ContextModel(RateModel):
     def requires_normalization(self):
         return True
     
+
+    @property
+    def requires_dims(self):
+        return ('configuration','context','locus')
+    
+
+    @staticmethod
+    def predict_sparse(corpus,*, configuration, context, locus, **idx_dict):
+
+        strand_state = CS.fetch_val(corpus, 'strand_idx').data\
+                            [configuration, locus]
+
+        return CS.fetch_val(corpus, 'log_context_distribution').data\
+                            [:, context, strand_state]
+    
+
+
+    @staticmethod
+    def reduce_sparse_sstats(
+        sstats, 
+        corpus,*,
+        weighted_posterior,
+        locus,
+        context,
+        configuration,
+        **kw,
+    ):
+        strand_states = CS.fetch_val(corpus, 'strand_idx').data\
+                            [configuration, locus]
+
+        # Use numpy advanced indexing to update context_sstats
+        np.add.at(sstats, (slice(None), context, strand_states), weighted_posterior)
+
+        return sstats
+
 
     def init_from_signatures(self, signatures):
         
@@ -289,3 +335,84 @@ class ContextModel(RateModel):
             index=self.transformer.feature_names_out,
             columns=[self.context_names for i in range(c)] + ['Shared effect']
         )
+
+
+
+class UnstrandedContextModel(StrandedContextModel):
+
+
+    @property
+    def requires_dims(self):
+        return ('context','locus')
+    
+
+    @staticmethod
+    def predict_sparse(corpus,*, context, locus, **idx_dict):
+
+        strand_state = CS.fetch_val(corpus, 'strand_idx').data[locus]
+
+        return CS.fetch_val(corpus, 'log_context_distribution').data\
+                            [:, context, strand_state]
+    
+
+    @staticmethod
+    def reduce_sparse_sstats(
+        sstats, 
+        corpus,*,
+        weighted_posterior,
+        locus,
+        context,
+        **kw,
+    ):
+        strand_states = CS.fetch_val(corpus, 'strand_idx').data[locus]
+
+        # Use numpy advanced indexing to update context_sstats
+        np.add.at(sstats, (slice(None), context, strand_states), weighted_posterior)
+
+        return sstats
+    
+
+    def prepare_corpusstate(self, corpus):
+        return dict(
+                strand_idx = DataArray(
+                    self.transformer.encode(corpus),
+                    dims=('locus',),
+                ),
+                strand_design = DataArray(
+                    self.transformer.transform(corpus),
+                    dims=('locus','strand_state'),
+                ),
+                log_context_distribution = DataArray(
+                    self._get_log_context_distribution(corpus),
+                    dims=('component','context','strand_state'),
+                ),
+            )
+    
+
+    def predict(self, k, corpus_state):
+
+        conditional_mutation_rates = self._format_component(k)
+        # S x L
+        idx = CS.fetch_val(corpus_state, 'strand_idx').data
+
+        return DataArray(
+            conditional_mutation_rates[:, idx],
+            dims=('context','locus'),
+        )
+    
+
+    @staticmethod
+    def get_exp_offset(offsets, corpus):
+        
+        def aggregate_by_design(arr, design_matrix):
+            #       SxL @ (LxC) => (SxC) => (CxS) => (C*S)
+            return (design_matrix @ arr.T).T.ravel()
+
+        def get_design(state, key):
+            return CS.fetch_val(state, key).data.to_scipy_sparse().tocsc().T
+
+        exp_offsets = np.exp(offsets)\
+                        .transpose('context','locus')\
+                        .data
+        
+        return aggregate_by_design(exp_offsets, get_design(corpus, 'strand_design'))

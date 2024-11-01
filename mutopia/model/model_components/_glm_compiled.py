@@ -14,10 +14,10 @@ set_config(skip_parameter_validation=True)
 
 
 POISSON_GLM = {
-    'mean_fn' : njit(lambda eta : np.exp(eta)),
-    'response_fn' : njit(lambda y, eta, mu : eta + (y - mu) / mu),
-    'weight_fn' : njit(lambda mu : mu),
-    'likelihood_fn' : njit(lambda y, w, mu : w @ (y*np.log(mu) - mu)),
+    'mean_fn' : njit(lambda eta : np.exp(eta), nogil=True),
+    'response_fn' : njit(lambda y, eta, mu : eta + (y - mu) / mu, nogil=True),
+    'weight_fn' : njit(lambda mu : mu, nogil=True),
+    'likelihood_fn' : njit(lambda y, w, mu : w @ (y*np.log(mu) - mu), nogil=True),
 }
 
 
@@ -72,7 +72,7 @@ def get_lsqr_solver(
 
 
 
-@njit
+@njit(nogil=True)
 def _iterative_partial_ls(
         X1, X1T,
         X2, X2T,
@@ -177,7 +177,7 @@ def setup_mixed_solver(
     return get_interior
 
 
-@njit
+@njit(nogil=True)
 def outer_update(
     X,
     y, 

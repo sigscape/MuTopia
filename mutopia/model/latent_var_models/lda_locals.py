@@ -1,6 +1,6 @@
 from xarray import DataArray
 import numpy as np
-from functools import partial
+from functools import partial, reduce
 from ..model_components.base import _svi_update_fn, PrimitiveModel
 from ..corpus_state import CorpusState as CS
 
@@ -21,12 +21,12 @@ def gammalnvec(x):
     return gammaln(x)
 
 
-@njit('double[:](double[:])')
+@njit('double[:](double[:])', nogil=True)
 def log_dirichlet_expectation(alpha):
     return psivec(alpha) - psi(np.sum(alpha))
 
 
-@njit('double(double[:], double[:])')
+@njit('double(double[:], double[:])', nogil=True)
 def dirichlet_bound(alpha, gamma):
 
     logE_gamma = log_dirichlet_expectation(gamma)
@@ -35,7 +35,7 @@ def dirichlet_bound(alpha, gamma):
         np.sum(gammalnvec(gamma) - gammalnvec(alpha) + (alpha - gamma)*logE_gamma)
 
 
-@njit('double[:](double[:], double[:], double[:,:], double[:])')
+@njit('double[:](double[:], double[:], double[:,:], double[:])', nogil=True)
 def _update_step(
         gamma,
         alpha, 
@@ -53,7 +53,7 @@ def _update_step(
     return alpha + gamma_sstats
 
 
-@njit('double[:](double[:], double[:,:], double[:], int64, double, double[:])')
+@njit('double[:](double[:], double[:,:], double[:], int64, double, double[:])', nogil=True)
 def _iterative_update(
     alpha, 
     conditional_likelihood, 
@@ -78,7 +78,7 @@ def _iterative_update(
     return gamma
 
 
-@njit('double[:,:](double[:], double[:,:], double[:])')
+@njit('double[:,:](double[:], double[:,:], double[:])', nogil=True)
 def _calc_local_variables(
         gamma,
         conditional_likelihood,
@@ -94,7 +94,7 @@ def _calc_local_variables(
     return phi_matrix
 
 
-@njit('double(double[:,:], double[:], double[:], double[:,:], double[:], double)')
+@njit('double(double[:,:], double[:], double[:], double[:,:], double[:], double)', nogil=True)
 def _bound(
     weighted_posterior,
     gamma,
@@ -123,7 +123,7 @@ def _bound(
 
 class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
 
-    reducer = SparseSuffStatReducer
+    #reducer = SparseSuffStatReducer
 
     def __init__(self,
             corpuses,
@@ -151,15 +151,16 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
     ##
     def convert_sample(self, sample):
 
-        sample = sample.sparse_to_coo()  
-        (configuration, context, mutation, locus) = sample.indices.data
+        sample = sample.sparse_to_coo()
         weights = sample.data.data.astype(self.dtype, copy=False)
 
+        idx_dict = dict(zip(
+            tuple(sample.coords['obs_indices'].data),
+            sample.indices.data,
+        ))
+
         return dict(
-            configuration=configuration,
-            context=context,
-            mutation=mutation,
-            locus=locus,
+            **idx_dict,
             weights=weights,
         )
 
@@ -169,28 +170,15 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
         corpus,
         model_state,
         *,
-        configuration,
-        context,
-        mutation,
-        locus,
         weights,
+        locus,
+        **idx_dict,
     ):
 
         ##
         # What's going on here: we have the normalized log mutation rate for each signature, configuration, context, locus.
         # For the mutations in this sample, we select over these axes.
         ##
-        strand_state = CS.fetch_val(corpus, 'strand_idx').data\
-                            [configuration, locus]
-        
-        logp_locus_X = CS.fetch_val(corpus, 'log_locus_distribution').data\
-                            [:, locus]
-        
-        logp_mutation_X = CS.fetch_val(corpus, 'log_mutation_distribution').data\
-                            [:, context, mutation, strand_state] 
-        
-        logp_context_X = CS.fetch_val(corpus, 'log_context_distribution').data\
-                            [:, context, strand_state]
         
          #CS.fetch_val(corpus, 'log_mutrate_normalizer').data\
         logp_normalizer = model_state.get_normalizers(corpus)[:,None]
@@ -199,10 +187,14 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
             warnings.simplefilter("ignore")
             #+ np.log(corpus.regions.context_frequencies.data[configuration, context, locus]) \
             logp_X = np.log(corpus.regions.exposures.data[locus]) \
-                        + logp_locus_X \
-                        + logp_mutation_X \
-                        + logp_context_X \
-                        + logp_normalizer
+                        + logp_normalizer \
+                        + reduce(
+                            lambda x,y: x+y,
+                            (
+                                model.predict_sparse(corpus, locus=locus, **idx_dict)
+                                for model in model_state.nonlocals.values()
+                            )
+                        )
 
         return np.ascontiguousarray(
                     np.nan_to_num(np.exp(logp_X), nan=0)\
@@ -393,6 +385,18 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
 
     def spawn_sstats(self, corpus):
         return []
+    
+
+    @staticmethod
+    def reduce_sparse_sstats(
+        sstats, 
+        corpus,
+        *,
+        gamma,
+        **kw,
+    ):
+        sstats.append(gamma)
+        return sstats
 
 
     def partial_fit(

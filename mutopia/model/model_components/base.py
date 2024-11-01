@@ -41,10 +41,31 @@ class RateModel(PrimitiveModel, ABC):
     @abstractmethod
     def requires_normalization(self):
         raise NotImplementedError
+    
+    @property
+    @abstractmethod
+    def requires_dims(self):
+        raise NotImplementedError
+    
+
+    @staticmethod
+    @abstractmethod
+    def predict_sparse(corpus,**idx_dict):
+        raise NotImplementedError
+    
+
+    @staticmethod
+    @abstractmethod
+    def reduce_sparse_sstats(
+        sstats, 
+        corpus, 
+        **idx_dict
+    ):
+        raise NotImplementedError
 
 
-def dims_except_for(corpus, *dims):
-    return tuple([d for d in list(corpus.dims.keys()) if not d in dims])
+def dims_except_for(dims, *keepdims):
+    return tuple({*dims}.difference({*keepdims}))
 
 
 ## Shared methods for rate models ##
@@ -97,12 +118,12 @@ def get_corpus_design(corpuses, encoder : dict, n_repeats = lambda x : 1):
     )
 
 
-@njit
+@njit(nogil=True)
 def _svi_update_fn(old_value, new_value, learning_rate):
     return (1-learning_rate)*old_value + learning_rate*new_value
 
 
-@njit
+@njit(nogil=True)
 def csr_matmul(X, B):
     
     (ptr, idx, data) = X
@@ -115,7 +136,7 @@ def csr_matmul(X, B):
     return out
 
 
-@njit
+@njit(nogil=True)
 def weighted_csr_matmul(X, w, B):
     '''
     Computes X @ w @ B, where X and w are sparse matrices,
@@ -131,7 +152,7 @@ def weighted_csr_matmul(X, w, B):
     return out
 
 
-@njit
+@njit(nogil=True)
 def transpose_weighted_csr_matmul(X, w, B):
     '''
     Computes (X @ w)^T @ B, where X and w are sparse matrices,
@@ -148,7 +169,7 @@ def transpose_weighted_csr_matmul(X, w, B):
 
 
 
-@njit
+@njit(nogil=True)
 def design_csr(X, B):
 
     (ptr, idx, _) = X

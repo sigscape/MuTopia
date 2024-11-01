@@ -46,7 +46,7 @@ class ShrunkTreePredictor:
         return self.tree_predictor.nodes
     
 
-@njit
+@njit(nogil=True)
 def _fit_bias(*, 
         y_train, 
         raw_predictions, 

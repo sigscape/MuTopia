@@ -154,6 +154,11 @@ def SVI_step(
         norm_update_fn=partial(model_state._update_normalizer, **svi_kw)
     )
 
+    model_state.init_normalizers(
+        corpuses, 
+        parallel_context=parallel_context
+    )
+
     # calculate the bound here because the mutations rates
     # have just been re-normalized during the offset calculation
     elbo = score(

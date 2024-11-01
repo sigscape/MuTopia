@@ -84,6 +84,43 @@ class MutationModel(RateModel):
     @property
     def requires_normalization(self):
         return False
+    
+
+    @property
+    def requires_dims(self):
+        return ('configuration','context','mutation','locus')
+    
+
+    @staticmethod
+    def predict_sparse(corpus,*,context, mutation, configuration, locus, **idx_dict):
+
+        strand_state = CS.fetch_val(corpus, 'strand_idx').data\
+                            [configuration, locus]
+        
+        return CS.fetch_val(corpus, 'log_mutation_distribution').data\
+                [:, context, mutation, strand_state]
+    
+
+    @staticmethod
+    def reduce_sparse_sstats(
+        sstats, 
+        corpus,
+        *,
+        weighted_posterior,
+        configuration,
+        locus,
+        context,
+        mutation,
+        **kw,
+    ):
+        strand_states = CS.fetch_val(corpus, 'strand_idx').data\
+                            [configuration, locus]
+
+        # Use numpy advanced indexing to update mutation_sstats
+        np.add.at(sstats, (slice(None), context, strand_states, mutation), weighted_posterior)
+
+        return sstats
+
 
     def init_from_signatures(self, signatures):
 
@@ -236,3 +273,4 @@ class MutationModel(RateModel):
 
     def _format_component(self, k):
         return self._calc_rho(k, self._mut_encoding_matrix)
+

@@ -1,7 +1,7 @@
 
 import inspect
 from .base import get_corpus_intercepts, get_poisson_targets_weights,\
-     _svi_update_fn, RateModel, idx_array_to_design
+     _svi_update_fn, RateModel, idx_array_to_design, dims_except_for
 from ..corpus_state import CorpusState as CS
 from ._hist_gbt import CustomHistGradientBooster
 from ._feature_tranformer import get_smoothing_transformer, \
@@ -81,6 +81,10 @@ class ThetaModel(RateModel):
     def requires_normalization(self):
         return True
 
+    @property
+    def requires_dims(self):
+        return ('locus',)
+
 
     def _get_baseline_prediction(self, corpus):
         return np.zeros(
@@ -158,7 +162,7 @@ class ThetaModel(RateModel):
     @staticmethod
     def get_exp_offset(offsets, corpus):
         return np.exp(offsets)\
-                .sum(dim=('context','configuration'))\
+                .sum(dim=dims_except_for(offsets.dims, 'locus'))\
                 .data
 
 
@@ -180,6 +184,27 @@ class ThetaModel(RateModel):
 
     def partial_fit(self, k, sstats, exp_offsets, corpuses, learning_rate=1.):
         raise NotImplementedError
+    
+
+    @staticmethod
+    def predict_sparse(corpus, locus, **idx_dict):
+        return CS.fetch_val(corpus, 'log_locus_distribution').data\
+                            [:, locus]
+    
+
+    @staticmethod
+    def reduce_sparse_sstats(
+        sstats, 
+        corpus,
+        *,
+        weighted_posterior,
+        locus,
+        **kw,
+    ):
+        np.add.at(sstats, (slice(None), locus), weighted_posterior)
+
+        return sstats
+    
 
 
 class LinearThetaModel(ThetaModel):

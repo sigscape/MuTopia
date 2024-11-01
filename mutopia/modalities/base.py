@@ -11,22 +11,25 @@ class ModeConfig(ABC):
     MUTATIONS = None
     CONFIGURATIONS = None
     MODE_ID = None
+
+    @classmethod
+    @abstractmethod
+    def dims(cls):
+        return {
+            'configuration' : len(cls.CONFIGURATIONS),
+            'context' : len(cls.CONTEXTS),
+            'mutation' : len(cls.MUTATIONS),
+        }
     
     @classmethod
-    def dim_context(cls):
-        return len(cls.CONTEXTS)
+    @abstractmethod
+    def coords(cls):
+        return {
+            'configuration' : cls.CONFIGURATIONS,
+            'context' : cls.CONTEXTS,
+            'mutation' : cls.MUTATIONS,
+        }
 
-    @classmethod
-    def dim_mutation(cls):
-        return len(cls.MUTATIONS)
-
-    @classmethod
-    def dim_configuration(cls):
-        return len(cls.CONFIGURATIONS)
-
-    @classmethod
-    def dims(cls):
-        return (cls.dim_configuration(), cls.dim_context(), cls.dim_mutation())
     
     @classmethod
     @abstractmethod
