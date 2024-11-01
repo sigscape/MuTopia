@@ -33,7 +33,7 @@ class MutationModel(RateModel):
                                         .fit(corpuses)
         
         _mut_encoding_matrix = self.transformer.encoding_matrix_
-        is_regularized = ~np.array(self.transformer.intercept_mask_)
+        self._is_regularized = ~np.array(self.transformer.intercept_mask_)
         X = _mut_encoding_matrix.copy()
 
         eln_solver = partial(
@@ -43,21 +43,18 @@ class MutationModel(RateModel):
             random_state=random_state,
         ) # f(X) -> f(z, w, beta) -> beta
 
-        '''ridge_solver = partial(
-            get_lsqr_solver,
-            tol=tol,
-            alpha=conditioning_alpha,
-        ) # f(X) -> f(z, w, beta) -> beta'''
-
         ridge_solver = partial(
             ls_partial_solver,
-            group_mask = np.array([True]*3 + [False]*(is_regularized.sum()-3)),
+            group_mask = np.array(
+                [True]*self.mutation_dim \
+                + [False]*( (~self._is_regularized).sum() - self.mutation_dim )
+            ),
             tol=tol,
             max_iter=10000,
         )
 
         # f(X) -> f( f(X) -> f(z, w, beta) -> beta, f(X) -> f(z, w, beta) -> beta ) -> f(z, w, beta) -> beta
-        mixed_solver = setup_mixed_solver(X, is_regularized)(
+        mixed_solver = setup_mixed_solver(X, self._is_regularized)(
                             eln_solver, # f(X) -> f(z, w, beta) -> beta
                             ridge_solver, # f(X) -> f(z, w, beta) -> beta
                         ) # f(z, w, beta) -> beta

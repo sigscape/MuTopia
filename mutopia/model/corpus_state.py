@@ -12,10 +12,14 @@ class CorpusState:
         cls,
         corpus,
         model_state,
+        from_scratch=False,
     ):
         
         for model in model_state.models.values():
-            model.update_corpusstate(corpus)
+            model.update_corpusstate(
+                corpus, 
+                from_scratch=from_scratch
+            )
         
         return corpus
     

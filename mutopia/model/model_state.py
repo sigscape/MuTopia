@@ -2,6 +2,7 @@
 from .model_components import *
 from .model_components.base import _svi_update_fn
 from .latent_var_models import *
+from .corpus_state import CorpusState as CS
 import numpy as np
 import warnings
 from functools import partial
@@ -13,9 +14,7 @@ from collections import defaultdict
 
 
 class ModelState:
-    '''
-    A simple container for the model components that allows for easy updating of the model state.
-    '''
+
     def __init__(self,
                 corpuses,
                 *,
@@ -182,13 +181,27 @@ class ModelState:
             )
     
 
-    def init_normalizers(self, corpuses):
-        for corpus in corpuses:
-            for k in range(self.n_components):
-                self._update_normalizer(
-                    k, corpus, 
-                    -logsumexp(self.get_propto_log_mutation_rate(k, corpus).data)
-                )
+    def init_normalizers(self, 
+            corpuses,
+            *,
+            parallel_context
+        ):
+
+        _update_norm = lambda k, corpus : \
+            self._update_normalizer(
+                k, corpus, 
+                -logsumexp(self.get_propto_log_mutation_rate(k, corpus).data)
+            )
+
+        update_fns = (
+            partial(_update_norm, k, corpus)
+            for k in range(self.n_components)
+            for corpus in corpuses
+        )
+
+        for _ in parallel_context(delayed(fn)() for fn in update_fns):
+            pass
+
 
     def _update_normalizer(self, 
             k, corpus, logsum_mutation_rate, 
@@ -206,9 +219,9 @@ class ModelState:
         
 
     def Mstep(self,
+            corpuses,
             sstats,
             offsets,
-            corpuses,
             *,
             parallel_context,
             learning_rate=1.,
@@ -233,3 +246,70 @@ class ModelState:
 
         for _ in parallel_context(delayed(fn)() for fn in update_fns):
             pass
+
+
+    def Estep(
+        self,
+        corpuses,
+        *,
+        parallel_context,
+        learning_rate = 1.,
+        subsample_rate = 1.,    
+    ):
+    
+        latent_vars_model = self.locals_model
+
+        '''
+        A suffstats dictionary with the following structure:
+        sstats[parameter_name][corpus_name] <- suffstats
+        '''
+        sstats = self.get_sstats_dict(corpuses)
+        elbo = 0.
+
+        '''
+        Construct the update function for each sample from the corpus
+        in a generator fashion. Curry the initial gamma value for the 
+        update, but don't call the update function yet - we want to
+        pass this expression to the multiprocessing pool.
+        '''
+        samples = [
+            (corpus, sample_name)
+            for corpus in corpuses
+            for sample_name in corpus.samples.data_vars.keys()
+        ]
+
+        updates = (
+            partial(
+                latent_vars_model._get_update_fn(
+                    sample=corpus.samples[sample_name],
+                    corpus=corpus,
+                    model_state=self,
+                    learning_rate=learning_rate,
+                    subsample_rate=subsample_rate,
+                ),
+                CS.fetch_topic_compositions(corpus, sample_name),
+            )   
+            for (corpus, sample_name) in samples
+        )
+        
+        for (corpus, sample_name), (suffstats, gamma_new, bound) in zip(
+            samples, 
+            parallel_context(delayed(update)() for update in updates)
+        ):
+                elbo += bound
+                # Update the topic compositions for the sample
+                CS.update_topic_compositions(
+                    corpus, 
+                    sample_name, 
+                    gamma_new
+                )
+                
+                # After every sample, we update the suffstats
+                for stat, vals in sstats.items():
+                    getattr(latent_vars_model.reducer, f'reduce_{stat}')(
+                        vals[corpus.attrs['name']],
+                        corpus=corpus,
+                        **suffstats
+                    )
+
+        return sstats, elbo

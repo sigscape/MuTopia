@@ -35,13 +35,12 @@ def dirichlet_bound(alpha, gamma):
         np.sum(gammalnvec(gamma) - gammalnvec(alpha) + (alpha - gamma)*logE_gamma)
 
 
-@njit('double[:](double[:], double[:], double[:,:], double[:], double)')
+@njit('double[:](double[:], double[:], double[:,:], double[:])')
 def _update_step(
         gamma,
         alpha, 
         conditional_likelihood, 
         weights,
-        likelihood_scale,
     ):
 
     exp_Elog_gamma = np.exp(log_dirichlet_expectation(gamma))
@@ -51,15 +50,14 @@ def _update_step(
     #                                    KxN @ N => K
     gamma_sstats = exp_Elog_gamma*(conditional_likelihood @ (weights/X_tild))
 
-    return alpha + gamma_sstats*likelihood_scale
+    return alpha + gamma_sstats
 
 
-@njit('double[:](double[:], double[:,:], double[:], double, int64, double, double[:])')
+@njit('double[:](double[:], double[:,:], double[:], int64, double, double[:])')
 def _iterative_update(
     alpha, 
     conditional_likelihood, 
     weights,
-    likelihood_scale,
     iters,
     tol,
     gamma, # move gamma to the end so we can curry the function
@@ -72,43 +70,41 @@ def _iterative_update(
             alpha, 
             conditional_likelihood, 
             weights,
-            likelihood_scale,
         )
 
-        if np.abs(gamma - old_gamma).mean() < tol:
+        if (np.abs(gamma - old_gamma)/np.sum(old_gamma)).sum() < tol:
             break
 
     return gamma
 
 
-@njit('double[:,:](double[:], double[:,:], double[:], double)')
+@njit('double[:,:](double[:], double[:,:], double[:])')
 def _calc_local_variables(
         gamma,
         conditional_likelihood,
         weights,
-        likelihood_scale
     ):
     
     exp_Elog_gamma = np.exp(log_dirichlet_expectation(gamma))
     # NxK @ Kx1 => Nx1
     X_tild = exp_Elog_gamma @ conditional_likelihood
 
-    phi_matrix = np.outer(exp_Elog_gamma, weights/X_tild)*conditional_likelihood*likelihood_scale
+    phi_matrix = np.outer(exp_Elog_gamma, weights/X_tild)*conditional_likelihood
 
     return phi_matrix
 
 
-@njit('double(double[:,:], double[:], double[:], double[:,:], double[:])')
+@njit('double(double[:,:], double[:], double[:], double[:,:], double[:], double)')
 def _bound(
     weighted_posterior,
     gamma,
     alpha,
     conditional_likelihood,
     weights,
+    locals_weight,
     ):
 
     phi = weighted_posterior/weights[None,:]
-
     entropy_sstats = -np.sum(weighted_posterior * np.where(phi > 0, np.log(phi), 0.))
     entropy_sstats += dirichlet_bound(alpha, gamma)
     
@@ -120,7 +116,8 @@ def _bound(
                     weighted_posterior*flattened_logweight, 
                     0.
                 )
-            ) + entropy_sstats
+            ) \
+            + entropy_sstats*locals_weight
 
 
 
@@ -132,8 +129,8 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
             corpuses,
             n_components,
             prior_alpha=1.0,
-            estep_iterations=100,
-            difference_tol=1e-6,
+            estep_iterations=300,
+            difference_tol=1e-4,
             dtype=float,
             *,
             random_state,
@@ -200,9 +197,8 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            
+            #+ np.log(corpus.regions.context_frequencies.data[configuration, context, locus]) \
             logp_X = np.log(corpus.regions.exposures.data[locus]) \
-                        + np.log(corpus.regions.context_frequencies.data[configuration, context, locus]) \
                         + logp_locus_X \
                         + logp_mutation_X \
                         + logp_context_X \
@@ -250,7 +246,7 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
         
         # 1. get the information we need from the sample
         sample_dict = self.convert_sample(sample)
-        weights = sample_dict['weights']
+        weights = sample_dict['weights']/subsample_rate
         alpha = self.alpha[corpus.attrs['name']]
 
         conditional_likelihood = \
@@ -265,7 +261,6 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
             alpha, 
             conditional_likelihood, 
             weights,
-            1/subsample_rate,
             self.estep_iterations,
             self.difference_tol,
         )
@@ -274,7 +269,7 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
             self._calc_sstats,
             sample_dict=sample_dict,
             conditional_likelihood=conditional_likelihood,
-            subsample_rate=subsample_rate,
+            weights=weights,
             alpha=alpha,
         )
 
@@ -295,16 +290,13 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
         alpha,
         sample_dict,
         conditional_likelihood,
-        subsample_rate=1.,
+        weights,
         ):
-
-        weights = sample_dict['weights']
 
         weighted_posterior = _calc_local_variables(
             gamma,
             conditional_likelihood,
             weights,
-            1/subsample_rate,
         )
 
         bound = _bound(
@@ -312,7 +304,8 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
             gamma,
             alpha,
             conditional_likelihood,
-            weights/subsample_rate,
+            weights,
+            1.
         )        
 
         suffstats = {
@@ -345,6 +338,8 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
     
     def bound(self,
         gamma,
+        subsample_rate=1.,
+        locals_weight=1.,
         *,
         corpus,
         sample,
@@ -353,7 +348,7 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
         
         sample_dict = self.convert_sample(sample)
         alpha = self.alpha[corpus.attrs['name']]
-        weights = sample_dict['weights']
+        weights = sample_dict['weights']/subsample_rate
         
         conditional_likelihood = \
             self.conditional_observation_likelihood(
@@ -366,7 +361,6 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
             gamma,
             conditional_likelihood,
             weights,
-            1.,
         )
 
         return _bound(
@@ -375,6 +369,7 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
             alpha,
             conditional_likelihood,
             weights,
+            locals_weight
         )
     
     ## 

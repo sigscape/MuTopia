@@ -3,6 +3,7 @@ from .corpus_state import CorpusState as CS
 from functools import reduce, partial
 from joblib import Parallel, delayed
 from contextlib import contextmanager
+from numpy import exp
 
 @contextmanager
 def ParContext(n_jobs, verbose=0):
@@ -15,84 +16,42 @@ def ParContext(n_jobs, verbose=0):
     )
 
 
-def Estep(
-    model_state,
-    corpuses,
-    parallel_context,
-    learning_rate = 1.,
-    subsample_rate = 1.,    
+def get_n_mutations(
+        corpuses,
 ):
-    
-    latent_vars_model = model_state.locals_model
-
-    '''
-    A suffstats dictionary with the following structure:
-    sstats[parameter_name][corpus_name] <- suffstats
-    '''
-    sstats = model_state.get_sstats_dict(corpuses)
-    elbo = 0.
-
-    '''
-    Construct the update function for each sample from the corpus
-    in a generator fashion. Curry the initial gamma value for the 
-    update, but don't call the update function yet - we want to
-    pass this expression to the multiprocessing pool.
-    '''
-    samples = [
+    samples = (
         (corpus, sample_name)
-        for corpus in corpuses
+        for corpus in corpuses 
         for sample_name in corpus.samples.data_vars.keys()
-    ]
-
-    updates = (
-        partial(
-            latent_vars_model._get_update_fn(
-                sample=corpus.samples[sample_name],
-                corpus=corpus,
-                model_state=model_state,
-                learning_rate=learning_rate,
-                subsample_rate=subsample_rate,
-            ),
-            CS.fetch_topic_compositions(corpus, sample_name),
-        )   
-        for (corpus, sample_name) in samples
     )
-    
-    for (corpus, sample_name), (suffstats, gamma_new, bound) in zip(
-        samples, 
-        parallel_context(delayed(update)() for update in updates)
-    ):
-            elbo += bound
-            # Update the topic compositions for the sample
-            CS.update_topic_compositions(
-                corpus, 
-                sample_name, 
-                gamma_new
+
+    return reduce(
+            lambda x,y : x+y,
+            (
+            corpus.samples[sample_name].data.sum()
+            for corpus, sample_name in samples
             )
-            
-            # After every sample, we update the suffstats
-            for stat, vals in sstats.items():
-                getattr(latent_vars_model.reducer, f'reduce_{stat}')(
-                    vals[corpus.attrs['name']],
-                    corpus=corpus,
-                    **suffstats
-                )
-
-    return sstats, elbo
-
+    )
 
 
 def score(
     model_state,
     corpuses,
+    locals_weight=1.0,
+    subsample_rate=1.0,
+    exposures_fn = CS.fetch_topic_compositions,
+    *,
+    parallel_context,
 ):
     
     bound = lambda corpus, sample_name : \
                 model_state.locals_model.bound(
-                    CS.fetch_topic_compositions(corpus, sample_name),
+                    exposures_fn(corpus, sample_name),
                     corpus=corpus,
                     sample=corpus.samples[sample_name],
                     model_state=model_state,
+                    subsample_rate=subsample_rate,
+                    locals_weight=locals_weight,
                 )
     
     samples = (
@@ -101,21 +60,25 @@ def score(
         for sample_name in corpus.samples.data_vars.keys()
     )
 
-    return reduce(
-        lambda x,y : x+y,
-        map(
-            lambda x : bound(*x),
-            samples
+    elbo = reduce(
+            lambda x,y : x+y,
+            parallel_context(
+                delayed(bound)(corpus, sample_name)
+                for corpus, sample_name in samples
+            )
         )
-    )
+    
+    return elbo
+
 
 
 def VI_step(
-    *,
-    parallel_context,
     model_state,
     corpuses,
     update_prior=True,
+    *,
+    test_score_fn,
+    parallel_context,
 ):
     
     args = dict(
@@ -127,14 +90,23 @@ def VI_step(
         **args,
         norm_update_fn=model_state._update_normalizer
     )
+    '''
+    The normalizers are updated in the previous function
+    (because the mutation rates are used to get the offsets, 
+    so it's more efficient to use them to update the normalizers there).
 
-    # calculate the bound here because the mutations rates
-    # have just been re-normalized during the offset calculation
-    elbo = score(model_state, corpuses)
-    
-    stats, _ = Estep(
-        model_state=model_state,
-        **args
+    Therefore, this is the best time to evaluate the loss functions.
+    The elbo is calculated during the E-step because it's convenient.
+    '''
+    stats, elbo = model_state.Estep(**args)
+    '''
+    We're agnostic to the form of the test set evaluation function,
+    but it should be a function of the model state that returns the
+    test set score.
+    '''
+    test_elbo = test_score_fn(
+        model_state,
+        parallel_context=parallel_context
     )
     
     model_state.Mstep(
@@ -147,30 +119,21 @@ def VI_step(
     for corpus in corpuses:
         CS.update_corpusstate(corpus, model_state)
 
-    return elbo
+    return elbo, test_elbo
+
 
 
 def SVI_step(
-    update_prior=True,
-    *,
-    parallel_context,
     model_state,
     corpuses,
+    update_prior=True,
+    *,
+    test_score_fn,
+    parallel_context,
     batch_generator,
     learning_rate,
     subsample_rate,
-):    
-
-    # The normalizer only matters for the E-step, so update it here.
-    offsets = model_state.get_exp_offsets_dict(
-        corpuses=corpuses,
-        parallel_context=parallel_context,
-        norm_update_fn=model_state._update_normalizer
-    )
-
-    # calculate the bound here because the mutations rates
-    # have just been re-normalized during the offset calculation
-    elbo = score(model_state, corpuses)
+):
 
     #use "batch_generator" to slice or subsample the corpuses
     #args = (model_state, batch_generator(*corpuses))
@@ -179,26 +142,51 @@ def SVI_step(
     args = dict(
         corpuses=slices,
         parallel_context=parallel_context,
+    )
+    svi_kw = dict(
         learning_rate=learning_rate,
         subsample_rate=subsample_rate,
     )
 
-    stats, _ = Estep(
-        model_state=model_state,
-        **args
-    )
-    
-    model_state.Mstep(
-        offsets=offsets,
-        sstats=stats,
-        update_prior=update_prior,
+    # The normalizer only matters for the E-step, so update it here.
+    offsets = model_state.get_exp_offsets_dict(
         **args,
+        norm_update_fn=partial(model_state._update_normalizer, **svi_kw)
     )
 
+    # calculate the bound here because the mutations rates
+    # have just been re-normalized during the offset calculation
+    elbo = score(
+        corpuses=corpuses, 
+        model_state=model_state, 
+        parallel_context=parallel_context,
+    )
+
+    test_elbo = test_score_fn(
+        model_state, 
+        parallel_context=parallel_context
+    )
+
+    # E-step ELBO calculation is unreliable because it's only calculated
+    # on a subset of the data.
+    sstats, _ = model_state.Estep(
+        **args, 
+        **svi_kw,
+    )
+
+    model_state.Mstep(
+        offsets=offsets,
+        sstats=sstats,
+        update_prior=update_prior,
+        **args,
+        **svi_kw,
+    )
+
+    # Update the corpus states in the ORIGINAL corpuses
     for corpus in corpuses:
         CS.update_corpusstate(corpus, model_state)
 
-    return elbo
+    return elbo, test_elbo
 
 
 def learning_rate_schedule(epoch, tau=1, kappa=0.5):
@@ -223,3 +211,7 @@ def locus_slice_generator(
         corpus.isel(locus=sel_loci)
         for corpus in corpuses
     )
+
+
+def perplexity(num_mutations, elbo):
+    return exp(-elbo/num_mutations)

@@ -6,7 +6,8 @@ from ..corpus_state import CorpusState as CS
 from ._hist_gbt import CustomHistGradientBooster
 from ._feature_tranformer import get_smoothing_transformer, \
     get_paste_transformer, get_normalizing_transformer, \
-    get_categorical_features, get_feature_interaction_groups
+    get_categorical_features, get_feature_interaction_groups, \
+    StratifiedTransformer
 
 from functools import partial
 import numpy as np
@@ -42,24 +43,25 @@ class ThetaModel(RateModel):
         }
 
         corpus = corpuses[0]
+
         self.base_transformer_ = Pipeline([
-                ('paste', get_paste_transformer(*corpuses)),
-                ('smoother', get_smoothing_transformer(
-                        *corpuses,
-                        window_size=smoothing_size
-                    )
-                ),
-                ('normalize', get_normalizing_transformer(
-                        *corpuses,
-                        categorical_encoder=self.categorical_encoder,
-                        add_corpus_intercepts=add_corpus_intercepts,
-                    )
-                ),
-                *[(f'user_transformer_{i}', t) for i, t in enumerate(transformers)]
-            ])
-        
+            ('paste', get_paste_transformer(*corpuses)),
+            ('smoother', get_smoothing_transformer(
+                    *corpuses,
+                    window_size=smoothing_size
+                )
+            ),
+            ('normalize', get_normalizing_transformer(
+                    *corpuses,
+                    categorical_encoder=self.categorical_encoder,
+                    add_corpus_intercepts=add_corpus_intercepts,
+                )
+            ),
+            *[(f'user_transformer_{i}', t) for i, t in enumerate(transformers)]
+        ])
+
         self.base_transformer_.fit(corpus, corpus=corpus)
-        
+
         self.rate_models = [
             self._make_model(
                 **model_kw,
@@ -71,9 +73,14 @@ class ThetaModel(RateModel):
             for _ in range(n_components)
         ]
 
+        self.locus_transformer_ = StratifiedTransformer(self.base_transformer_)
+
+
+
     @property
     def requires_normalization(self):
         return True
+
 
     def _get_baseline_prediction(self, corpus):
         return np.zeros(
@@ -85,12 +92,12 @@ class ThetaModel(RateModel):
     def prepare_corpusstate(self, corpus):
         return dict(
                 locus_features  = DataArray(
-                    clone(self.base_transformer_)\
-                        .fit(corpus, corpus=corpus)\
+                    self.locus_transformer_\
                         .transform(corpus, corpus=corpus),
                     dims=('locus', 'feature'),
                     coords={
-                        'feature' : self.base_transformer_[2].get_feature_names_out()
+                        'feature' : self.base_transformer_[2]\
+                                        .get_feature_names_out()
                     }
                 ),
                 log_locus_distribution = DataArray(
@@ -269,7 +276,7 @@ class GBTThetaModel(ThetaModel):
                  max_trees_per_iter = 25,
                  max_leaf_nodes = 31,
                  min_samples_leaf = 30,
-                 max_features = 0.75,
+                 max_features = 0.5,
                  n_iter_no_change=2,
                  use_groups=True,
                  **kw

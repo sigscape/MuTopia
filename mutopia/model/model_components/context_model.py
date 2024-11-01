@@ -25,7 +25,7 @@ class ContextModel(RateModel):
             tol=5e-4,
             reg : float = 0.0001, 
             conditioning_alpha : float = 5e-5,
-            dtype = np.float32,
+            dtype = float,
             init_components = None,
             *,
             n_components : int,
@@ -82,36 +82,7 @@ class ContextModel(RateModel):
             for _ in range(n_components)
         ]
 
-        '''reg_basemodel = ElasticNet(
-            **get_reg_params(reg, conditioning_alpha),
-            warm_start=True,
-            fit_intercept=False,
-            selection='random',
-            tol=tol,
-        )
 
-        unreg_basemodel = partial(
-            simple_ridge,
-            alpha=conditioning_alpha,
-            tol=tol,
-            max_iter=None,
-        )
-
-        is_intercept = np.array( self.transformer.intercept_mask_ + [True] )
-
-        self.context_models = [
-            make_optimizer(
-                regularized_model=SklearnWrapper(clone(reg_basemodel)),
-                unregularized_model=unreg_basemodel,
-                regularize_mask=~is_intercept,
-                max_iter=max_iter,
-                X = self.transformer.one_pad_right(
-                    self.transformer.get_encoding_matrix(1)
-                )
-            )
-            for _ in range(n_components)
-        ]'''
-    
     @property
     def requires_normalization(self):
         return True
@@ -133,12 +104,13 @@ class ContextModel(RateModel):
     
 
     def _init_params(self, random_state, n_components, n_contexts, dtype):
-        return random_state.normal(0., 0.1, 
-                            (
-                                n_components, 
-                                self.transformer.get_num_coefs() + self.n_corpuses
-                            ),
-                        ).astype(dtype, copy=False)
+        return random_state.normal(
+                    0., 0.1, 
+                    (
+                        n_components, 
+                        self.transformer.get_num_coefs() + self.n_corpuses
+                    ),
+                ).astype(dtype, copy=False)
 
 
     @property

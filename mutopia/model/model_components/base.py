@@ -43,6 +43,10 @@ class RateModel(PrimitiveModel, ABC):
         raise NotImplementedError
 
 
+def dims_except_for(corpus, *dims):
+    return tuple([d for d in list(corpus.dims.keys()) if not d in dims])
+
+
 ## Shared methods for rate models ##
 def get_reg_params(l1_rate, l2_rate):
         return dict(

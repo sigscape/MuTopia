@@ -16,7 +16,9 @@ set_config(enable_metadata_routing=True)
 import logging
 logger = logging.getLogger(' Mutopia')
 
-
+'''
+TODO: make this work again ...
+'''
 def get_feature_interaction_groups(
     corpus,
     transformer,
@@ -180,3 +182,24 @@ def get_normalizing_transformer(
         verbose_feature_names_out=False,
     )
 
+
+class StratifiedTransformer:
+    
+    def __init__(self,          
+        transformer,
+        key = lambda x : x.attrs['name'],
+        ):
+        self.base_transformer = transformer
+        self.key = key
+        self._transformers = {}
+
+    
+    def transform(self, X, **kwargs):
+        try:
+            transformer = self._transformers[self.key(X)]
+        except KeyError:
+            transformer = clone(self.base_transformer)\
+                            .fit(X,**kwargs)
+            self._transformers[self.key(X)] = transformer
+
+        return transformer.transform(X, **kwargs)
