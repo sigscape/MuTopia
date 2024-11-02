@@ -3,43 +3,34 @@ from functools import partial, reduce
 import numpy as np
 from xarray import DataArray
 from pandas import DataFrame
-from sklearn.linear_model import ElasticNet, Ridge
-from sklearn.base import clone
-
-#from ._poisson_elastic_net import make_optimizer, SklearnWrapper, simple_ridge
 from ._glm_compiled import make_optimizer, setup_mixed_solver, get_lsqr_solver
 from ._fast_eln import get_eln_solver
 from ..corpus_state import CorpusState as CS
 from .base import get_reg_params, get_poisson_targets_weights, _svi_update_fn, \
-    RateModel, dims_except_for
+    RateModel, dims_except_for, SparseDataBase
 from ._strand_transformer import StrandEncoder
 
 import logging
 logger = logging.getLogger(' LocusRegressor')
 
 
-class StrandedContextModel(RateModel):
+class StrandedContextModel(RateModel, SparseDataBase):
      
     def __init__(self,
-            corpuses,
-            max_iter=100,
-            tol=5e-4,
-            reg : float = 0.0001, 
-            conditioning_alpha : float = 5e-5,
-            dtype = float,
-            init_components = None,
-            *,
-            n_components : int,
-            random_state,
-        ):
-
-        if not all(d in corpuses[0].dims for d in self.requires_dims):
-            raise ValueError(
-                f'Corpus must have dimensions {self.requires_dims}! '
-                f'You\'re missing: {",".join(set(self.requires_dims).difference(corpuses[0].dims))}'
-            )
-        
-        self.n_corpuses = len(corpuses)
+        corpuses,
+        max_iter=100,
+        tol=5e-4,
+        reg : float = 0.0001, 
+        conditioning_alpha : float = 5e-5,
+        dtype = float,
+        init_components = None,
+        *,
+        n_components : int,
+        random_state,
+    ):
+        super().__init__(*corpuses)
+            
+        #self.n_corpuses = len(corpuses)
         self.n_components = n_components
         self.context_dim = corpuses[0].dims['context']
         self.context_names = corpuses[0].modality().coords()['context']
@@ -80,18 +71,19 @@ class StrandedContextModel(RateModel):
         ) # f(X) -> f(z, w, beta) -> beta
 
         
-        mixed_solver = setup_mixed_solver(X, ~is_intercept)( 
-                            eln_solver, # f(X) -> f(z, w, beta) -> beta
-                            ridge_solver, # f(X) -> f(z, w, beta) -> beta
-                        ) # f(z, w, beta) -> beta
- 
-        self.context_models = [
-            partial(
-                make_optimizer(X, tol=tol, max_iter=max_iter), # f(X) -> f( f(z, w, beta) -> beta ) -> f(y, weight) -> f(beta) -> beta
-                mixed_solver, # f( solver, solver ) -> f(z, w, beta) -> beta
-            ) # f(y, weight) -> f(beta) -> beta    
-            for _ in range(n_components)
-        ]
+        mixed_solver = partial(
+            setup_mixed_solver,
+            is_regularized = ~is_intercept,
+            reg_solver = eln_solver, # f(X) -> f(z, w, beta) -> beta
+            unreg_solver = ridge_solver, # f(X) -> f(z, w, beta) -> beta
+        )
+        
+        self.model = make_optimizer(
+            X,
+            mixed_solver,
+            tol=tol,
+            max_iter=max_iter,
+        )
 
 
     @property
@@ -104,6 +96,9 @@ class StrandedContextModel(RateModel):
         return ('configuration','context','locus')
     
 
+    ##
+    # Satisfaction of SparseDataBase interface
+    ##
     @staticmethod
     def predict_sparse(corpus,*, configuration, context, locus, **idx_dict):
 
@@ -113,7 +108,6 @@ class StrandedContextModel(RateModel):
         return CS.fetch_val(corpus, 'log_context_distribution').data\
                             [:, context, strand_state]
     
-
 
     @staticmethod
     def reduce_sparse_sstats(
@@ -132,6 +126,9 @@ class StrandedContextModel(RateModel):
         np.add.at(sstats, (slice(None), context, strand_states), weighted_posterior)
 
         return sstats
+    ##
+    # End of SparseDataBase interface
+    ##
 
 
     def init_from_signatures(self, signatures):
@@ -154,7 +151,7 @@ class StrandedContextModel(RateModel):
                     0., 0.1, 
                     (
                         n_components, 
-                        self.transformer.get_num_coefs() + self.n_corpuses
+                        self.transformer.get_num_coefs() + 1 #self.n_corpuses
                     ),
                 ).astype(dtype, copy=False)
 
@@ -280,7 +277,7 @@ class StrandedContextModel(RateModel):
         yield partial(
             self._run_regression,
             *get_poisson_targets_weights(target, eta),
-            model = self.context_models[k],
+            model = self.model,
             update_vec = self._coefs[k],
             learning_rate = learning_rate,
         )
@@ -298,7 +295,7 @@ class StrandedContextModel(RateModel):
     
     @property
     def coefs_(self):
-        return self._coefs[:,:-self.n_corpuses]
+        return self._coefs[:,:-1] #self.n_corpuses]
     
 
     def _calc_lambda(self, k, design_matrix):
@@ -311,11 +308,28 @@ class StrandedContextModel(RateModel):
                     k, self.transformer.encoding_matrix_
                 )
     
-    def format_counterfactual(self, k):
-        return self._calc_lambda(k,
+
+    def format_signature(self, k):
+        # C x S
+        signature = self._calc_lambda(k,
                         self.transformer\
                             .independent_effects_encoding()
-                    ).T
+                    )/self._context_distribution
+        
+        return DataArray(
+            signature,
+            dims=('context','strand_state'),
+            coords={
+                'context' : self.context_names,
+                'strand_state' : self.transformer.feature_names_out
+            }
+        )
+    
+    def get_save_data(self):
+        return dict(
+            coefs = self.coefs_,
+            context_distribution = self.context_distribution_,
+        )
     
 
     def component_coef_summary(self, sig_idx):
@@ -338,7 +352,7 @@ class StrandedContextModel(RateModel):
 
 
 
-class UnstrandedContextModel(StrandedContextModel):
+class UnstrandedContextModel(StrandedContextModel, SparseDataBase):
 
 
     @property
@@ -358,7 +372,8 @@ class UnstrandedContextModel(StrandedContextModel):
     @staticmethod
     def reduce_sparse_sstats(
         sstats, 
-        corpus,*,
+        corpus,
+        *,
         weighted_posterior,
         locus,
         context,

@@ -20,9 +20,22 @@ class PrimitiveModel(ABC):
 
 class RateModel(PrimitiveModel, ABC):
 
-    @classmethod
-    def list_params(cls):
-        return inspect.getfullargspec(cls.__init__).args[1:]
+    def __init__(self, *corpuses):
+        if not all(d in corpuses[0].dims for d in self.requires_dims):
+            raise ValueError(
+                f'Corpus must have dimensions {self.requires_dims}! '
+                f'You\'re missing: {",".join(set(self.requires_dims).difference(corpuses[0].dims))}'
+            )
+    
+    @property
+    @abstractmethod
+    def requires_normalization(self):
+        raise NotImplementedError
+    
+    @property
+    @abstractmethod
+    def requires_dims(self):
+        raise NotImplementedError
     
     @abstractmethod
     def partial_fit(self, k, sstats, exp_offsets, corpuses, learning_rate=1.):
@@ -35,20 +48,16 @@ class RateModel(PrimitiveModel, ABC):
     @staticmethod
     @abstractmethod
     def get_exp_offset(offsets, corpus):
-        raise NotImplementedError
-    
-    @property
-    @abstractmethod
-    def requires_normalization(self):
-        raise NotImplementedError
-    
-    @property
-    @abstractmethod
-    def requires_dims(self):
-        raise NotImplementedError
-    
+        raise NotImplementedError    
 
-    @staticmethod
+    @abstractmethod
+    def format_signature(self, k):
+        raise NotImplementedError
+
+
+
+class SparseDataBase(ABC):
+
     @abstractmethod
     def predict_sparse(corpus,**idx_dict):
         raise NotImplementedError
@@ -62,6 +71,8 @@ class RateModel(PrimitiveModel, ABC):
         **idx_dict
     ):
         raise NotImplementedError
+
+
 
 
 def dims_except_for(dims, *keepdims):

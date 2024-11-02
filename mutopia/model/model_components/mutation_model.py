@@ -1,4 +1,4 @@
-from .base import get_reg_params, _svi_update_fn, RateModel
+from .base import get_reg_params, _svi_update_fn, RateModel, SparseDataBase
 from ._strand_transformer import MutationStrandEncoder
 #from ._poisson_elastic_net import make_optimizer, SklearnWrapper, simple_ridge
 from ._glm_compiled import make_optimizer, setup_mixed_solver, \
@@ -11,23 +11,28 @@ from ..corpus_state import CorpusState as CS
 from xarray import DataArray
 from functools import reduce
 
-class MutationModel(RateModel):
+class MutationModel(RateModel, SparseDataBase):
 
     def __init__(self,
-            corpuses,
-            reg : float = 0.0005,
-            conditioning_alpha = 5e-5,
-            tol = 5e-4,
-            max_iter=100,
-            dtype = float,
-            init_components = None,
-            *,
-            n_components,
-            random_state,
-            ):
+        corpuses,
+        reg : float = 0.0005,
+        conditioning_alpha = 5e-5,
+        tol = 5e-4,
+        max_iter=100,
+        dtype = float,
+        init_components = None,
+        *,
+        n_components,
+        random_state,
+    ):
+        super().__init__(*corpuses)
+
         self.n_components = n_components
         self.mutation_dim = corpuses[0].dims['mutation']
         self.context_dim = corpuses[0].dims['context']
+        self.context_names = corpuses[0].coords['context'].values
+        self.mutation_names = corpuses[0].coords['mutation'].values
+
         
         self.transformer = MutationStrandEncoder(self.mutation_dim)\
                                         .fit(corpuses)
@@ -54,27 +59,30 @@ class MutationModel(RateModel):
         )
 
         # f(X) -> f( f(X) -> f(z, w, beta) -> beta, f(X) -> f(z, w, beta) -> beta ) -> f(z, w, beta) -> beta
-        mixed_solver = setup_mixed_solver(X, self._is_regularized)(
-                            eln_solver, # f(X) -> f(z, w, beta) -> beta
-                            ridge_solver, # f(X) -> f(z, w, beta) -> beta
-                        ) # f(z, w, beta) -> beta
+        mixed_solver = partial(
+            setup_mixed_solver,
+            is_regularized = self._is_regularized,
+            reg_solver = eln_solver,
+            unreg_solver = ridge_solver,
+        )
  
-        self.mutation_models = [
-            [
-                partial(
-                    make_optimizer(X, tol=tol, max_iter=max_iter), # f(X) -> f( f(z, w, beta) -> beta ) -> f(y, weight) -> f(beta) -> beta
-                    mixed_solver, # f(z, w, beta) -> beta
-                ) # f(y, weight) -> f(beta) -> beta
-                for _ in range(self.context_dim)
-            ]
-            for _ in range(n_components)
-        ]
+        self.model = make_optimizer(
+            X,
+            mixed_solver,
+            tol=tol,
+            max_iter=max_iter,
+        )
 
         # convert to dense for other computations, but keep sparse for regression updates
         self._mut_encoding_matrix=_mut_encoding_matrix\
                                     .toarray()[:,:-self.transformer.n_states_]
 
-        self._coefs = self._init_params(random_state, n_components, self.context_dim, dtype)
+        self._coefs = self._init_params(
+            random_state, 
+            n_components, 
+            self.context_dim, 
+            dtype
+        )
 
         if not init_components is None:
             self.init_from_signatures(
@@ -233,7 +241,7 @@ class MutationModel(RateModel):
         # CxSxM
         stats_reduced = reduce(sum, [sstats[n][k] for n in corpus_names])
 
-        for c, model in enumerate(self.mutation_models[k]):
+        for c in range(self.context_dim):
             
             # CxSxM => MxS => M*S
             target=stats_reduced[c].T.ravel()
@@ -245,7 +253,7 @@ class MutationModel(RateModel):
                 np.ones_like(target),
                 update_vec=self._coefs[k,c],
                 learning_rate=learning_rate,
-                model=model
+                model=self.model
             )
     
 
@@ -264,12 +272,23 @@ class MutationModel(RateModel):
         return np.log(rho)
 
 
-    def format_counterfactual(self, k):
-        return self._calc_rho(k, 
+    def format_signature(self, k):
+        # CxMxS
+        rho = self._calc_rho(k, 
                     self.transformer\
                         .independent_effects_encoding()
                 ).transpose((2,0,1))
-
+        
+        return DataArray(
+            rho,
+            dims=('context','mutation','strand_state'),
+            coords=dict(
+                strand_state = self.transformer.feature_names_out,
+                mutation = self.mutation_names,
+                context = self.context_names
+            )
+        )
+    
 
     def _format_component(self, k):
         return self._calc_rho(k, self._mut_encoding_matrix)

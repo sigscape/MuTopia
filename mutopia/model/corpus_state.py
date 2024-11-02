@@ -66,6 +66,9 @@ class CorpusState:
     def fetch_val(corpus, key):
         return corpus.state[key]
     
+    @staticmethod
+    def get_name(corpus):
+        return corpus.attrs['name']
     
     @staticmethod
     def update(corpus, **items):

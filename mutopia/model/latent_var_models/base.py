@@ -18,20 +18,28 @@ class LocalUpdate(ABC):
         raise NotImplementedError
     
 
-class Reducer(ABC):
+    @abstractmethod
+    def _get_update_fn(
+        self,
+        learning_rate=1.,
+        subsample_rate=1.,
+        *,
+        corpus,
+        sample,
+        model_state,
+    ):
+        raise NotImplementedError
+    
 
     @staticmethod
-    @abstractmethod
-    def reduce_context_sstats(context_sstats, corpus,**kw):
-        raise NotImplementedError
-    
-    @staticmethod
-    @abstractmethod
-    def reduce_mutation_sstats(mutation_sstats, corpus,**kw):
-        raise NotImplementedError
-    
-    @staticmethod
-    @abstractmethod
-    def reduce_theta_sstats(theta_sstats, corpus,**kw):
-        raise NotImplementedError
-    
+    def reduce_model_sstats(
+        model,
+        carry,
+        corpus,
+        **sample_sstats,
+    ):
+        return model.reduce_sparse_sstats(
+            carry, 
+            corpus,
+            **sample_sstats
+        )

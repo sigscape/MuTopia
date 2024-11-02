@@ -135,10 +135,22 @@ def SVI_step(
     subsample_rate,
 ):
 
-    #use "batch_generator" to slice or subsample the corpuses
-    #args = (model_state, batch_generator(*corpuses))
-    slices = batch_generator(*corpuses)
+    # Update the normalizing constants using the whole training set.
+    # Otherwise, the updates have too high variance and nothing works.
+    model_state.init_normalizers(
+        corpuses, 
+        parallel_context=parallel_context
+    )
 
+    # calculate the bound here because the mutations rates
+    # have just been re-normalized during the offset calculation
+    test_elbo = test_score_fn(
+        model_state, 
+        parallel_context=parallel_context
+    )
+
+    #use "batch_generator" to slice or subsample the corpuses
+    slices = batch_generator(*corpuses)
     args = dict(
         corpuses=slices,
         parallel_context=parallel_context,
@@ -148,35 +160,15 @@ def SVI_step(
         subsample_rate=subsample_rate,
     )
 
-    # The normalizer only matters for the E-step, so update it here.
-    offsets = model_state.get_exp_offsets_dict(
-        **args,
-        norm_update_fn=partial(model_state._update_normalizer, **svi_kw)
-    )
-
-    model_state.init_normalizers(
-        corpuses, 
-        parallel_context=parallel_context
-    )
-
-    # calculate the bound here because the mutations rates
-    # have just been re-normalized during the offset calculation
-    elbo = score(
-        corpuses=corpuses, 
-        model_state=model_state, 
-        parallel_context=parallel_context,
-    )
-
-    test_elbo = test_score_fn(
-        model_state, 
-        parallel_context=parallel_context
-    )
-
     # E-step ELBO calculation is unreliable because it's only calculated
     # on a subset of the data.
-    sstats, _ = model_state.Estep(
-        **args, 
-        **svi_kw,
+    sstats, elbo = model_state.Estep(**args, **svi_kw)
+
+    # Get the offsets on the sliced data, 
+    # BUT DON'T UPDATE the normalizer using the slice!
+    offsets = model_state.get_exp_offsets_dict(
+        **args,
+        norm_update_fn=lambda *x : None # don't update the normalizer
     )
 
     model_state.Mstep(

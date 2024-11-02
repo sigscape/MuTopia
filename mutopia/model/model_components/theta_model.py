@@ -1,7 +1,8 @@
 
 import inspect
 from .base import get_corpus_intercepts, get_poisson_targets_weights,\
-     _svi_update_fn, RateModel, idx_array_to_design, dims_except_for
+     _svi_update_fn, RateModel, idx_array_to_design, dims_except_for, \
+     SparseDataBase
 from ..corpus_state import CorpusState as CS
 from ._hist_gbt import CustomHistGradientBooster
 from ._feature_tranformer import get_smoothing_transformer, \
@@ -20,21 +21,23 @@ import logging
 logger = logging.getLogger(' Mutopia')
 
     
-class ThetaModel(RateModel):
+class ThetaModel(RateModel, SparseDataBase):
 
     categorical_encoder = None
 
     def __init__(self,
-                corpuses,
-                add_corpus_intercepts=False,
-                model_kw={},
-                dtype = float,
-                smoothing_size=1000,
-                transformers=[],
-                *,
-                n_components : int,
-                random_state,
-                ):
+        corpuses,
+        add_corpus_intercepts=False,
+        model_kw={},
+        dtype = float,
+        smoothing_size=1000,
+        transformers=[],
+        *,
+        n_components : int,
+        random_state,
+    ):
+        super().__init__(*corpuses)
+
         self.dtype = dtype
         self.n_components = n_components
         self.corpus_encoder_ = {
@@ -205,6 +208,9 @@ class ThetaModel(RateModel):
 
         return sstats
     
+
+    def format_signature(self, k):
+        return 0.
 
 
 class LinearThetaModel(ThetaModel):

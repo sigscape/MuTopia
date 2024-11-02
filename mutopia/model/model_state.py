@@ -300,7 +300,7 @@ class ModelState:
             for (corpus, sample_name) in samples
         )
         
-        for (corpus, sample_name), (suffstats, gamma_new, bound) in zip(
+        for (corpus, sample_name), (sample_suffstats, gamma_new, bound) in zip(
             samples, 
             parallel_context(delayed(update)() for update in updates)
         ):
@@ -313,11 +313,18 @@ class ModelState:
                 )
                 
                 for model_name, model in self.models.items():
+                    '''
+                    The latent variables model handle the observation data format
+                    and the gamma updates. Here, the model state just delegates the
+                    suffstat reduction back to the latent variables model, which
+                    calls the model's reduce_sstats method depending on the data type.
+                    '''
                     sstats[model_name + '_sstats'][corpus.attrs['name']] = \
-                        model.reduce_sparse_sstats(
+                        latent_vars_model.reduce_model_sstats(
+                            model,
                             sstats[model_name + '_sstats'][corpus.attrs['name']],
-                            corpus=corpus,
-                            **suffstats
+                            corpus,
+                            **sample_suffstats
                         )
 
 

@@ -5,7 +5,6 @@ from ..model_components.base import _svi_update_fn, PrimitiveModel
 from ..corpus_state import CorpusState as CS
 
 from ._dirichlet_update import dirichlet_bound, update_alpha
-from .sparse_sstats import SparseSuffStatReducer
 from .base import LocalUpdate
 from scipy.special import psi, gammaln
 from numba import njit, vectorize
@@ -123,8 +122,6 @@ def _bound(
 
 class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
 
-    #reducer = SparseSuffStatReducer
-
     def __init__(self,
             corpuses,
             n_components,
@@ -219,7 +216,8 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
         )
     
 
-    def _get_update_fn(self,
+    def _get_update_fn(
+        self,
         learning_rate=1.,
         subsample_rate=1.,
         *,
@@ -385,6 +383,12 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
 
     def spawn_sstats(self, corpus):
         return []
+    
+
+    def reduce_sstats(
+        self, *args, **kw
+    ):
+        return self.reduce_sparse_sstats(*args, **kw) 
     
 
     @staticmethod

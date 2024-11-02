@@ -139,8 +139,11 @@ def ls_partial_solver(
 # Mixed solver - some weights are regularized, some are not
 ##
 def setup_mixed_solver(
-        X, 
+        X,
+        *,
         is_regularized,
+        reg_solver,
+        unreg_solver,
     ): # -> f(X) -> f(solver, solver) -> f(z, w, beta) -> beta
     '''
     Sets up a solver where some of the coefficients are optimized
@@ -159,22 +162,19 @@ def setup_mixed_solver(
     f_X_reg = partial(csr_matmul, sp2tup(X_reg))
     f_X_unreg = partial(csr_matmul, sp2tup(X_unreg))
 
-    def get_interior(reg_solver, unreg_solver):
+    reg_solver = reg_solver(X_reg)
+    unreg_solver = unreg_solver(X_unreg)
 
-        reg_solver = reg_solver(X_reg)
-        unreg_solver = unreg_solver(X_unreg)
-
-        def interior_solver(z, w, beta):
-            
-            beta_new = beta.copy()
-            beta_new[~reg] = unreg_solver(z - f_X_reg(beta_new[reg]), w, beta_new[~reg])
-            beta_new[reg] = reg_solver(z - f_X_unreg(beta_new[~reg]), w, beta_new[reg])
-
-            return beta_new
+    def interior_solver(z, w, beta):
         
-        return interior_solver
-    
-    return get_interior
+        beta_new = beta.copy()
+        beta_new[~reg] = unreg_solver(z - f_X_reg(beta_new[reg]), w, beta_new[~reg])
+        beta_new[reg] = reg_solver(z - f_X_unreg(beta_new[~reg]), w, beta_new[reg])
+
+        return beta_new
+        
+    return interior_solver
+
 
 
 @njit(nogil=True)
@@ -222,8 +222,21 @@ def iter_fit(
     return beta #, ll
 
 
+
+def _optim_fn(solver, update_fn, y, weights, tol=1e-3, max_iter=50):
+    return partial(
+        iter_fit,
+        tol=tol,
+        max_iter=max_iter,
+        outer_update=partial(update_fn, y, weights), # f(beta) -> mu, z, w
+        interior_solver=solver, # f(z, w, beta) -> beta
+        likelihood_fn=None 
+    )
+
+
 def make_optimizer(
     X,
+    solver,
     tol=5e-4,
     max_iter=100,
 ):
@@ -234,14 +247,10 @@ def make_optimizer(
         **POISSON_GLM,
     )
 
-    def optim_fn(solver, y, weights):
-        return partial(
-            iter_fit,
-            tol=tol,
-            max_iter=max_iter,
-            outer_update=partial(update_fn, y, weights),
-            interior_solver=solver,
-            likelihood_fn=None #partial(POISSON_GLM['likelihood_fn'], y, weights),
-        )
-    
-    return optim_fn
+    return partial(
+        _optim_fn,
+        solver(X),
+        update_fn,
+        tol=tol,
+        max_iter=max_iter,
+    )
