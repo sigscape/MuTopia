@@ -1,8 +1,8 @@
 import numpy as np
 from sparse import COO, GCXS
 from abc import ABC, abstractmethod
-import inspect
 from numba import njit
+import warnings
 
 class PrimitiveModel(ABC):
 
@@ -132,8 +132,12 @@ def get_corpus_design(corpuses, encoder : dict, n_repeats = lambda x : 1):
     )
 
 
-@njit(nogil=True)
 def _svi_update_fn(old_value, new_value, learning_rate):
+    
+    if np.isnan(new_value).any():
+        print('NaN value encountered in update!')
+        return old_value
+    
     return (1-learning_rate)*old_value + learning_rate*new_value
 
 

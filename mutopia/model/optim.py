@@ -273,6 +273,17 @@ def fit_model(
                     test_score_fn=test_score_fn if evaluate_test else dummy_score_fn,
                 )
 
+                if np.isnan(train_score):
+                    raise ValueError(
+                        'The model has diverged - some parameter is NaN. '
+                        'This usually means that the model is under-regularized.\n'
+                        'Try increasing one of the regularization parameters:\n'
+                        '  - mutation_reg\n'
+                        '  - context_reg\n'
+                        '  - l2_regularization\n'
+                        '  - conditioning_alpha\n'
+                    )
+
                 for test_corpus in test_corpuses:
                     CS.update_corpusstate(
                         test_corpus,
@@ -308,6 +319,14 @@ def fit_model(
         model_state.init_normalizers(
             train_corpuses, 
             parallel_context=par
+        )
+
+        logger.info('Calculating final test score...')
+        test_scores.append(
+            test_score_fn(
+                model_state,
+                parallel_context=par
+            )
         )
 
     return (

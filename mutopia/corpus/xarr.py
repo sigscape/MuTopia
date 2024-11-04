@@ -56,7 +56,7 @@ class BaseAccessor:
 @datatree.register_datatree_accessor("modality")
 class DataMode(BaseAccessor):
     def __call__(self):
-        return DTYPE_MAP[self._xrds.attrs['dtype']]
+        return DTYPE_MAP[self._xrds.attrs['dtype']]()
 
 
 @xr.register_dataarray_accessor("is_loaded")

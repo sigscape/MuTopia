@@ -34,7 +34,7 @@ def dirichlet_bound(alpha, gamma):
         np.sum(gammalnvec(gamma) - gammalnvec(alpha) + (alpha - gamma)*logE_gamma)
 
 
-@njit('double[:](double[:], double[:], double[:,:], double[:])', nogil=True)
+@njit('double[::1](double[::1], double[::1], double[:,::1], double[::1])', nogil=True)
 def _update_step(
         gamma,
         alpha, 
@@ -52,7 +52,7 @@ def _update_step(
     return alpha + gamma_sstats
 
 
-@njit('double[:](double[:], double[:,:], double[:], int64, double, double[:])', nogil=True)
+@njit('double[::1](double[::1], double[:,::1], double[::1], int64, double, double[::1])', nogil=True)
 def _iterative_update(
     alpha, 
     conditional_likelihood, 
@@ -77,7 +77,7 @@ def _iterative_update(
     return gamma
 
 
-@njit('double[:,:](double[:], double[:,:], double[:])', nogil=True)
+@njit('double[:,::1](double[::1], double[:,::1], double[::1])', nogil=True)
 def _calc_local_variables(
         gamma,
         conditional_likelihood,
@@ -93,7 +93,7 @@ def _calc_local_variables(
     return phi_matrix
 
 
-@njit('double(double[:,:], double[:], double[:], double[:,:], double[:], double)', nogil=True)
+@njit('double(double[:,::1], double[::1], double[::1], double[:,::1], double[::1], double)', nogil=True)
 def _bound(
     weighted_posterior,
     gamma,
@@ -149,7 +149,7 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
     def convert_sample(self, sample):
 
         sample = sample.sparse_to_coo()
-        weights = sample.data.data.astype(self.dtype, copy=False)
+        weights = np.ascontiguousarray(sample.data.data.astype(self.dtype, copy=True))
 
         idx_dict = dict(zip(
             tuple(sample.coords['obs_indices'].data),
@@ -235,7 +235,7 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
         # 1. get the information we need from the sample
         sample_dict = self.convert_sample(sample)
         weights = sample_dict['weights']/subsample_rate
-        alpha = self.alpha[corpus.attrs['name']]
+        alpha = np.ascontiguousarray(self.alpha[corpus.attrs['name']])
 
         conditional_likelihood = \
             self.conditional_observation_likelihood(
@@ -335,7 +335,8 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
     ):
         
         sample_dict = self.convert_sample(sample)
-        alpha = self.alpha[corpus.attrs['name']]
+        alpha = np.ascontiguousarray(self.alpha[corpus.attrs['name']])
+        gamma = np.ascontiguousarray(gamma)
         weights = sample_dict['weights']/subsample_rate
         
         conditional_likelihood = \

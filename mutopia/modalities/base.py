@@ -1,33 +1,31 @@
 import xarray as xr
-import numpy as np
 from abc import ABC, abstractmethod
-from itertools import chain
-import matplotlib.pyplot as plt
-
 
 class ModeConfig(ABC):
 
-    CONTEXTS = None
-    MUTATIONS = None
-    CONFIGURATIONS = None
     MODE_ID = None
 
-    @classmethod
-    def dims(cls):
+    @property
+    def dims(self):
         return {
             k : len(v)
-            for k,v in cls.coords().items()
+            for k,v in self.coords.items()
         }
     
-    @classmethod
+    @property
     @abstractmethod
-    def coords(cls):
-        return {
-            'configuration' : cls.CONFIGURATIONS,
-            'context' : cls.CONTEXTS,
-            'mutation' : cls.MUTATIONS,
-        }
-
+    def coords(self) -> dict:
+        raise NotImplementedError
+    
+    @property
+    @abstractmethod
+    def make_model(self):
+        raise NotImplementedError
+    
+    @property
+    @abstractmethod
+    def sample_params(self):
+        raise NotImplementedError
     
     @classmethod
     @abstractmethod
@@ -37,6 +35,7 @@ class ModeConfig(ABC):
     ):
         raise NotImplementedError
     
+
     @classmethod
     @abstractmethod
     def get_context_frequencies(
@@ -51,18 +50,24 @@ class ModeConfig(ABC):
     @classmethod
     def validate_signatures(
         cls,
-        *signatures,
+        signature,
+        required_dims = [],
     ):
-        pass
-        #for sig in signatures:
-        #    if not sig.shape == cls.dims()[1:]:
-        #        raise ValueError(f"Expected tensor of shape {cls.dims()[1:]} but got {sig.shape}")
+        for dim in required_dims:
+            if not dim in signature.dims:
+                raise ValueError(f"Expected dimension {dim} in signature but got {signature.dims}")
+            
+        if not len(signature.dims) <= (len(required_dims) + 1):
+            raise ValueError(
+                f"Expected signature to have at most {len(required_dims) + 1} dimensions "
+                f"({', '.join(required_dims)}, +1 other), but got {', '.join(signature.dims)}"
+            )
 
 
     @classmethod
     @abstractmethod
     def plot(cls,
-        *signatures,
+        signatures,
         **kwargs,
     ):
         raise NotImplementedError

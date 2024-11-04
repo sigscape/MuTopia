@@ -114,7 +114,11 @@ class ModelState:
     @staticmethod
     def _marginalize_mutrate(log_mutrate_tensor, exposures):
         return xr.apply_ufunc(
-            lambda gamma, mu : np.dot(mu, gamma/gamma.sum()),
+            lambda gamma, mu : np.nan_to_num(
+                np.dot(mu, gamma/gamma.sum()),
+                copy=False,
+                nan=0.
+            ),
             exposures,
             np.exp(log_mutrate_tensor),
             input_core_dims=[[], ('component',)],
@@ -329,7 +333,9 @@ class ModelState:
                     learning_rate=learning_rate,
                     subsample_rate=subsample_rate,
                 ),
-                CS.fetch_topic_compositions(corpus, sample_name),
+                np.ascontiguousarray(
+                    CS.fetch_topic_compositions(corpus, sample_name)
+                ),
             )   
             for (corpus, sample_name) in samples
         )

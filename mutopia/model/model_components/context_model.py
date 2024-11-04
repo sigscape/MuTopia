@@ -33,7 +33,7 @@ class StrandedContextModel(RateModel, SparseDataBase):
         #self.n_corpuses = len(corpuses)
         self.n_components = n_components
         self.context_dim = corpuses[0].dims['context']
-        self.context_names = corpuses[0].modality().coords()['context']
+        self.context_names = corpuses[0].modality().coords['context']
         
         self.transformer = StrandEncoder(self.context_dim)\
                                     .fit(corpuses)
@@ -346,7 +346,6 @@ class StrandedContextModel(RateModel, SparseDataBase):
 
 
 class UnstrandedContextModel(StrandedContextModel, SparseDataBase):
-
 
     @property
     def requires_dims(self):
