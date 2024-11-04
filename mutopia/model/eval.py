@@ -5,6 +5,7 @@ import xarray as xr
 import sparse as sp
 from functools import reduce, partial
 from joblib import delayed
+import warnings
 from .corpus_state import CorpusState as CS
 
 
@@ -24,6 +25,10 @@ def get_n_mutations(
             for corpus, sample_name in samples
             )
     )
+
+
+def perplexity(num_mutations, elbo):
+    return np.exp(-elbo/num_mutations)
 
 
 def elbo_score(
@@ -103,6 +108,7 @@ def deviance(
     
     
     def _corpus_deviance(corpus):
+
         marg_fn = partial(
             model_state._marginalize_mutrate,
             model_state._get_log_mutation_rate_tensor(corpus)
@@ -114,7 +120,8 @@ def deviance(
 
         fit_deviance = lambda obs, gamma : _sample_deviance(obs, marg_fn(gamma))
         null_deviance = lambda obs : _sample_deviance(obs, null_marginal_mutrate)
-        
+    
+    
         D_fit = sum(list(parallel_context(
                     delayed(fit_deviance)(obs, exposures_fn(corpus, sample_name))
                     for sample_name, obs in corpus.samples.data_vars.items()
@@ -125,11 +132,14 @@ def deviance(
                     for obs in corpus.samples.data_vars.values()
                 ))))
         
-        return D_fit, D_null
+        return (D_fit, D_null)
     
-    D_fit, D_null = reduce(
-        lambda x,y : (x[0]+y[0], x[1]+y[1]),
-        map(_corpus_deviance, corpuses)
-    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        
+        D_fit, D_null = reduce(
+            lambda x,y : (x[0]+y[0], x[1]+y[1]),
+            map(_corpus_deviance, corpuses)
+        )
 
-    return 1 - D_fit/D_null
+    return 10*(1 - D_fit/D_null)

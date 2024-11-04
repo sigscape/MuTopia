@@ -16,6 +16,9 @@ class PrimitiveModel(ABC):
 
     def update_corpusstate(self, corpus, **kwargs):
         pass
+
+    def prepare_to_save(self):
+        pass
     
 
 class RateModel(PrimitiveModel, ABC):

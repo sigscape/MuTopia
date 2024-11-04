@@ -35,9 +35,12 @@ class ModelState:
         }
 
     @property
+    def n_models(self):
+        return 420
+
+    @property
     def n_components(self):
         return next(iter(self._models.values())).n_components
-    
 
     @property
     def models(self):
@@ -55,7 +58,7 @@ class ModelState:
         return self._normalizers[corpus.attrs['name']]
     
 
-    def get_propto_log_mutation_rate(self, k, corpus):
+    def _get_propto_log_mutation_rate(self, k, corpus):
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -73,14 +76,37 @@ class ModelState:
 
         return un_normalized
     
+    
+    def predict(self, k, corpus):
+        
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
 
-    def _get_log_mutation_rate_tensor(self, corpus):
-        return xr.concat(
-            (
-                self.get_propto_log_mutation_rate(k, corpus)\
+            y_hat = reduce(
+                lambda x,y: x+y, 
+                (
+                    model.predict(k, corpus)
+                    for model in self.nonlocals.values()
+                ),  # sum over models
+                np.log(corpus.regions.exposures) \
+                    + np.log(corpus.regions.context_frequencies) \
                     + self.get_normalizers(corpus)[k]
+            )
+
+        return y_hat
+    
+
+    def _get_log_mutation_rate_tensor(
+        self, 
+        corpus,
+        *,
+        parallel_context
+    ):
+        return xr.concat(
+            list(parallel_context(
+                delayed(self.predict)(k, corpus)
                 for k in range(self.n_components)
-            ),
+            )),
             dim='component'
         )
     
@@ -199,7 +225,7 @@ class ModelState:
         _update_norm = lambda k, corpus : \
             self._update_normalizer(
                 k, corpus, 
-                -logsumexp(self.get_propto_log_mutation_rate(k, corpus).data)
+                -logsumexp(self._get_propto_log_mutation_rate(k, corpus).data)
             )
 
         update_fns = (
@@ -267,12 +293,12 @@ class ModelState:
     def Estep(
         self,
         corpuses,
-        *,
-        parallel_context,
         learning_rate = 1.,
         subsample_rate = 1.,    
+        *,
+        parallel_context,
     ):
-    
+
         latent_vars_model = self.locals_model
 
         '''

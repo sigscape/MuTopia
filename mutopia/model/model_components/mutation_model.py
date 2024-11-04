@@ -98,7 +98,9 @@ class MutationModel(RateModel, SparseDataBase):
     def requires_dims(self):
         return ('configuration','context','mutation','locus')
     
-
+    def prepare_to_save(self):
+        del self.model
+        
     @staticmethod
     def predict_sparse(corpus,*,context, mutation, configuration, locus, **idx_dict):
 

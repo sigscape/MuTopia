@@ -95,6 +95,10 @@ class StrandedContextModel(RateModel, SparseDataBase):
     def requires_dims(self):
         return ('configuration','context','locus')
     
+    def prepare_to_save(self):
+        del self.model 
+        # the model is not serializable because it has nested functions
+
 
     ##
     # Satisfaction of SparseDataBase interface
@@ -281,17 +285,6 @@ class StrandedContextModel(RateModel, SparseDataBase):
             update_vec = self._coefs[k],
             learning_rate = learning_rate,
         )
-
-
-    '''def _make_design_matrix(self, *corpus_states):
-        return sparse.hstack([
-            self.transformer.get_encoding_matrix(len(corpus_states)),
-            get_corpus_dummies(
-                corpus_states, 
-                self.corpus_dummy_encoder, 
-                n_repeats = lambda _ : self.transformer.encoding_matrix_.shape[0]
-            )
-        ]).tocsr()'''
     
     @property
     def coefs_(self):

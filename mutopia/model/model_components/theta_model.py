@@ -41,7 +41,7 @@ class ThetaModel(RateModel, SparseDataBase):
         self.dtype = dtype
         self.n_components = n_components
         self.corpus_encoder_ = {
-            corpus.attrs['name'] : i
+            CS.get_name(corpus) : i
             for i, corpus in enumerate(corpuses)
         }
 
@@ -310,6 +310,7 @@ class GBTThetaModel(ThetaModel):
                  max_features = 0.5,
                  n_iter_no_change=1,
                  use_groups=True,
+                 l2_regularization=1.,
                  **kw
                 ):
         super().__init__(
@@ -322,6 +323,7 @@ class GBTThetaModel(ThetaModel):
                         'max_features' : max_features,
                         'n_iter_no_change' : n_iter_no_change,
                         'use_groups' : use_groups,
+                        'l2_regularization' : l2_regularization,
                     },
                     **kw,
                 )

@@ -23,6 +23,11 @@ class CorpusState:
         
         return corpus
     
+    
+    @classmethod
+    def list_samples(cls, corpus):
+        return list(corpus.samples.data_vars.keys())
+    
 
     @classmethod
     def init_corpusstate(

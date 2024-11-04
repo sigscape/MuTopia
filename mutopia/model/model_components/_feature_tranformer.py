@@ -1,7 +1,7 @@
 from sklearn.preprocessing import OneHotEncoder, PowerTransformer, MinMaxScaler, \
-    QuantileTransformer, StandardScaler, RobustScaler, LabelEncoder
-from mutopia.genome_utils.peeking_sort import streaming_groupby, \
-                            RegionOverlapComparitor, expand_args
+    QuantileTransformer, StandardScaler, RobustScaler
+from ..corpus_state import CorpusState as CS
+from mutopia.genome_utils.peeking_sort import streaming_groupby
 from sklearn.compose import ColumnTransformer
 from itertools import chain
 import pandas as pd
@@ -187,8 +187,8 @@ class StratifiedTransformer:
     
     def __init__(self,          
         transformer,
-        key = lambda x : x.attrs['name'],
-        ):
+        key = CS.get_name,
+    ):
         self.base_transformer = transformer
         self.key = key
         self._transformers = {}

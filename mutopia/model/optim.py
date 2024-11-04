@@ -1,82 +1,23 @@
 
 from .corpus_state import CorpusState as CS
-from functools import reduce, partial
-from joblib import Parallel, delayed
-from contextlib import contextmanager
-from numpy import exp
-from .eval import elbo_score
+from .eval import *
+from .utils import *
+import logging
+from tqdm import trange
 
-@contextmanager
-def ParContext(n_jobs, verbose=0):
-    yield Parallel(
-        n_jobs=n_jobs, 
-        backend='threading', 
-        return_as='generator', 
-        verbose=verbose,
-        pre_dispatch='n_jobs',
-    )
-
-
-def get_n_mutations(
-        corpuses,
-):
-    samples = (
-        (corpus, sample_name)
-        for corpus in corpuses 
-        for sample_name in corpus.samples.data_vars.keys()
-    )
-
-    return reduce(
-            lambda x,y : x+y,
-            (
-            corpus.samples[sample_name].data.sum()
-            for corpus, sample_name in samples
-            )
-    )
-
-
-def score(
-    model_state,
-    corpuses,
-    locals_weight=1.0,
-    subsample_rate=1.0,
-    exposures_fn = CS.fetch_topic_compositions,
-    *,
-    parallel_context,
-):
-    
-    bound = lambda corpus, sample_name : \
-                model_state.locals_model.bound(
-                    exposures_fn(corpus, sample_name),
-                    corpus=corpus,
-                    sample=corpus.samples[sample_name],
-                    model_state=model_state,
-                    subsample_rate=subsample_rate,
-                    locals_weight=locals_weight,
-                )
-    
-    samples = (
-        (corpus, sample_name)
-        for corpus in corpuses 
-        for sample_name in corpus.samples.data_vars.keys()
-    )
-
-    elbo = reduce(
-            lambda x,y : x+y,
-            parallel_context(
-                delayed(bound)(corpus, sample_name)
-                for corpus, sample_name in samples
-            )
-        )
-    
-    return elbo
-
+logging.basicConfig(
+    level="INFO",
+    format="%(message)s",
+    datefmt="[%X]",
+)
+logger = logging.getLogger(" Mutopia ")
 
 
 def VI_step(
     model_state,
     corpuses,
     update_prior=True,
+    learning_rate=1.,
     *,
     test_score_fn,
     parallel_context,
@@ -167,7 +108,6 @@ def SVI_step(
         **args,
         norm_update_fn=lambda *x : None # don't update the normalizer
     )
-
     
     sstats, _ = model_state.Estep(**args, **svi_kw)
 
@@ -175,7 +115,7 @@ def SVI_step(
     Calculate the bounds here because the normalizers and 
     locals have been updated for some set of model parameters.
     '''
-    test_elbo = test_score_fn(
+    test_score = test_score_fn(
         model_state, 
         parallel_context=parallel_context
     )
@@ -204,17 +144,17 @@ def SVI_step(
     for corpus in corpuses:
         CS.update_corpusstate(corpus, model_state)
 
-    return elbo, test_elbo
+    return elbo, test_score
 
 
-def learning_rate_schedule(epoch, tau=1, kappa=0.5):
+def learning_rate_schedule(tau, kappa, epoch):
     return (tau + epoch)**(-kappa)
 
 
 def locus_slice_generator(
         random_state,
         *corpuses,
-        subsample_rate=0.125,
+        subsample_rate=0.25,
     ):
 
     n_loci = corpuses[0].dims['locus']
@@ -231,5 +171,147 @@ def locus_slice_generator(
     )
 
 
-def perplexity(num_mutations, elbo):
-    return exp(-elbo/num_mutations)
+def _should_stop(stop_condition, scores):
+    return len(scores) > stop_condition \
+        and scores.index(max(scores)) < (len(scores) - stop_condition)
+
+
+def fit_model( 
+    train_corpuses,
+    test_corpuses,
+    model_state,
+    random_state,
+    # optimization settings
+    empirical_bayes = True,
+    begin_prior_updates = 10,
+    stop_condition=50,
+    # optimization settings
+    num_epochs = 2000,
+    locus_subsample = None,
+    threads = 1,
+    kappa = 0.5,
+    tau = 1.,
+    callback=None,
+    eval_every=10,
+):
+
+    logger.info('Preprocessing training corpuses...')
+    for corpus in train_corpuses:   
+        CS.init_corpusstate(corpus, model_state)
+
+    logger.info('Preprocessing testing corpuses...')
+    for test_corpus in test_corpuses:
+        CS.init_corpusstate(test_corpus, model_state)
+
+    test_score_fn = partial(
+        deviance,
+        corpuses=test_corpuses,
+        exposures_fn=using_exposures_from(*train_corpuses)
+    )
+
+    '''
+    Sometimes we'd like to skip evaluating the test data
+    to decrease the computational burden.
+    '''
+    dummy_score_fn = lambda *x, **y : np.nan
+
+    train_scorer = partial(
+        perplexity,
+        get_n_mutations(train_corpuses)
+    )
+
+    lr_schedule = partial(learning_rate_schedule, tau, kappa)
+
+    stop_fn = partial(_should_stop, stop_condition//eval_every)
+
+    if locus_subsample is None:
+        logger.info('Using batch variational inference.')
+        step_fn = partial(
+            VI_step, 
+            model_state=model_state,
+            corpuses=train_corpuses,
+        )
+
+    else:
+        logger.info(f'Using stochastic VI with a sampling rate of {locus_subsample:3f}.')
+        subsampler = partial(
+            locus_slice_generator, 
+            random_state, 
+            subsample_rate=locus_subsample
+        )
+
+        step_fn = partial(
+            SVI_step, 
+            model_state=model_state,
+            corpuses=train_corpuses,
+            batch_generator=subsampler,
+            subsample_rate=locus_subsample,
+        )
+
+    logger.info(f'Training model with {threads} threads.')
+    train_scores = []
+    test_scores = []
+
+    with ParContext(threads) as par:
+        try:
+            progress_bar = trange(
+                1, num_epochs+1, 
+                desc='Training',
+                bar_format='Epoch: {n_fmt}/{total_fmt} |{bar}| [{elapsed}<{remaining}, {rate_fmt}] Scores{postfix}',
+                position=0,
+            )
+            
+            for epoch in progress_bar:
+
+                evaluate_test = (epoch % eval_every == 0) or epoch == 1
+
+                train_score, test_score = step_fn(
+                    parallel_context=par,
+                    update_prior = epoch >= begin_prior_updates \
+                        and empirical_bayes,
+                    learning_rate = lr_schedule(epoch),
+                    test_score_fn=test_score_fn if evaluate_test else dummy_score_fn,
+                )
+
+                for test_corpus in test_corpuses:
+                    CS.update_corpusstate(
+                        test_corpus,
+                        model_state,
+                        from_scratch=False,
+                    )
+
+                train_score = train_scorer(train_score)
+
+                train_scores.append(train_score)
+                
+                if evaluate_test:
+                    test_scores.append(test_score)
+
+                progress_bar.set_postfix({
+                    'Best' : f'{max(test_scores):2f}',
+                    'Recent' : ', '.join([f'{x:2f}' for x in test_scores[-5:]]),
+                })
+
+                if not callback is None:
+                    callback(model_state, train_scores, test_scores)
+
+                if stop_fn(test_scores):
+                    break
+        
+        except KeyboardInterrupt:
+            pass
+
+        finally:
+            progress_bar.close()
+        
+        logger.info('Finalizing model state...')
+        model_state.init_normalizers(
+            train_corpuses, 
+            parallel_context=par
+        )
+
+    return (
+        model_state,
+        train_scores,
+        test_scores,
+    )
