@@ -5,6 +5,7 @@ from sklearn.base import BaseEstimator
 from optim import *
 from .model_components import *
 from .latent_var_models import *
+from .eval import *
 
 class Model(BaseEstimator):
 
@@ -100,7 +101,7 @@ class Model(BaseEstimator):
                 l2_regularization=self.l2_regularization,
             )
 
-        context_model = ContextModel(
+        context_model = StrandedContextModel(
             corpuses,
             n_components=self.n_components,
             random_state=self.random_state,
@@ -177,18 +178,10 @@ class Model(BaseEstimator):
                 self.model_state_,
             )
 
-        with ParContext(self.threads) as par:
-            
-            self.model_state_.init_normalizers(
-                corpuses,
-                parallel_context=par
-            )
-
         train_corpus_dict = {c.attrs['name'] : c for c in train_corpuses}
         test_score_fn = partial(
-            score,
+            deviance,
             corpuses=test_corpuses,
-            locals_weight=0.0,
             exposures_fn = lambda test_corpus, sample_name : \
                 CS.fetch_topic_compositions(
                     train_corpus_dict[test_corpus.attrs['name']], 

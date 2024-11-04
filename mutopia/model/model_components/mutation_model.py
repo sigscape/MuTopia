@@ -277,7 +277,7 @@ class MutationModel(RateModel, SparseDataBase):
         rho = self._calc_rho(k, 
                     self.transformer\
                         .independent_effects_encoding()
-                ).transpose((2,0,1))
+                )
         
         return DataArray(
             rho,

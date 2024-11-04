@@ -13,12 +13,10 @@ class ModeConfig(ABC):
     MODE_ID = None
 
     @classmethod
-    @abstractmethod
     def dims(cls):
         return {
-            'configuration' : len(cls.CONFIGURATIONS),
-            'context' : len(cls.CONTEXTS),
-            'mutation' : len(cls.MUTATIONS),
+            k : len(v)
+            for k,v in cls.coords().items()
         }
     
     @classmethod
@@ -55,9 +53,10 @@ class ModeConfig(ABC):
         cls,
         *signatures,
     ):
-        for sig in signatures:
-            if not sig.shape == cls.dims()[1:]:
-                raise ValueError(f"Expected tensor of shape {cls.dims()[1:]} but got {sig.shape}")
+        pass
+        #for sig in signatures:
+        #    if not sig.shape == cls.dims()[1:]:
+        #        raise ValueError(f"Expected tensor of shape {cls.dims()[1:]} but got {sig.shape}")
 
 
     @classmethod

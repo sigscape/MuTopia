@@ -176,22 +176,20 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
         # What's going on here: we have the normalized log mutation rate for each signature, configuration, context, locus.
         # For the mutations in this sample, we select over these axes.
         ##
-        
-         #CS.fetch_val(corpus, 'log_mutrate_normalizer').data\
         logp_normalizer = model_state.get_normalizers(corpus)[:,None]
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             #+ np.log(corpus.regions.context_frequencies.data[configuration, context, locus]) \
-            logp_X = np.log(corpus.regions.exposures.data[locus]) \
-                        + logp_normalizer \
-                        + reduce(
-                            lambda x,y: x+y,
-                            (
-                                model.predict_sparse(corpus, locus=locus, **idx_dict)
-                                for model in model_state.nonlocals.values()
-                            )
-                        )
+            logp_X = reduce(
+                        lambda x,y: x+y,
+                        (
+                            model.predict_sparse(corpus, locus=locus, **idx_dict)
+                            for model in model_state.nonlocals.values()
+                        ),
+                        np.log(corpus.regions.exposures.data[locus]) \
+                        + logp_normalizer
+                    )
 
         return np.ascontiguousarray(
                     np.nan_to_num(np.exp(logp_X), nan=0)\

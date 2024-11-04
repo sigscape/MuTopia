@@ -4,6 +4,7 @@ from functools import reduce, partial
 from joblib import Parallel, delayed
 from contextlib import contextmanager
 from numpy import exp
+from .eval import elbo_score
 
 @contextmanager
 def ParContext(n_jobs, verbose=0):
@@ -135,22 +136,20 @@ def SVI_step(
     subsample_rate,
 ):
 
-    # Update the normalizing constants using the whole training set.
-    # Otherwise, the updates have too high variance and nothing works.
+    '''
+    Fit the normalizing constants on the whole training corpus - 
+    it's really important that this step has low variance.
+    '''
     model_state.init_normalizers(
         corpuses, 
         parallel_context=parallel_context
     )
 
-    # calculate the bound here because the mutations rates
-    # have just been re-normalized during the offset calculation
-    test_elbo = test_score_fn(
-        model_state, 
-        parallel_context=parallel_context
-    )
-
-    #use "batch_generator" to slice or subsample the corpuses
+    '''
+    Generate the sliced corpuses for the E-step.
+    '''
     slices = batch_generator(*corpuses)
+    
     args = dict(
         corpuses=slices,
         parallel_context=parallel_context,
@@ -160,17 +159,36 @@ def SVI_step(
         subsample_rate=subsample_rate,
     )
 
-    # E-step ELBO calculation is unreliable because it's only calculated
-    # on a subset of the data.
-    sstats, elbo = model_state.Estep(**args, **svi_kw)
-
-    # Get the offsets on the sliced data, 
-    # BUT DON'T UPDATE the normalizer using the slice!
+    '''
+    Get the offsets from the sliced data,
+    but don't update the normalizers!
+    '''
     offsets = model_state.get_exp_offsets_dict(
         **args,
         norm_update_fn=lambda *x : None # don't update the normalizer
     )
 
+    
+    sstats, _ = model_state.Estep(**args, **svi_kw)
+
+    '''
+    Calculate the bounds here because the normalizers and 
+    locals have been updated for some set of model parameters.
+    '''
+    test_elbo = test_score_fn(
+        model_state, 
+        parallel_context=parallel_context
+    )
+
+    elbo = elbo_score(
+        model_state,
+        corpuses,
+        parallel_context=parallel_context,
+    )
+
+    '''
+    Update global model parameters
+    '''
     model_state.Mstep(
         offsets=offsets,
         sstats=sstats,
@@ -179,7 +197,10 @@ def SVI_step(
         **svi_kw,
     )
 
-    # Update the corpus states in the ORIGINAL corpuses
+    '''
+    Update the state of the original corpuses,
+    - not the slices.
+    '''
     for corpus in corpuses:
         CS.update_corpusstate(corpus, model_state)
 

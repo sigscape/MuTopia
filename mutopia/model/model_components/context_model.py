@@ -314,7 +314,7 @@ class StrandedContextModel(RateModel, SparseDataBase):
         signature = self._calc_lambda(k,
                         self.transformer\
                             .independent_effects_encoding()
-                    )/self._context_distribution
+                    ) + np.log(self._context_distribution)[:, None]
         
         return DataArray(
             signature,

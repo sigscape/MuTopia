@@ -308,7 +308,7 @@ class GBTThetaModel(ThetaModel):
                  max_leaf_nodes = 31,
                  min_samples_leaf = 30,
                  max_features = 0.5,
-                 n_iter_no_change=2,
+                 n_iter_no_change=1,
                  use_groups=True,
                  **kw
                 ):

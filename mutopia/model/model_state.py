@@ -11,6 +11,7 @@ from itertools import chain
 from scipy.special import logsumexp
 from functools import cache, wraps, reduce
 from collections import defaultdict
+import xarray as xr
 
 
 class ModelState:
@@ -52,30 +53,9 @@ class ModelState:
 
     def get_normalizers(self, corpus):
         return self._normalizers[corpus.attrs['name']]
-        
-        
-    '''def format_counterfactual(self, k):
-        return dict(zip(
-                    self.context_model.transformer.feature_names_out,
-                    np.exp(
-                        self.context_model.format_counterfactual(k)[:,:,None] \
-                            + np.log(self.context_model.context_distribution_[None,:,None]) \
-                            + self.mutation_model.format_counterfactual(k)
-                    )
-                ))'''
     
 
     def get_propto_log_mutation_rate(self, k, corpus):
-
-        '''with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-
-            un_normalized = (
-                            np.log(corpus.regions.exposures) \
-                            + np.log(corpus.regions.context_frequencies) \
-                            + self.theta_model.predict(k, corpus) \
-                            + self.context_model.predict(k, corpus)
-                          )'''
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -92,6 +72,27 @@ class ModelState:
             )
 
         return un_normalized
+    
+
+    def _get_log_mutation_rate_tensor(self, corpus):
+        return xr.concat(
+            (
+                self.get_propto_log_mutation_rate(k, corpus)\
+                    + self.get_normalizers(corpus)[k]
+                for k in range(self.n_components)
+            ),
+            dim='component'
+        )
+    
+    
+    @staticmethod
+    def _marginalize_mutrate(log_mutrate_tensor, exposures):
+        return xr.apply_ufunc(
+            lambda gamma, mu : np.dot(mu, gamma/gamma.sum()),
+            exposures,
+            np.exp(log_mutrate_tensor),
+            input_core_dims=[[], ('component',)],
+        )
     
 
     def get_sstats_dict(self, corpuses):
@@ -216,14 +217,21 @@ class ModelState:
             learning_rate=1., 
             subsample_rate=1.
         ):
-        
         norm = self._normalizers[corpus.attrs['name']]
-        
         norm[k] = _svi_update_fn(
                 norm[k],
                 np.log(subsample_rate) + logsum_mutation_rate,
                 learning_rate
             )
+        
+    def format_signature(self, k):
+        return np.exp(reduce(
+            lambda x,y : x+y,
+            (
+                model.format_signature(k)
+                for model in self.nonlocals.values()
+            )
+        ))
         
 
     def Mstep(self,
