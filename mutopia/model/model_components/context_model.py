@@ -7,8 +7,9 @@ from ._glm_compiled import make_optimizer, setup_mixed_solver, get_lsqr_solver
 from ._fast_eln import get_eln_solver
 from ..corpus_state import CorpusState as CS
 from .base import get_reg_params, get_poisson_targets_weights, _svi_update_fn, \
-    RateModel, dims_except_for, SparseDataBase
+    RateModel, SparseDataBase
 from ._strand_transformer import StrandEncoder
+from ..utils import dims_except_for
 
 import logging
 logger = logging.getLogger(' LocusRegressor')
@@ -29,7 +30,7 @@ class StrandedContextModel(RateModel, SparseDataBase):
         random_state,
     ):
         super().__init__(*corpuses)
-            
+        
         #self.n_corpuses = len(corpuses)
         self.n_components = n_components
         self.context_dim = corpuses[0].dims['context']

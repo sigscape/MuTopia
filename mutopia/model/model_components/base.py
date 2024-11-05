@@ -76,12 +76,6 @@ class SparseDataBase(ABC):
         raise NotImplementedError
 
 
-
-
-def dims_except_for(dims, *keepdims):
-    return tuple({*dims}.difference({*keepdims}))
-
-
 ## Shared methods for rate models ##
 def get_reg_params(l1_rate, l2_rate):
         return dict(

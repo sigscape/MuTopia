@@ -109,12 +109,12 @@ class OnDiskSparse(BaseAccessor):
 
         #self._validate(self, ['configuration', 'context', 'mutation', 'locus'], None)
 
-        sparse_matrix : sparse.GCXS = self._xrds.data
+        sparse_matrix = self._xrds.data.tocoo()
 
         return xr.Dataset(
             {
                 'indices' : xr.DataArray(
-                    sparse_matrix.tocoo().coords,
+                    sparse_matrix.coords,
                     dims=['obs_indices', 'n_observations'],
                 ),
                 'data' : xr.DataArray(

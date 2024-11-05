@@ -35,10 +35,6 @@ class ModelState:
         }
 
     @property
-    def n_models(self):
-        return 420
-
-    @property
     def n_components(self):
         return next(iter(self._models.values())).n_components
 

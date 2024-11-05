@@ -1,7 +1,7 @@
 
 from .base import ModeConfig
-from .sbs import SBSMode
-from .fragment_motif import FragmentMotif
+from .sbs import SBSMode, SBSModel
+from .fragment_motif import FragmentMotif, MotifModel
 
 DTYPE_MAP = {
     'sbs' : SBSMode,

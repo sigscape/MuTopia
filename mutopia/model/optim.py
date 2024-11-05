@@ -263,7 +263,7 @@ def fit_model(
             
             for epoch in progress_bar:
 
-                evaluate_test = (epoch % eval_every == 0) or epoch == 1
+                evaluate_test = (epoch % eval_every == 0) or epoch == 1 or epoch == num_epochs
 
                 train_score, test_score = step_fn(
                     parallel_context=par,
@@ -319,14 +319,6 @@ def fit_model(
         model_state.init_normalizers(
             train_corpuses, 
             parallel_context=par
-        )
-
-        logger.info('Calculating final test score...')
-        test_scores.append(
-            test_score_fn(
-                model_state,
-                parallel_context=par
-            )
         )
 
     return (

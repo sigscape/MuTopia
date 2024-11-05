@@ -24,6 +24,17 @@ def using_exposures_from(*corpuses):
             sample_name
         )
 
+def dims_except_for(dims, *keepdims):
+    return tuple({*dims}.difference({*keepdims}))
+
+
+def match_dims(corpus, X):
+    data_dims = corpus.modality().dims
+    return X.expand_dims({
+        d : data_dims[d]
+        for d in dims_except_for(data_dims.keys(), *X.dims)
+    })
+
 
 def split_by_chrom(
     corpus,

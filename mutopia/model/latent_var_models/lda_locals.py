@@ -178,9 +178,10 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
         ##
         logp_normalizer = model_state.get_normalizers(corpus)[:,None]
 
+        # np.log(corpus.regions.context_frequencies.data[context, locus]) \
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            #+ np.log(corpus.regions.context_frequencies.data[configuration, context, locus]) \
+
             logp_X = reduce(
                         lambda x,y: x+y,
                         (
