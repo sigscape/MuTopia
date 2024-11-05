@@ -1,0 +1,10 @@
+__pycache__/
+data/
+*.db
+*.ipynb
+**/.ipynb_checkpoints/
+build/
+*.nc
+*.prof
+test.py
+testing.ipynb
