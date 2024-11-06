@@ -233,7 +233,7 @@ def fit_model(
         )
 
     else:
-        logger.info(f'Using stochastic VI with a sampling rate of {locus_subsample:3f}.')
+        logger.info(f'Using stochastic VI with a sampling rate of {locus_subsample:2f}.')
         subsampler = partial(
             locus_slice_generator, 
             random_state, 
@@ -263,7 +263,9 @@ def fit_model(
             
             for epoch in progress_bar:
 
-                evaluate_test = (epoch % eval_every == 0) or epoch == 1 or epoch == num_epochs
+                evaluate_test = (epoch % eval_every == 0) \
+                                or epoch == 1 \
+                                or epoch == num_epochs
 
                 train_score, test_score = step_fn(
                     parallel_context=par,
@@ -307,6 +309,7 @@ def fit_model(
                     callback(model_state, train_scores, test_scores)
 
                 if stop_fn(test_scores):
+                    logger.info('Early stopping criterion met. The model has converged.')
                     break
         
         except KeyboardInterrupt:

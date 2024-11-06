@@ -3,18 +3,29 @@ import numpy as np
 from functools import partial, reduce
 from ..model_components.base import _svi_update_fn, PrimitiveModel
 from ..corpus_state import CorpusState as CS
-
-from ._dirichlet_update import dirichlet_bound, update_alpha
+from ._dirichlet_update import update_alpha
 from .base import LocalUpdate
-from scipy.special import psi, gammaln
 from numba import njit, vectorize
 import warnings
+from numba.extending import get_cython_function_address
+import ctypes
 
+
+'''
+Here we're defining numba-compatible functions for the
+psi and gammaln functions from scipy.special, referencing the 
+cython code underlying the scipy.special module.
+'''
+addr = get_cython_function_address("scipy.special.cython_special", "__pyx_fuse_1psi")
+functype = ctypes.CFUNCTYPE(ctypes.c_double, ctypes.c_double)
+psi = functype(addr)
 
 @vectorize(['double(double)'])
 def psivec(x):
     return psi(x)
 
+
+gammaln = functype(get_cython_function_address("scipy.special.cython_special", "gammaln"))
 @vectorize(['double(double)'])
 def gammalnvec(x):
     return gammaln(x)
@@ -34,6 +45,7 @@ def dirichlet_bound(alpha, gamma):
         np.sum(gammalnvec(gamma) - gammalnvec(alpha) + (alpha - gamma)*logE_gamma)
 
 
+# enforcing contiguous memory layout for  the following functions
 @njit('double[::1](double[::1], double[::1], double[:,::1], double[::1])', nogil=True)
 def _update_step(
         gamma,
