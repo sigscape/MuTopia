@@ -171,16 +171,13 @@ class SBSMode(ModeConfig):
     def load_components(cls, *init_components):
         
         filepath = os.path.join(os.path.dirname(__file__), 'musical_sbs.json')
-
         with open(filepath, 'r') as f:
             database = json.load(f)
 
         comps = []
         for component in init_components:
-            
             if not component in database:
                 raise ValueError(f"Component {component} not found in database")
-            
             comps.append(
                 np.array(
                     [database[component][context_mut] for context_mut in MUTOPIA_ORDER]
@@ -280,6 +277,26 @@ def SBSModel(
 ):
     
     random_state = np.random.RandomState(seed)
+    
+    mutation_model = MutationModel(
+        train_corpuses,
+        n_components=n_components,
+        random_state=random_state,
+        tol=5e-4,
+        reg=mutation_reg,
+        conditioning_alpha=conditioning_alpha,
+        init_components=init_components,
+    )
+
+    context_model = StrandedContextModel(
+        train_corpuses,
+        n_components=n_components,
+        random_state=random_state,
+        tol=5e-4,
+        reg=context_reg,
+        conditioning_alpha=conditioning_alpha,
+        init_components=init_components,
+    )
 
     logger.info('Initializing model parameters and transformations...')
     theta_model = \
@@ -301,26 +318,6 @@ def SBSModel(
             #add_corpus_intercepts=add_corpus_intercepts,
             l2_regularization=l2_regularization,
         )
-
-    context_model = StrandedContextModel(
-        train_corpuses,
-        n_components=n_components,
-        random_state=random_state,
-        tol=5e-4,
-        reg=context_reg,
-        conditioning_alpha=conditioning_alpha,
-        init_components=init_components,
-    )
-
-    mutation_model = MutationModel(
-        train_corpuses,
-        n_components=n_components,
-        random_state=random_state,
-        tol=5e-4,
-        reg=mutation_reg,
-        conditioning_alpha=conditioning_alpha,
-        init_components=init_components,
-    )
 
     locals_model = LocalUpdateSparse(
         train_corpuses,

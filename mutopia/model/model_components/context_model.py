@@ -96,10 +96,10 @@ class StrandedContextModel(RateModel, SparseDataBase):
     def requires_dims(self):
         return ('configuration','context','locus')
     
+
     def prepare_to_save(self):
         del self.model 
         # the model is not serializable because it has nested functions
-
 
     ##
     # Satisfaction of SparseDataBase interface

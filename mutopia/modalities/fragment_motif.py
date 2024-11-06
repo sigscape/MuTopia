@@ -4,13 +4,35 @@ from .base import ModeConfig
 from itertools import product
 from ..model import *
 import numpy as np
+import os
+import json
 import logging
+import matplotlib.pyplot as plt
+from ..plot.signature_plot import _plot_linear_signature
 logger = logging.getLogger(' Mutopia-MotifModel ')
 
 CONTEXTS = sorted(
     map(lambda x : ''.join(x), product('ATCG','ATCG','ATCG', 'ATCG')), 
     key = lambda x : (x[0], x[1], x[2], x[3])
     )
+
+cmap = plt.colormaps['tab10']
+
+_context_palette = {
+    'A': cmap(0.3),
+    'C': cmap(0.2),
+    'G': cmap(0.9),
+    'T': cmap(0.4)
+}
+
+ALPHA_LIST = [0.5 if fourmer[1] in ['A','G'] else 1 for fourmer in CONTEXTS]
+COLOR_LIST = [_context_palette[fourmer[0]] for fourmer in CONTEXTS]
+for i in range(len(COLOR_LIST)):
+    color_tuple = list(COLOR_LIST[i])
+    color_tuple[-1] = ALPHA_LIST[i]
+    COLOR_LIST[i] = tuple(color_tuple)
+
+
 
 class FragmentMotif(ModeConfig):
 
@@ -28,18 +50,57 @@ class FragmentMotif(ModeConfig):
     @property
     def sample_params(self):
         return _sample_params
-    
-    def get_context_frequencies(self, *args,**kw):
-        pass
 
-    def load_components(self, *args, **kw):
-        pass
+    @classmethod
+    def load_components(cls, *init_components):
+        
+        filepath = os.path.join(os.path.dirname(__file__), 'fragment_motifs.json')
+        with open(filepath, 'r') as f:
+            database = json.load(f)
 
-    def plot(self, *args, **kw):
-        pass
+        comps = []
+        for component in init_components:
+            if not component in database:
+                raise ValueError(f"Component {component} not found in database")
+            comps.append(
+                [database[component][context_mut] for context_mut in cls().coords['context']]
+            )
+        print(comps)
+        return np.expand_dims(np.array(comps), axis=-1)
+
+
+    @classmethod
+    def plot(
+        cls,
+        signature,
+        palette = COLOR_LIST,
+        select = ['Baseline'],
+        **kwargs,
+    ):
+        cls.validate_signatures(
+            signature,
+            required_dims=('context',),
+        )
+        signature = signature.transpose(...,'context',)
+        lead_dim = signature.dims[0]
+        
+        _plot_linear_signature(
+            CONTEXTS,
+            palette,
+            *list(map(
+                lambda s : s.ravel(),
+                signature.loc[{lead_dim : list(select)}].data
+            )),
+            **kwargs
+        )
+
 
     def ingest_observations(self, *args, **kw):
         pass
+
+    def get_context_frequencies(self, *args,**kw):
+        pass
+
 
 
 def MotifModel(
