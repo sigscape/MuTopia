@@ -341,7 +341,7 @@ class StrandedContextModel(RateModel, SparseDataBase):
         return DataFrame(
             coef_matrix,
             index=self.transformer.feature_names_out,
-            columns=[self.context_names for i in range(c)] + ['Shared effect']
+            columns=self.context_names + ['Shared effect']
         )
 
 

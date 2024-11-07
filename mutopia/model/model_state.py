@@ -269,6 +269,7 @@ class ModelState:
             learning_rate=1.,
             subsample_rate=1.,
             update_prior=True,
+            use_parallel=False,
         ):
 
         if update_prior:
@@ -286,8 +287,10 @@ class ModelState:
             for model_name, model in self.nonlocals.items()
         ))
 
-        for _ in parallel_context(delayed(fn)() for fn in update_fns):
-            pass
+        it = parallel_context(delayed(fn)() for fn in update_fns) if use_parallel \
+                else (fn() for fn in update_fns)
+        
+        for _ in it: pass
 
 
     def Estep(

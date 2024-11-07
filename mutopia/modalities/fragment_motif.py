@@ -36,12 +36,11 @@ for i in range(len(COLOR_LIST)):
 
 class FragmentMotif(ModeConfig):
 
-    CONTEXTS=CONTEXTS
     MODE_ID='fragment-motif'
 
     @property
     def coords(self):
-        return {'context' : self.CONTEXTS}
+        return {'context' : CONTEXTS}
     
     @property
     def make_model(self):
@@ -65,9 +64,7 @@ class FragmentMotif(ModeConfig):
             comps.append(
                 [database[component][context_mut] for context_mut in cls().coords['context']]
             )
-        print(comps)
         return np.expand_dims(np.array(comps), axis=-1)
-
 
     @classmethod
     def plot(
@@ -93,7 +90,6 @@ class FragmentMotif(ModeConfig):
             )),
             **kwargs
         )
-
 
     def ingest_observations(self, *args, **kw):
         pass
@@ -138,6 +134,7 @@ def MotifModel(
     tau = 1.,
     callback=None,
     eval_every=10,
+    verbose=0,
 ):
     random_state = np.random.RandomState(seed)
 
@@ -202,6 +199,7 @@ def MotifModel(
             tau=tau,
             callback=callback,
             eval_every=eval_every,
+            verbose=verbose,
         )
 
     return (

@@ -9,7 +9,9 @@ from ..model import *
 from .base import ModeConfig
 logger = logging.getLogger(' Mutopia-SBSModel ')
 
+'''
 
+'''
 COSMIC_SORT_ORDER = [
  'A[C>A]A',
  'A[C>A]C',
@@ -147,16 +149,13 @@ MUTOPIA_TO_COSMIC_IDX = np.array([
 class SBSMode(ModeConfig):
 
     MODE_ID = 'sbs'
-    CONTEXTS = CONTEXTS
-    MUTATIONS = MUTATIONS
-    CONFIGURATIONS = CONFIGURATIONS
 
     @property
     def coords(self):
         return {
-            'configuration' : self.CONFIGURATIONS,
-            'context' : self.CONTEXTS,
-            'mutation' : self.MUTATIONS,
+            'configuration' : CONFIGURATIONS,
+            'context' : CONTEXTS,
+            'mutation' : MUTATIONS,
         }
     
     @property
@@ -188,7 +187,6 @@ class SBSMode(ModeConfig):
 
         return np.array(comps)
 
-
     @classmethod
     def plot(cls,
         signature,
@@ -210,10 +208,10 @@ class SBSMode(ModeConfig):
                 lambda s : s.ravel()[MUTOPIA_TO_COSMIC_IDX],
                 signature.loc[{lead_dim : list(select)}].data
             )),
+            sig_names=select,
             **kwargs
         )
     
-
     @classmethod
     def get_context_frequencies(
         cls,
@@ -222,7 +220,6 @@ class SBSMode(ModeConfig):
         n_jobs = 1,
     ):
         pass
-
 
     @classmethod
     def ingest_observations(

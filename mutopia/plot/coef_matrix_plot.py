@@ -3,7 +3,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 
-def _plot_interaction_matrix(coef_matrix : pd.DataFrame):
+def _plot_interaction_matrix(
+        coef_matrix : pd.DataFrame,
+        palette='vlag',
+    ):
 
     fig = plt.figure(figsize=(7, 2))
     gs = gridspec.GridSpec(
@@ -13,8 +16,6 @@ def _plot_interaction_matrix(coef_matrix : pd.DataFrame):
                 wspace=0.05,
                 hspace=0.1,
             )
-
-    palette = 'vlag', #sns.diverging_palette(220, 20, as_cmap=True)
 
     base_ax = fig.add_subplot(gs[0,1])
 

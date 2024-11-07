@@ -81,10 +81,10 @@ def SVI_step(
     Fit the normalizing constants on the whole training corpus - 
     it's really important that this step has low variance.
     '''
-    model_state.init_normalizers(
-        corpuses, 
-        parallel_context=parallel_context
-    )
+    #model_state.init_normalizers(
+    #    corpuses, 
+    #    parallel_context=parallel_context
+    #)
 
     '''
     Generate the sliced corpuses for the E-step.
@@ -106,10 +106,10 @@ def SVI_step(
     '''
     offsets = model_state.get_exp_offsets_dict(
         **args,
-        norm_update_fn=lambda *x : None # don't update the normalizer
+        norm_update_fn=partial(model_state._update_normalizer, **svi_kw),
     )
     
-    sstats, _ = model_state.Estep(**args, **svi_kw)
+    sstats, elbo = model_state.Estep(**args, **svi_kw)
 
     '''
     Calculate the bounds here because the normalizers and 
@@ -118,12 +118,6 @@ def SVI_step(
     test_score = test_score_fn(
         model_state, 
         parallel_context=parallel_context
-    )
-
-    elbo = elbo_score(
-        model_state,
-        corpuses,
-        parallel_context=parallel_context,
     )
 
     '''
@@ -193,6 +187,7 @@ def fit_model(
     tau = 1.,
     callback=None,
     eval_every=10,
+    verbose=0,
 ):
 
     logger.info('Preprocessing training corpuses...')
@@ -252,7 +247,7 @@ def fit_model(
     train_scores = []
     test_scores = []
 
-    with ParContext(threads) as par:
+    with ParContext(threads, verbose) as par:
         try:
             progress_bar = trange(
                 1, num_epochs+1, 
@@ -263,9 +258,12 @@ def fit_model(
             
             for epoch in progress_bar:
 
-                evaluate_test = (epoch % eval_every == 0) \
+                evaluate_test = not eval_every is None and \
+                                (
+                                (epoch % eval_every == 0) \
                                 or epoch == 1 \
                                 or epoch == num_epochs
+                                )
 
                 train_score, test_score = step_fn(
                     parallel_context=par,

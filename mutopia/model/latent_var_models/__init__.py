@@ -1,2 +1,2 @@
 from .base import LocalUpdate
-from .lda_locals import LocalUpdateSparse
+from .sparse_lda_locals import LocalUpdateSparse

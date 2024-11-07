@@ -2,7 +2,7 @@ from .corpus_state import CorpusState as CS
 from .optim import *
 from .model_components import *
 from .latent_var_models import *
-from .optim import fit_model
+from ..plot.coef_matrix_plot import _plot_interaction_matrix
 from joblib import dump, load
    
 '''
@@ -43,6 +43,26 @@ class Model:
 
         dump(self, path)
     
+
+    def plot_signature(self, component, **kwargs):
+        self.modality_.plot(
+            self.model_state_.format_signature(component), 
+            **kwargs
+        )
+
+
+    def plot_interaction_matrix(self, 
+            component, 
+            model='context_model', 
+            palette='vlag',
+            **kw,
+        ):
+        return _plot_interaction_matrix(
+            self.model_state_.models[model]\
+                .component_coef_summary(component),
+            palette=palette,
+            **kw
+        )
 
     def predict_exposures(self, corpus):
         pass
