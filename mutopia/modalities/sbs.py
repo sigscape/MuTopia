@@ -178,11 +178,8 @@ class SBSMode(ModeConfig):
             if not component in database:
                 raise ValueError(f"Component {component} not found in database")
             comps.append(
-                np.array(
-                    [database[component][context_mut] for context_mut in MUTOPIA_ORDER]
-                ).reshape(
-                    (cls.dim_context(), cls.dim_mutation())
-                )
+                np.array([database[component][context_mut] for context_mut in MUTOPIA_ORDER])\
+                    .reshape( (cls.dim_context(), cls.dim_mutation()) )
             )
 
         return np.array(comps)

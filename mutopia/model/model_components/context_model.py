@@ -141,7 +141,7 @@ class StrandedContextModel(RateModel, SparseDataBase):
         k = signatures.shape[0]
         c=self.transformer.n_encoded_features_
 
-        renormalized = (signatures.sum(axis = -1)*100 + 1)/self._context_distribution
+        renormalized = 100*(signatures.sum(axis = -1) + 1e-5)/self._context_distribution
 
         self._coefs[
                 :k,
