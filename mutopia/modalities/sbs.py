@@ -272,7 +272,8 @@ def SBSModel(
     
     random_state = np.random.RandomState(seed)
     
-    mutation_model = MutationModel(
+    mutation_model = StrandedConditionalConsequenceModel(
+        'mutation', # require the mutation dimension - this is the stranded conditional consequence
         train_corpuses,
         n_components=n_components,
         random_state=random_state,

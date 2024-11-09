@@ -93,7 +93,7 @@ class DesignMatrixHelper:
         return single_block*n_blocks + ([False]*(R-1) if shared_effects else [])
     
 
-class StrandEncoder:
+class MesoscaleEncoder:
     
     def __init__(self, n_blocks) -> None:
         self.n_blocks = n_blocks
@@ -224,7 +224,7 @@ class StrandEncoder:
     
 
 
-class MutationStrandEncoder(StrandEncoder):
+class NormalizedMesoscaleEncoder(MesoscaleEncoder):
     
     @classmethod
     def compose_encoding_matrix(cls, n_blocks, block_matrix):

@@ -1,6 +1,5 @@
-from .base import get_reg_params, _svi_update_fn, RateModel, SparseDataBase
-from ._strand_transformer import MutationStrandEncoder
-#from ._poisson_elastic_net import make_optimizer, SklearnWrapper, simple_ridge
+from .base import get_reg_params, _svi_update_fn, RateModel, SparseDataBase, DenseDataBase
+from ._strand_transformer import NormalizedMesoscaleEncoder
 from ._glm_compiled import make_optimizer, setup_mixed_solver, \
     get_lsqr_solver, ls_partial_solver
 from ._fast_eln import get_eln_solver
@@ -8,12 +7,20 @@ from functools import partial
 from sklearn.base import clone
 import numpy as np
 from ..corpus_state import CorpusState as CS
+from ..utils import dims_except_for
 from xarray import DataArray
 from functools import reduce
 
-class MutationModel(RateModel, SparseDataBase):
+class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBase):
+    '''
+    Stranded -> depends on the presence of the "configuration" dimension
+    Conditional -> depends on the context of the event
+    Consequence -> this model predicts the consequences of some event, not where it occurs.
+    '''
 
-    def __init__(self,
+    def __init__(
+        self,
+        dim_name,
         corpuses,
         reg : float = 0.0005,
         conditioning_alpha = 5e-5,
@@ -25,21 +32,21 @@ class MutationModel(RateModel, SparseDataBase):
         n_components,
         random_state,
     ):
+        self.dim_name = dim_name
         super().__init__(*corpuses)
 
         self.n_components = n_components
-        self.mutation_dim = corpuses[0].dims['mutation']
+        self.consequence_dim = corpuses[0].dims[dim_name]
+        self.consequence_names = corpuses[0].coords[dim_name].values
         self.context_dim = corpuses[0].dims['context']
         self.context_names = corpuses[0].coords['context'].values
-        self.mutation_names = corpuses[0].coords['mutation'].values
 
+        self.transformer = NormalizedMesoscaleEncoder(self.consequence_dim)\
+                                .fit(corpuses)
         
-        self.transformer = MutationStrandEncoder(self.mutation_dim)\
-                                        .fit(corpuses)
-        
-        _mut_encoding_matrix = self.transformer.encoding_matrix_
+        _cons_encoding_matrix = self.transformer.encoding_matrix_
         self._is_regularized = ~np.array(self.transformer.intercept_mask_)
-        X = _mut_encoding_matrix.copy()
+        X = _cons_encoding_matrix.copy()
 
         eln_solver = partial(
             get_eln_solver,
@@ -51,8 +58,8 @@ class MutationModel(RateModel, SparseDataBase):
         ridge_solver = partial(
             ls_partial_solver,
             group_mask = np.array(
-                [True]*self.mutation_dim \
-                + [False]*( (~self._is_regularized).sum() - self.mutation_dim )
+                [True]*self.consequence_dim \
+                + [False]*( (~self._is_regularized).sum() - self.consequence_dim )
             ),
             tol=tol,
             max_iter=10000,
@@ -74,7 +81,7 @@ class MutationModel(RateModel, SparseDataBase):
         )
 
         # convert to dense for other computations, but keep sparse for regression updates
-        self._mut_encoding_matrix=_mut_encoding_matrix\
+        self._cons_encoding_matrix=_cons_encoding_matrix\
                                     .toarray()[:,:-self.transformer.n_states_]
 
         self._coefs = self._init_params(
@@ -96,23 +103,25 @@ class MutationModel(RateModel, SparseDataBase):
 
     @property
     def requires_dims(self):
-        return ('configuration','context','mutation','locus')
+        return ('configuration','context', self.dim_name, 'locus')
     
     def prepare_to_save(self):
         del self.model
         
-    @staticmethod
-    def predict_sparse(corpus,*,context, mutation, configuration, locus, **idx_dict):
+    
+    def predict_sparse(self, corpus,*,context, configuration, locus, **idx_dict):
 
-        strand_state = CS.fetch_val(corpus, 'strand_idx').data\
+        consequence = idx_dict[self.dim_name]
+
+        mesoscale_state = CS.fetch_val(corpus, 'mesoscale_idx').data\
                             [configuration, locus]
         
-        return CS.fetch_val(corpus, 'log_mutation_distribution').data\
-                [:, context, mutation, strand_state]
+        return CS.fetch_val(corpus, f'log_{self.dim_name}_distribution').data\
+                [:, context, consequence, mesoscale_state]
     
 
-    @staticmethod
     def reduce_sparse_sstats(
+        self,
         sstats, 
         corpus,
         *,
@@ -120,14 +129,37 @@ class MutationModel(RateModel, SparseDataBase):
         configuration,
         locus,
         context,
-        mutation,
-        **kw,
+        **idx_dict,
     ):
-        strand_states = CS.fetch_val(corpus, 'strand_idx').data\
+        consequence = idx_dict[self.dim_name]
+        mesoscale_states = CS.fetch_val(corpus, 'mesoscale_idx').data\
                             [configuration, locus]
 
         # Use numpy advanced indexing to update mutation_sstats
-        np.add.at(sstats, (slice(None), context, strand_states, mutation), weighted_posterior)
+        np.add.at(sstats, (slice(None), context, consequence, mesoscale_states), weighted_posterior)
+
+        return sstats
+    
+
+    def reduce_dense_sstats(self, sstats, corpus, *, weighted_posterior, **kw):
+
+        to_dim = ('component', *self.requires_dims)
+
+        if not to_dim[1] == 'configuration':
+            raise ValueError('First dimension must be configuration!')
+        
+        # K x D x C x M x L
+        weights = weighted_posterior\
+            .sum(dim=dims_except_for(weighted_posterior.dims, *to_dim))\
+            .transpose(*to_dim)\
+            .data
+
+        # 2 x L
+        (plus_idx, minus_idx) = CS.fetch_val(corpus, 'mesoscale_idx').data
+        
+        # sstats : K x C x S x M
+        np.add.at(sstats, (slice(None), slice(None), slice(None), plus_idx), weights[:,0])
+        np.add.at(sstats, (slice(None), slice(None), slice(None), minus_idx), weights[:,1])
 
         return sstats
 
@@ -137,13 +169,13 @@ class MutationModel(RateModel, SparseDataBase):
         k = signatures.shape[0]
         c=self.transformer.n_encoded_features_
 
-        renormalized = signatures*1000 + 1
+        renormalized = signatures + 1e-5
         renormalized = renormalized/renormalized.sum(axis = -1, keepdims = True)
 
         self._coefs[
                 :k,
                 :,
-                0:c*self.mutation_dim:c
+                0:c*self.consequence_dim:c
             ] = np.log( renormalized )
     
 
@@ -158,7 +190,7 @@ class MutationModel(RateModel, SparseDataBase):
                 ).astype(dtype, copy = False)
     
 
-    def _get_log_mutation_distribution(self, corpus_state):
+    def _get_log_cons_distribution(self, corpus_state):
         return np.array([
             self._format_component(k)
             for k in range(self.n_components)
@@ -167,25 +199,25 @@ class MutationModel(RateModel, SparseDataBase):
 
     def prepare_corpusstate(self, corpus):
         return dict(
-                    log_mutation_distribution = DataArray(
-                        self._get_log_mutation_distribution(corpus),
-                        dims=('component','context','mutation','strand_state')
-                    )
+                    {f'log_{self.dim_name}_distribution' : DataArray(
+                        self._get_log_cons_distribution(corpus),
+                        dims=('component','context', self.dim_name, 'mesoscale_state')
+                    ),
+                    }
                 )
         
     def update_corpusstate(self, corpus, **kwargs):
-        CS.fetch_val(corpus, 'log_mutation_distribution').data[:] = \
-            self._get_log_mutation_distribution(corpus)
+        CS.fetch_val(corpus, f'log_{self.dim_name}_distribution').data[:] = \
+            self._get_log_cons_distribution(corpus)
 
 
     def _get_sstats_dim(self):
         return (
             self.n_components, 
             self.context_dim, 
+            self.consequence_dim,
             self.transformer.n_states_, 
-            self.mutation_dim
         )
-    
 
     def spawn_sstats(self, corpus):
         return np.zeros(self._get_sstats_dim(), self._coefs.dtype)
@@ -196,7 +228,7 @@ class MutationModel(RateModel, SparseDataBase):
         #CxMxS
         rho = self._format_component(k)
 
-        (plus_idx, minus_idx) = CS.fetch_val(corpus_state, 'strand_idx').data
+        (plus_idx, minus_idx) = CS.fetch_val(corpus_state, 'mesoscale_idx').data
         
          # 2 x C x M x L
         mutation_effects = np.array([
@@ -206,7 +238,7 @@ class MutationModel(RateModel, SparseDataBase):
 
         return DataArray(
             mutation_effects,
-            dims=('configuration','context','mutation','locus'),
+            dims=('configuration', 'context', self.dim_name, 'locus'),
         )
     
 
@@ -245,8 +277,8 @@ class MutationModel(RateModel, SparseDataBase):
 
         for c in range(self.context_dim):
             
-            # CxSxM => MxS => M*S
-            target=stats_reduced[c].T.ravel()
+            # CxMxS => MxS => M*S
+            target=stats_reduced[c].ravel()
             target = target/target.mean()
 
             yield partial(
@@ -267,7 +299,7 @@ class MutationModel(RateModel, SparseDataBase):
     def _calc_rho(self,k, design_matrix):
 
         rho_tilde = np.exp( self.coefs_[k] @ design_matrix.T)\
-            .reshape((self.context_dim, self.mutation_dim, -1))
+            .reshape((self.context_dim, self.consequence_dim, -1))
         # CxMxS
         rho = rho_tilde/rho_tilde.sum(axis = -2, keepdims = True)
 
@@ -283,15 +315,15 @@ class MutationModel(RateModel, SparseDataBase):
         
         return DataArray(
             rho,
-            dims=('context','mutation','strand_state'),
-            coords=dict(
-                strand_state = self.transformer.feature_names_out,
-                mutation = self.mutation_names,
-                context = self.context_names
-            )
+            dims=('context', self.dim_name, 'mesoscale_state'),
+            coords={
+                'mesoscale_state' : self.transformer.feature_names_out,
+                'context' : self.context_names,
+                self.dim_name : self.consequence_names,
+            }
         )
     
 
     def _format_component(self, k):
-        return self._calc_rho(k, self._mut_encoding_matrix)
+        return self._calc_rho(k, self._cons_encoding_matrix)
 

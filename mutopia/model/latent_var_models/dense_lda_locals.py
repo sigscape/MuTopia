@@ -2,13 +2,12 @@ from xarray import DataArray
 import numpy as np
 from functools import partial, reduce
 from ..model_components.base import _svi_update_fn, PrimitiveModel
-from ._dirichlet_update import update_alpha
 from ..corpus_state import CorpusState as CS
+from ._dirichlet_update import update_alpha
 from .base import *
-import warnings
 
 
-class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
+class LocalUpdateDense(PrimitiveModel, LocalUpdate):
 
     def __init__(self,
             corpuses,
@@ -31,62 +30,10 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
             for corpus in corpuses
         }
     
-    ##
-    # E-step functionality to satisfy the LocalUpdate interface
-    ##
-    def _convert_sample(self, sample):
+    @staticmethod
+    def _convert_sample(sample):
+        return np.ascontiguousarray(sample.data)
 
-        sample = sample.sparse_to_coo()
-        weights = np.ascontiguousarray(
-            sample.data.data.astype(self.dtype, copy=False)
-        )
-
-        idx_dict = dict(zip(
-            tuple(sample.coords['obs_indices'].data),
-            sample.indices.data,
-        ))
-
-        return dict(
-            **idx_dict,
-            weights=weights,
-        )
-
-
-    def _conditional_observation_likelihood(
-        self,
-        corpus,
-        model_state,
-        *,
-        weights,
-        locus,
-        **idx_dict,
-    ):
-
-        ##
-        # What's going on here: we have the normalized log mutation rate for each signature, configuration, context, locus.
-        # For the mutations in this sample, we select over these axes.
-        ##
-        logp_normalizer = model_state.get_normalizers(corpus)[:,None]
-
-        # np.log(corpus.regions.context_frequencies.data[context, locus]) \
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-
-            logp_X = reduce(
-                        lambda x,y: x+y,
-                        (
-                            model.predict_sparse(corpus, locus=locus, **idx_dict)
-                            for model in model_state.nonlocals.values()
-                        ),
-                        np.log(corpus.regions.exposures.data[locus]) \
-                        + logp_normalizer
-                    )
-
-        return np.ascontiguousarray(
-                    np.nan_to_num(np.exp(logp_X), nan=0)\
-                        .astype(self.dtype, copy=False)
-                )
-    
 
     @staticmethod
     def _calc_sstats(
@@ -95,7 +42,7 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
         weights,
         gamma,
         *,
-        sample_dict,
+        dims,
         ):
 
         args = (
@@ -109,10 +56,12 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
         elbo = bound(*args, weighted_posterior)        
 
         suffstats = {
-                **sample_dict,
-                'weighted_posterior' : weighted_posterior, 
-                'gamma' : gamma, 
-            }
+            'weighted_posterior' : DataArray(
+                weighted_posterior, 
+                dims=('component', *dims),
+            ),
+            'gamma' : gamma, 
+        }
 
         return (suffstats, gamma, elbo)
     
@@ -141,7 +90,8 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
         *,
         corpus,
         sample,
-        model_state,
+        conditional_likelihood,
+        dims,
     ):
         '''
         Why am I doing it this way? - one could pass 
@@ -153,16 +103,8 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
         '''
         
         # 1. get the information we need from the sample
-        sample_dict = self._convert_sample(sample)
-        weights = sample_dict['weights']/subsample_rate
-        alpha = np.ascontiguousarray(self.alpha[corpus.attrs['name']])
-
-        conditional_likelihood = \
-            self._conditional_observation_likelihood(
-                corpus, 
-                model_state,
-                **sample_dict
-            )
+        weights = self._convert_sample(sample)/subsample_rate
+        alpha = np.ascontiguousarray(self.alpha[CS.get_name(corpus)])
         
         args = (
             alpha, 
@@ -180,7 +122,7 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
         suffstat_fn = partial(
             self._calc_sstats,
             *args,
-            sample_dict=sample_dict,
+            dims=dims,
         )
 
         svi_update = partial(
@@ -202,27 +144,41 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
         *,
         parallel_context,
     ):
-        '''
-        In this case, each update function can be computed independently,
-        and does not depend on any contextual evaluations.
-        I added "get_update_fns" to the API for the locals model because 
-        some update functions may depend on something computed ahead of time.
-        '''
-
+        
         samples = [
             (corpus, sample_name)
             for corpus in corpuses
             for sample_name in CS.list_samples(corpus)
         ]
 
+        _corpus, _sname = samples[0]
+        sample_dims = _corpus.samples[_sname].dims
+
+        transform = lambda x : np.ascontiguousarray(np.nan_to_num(np.exp(x), nan=0.))
+        
+        likelihood_tensors = {
+            CS.get_name(corpus) : transform(
+                model_state\
+                ._get_log_mutation_rate_tensor(
+                    corpus, 
+                    parallel_context=parallel_context,
+                    with_context=False
+                )\
+                .transpose('component', *sample_dims)\
+                .data
+            )
+            for corpus in corpuses
+        }
+
         updates = (
             partial(
                 self._get_update_fn(
                     sample=corpus.samples[sample_name],
                     corpus=corpus,
-                    model_state=model_state,
                     learning_rate=learning_rate,
                     subsample_rate=subsample_rate,
+                    conditional_likelihood=likelihood_tensors[CS.get_name(corpus)],
+                    dims=sample_dims,
                 ),
                 np.ascontiguousarray(CS.fetch_topic_compositions(corpus, sample_name)),
             )
@@ -245,7 +201,7 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
     ):
         
         sample_dict = self._convert_sample(sample)
-        alpha = np.ascontiguousarray(self.alpha[corpus.attrs['name']])
+        alpha = np.ascontiguousarray(self.alpha[CS.get_name(corpus)])
         gamma = np.ascontiguousarray(gamma)
         weights = sample_dict['weights']/subsample_rate
         
@@ -278,18 +234,18 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
 
     def prepare_corpusstate(self, corpus):
         return dict(
-                topic_compositions = DataArray(
-                        self.init_locals( len(corpus.samples.keys()) ),
-                        dims=('component','sample')
-                    )
-                )
+            topic_compositions = DataArray(
+                self.init_locals( len(corpus.samples.keys()) ),
+                dims=('component','sample')
+            )
+        )
 
     def spawn_sstats(self, corpus):
         return []
     
 
     @staticmethod
-    def reduce_sparse_sstats(
+    def reduce_dense_sstats(
         sstats, 
         corpus,
         *,
@@ -307,7 +263,7 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
         corpus, 
         **sample_sstats
     ):
-        return model.reduce_sparse_sstats(
+        return model.reduce_dense_sstats(
                 carry, 
                 corpus,
                 **sample_sstats
@@ -317,7 +273,6 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
     def partial_fit(
         self, sstats, learning_rate
     ):
-        
         for corpus_name, gammas in sstats.items():
             alpha0 = self.alpha[corpus_name]
             self.alpha[corpus_name] = _svi_update_fn(
@@ -325,4 +280,3 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
                 update_alpha(alpha0, np.array(gammas)),
                 learning_rate
             )
-    

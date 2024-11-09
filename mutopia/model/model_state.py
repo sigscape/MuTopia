@@ -73,7 +73,7 @@ class ModelState:
         return un_normalized
     
     
-    def predict(self, k, corpus):
+    def predict(self, k, corpus, with_context=True):
         
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -85,9 +85,10 @@ class ModelState:
                     for model in self.nonlocals.values()
                 ),  # sum over models
                 np.log(corpus.regions.exposures) \
-                    + np.log(corpus.regions.context_frequencies) \
                     + self.get_normalizers(corpus)[k]
             )
+            if with_context:
+                y_hat += np.log(corpus.regions.context_frequencies)
 
         return y_hat
     
@@ -96,11 +97,12 @@ class ModelState:
         self, 
         corpus,
         *,
-        parallel_context
+        parallel_context,
+        with_context=True,
     ):
         return xr.concat(
             list(parallel_context(
-                delayed(self.predict)(k, corpus)
+                delayed(self.predict)(k, corpus, with_context=with_context)
                 for k in range(self.n_components)
             )),
             dim='component'
@@ -317,26 +319,12 @@ class ModelState:
         update, but don't call the update function yet - we want to
         pass this expression to the multiprocessing pool.
         '''
-        samples = [
-            (corpus, sample_name)
-            for corpus in corpuses
-            for sample_name in corpus.samples.data_vars.keys()
-        ]
-
-        updates = (
-            partial(
-                latent_vars_model._get_update_fn(
-                    sample=corpus.samples[sample_name],
-                    corpus=corpus,
-                    model_state=self,
-                    learning_rate=learning_rate,
-                    subsample_rate=subsample_rate,
-                ),
-                np.ascontiguousarray(
-                    CS.fetch_topic_compositions(corpus, sample_name)
-                ),
-            )   
-            for (corpus, sample_name) in samples
+        samples, updates = self.locals_model.get_update_fns(
+            corpuses,
+            self,
+            learning_rate=learning_rate,
+            subsample_rate=subsample_rate,
+            parallel_context=parallel_context,
         )
         
         for (corpus, sample_name), (sample_suffstats, gamma_new, bound) in zip(
@@ -358,13 +346,12 @@ class ModelState:
                     suffstat reduction back to the latent variables model, which
                     calls the model's reduce_sstats method depending on the data type.
                     '''
-                    sstats[model_name + '_sstats'][corpus.attrs['name']] = \
-                        latent_vars_model.reduce_model_sstats(
-                            model,
-                            sstats[model_name + '_sstats'][corpus.attrs['name']],
-                            corpus,
-                            **sample_suffstats
-                        )
+                    latent_vars_model.reduce_model_sstats(
+                        model,
+                        sstats[model_name + '_sstats'][corpus.attrs['name']],
+                        corpus,
+                        **sample_suffstats
+                    )
 
 
         return sstats, elbo

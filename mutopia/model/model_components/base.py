@@ -65,8 +65,6 @@ class SparseDataBase(ABC):
     def predict_sparse(corpus,**idx_dict):
         raise NotImplementedError
     
-
-    @staticmethod
     @abstractmethod
     def reduce_sparse_sstats(
         sstats, 
@@ -74,6 +72,18 @@ class SparseDataBase(ABC):
         **idx_dict
     ):
         raise NotImplementedError
+    
+
+class DenseDataBase(ABC):
+
+    @abstractmethod
+    def reduce_dense_sstats(
+        sstats,
+        corpus,
+        *,
+        weighted_posterior,
+    ):
+        raise NotADirectoryError
 
 
 ## Shared methods for rate models ##

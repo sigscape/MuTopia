@@ -2,7 +2,7 @@
 import inspect
 from .base import get_corpus_intercepts, get_poisson_targets_weights,\
      _svi_update_fn, RateModel, idx_array_to_design, \
-     SparseDataBase
+     SparseDataBase, DenseDataBase
 from ..utils import dims_except_for
 from ..corpus_state import CorpusState as CS
 from ._hist_gbt import CustomHistGradientBooster
@@ -22,7 +22,7 @@ import logging
 logger = logging.getLogger(' Mutopia')
 
     
-class ThetaModel(RateModel, SparseDataBase):
+class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
 
     categorical_encoder = None
 
@@ -206,6 +206,20 @@ class ThetaModel(RateModel, SparseDataBase):
         **kw,
     ):
         np.add.at(sstats, (slice(None), locus), weighted_posterior)
+
+        return sstats
+    
+
+    def reduce_dense_sstats(self, sstats, corpus, *, weighted_posterior, **kw):
+
+        to_dim = ('component', *self.requires_dims)
+
+        weights = weighted_posterior\
+            .sum(dim=dims_except_for(weighted_posterior.dims, *to_dim))\
+            .transpose(*to_dim)\
+            .data
+        
+        sstats += weights
 
         return sstats
     

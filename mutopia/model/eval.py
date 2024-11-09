@@ -29,7 +29,7 @@ def perplexity(num_mutations, elbo):
     return np.exp(-elbo/num_mutations)
 
 
-def elbo_score(
+'''def elbo_score(
     model_state,
     corpuses,
     locals_weight=1.0,
@@ -61,7 +61,7 @@ def elbo_score(
             )
         )
     
-    return elbo
+    return elbo'''
 
 
 def deviance(
