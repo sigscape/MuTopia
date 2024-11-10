@@ -8,7 +8,7 @@ from .base import *
 import warnings
 
 
-class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
+class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
 
     def __init__(self,
             corpuses,
@@ -27,7 +27,7 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
         self.dtype = dtype
 
         self.alpha = {
-            corpus.attrs['name'] : np.ones(n_components, dtype=dtype)*prior_alpha
+            CS.get_name(corpus) : np.ones(n_components, dtype=dtype)*prior_alpha
             for corpus in corpuses
         }
     
@@ -155,7 +155,7 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
         # 1. get the information we need from the sample
         sample_dict = self._convert_sample(sample)
         weights = sample_dict['weights']/subsample_rate
-        alpha = np.ascontiguousarray(self.alpha[corpus.attrs['name']])
+        alpha = np.ascontiguousarray(self.alpha[CS.get_name(corpus)])
 
         conditional_likelihood = \
             self._conditional_observation_likelihood(
@@ -218,7 +218,7 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
         updates = (
             partial(
                 self._get_update_fn(
-                    sample=corpus.samples[sample_name],
+                    sample=CS.fetch_sample(corpus, sample_name),
                     corpus=corpus,
                     model_state=model_state,
                     learning_rate=learning_rate,
@@ -245,7 +245,7 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
     ):
         
         sample_dict = self._convert_sample(sample)
-        alpha = np.ascontiguousarray(self.alpha[corpus.attrs['name']])
+        alpha = np.ascontiguousarray(self.alpha[CS.get_name(corpus)])
         gamma = np.ascontiguousarray(gamma)
         weights = sample_dict['weights']/subsample_rate
         
@@ -278,11 +278,11 @@ class LocalUpdateSparse(PrimitiveModel, LocalUpdate):
 
     def prepare_corpusstate(self, corpus):
         return dict(
-                topic_compositions = DataArray(
-                        self.init_locals( len(corpus.samples.keys()) ),
-                        dims=('component','sample')
-                    )
-                )
+            topic_compositions = DataArray(
+                self.init_locals( len(CS.list_samples(corpus)) ),
+                dims=('component','sample')
+            )
+        )
 
     def spawn_sstats(self, corpus):
         return []

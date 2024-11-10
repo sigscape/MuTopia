@@ -7,7 +7,7 @@ from ._dirichlet_update import update_alpha
 from .base import *
 
 
-class LocalUpdateDense(PrimitiveModel, LocalUpdate):
+class LDAUpdateDense(PrimitiveModel, LocalUpdate):
 
     def __init__(self,
             corpuses,
@@ -26,7 +26,7 @@ class LocalUpdateDense(PrimitiveModel, LocalUpdate):
         self.dtype = dtype
 
         self.alpha = {
-            corpus.attrs['name'] : np.ones(n_components, dtype=dtype)*prior_alpha
+            CS.get_name(corpus) : np.ones(n_components, dtype=dtype)*prior_alpha
             for corpus in corpuses
         }
     
@@ -151,8 +151,7 @@ class LocalUpdateDense(PrimitiveModel, LocalUpdate):
             for sample_name in CS.list_samples(corpus)
         ]
 
-        _corpus, _sname = samples[0]
-        sample_dims = _corpus.samples[_sname].dims
+        sample_dims = (*corpuses[0].modality().dims, 'locus')
 
         transform = lambda x : np.ascontiguousarray(np.nan_to_num(np.exp(x), nan=0.))
         
@@ -173,14 +172,16 @@ class LocalUpdateDense(PrimitiveModel, LocalUpdate):
         updates = (
             partial(
                 self._get_update_fn(
-                    sample=corpus.samples[sample_name],
+                    sample=CS.fetch_sample(corpus, sample_name),
                     corpus=corpus,
                     learning_rate=learning_rate,
                     subsample_rate=subsample_rate,
                     conditional_likelihood=likelihood_tensors[CS.get_name(corpus)],
                     dims=sample_dims,
                 ),
-                np.ascontiguousarray(CS.fetch_topic_compositions(corpus, sample_name)),
+                np.ascontiguousarray(
+                    CS.fetch_topic_compositions(corpus, sample_name)
+                ),
             )
             for (corpus, sample_name) in samples
         )
@@ -235,7 +236,7 @@ class LocalUpdateDense(PrimitiveModel, LocalUpdate):
     def prepare_corpusstate(self, corpus):
         return dict(
             topic_compositions = DataArray(
-                self.init_locals( len(corpus.samples.keys()) ),
+                self.init_locals( len(CS.list_samples(corpus)) ),
                 dims=('component','sample')
             )
         )

@@ -268,6 +268,7 @@ def SBSModel(
     tau = 1.,
     callback=None,
     eval_every=10,
+    sparse=True,
 ):
     
     random_state = np.random.RandomState(seed)
@@ -314,12 +315,13 @@ def SBSModel(
             l2_regularization=l2_regularization,
         )
 
-    locals_model = LocalUpdateSparse(
-        train_corpuses,
-        n_components=n_components,
-        random_state=random_state,
-        prior_alpha=pi_prior,
-    )
+    locals_model = \
+        (LDAUpdateSparse if sparse else LDAUpdateDense)(
+            train_corpuses,
+            n_components=n_components,
+            random_state=random_state,
+            prior_alpha=pi_prior,
+        )
 
     model_state = ModelState(
         train_corpuses,

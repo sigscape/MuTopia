@@ -271,7 +271,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
                     learning_rate=1.,
                 ):
 
-        corpus_names = [state.attrs['name'] for state in corpuses]
+        corpus_names = [CS.get_name(state) for state in corpuses]
         # CxSxM
         stats_reduced = reduce(sum, [sstats[n][k] for n in corpus_names])
 

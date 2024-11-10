@@ -172,7 +172,7 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
 
     def _get_targets(self, k, sstats, exp_offsets, corpuses):
 
-        corpus_names = [corpus.attrs['name'] for corpus in corpuses]
+        corpus_names = [CS.get_name(corpus) for corpus in corpuses]
         target = np.concatenate([sstats[n][k] for n in corpus_names])
         eta = np.concatenate([exp_offsets[n][k] for n in corpus_names])
 

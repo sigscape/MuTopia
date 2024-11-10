@@ -1,9 +1,7 @@
 
 import xarray as xr
 from datatree import DataTree
-from scipy.special import logsumexp
 import numpy as np
-import warnings
 
 class CorpusState:
 
@@ -27,7 +25,10 @@ class CorpusState:
     @classmethod
     def list_samples(cls, corpus):
         return list(corpus.samples.data_vars.keys())
-    
+
+    @classmethod
+    def fetch_sample(cls, corpus, sample_name):
+        return corpus.samples[sample_name]
 
     @classmethod
     def init_corpusstate(

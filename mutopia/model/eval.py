@@ -7,22 +7,18 @@ from .corpus_state import CorpusState as CS
 from .utils import dims_except_for, match_dims
 import warnings
 
+def _reduce_sum(g):
+    return reduce(lambda x,y : x+y, g)
+
+
 def get_n_mutations(
         corpuses,
 ):
-    samples = (
-        (corpus, sample_name)
+    return _reduce_sum((
+        CS.fetch_sample(corpus, sample_name).data.sum()
         for corpus in corpuses 
-        for sample_name in corpus.samples.data_vars.keys()
-    )
-
-    return reduce(
-            lambda x,y : x+y,
-            (
-            corpus.samples[sample_name].data.sum()
-            for corpus, sample_name in samples
-            )
-    )
+        for sample_name in CS.list_samples(corpus)
+    ))
 
 
 def perplexity(num_mutations, elbo):
@@ -119,10 +115,13 @@ def deviance(
                             match_dims(corpus, marg_fn(gamma)).sum(dim=ignore_dims)
                         )
         
-        return sum(parallel_context(
-                    delayed(fit_deviance)(obs, exposures_fn(corpus, sample_name))
-                    for sample_name, obs in corpus.samples.data_vars.items()
-                ))
+        return _reduce_sum(parallel_context(
+            delayed(fit_deviance)(
+                CS.fetch_sample(corpus, sample_name),
+                exposures_fn(corpus, sample_name)
+            )
+            for sample_name in CS.list_samples(corpus)
+        ))
     
     
     def _corpus_null_deviance(corpus):
@@ -131,26 +130,26 @@ def deviance(
         set up the background mutation rate tensor
         '''
         background_rate = match_dims(
-                                corpus, 
-                                corpus.regions.exposures \
-                                    * corpus.regions.context_frequencies
-                            ).sum(dim=ignore_dims)
+                            corpus, 
+                            corpus.regions.exposures \
+                                * corpus.regions.context_frequencies
+                        ).sum(dim=ignore_dims)
         
         null_deviance = lambda obs : _sample_deviance(
                             obs.sum(dim=ignore_dims),
                             background_rate
                         )
         
-        return sum(parallel_context(
-                    delayed(null_deviance)(obs)
-                    for obs in corpus.samples.data_vars.values()
-                ))
+        return _reduce_sum(parallel_context(
+            delayed(null_deviance)(CS.fetch_sample(corpus, sample_name))
+            for sample_name in CS.list_samples(corpus)
+        ))
 
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
 
-        D_fit = sum(map(_corpus_fit_deviance, corpuses))
-        D_null = sum(map(_corpus_null_deviance, corpuses))
+        D_fit = _reduce_sum(map(_corpus_fit_deviance, corpuses))
+        D_null = _reduce_sum(map(_corpus_null_deviance, corpuses))
 
     return 10*(1 - D_fit/D_null)

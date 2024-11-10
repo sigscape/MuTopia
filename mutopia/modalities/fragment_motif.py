@@ -169,7 +169,7 @@ def MotifModel(
         init_components=init_components,
     )
 
-    locals_model = LocalUpdateSparse(
+    locals_model = LDAUpdateSparse(
         train_corpuses,
         n_components=n_components,
         random_state=random_state,

@@ -2,7 +2,7 @@ import numpy as np
 from sparse import COO, GCXS
 from abc import ABC, abstractmethod
 from numba import njit
-import warnings
+from ..corpus_state import CorpusState as CS
 
 class PrimitiveModel(ABC):
 
@@ -123,7 +123,7 @@ def idx_array_to_design(idx_array, n_cols):
 
 def get_corpus_intercepts(corpuses, encoder : dict, n_repeats = lambda x : 1):
     intercept_idx = np.concatenate([
-        np.repeat(encoder[corpus.attrs['name']], n_repeats(corpus), axis=0)
+        np.repeat(encoder[CS.get_name(corpus)], n_repeats(corpus), axis=0)
         for corpus in corpuses
     ])    
     return intercept_idx

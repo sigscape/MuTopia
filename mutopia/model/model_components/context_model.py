@@ -297,7 +297,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
                     learning_rate=1.,
                 ):
 
-        corpus_names = [state.attrs['name'] for state in corpuses]
+        corpus_names = [CS.get_name(state) for state in corpuses]
 
         eta = reduce(sum, (exp_offsets[n][k].ravel() for n in corpus_names))
         target = reduce(sum, (sstats[n][k].ravel() for n in corpus_names))

@@ -30,7 +30,7 @@ class ModelState:
             self._models[model_name] = model
         
         self._normalizers = {
-            corpus.attrs['name'] : np.zeros(self.n_components)
+            CS.get_name(corpus) : np.zeros(self.n_components)
             for corpus in corpuses
         }
 
@@ -51,7 +51,7 @@ class ModelState:
 
 
     def get_normalizers(self, corpus):
-        return self._normalizers[corpus.attrs['name']]
+        return self._normalizers[CS.get_name(corpus)]
     
 
     def _get_propto_log_mutation_rate(self, k, corpus):
@@ -127,7 +127,7 @@ class ModelState:
         # model -> corpus -> component -> sstats
         return {
             model_name + '_sstats' : {
-                corpus.attrs['name'] : model.spawn_sstats(corpus)
+                CS.get_name(corpus) : model.spawn_sstats(corpus)
                 for corpus in corpuses
             }
             for model_name, model in self.models.items()
@@ -163,7 +163,7 @@ class ModelState:
                 
                 all_offsets\
                     [model_name+ '_offsets']\
-                    [corpus.attrs['name']]\
+                    [CS.get_name(corpus)]\
                     [k] = _offsets
                 
                 norm_update_fn(
@@ -245,7 +245,7 @@ class ModelState:
             learning_rate=1., 
             subsample_rate=1.
         ):
-        norm = self._normalizers[corpus.attrs['name']]
+        norm = self._normalizers[CS.get_name(corpus)]
         norm[k] = _svi_update_fn(
                 norm[k],
                 np.log(subsample_rate) + logsum_mutation_rate,
@@ -348,7 +348,7 @@ class ModelState:
                     '''
                     latent_vars_model.reduce_model_sstats(
                         model,
-                        sstats[model_name + '_sstats'][corpus.attrs['name']],
+                        sstats[model_name + '_sstats'][CS.get_name(corpus)],
                         corpus,
                         **sample_suffstats
                     )
