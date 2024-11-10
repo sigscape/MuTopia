@@ -153,7 +153,7 @@ class LDAUpdateDense(PrimitiveModel, LocalUpdate):
 
         sample_dims = (*corpuses[0].modality().dims, 'locus')
 
-        transform = lambda x : np.ascontiguousarray(np.nan_to_num(np.exp(x), nan=0.))
+        transform = lambda x : np.ascontiguousarray(np.nan_to_num(np.exp(x - x.max()), nan=0.))
         
         likelihood_tensors = {
             CS.get_name(corpus) : transform(

@@ -149,6 +149,7 @@ MUTOPIA_TO_COSMIC_IDX = np.array([
 class SBSMode(ModeConfig):
 
     MODE_ID = 'sbs'
+    MUTOPIA_TO_COSMIC_IDX = MUTOPIA_TO_COSMIC_IDX
 
     @property
     def coords(self):
