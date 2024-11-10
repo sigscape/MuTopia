@@ -26,7 +26,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
         conditioning_alpha = 5e-5,
         tol = 5e-4,
         max_iter=100,
-        dtype = float,
+        dtype=np.float32,
         init_components = None,
         *,
         n_components,
@@ -40,6 +40,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
         self.consequence_names = corpuses[0].coords[dim_name].values
         self.context_dim = corpuses[0].dims['context']
         self.context_names = corpuses[0].coords['context'].values
+        self.dtype = dtype
 
         self.transformer = NormalizedMesoscaleEncoder(self.consequence_dim)\
                                 .fit(corpuses)
@@ -47,6 +48,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
         _cons_encoding_matrix = self.transformer.encoding_matrix_
         self._is_regularized = ~np.array(self.transformer.intercept_mask_)
         X = _cons_encoding_matrix.copy()
+        X.data = X.data.astype(dtype, copy=False)
 
         eln_solver = partial(
             get_eln_solver,
@@ -100,7 +102,6 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
     def requires_normalization(self):
         return False
     
-
     @property
     def requires_dims(self):
         return ('configuration','context', self.dim_name, 'locus')
@@ -136,7 +137,11 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
                             [configuration, locus]
 
         # Use numpy advanced indexing to update mutation_sstats
-        np.add.at(sstats, (slice(None), context, consequence, mesoscale_states), weighted_posterior)
+        np.add.at(
+            sstats, 
+            (slice(None), context, consequence, mesoscale_states), 
+            weighted_posterior.astype(self.dtype)
+        )
 
         return sstats
     
@@ -152,7 +157,8 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
         weights = weighted_posterior\
             .sum(dim=dims_except_for(weighted_posterior.dims, *to_dim))\
             .transpose(*to_dim)\
-            .data
+            .data\
+            .astype(self.dtype)
 
         # 2 x L
         (plus_idx, minus_idx) = CS.fetch_val(corpus, 'mesoscale_idx').data
@@ -176,7 +182,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
                 :k,
                 :,
                 0:c*self.consequence_dim:c
-            ] = np.log( renormalized )
+            ] = np.log( renormalized.astype(self.dtype) )
     
 
     def _init_params(self, random_state, n_components, context_dim, dtype):
@@ -273,7 +279,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
 
         corpus_names = [CS.get_name(state) for state in corpuses]
         # CxSxM
-        stats_reduced = reduce(sum, [sstats[n][k] for n in corpus_names])
+        stats_reduced = reduce(lambda x,y : x+y, [sstats[n][k] for n in corpus_names])
 
         for c in range(self.context_dim):
             
@@ -326,4 +332,3 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
 
     def _format_component(self, k):
         return self._calc_rho(k, self._cons_encoding_matrix)
-

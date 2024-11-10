@@ -28,7 +28,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         tol=5e-4,
         reg : float = 0.0001, 
         conditioning_alpha : float = 5e-5,
-        dtype = float,
+        dtype=np.float32,
         init_components = None,
         *,
         n_components : int,
@@ -39,18 +39,23 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         self.n_components = n_components
         self.context_dim = corpuses[0].dims['context']
         self.context_names = corpuses[0].modality().coords['context']
+        self.dtype = dtype
         
         self.transformer = MesoscaleEncoder(self.context_dim)\
                                     .fit(corpuses)
-        
 
-        self._coefs = self._init_params(random_state, n_components, self.context_dim, dtype)
+        self._coefs = self._init_params(
+            random_state, 
+            n_components, 
+            self.context_dim, 
+            self.dtype
+        )
 
         corpus=corpuses[0] # just grab the first one to use for initialization
         self._context_distribution = \
             corpus.regions.context_frequencies\
             .sum(dim=dims_except_for(corpus.regions.context_frequencies.dims, 'context'))\
-            .data + 1
+            .data.astype(self.dtype) + 1.
         
         self._context_distribution/=self._context_distribution.sum()
 
@@ -61,7 +66,8 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
 
         is_intercept = np.array( self.transformer.intercept_mask_ + [True] )
         X = self.transformer.one_pad_right(self.transformer.get_encoding_matrix(1))
-        
+        X.data = X.data.astype(self.dtype)
+
         eln_solver = partial(
             get_eln_solver,
             **get_reg_params(reg, conditioning_alpha),
@@ -94,12 +100,10 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
     @property
     def requires_normalization(self):
         return True
-    
 
     @property
     def requires_dims(self):
         return ('configuration','context','locus')
-    
 
     def prepare_to_save(self):
         del self.model 
@@ -131,7 +135,11 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
                             [configuration, locus]
 
         # Use numpy advanced indexing to update context_sstats
-        np.add.at(sstats, (slice(None), context, mesoscale_states), weighted_posterior)
+        np.add.at(
+            sstats, 
+            (slice(None), context, mesoscale_states), 
+            weighted_posterior.astype(self.dtype)
+        )
 
         return sstats
     ##
@@ -148,7 +156,8 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         weights = weighted_posterior\
             .sum(dim=dims_except_for(weighted_posterior.dims, *to_dim))\
             .transpose(*to_dim)\
-            .data
+            .data\
+            .astype(self.dtype)
 
         # 2 x L
         (plus_idx, minus_idx) = CS.fetch_val(corpus, 'mesoscale_idx').data
@@ -169,7 +178,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         self._coefs[
                 :k,
                 0:c*self.context_dim:c
-            ] = np.log( renormalized )
+            ] = np.log( renormalized.astype(self.dtype) )
         
         return self
     
@@ -181,7 +190,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
                         n_components, 
                         self.transformer.get_num_coefs() + 1 #self.n_corpuses
                     ),
-                ).astype(dtype, copy=False)
+                ).astype(dtype)
 
 
     @property
@@ -299,8 +308,9 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
 
         corpus_names = [CS.get_name(state) for state in corpuses]
 
-        eta = reduce(sum, (exp_offsets[n][k].ravel() for n in corpus_names))
-        target = reduce(sum, (sstats[n][k].ravel() for n in corpus_names))
+        eta = reduce(lambda x,y : x+y, (exp_offsets[n][k].ravel() for n in corpus_names))
+        target = reduce(lambda x,y : x+y, (sstats[n][k].ravel() for n in corpus_names))\
+                    .astype(self.dtype)
 
         yield partial(
             self._run_regression,
@@ -317,7 +327,8 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
 
     def _calc_lambda(self, k, design_matrix):
         return (self.coefs_[k] @ design_matrix.T)\
-                    .reshape((self.context_dim, -1))
+                    .reshape((self.context_dim, -1))\
+                    .astype(self.dtype, copy=False)
     
     
     def _format_component(self, k):        

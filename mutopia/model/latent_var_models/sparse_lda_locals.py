@@ -16,7 +16,7 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
             prior_alpha=1.0,
             estep_iterations=300,
             difference_tol=1e-4,
-            dtype=float,
+            dtype=np.float32,
             *,
             random_state,
         ):
@@ -273,7 +273,7 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
                             100., 
                             1./100., 
                             size=(self.n_components, n_samples)
-                        )
+                        ).astype(self.dtype)
     
 
     def prepare_corpusstate(self, corpus):

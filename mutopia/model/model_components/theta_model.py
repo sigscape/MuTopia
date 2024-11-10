@@ -30,7 +30,7 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         corpuses,
         add_corpus_intercepts=False,
         model_kw={},
-        dtype = float,
+        dtype = np.float32,
         smoothing_size=1000,
         transformers=[],
         *,
@@ -69,7 +69,8 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         self.rate_models = [
             self._make_model(
                 **model_kw,
-                X = self.base_transformer_.transform(corpus, corpus=corpus),
+                X = self.base_transformer_.transform(corpus, corpus=corpus)\
+                        .astype(self.dtype),
                 interaction_groups = get_feature_interaction_groups(corpus, self.base_transformer_),
                 categorical_features = get_categorical_features(self.base_transformer_),
                 random_state = random_state,
@@ -101,7 +102,8 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         return dict(
                 locus_features  = DataArray(
                     self.locus_transformer_\
-                        .transform(corpus, corpus=corpus),
+                        .transform(corpus, corpus=corpus)\
+                        .astype(self.dtype),
                     dims=('locus', 'feature'),
                     coords={
                         'feature' : self.base_transformer_[2]\
@@ -145,7 +147,8 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
             self.corpus_encoder_,
             n_repeats=lambda corpus : corpus.dims['locus'],
         )
-    
+
+
     def _get_intercept_design(self, *corpuses):
         return idx_array_to_design(
             self._get_intercept_idx(*corpuses),
@@ -163,21 +166,26 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
     def _make_model(self, **kw):
         raise NotImplementedError
     
-    @staticmethod
-    def get_exp_offset(offsets, corpus):
+    
+    def get_exp_offset(self, offsets, corpus):
         return np.exp(offsets)\
                 .sum(dim=dims_except_for(offsets.dims, 'locus'))\
-                .data
+                .data\
+                .astype(self.dtype)
 
 
     def _get_targets(self, k, sstats, exp_offsets, corpuses):
 
         corpus_names = [CS.get_name(corpus) for corpus in corpuses]
-        target = np.concatenate([sstats[n][k] for n in corpus_names])
+        
+        target = np.concatenate([sstats[n][k] for n in corpus_names])\
+                    .astype(self.dtype, copy=False)
+        
         eta = np.concatenate([exp_offsets[n][k] for n in corpus_names])
 
         current_prediction = np.concatenate([
-            CS.fetch_val(state, 'log_locus_distribution')[k].data for state in corpuses
+            CS.fetch_val(state, 'log_locus_distribution')[k].data 
+            for state in corpuses
         ])
 
         return (
@@ -196,8 +204,8 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
                             [:, locus]
     
 
-    @staticmethod
     def reduce_sparse_sstats(
+        self,
         sstats, 
         corpus,
         *,
@@ -205,7 +213,7 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         locus,
         **kw,
     ):
-        np.add.at(sstats, (slice(None), locus), weighted_posterior)
+        np.add.at(sstats, (slice(None), locus), weighted_posterior.astype(self.dtype))
 
         return sstats
     
@@ -217,7 +225,8 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         weights = weighted_posterior\
             .sum(dim=dims_except_for(weighted_posterior.dims, *to_dim))\
             .transpose(*to_dim)\
-            .data
+            .data\
+            .astype(self.dtype)
         
         sstats += weights
 
@@ -395,7 +404,9 @@ class GBTThetaModel(ThetaModel):
 
         self.predict_from[k] = n_fit_trees
 
-        rate_model = rate_model.set_params(max_iter = n_fit_trees + self.max_trees_per_iter)
+        rate_model = rate_model.set_params(
+                        max_iter = n_fit_trees + self.max_trees_per_iter
+                    )
                 
         yield partial(
             rate_model.fit,
