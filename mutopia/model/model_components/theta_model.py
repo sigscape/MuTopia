@@ -65,6 +65,7 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         ])
 
         self.base_transformer_.fit(corpus, corpus=corpus)
+        self.n_features_ = len(self.base_transformer_[2].get_feature_names_out())
 
         self.rate_models = [
             self._make_model(
@@ -79,6 +80,18 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         ]
 
         self.locus_transformer_ = StratifiedTransformer(self.base_transformer_)
+        
+        '''
+        We want to initialize the locus effects with something instead of just 0s
+        (if you initialize with 0s, the model can only use exposure differences to 
+        start disentangling the components). Since we expect the locus effects
+        to follow feature distributions, let's just initialize them with a simple
+        Laplace projection of the feature matrix.
+        '''
+        self.init_projection_ = random_state.laplace(
+                0., 0.1,
+                (self.n_components, self.n_features_),
+            ).astype(self.dtype)
 
 
 
@@ -89,21 +102,16 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
     @property
     def requires_dims(self):
         return ('locus',)
-
-
-    def _get_baseline_prediction(self, corpus):
-        return np.zeros(
-            (self.n_components, corpus.dims['locus']),
-            dtype=self.dtype,
-        )
-
+    
 
     def prepare_corpusstate(self, corpus):
+
+        X = self.locus_transformer_\
+            .transform(corpus, corpus=corpus)
+        
         return dict(
                 locus_features  = DataArray(
-                    self.locus_transformer_\
-                        .transform(corpus, corpus=corpus)\
-                        .astype(self.dtype),
+                    X,
                     dims=('locus', 'feature'),
                     coords={
                         'feature' : self.base_transformer_[2]\
@@ -111,7 +119,7 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
                     }
                 ),
                 log_locus_distribution = DataArray(
-                    self._get_baseline_prediction(corpus),
+                    (np.nan_to_num(X, nan=-3.) @ self.init_projection_.T).T,
                     dims=('component','locus'),
                 ),
             )

@@ -19,6 +19,7 @@ from sklearn.ensemble._hist_gradient_boosting.gradient_boosting import BaseHistG
 from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.ensemble._hist_gradient_boosting.grower import TreeGrower
 from numba import njit
+import warnings
 
 class ShrunkTreePredictor:
 
@@ -279,9 +280,10 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
             # else 1.
             # self._baseline_prediction has shape (1, n_trees_per_iteration)
 
-            assert np.isclose(raw_predictions, raw_predictions[0]).all(), "raw_predictions must be initialized to the same value"
+            if not np.isclose(raw_predictions, 0.).all():
+                warnings.warn('Initial raw predictions are not set to 0. This will bias the predictions of the model.')
 
-            self._baseline_prediction = np.array([raw_predictions[0]])
+            self._baseline_prediction = np.zeros_like(raw_predictions[0])
 
             # predictors is a matrix (list of lists) of TreePredictor objects
             # with shape (n_iter_, n_trees_per_iteration)

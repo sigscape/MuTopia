@@ -118,7 +118,7 @@ class ModelState:
                 nan=0.
             ),
             exposures,
-            np.exp(log_mutrate_tensor),
+            np.exp(log_mutrate_tensor - log_mutrate_tensor.max()),
             input_core_dims=[[], ('component',)],
         )
     
