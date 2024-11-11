@@ -150,6 +150,7 @@ class SBSMode(ModeConfig):
 
     MODE_ID = 'sbs'
     MUTOPIA_TO_COSMIC_IDX = MUTOPIA_TO_COSMIC_IDX
+    PALETTE = MUTATION_PALETTE
 
     @property
     def coords(self):
@@ -368,5 +369,5 @@ def _sample_params(study, trial):
         'empirical_bayes' : trial.suggest_categorical('empirical_bayes', [True, False]),
         'max_features' : trial.suggest_float('max_features', 0.1, 1.),
         'locus_subsample' : trial.suggest_categorical('locus_subsample', [None, 0.125, 0.25, 0.5]),
-        'kappa' : trial.suggest_float('kappa', 0.5, 0.9),
+        'kappa' : trial.suggest_float('kappa', 0.4, 0.7),
     }

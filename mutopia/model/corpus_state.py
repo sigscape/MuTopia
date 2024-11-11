@@ -21,14 +21,21 @@ class CorpusState:
         
         return corpus
     
+    @classmethod
+    def has_corpusstate(cls, corpus):
+        return hasattr(corpus, 'state')
     
     @classmethod
     def list_samples(cls, corpus):
-        return list(corpus.samples.data_vars.keys())
+        return list(corpus.coords['sample'].values)
 
     @classmethod
     def fetch_sample(cls, corpus, sample_name):
-        return corpus.samples[sample_name]
+        return corpus.sel(sample=sample_name).layers.X
+    
+    @classmethod
+    def sample_dims(cls, corpus):
+        return corpus.layers.X.dims
 
     @classmethod
     def init_corpusstate(
@@ -37,7 +44,7 @@ class CorpusState:
                 model_state,
             ):
 
-        sample_names = list(corpus.samples.keys())
+        sample_names = cls.list_samples(corpus)
         n_components = model_state.n_components
             
         state_elements = {

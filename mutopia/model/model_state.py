@@ -48,6 +48,14 @@ class ModelState:
     @property
     def nonlocals(self):
         return self._models
+    
+    @property
+    def required_dims(self):
+        return reduce(
+            lambda x,y : x.union(y.required_dims),
+            self.nonlocals.values(),
+            set(['sample'])
+        )
 
 
     def get_normalizers(self, corpus):

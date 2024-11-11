@@ -107,8 +107,6 @@ class OnDiskSparse(BaseAccessor):
         self,
     ):
 
-        #self._validate(self, ['configuration', 'context', 'mutation', 'locus'], None)
-
         sparse_matrix = self._xrds.data.tocoo()
 
         return xr.Dataset(
@@ -138,7 +136,7 @@ def write_sample(sample_arr, filename):
     sample_name = sample_arr.attrs['name']
 
     dset = sample_arr.sparse_to_coo() if isinstance(sample_arr.data, sparse.SparseArray) \
-                                        else sample_arr.to_dataset(name='data', promote_attrs=True)
+                else sample_arr.to_dataset(name='data', promote_attrs=True)
         
     dset.to_netcdf(
             filename, 
@@ -154,13 +152,14 @@ def write_dataset(dataset, filename):
     dataset['/'].to_dataset().to_netcdf(filename, group='/', **WRITE_KW)
 
     for group in dataset.groups:
-        if group == '/samples': # handled separately
+        if group == '/layers': # handled separately
             continue
         dataset[group].to_dataset()\
             .to_netcdf(filename, group=group, mode='a', **WRITE_KW)
 
-    for sample in dataset.samples.data_vars.values():
-        write_sample(sample, filename)
+    for layer in dataset.layers:
+        for sample in dataset.layers:
+            write_sample(sample, filename)
         
 
 
@@ -181,17 +180,39 @@ def load_dataset(filename):
     
     raw_sample_names = list(dataset._raw_samples.keys())
 
-    samples_arrs = {}
+    sample_names=[]; samples=[]
     for sample_name in raw_sample_names:
-        samples_arrs[sample_name] = _backend_load_sample(dataset, sample_name)
+        samples.append(_backend_load_sample(dataset, sample_name))
+        sample_names.append(sample_name)
         del dataset._raw_samples[sample_name]
 
+    sample_dims = list(samples[0].dims)
+
+    if isinstance(samples[0].data, sparse.SparseArray):
+        X = sparse.stack(
+            [s.data for s in samples],
+            axis=0,
+        ).change_compressed_axes(
+            (0, sample_dims.index('locus')+1),
+        )
+    else:
+        X = np.stack(
+            [s.data for s in samples],
+            axis=0,
+        )
 
     datatree.DataTree(
-        name='samples',
+        name='layers',
         data=xr.Dataset(
-            samples_arrs,
-            coords=dataset.coords
+            {
+                'X' : xr.DataArray(
+                    X,
+                    dims=('sample', *sample_dims),
+                ),
+            },
+            coords={
+                'sample' : sample_names,
+            }
         ),
         parent=dataset,
     )
@@ -239,7 +260,7 @@ def load_old_format(corpus):
                 dims=("locus",),
             ),
         },
-        coords=shared_coords,
+        #coords=shared_coords,
     )
 
     feature_arrays = xr.Dataset(
@@ -254,47 +275,59 @@ def load_old_format(corpus):
             )
             for feature_name, feature_data in corpus.features.items()
         },
-        coords=shared_coords,
+        #coords={'locus' : locus_coords},
     )
 
     sample_datasets = {}
     for sample in corpus:
         sample_datasets[sample.name] = xr.Dataset(
-                    {
-                        "indices" :  xr.DataArray(
-                                np.array([
-                                    sample.cardinality, sample.context, sample.mutation, sample.locus
-                                ]),
-                                dims=("obs_indices", "n_observations"),
-                            ),
-                        "data" : xr.DataArray(
-                                data=sample.weight,
-                                dims=("n_observations",),
-                        )
-                    },
-                    coords={
-                        "obs_indices" : ["configuration", "context", "mutation", "locus"],
-                    },
-                    attrs = {
-                        "shape" : (
-                            corpus.shape['cardinalities_dim'],
-                            corpus.shape['context_dim'],
-                            corpus.shape['mutation_dim'],
-                            corpus.shape['locus_dim'],
-                        ),
-                        "name" : sample.name,
-                    }
-                )\
-                .coo_to_sparse()
-        
+            {
+                "indices" :  xr.DataArray(
+                        np.array([
+                            sample.cardinality, sample.context, sample.mutation, sample.locus
+                        ]),
+                        dims=("obs_indices", "n_observations"),
+                    ),
+                "data" : xr.DataArray(
+                        data=sample.weight,
+                        dims=("n_observations",),
+                )
+            },
+            coords={
+                "obs_indices" : ["configuration", "context", "mutation", "locus"],
+            },
+            attrs = {
+                "shape" : (
+                    corpus.shape['cardinalities_dim'],
+                    corpus.shape['context_dim'],
+                    corpus.shape['mutation_dim'],
+                    corpus.shape['locus_dim'],
+                ),
+                "name" : sample.name,
+            }
+        )\
+        .coo_to_sparse()
+
+    def pack_samples(sample_datasets):
+        sample_dims = list(next(iter(sample_datasets.values())).dims)
+        return xr.DataArray(
+            sparse.stack(list(
+                sample_datasets.values(),
+                axis=0,
+            )).change_compressed_axes(
+                (0, sample_dims.index('locus')+1),
+            ),
+            dims=('sample', *sample_dims),
+        )
 
     return datatree.DataTree.from_dict({
                 '/' : root,
                 '/features' : feature_arrays,
                 '/regions' : regions,
-                '/samples' : xr.Dataset(
-                    sample_datasets,    
-                    coords=shared_coords
+                '/layers' : xr.Dataset(
+                    {'X' : pack_samples(sample_datasets)},
                 ),
+                '/obsm' : xr.Dataset(),
+                '/varm' : xr.Dataset(),
             },
         )

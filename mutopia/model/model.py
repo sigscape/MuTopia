@@ -4,6 +4,10 @@ from .model_components import *
 from .latent_var_models import *
 from ..plot.coef_matrix_plot import _plot_interaction_matrix
 from joblib import dump, load
+
+import logging
+logger = logging.getLogger(' Mutopia-Model ')
+logger.setLevel('INFO')
    
 '''
 The Model class is a wrapper around a trained model state object, 
@@ -24,6 +28,14 @@ class Model:
         self.model_state_ = model_state
         self.modality_ = modality
 
+    @property
+    def n_components(self):
+        return self.model_state_.n_components
+    
+    @property
+    def component_names(self):
+        return self.model_state_.component_names
+
 
     def _setup_corpus(self, corpus):
 
@@ -38,6 +50,7 @@ class Model:
         
 
     def save(self, path):
+
         for model in self.model_state_.models.values():
             model.prepare_to_save()
 
@@ -63,6 +76,77 @@ class Model:
             palette=palette,
             **kw
         )
+    
 
-    def predict_exposures(self, corpus):
+    def annot_exposures(
+        self,
+        corpus,
+        threads=1,
+        verbose=0,
+    ):
+        
+        if not CS.has_corpusstate(corpus):
+            corpus = self._setup_corpus(corpus)
+
+        with ParContext(threads, verbose=verbose) as par:
+            exposures = self.model_state_.locals_model\
+                            .predict(
+                                corpus,
+                                self.model_state_,
+                                parallel_context=par
+                            )
+
+        corpus = corpus.assign_coords({'component' : self.component_names})
+        corpus.obsm.update({'exposures' : exposures})
+        logger.info('Added key to obsm: "exposures"')
+        return corpus
+    
+    
+    def annot_component_distributions(
+        self, 
+        corpus,
+        threads=1,
+    ):
+
+        if not CS.has_corpusstate(corpus):
+            corpus = self._setup_corpus(corpus)
+
+        with ParContext(threads) as par:
+            topics = self.model_state_._get_log_mutation_rate_tensor(
+                corpus,
+                parallel_context=par,
+                with_context=False,
+            )
+
+        corpus = corpus.assign_coords({'component' : self.component_names})
+        corpus.varm.update({'component_distributions' : topics})
+        logger.info('Added key to varm: "component_distributions"')
+        return corpus
+
+
+    def annot_imputed(
+        self,
+        corpus,
+        threads=1,
+    ):
+        logger.info('Added key to layers: "imputed"')
+        pass
+
+
+    def annot_SHAP_values(
+        self,
+        corpus,
+        threads=1,
+    ):
+        logger.info('Added key to varm: "SHAP_values"')
+        pass
+
+    
+    def annot_residuals(
+        self,
+        corpus,
+        threads=1,
+        keepdims=('locus',),
+    ):
+        logger.info('Added key to varm: "residuals"')
         pass

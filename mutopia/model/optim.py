@@ -170,6 +170,20 @@ def _should_stop(stop_condition, scores):
         and scores.index(max(scores)) < (len(scores) - stop_condition)
 
 
+def _check_dims(corpus, model_state):
+    rm_dim = dims_except_for(
+        CS.sample_dims(corpus),
+        model_state.required_dims,
+    )
+    if not len(rm_dim) == 0:
+        raise ValueError(
+            f'The corpus {CS.get_name(corpus)} has extra dimensions: {", ".join(rm_dim)}.\n'
+            f'The model requires the following dimensions: {", ".join(model_state.required_dims)}.\n'
+            'Having extra data dimensions will increase training time and memory usage,\n'
+            'remove them by summing over them: `corpus.sum(dim="extra_dim")`.'
+        )
+
+
 def fit_model( 
     train_corpuses,
     test_corpuses,
@@ -189,6 +203,9 @@ def fit_model(
     eval_every=10,
     verbose=0,
 ):
+
+    for corpus in train_corpuses + test_corpuses:
+        _check_dims(corpus, model_state)
 
     logger.info('Preprocessing training corpuses...')
     for corpus in train_corpuses:   
@@ -291,9 +308,7 @@ def fit_model(
                         from_scratch=False,
                     )
 
-                train_score = train_scorer(train_score)
-
-                train_scores.append(train_score)
+                train_scores.append(train_scorer(train_score))
                 
                 if evaluate_test:
                     test_scores.append(test_score)
@@ -310,17 +325,12 @@ def fit_model(
                     logger.info('Early stopping criterion met. The model has converged.')
                     break
         
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt, SystemError):
+            # sometimes interrupting an optimizer throws a system error ...
             pass
 
         finally:
             progress_bar.close()
-        
-        logger.info('Finalizing model state...')
-        model_state.init_normalizers(
-            train_corpuses, 
-            parallel_context=par
-        )
 
     return (
         model_state,
