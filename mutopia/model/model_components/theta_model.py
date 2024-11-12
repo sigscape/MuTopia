@@ -421,8 +421,14 @@ class GBTThetaModel(ThetaModel):
 
         X = self._fetch_feature_matrix(corpus)
 
+        ##
+        # TODO:
+        # Make this "from_scratch" more robust, like define a private method 
+        # for initializing the mr estimates.
+        ##
         if from_scratch:
-            theta = np.log(self.rate_models[k].predict(X))
+            theta = np.log(self.rate_models[k].predict(X))\
+                        + CS.fetch_val(corpus, 'log_locus_distribution')[k].data
         else:
             theta = self.rate_models[k]._raw_predict_from(
                     X, 
