@@ -167,6 +167,14 @@ class SBSMode(ModeConfig):
     @property
     def sample_params(self):
         return _sample_params
+    
+    @property
+    def available_components(self):
+        filepath = os.path.join(os.path.dirname(__file__), 'musical_sbs.json')
+        with open(filepath, 'r') as f:
+            database = json.load(f)
+            
+        return list(database.keys())
 
     @classmethod
     def load_components(cls, *init_components):

@@ -138,8 +138,45 @@ class Model:
         corpus,
         threads=1,
     ):
+        try:
+            import shap
+        except ImportError:
+            raise ImportError('SHAP is required to calculate SHAP values')
+        
+        locus_model = self.model_state_.models['theta_model']
+        X = locus_model._fetch_feature_matrix(corpus)
+
+        background_idx = np.random.RandomState(0).choice(
+                            len(X), size = 1000, replace = False
+                        )
+        
+        def _component_shap(k):
+            return shap.TreeExplainer(
+                    locus_model.rate_models[k],
+                    X[background_idx],
+                ).shap_values(
+                    X,
+                    check_additivity=False,
+                    approximate=False,
+                )
+        
+        shap_matrix = np.array([
+            np.squeeze(_component_shap(k))
+            for k in range(self.n_components)
+        ])
+        
+        features = corpus.state.coords['feature'].data
+
+        corpus = corpus.assign_coords({'locus_features' : features})
+        corpus.varm.update({
+            'SHAP_values' : xr.DataArray(
+                shap_matrix,
+                dims=('component','locus','locus_features'),
+            )
+        })
+
         logger.info('Added key to varm: "SHAP_values"')
-        pass
+        return corpus
 
     
     def annot_residuals(

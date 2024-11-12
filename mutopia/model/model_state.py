@@ -50,9 +50,9 @@ class ModelState:
         return self._models
     
     @property
-    def required_dims(self):
+    def requires_dims(self):
         return reduce(
-            lambda x,y : x.union(y.required_dims),
+            lambda x,y : x.union(y.requires_dims),
             self.nonlocals.values(),
             set(['sample'])
         )

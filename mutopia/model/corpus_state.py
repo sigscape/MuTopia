@@ -31,7 +31,7 @@ class CorpusState:
 
     @classmethod
     def fetch_sample(cls, corpus, sample_name):
-        return corpus.sel(sample=sample_name).layers.X
+        return corpus.layers.sel(sample=sample_name).X
     
     @classmethod
     def sample_dims(cls, corpus):

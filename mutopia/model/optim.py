@@ -173,7 +173,7 @@ def _should_stop(stop_condition, scores):
 def _check_dims(corpus, model_state):
     rm_dim = dims_except_for(
         CS.sample_dims(corpus),
-        model_state.required_dims,
+        model_state.requires_dims,
     )
     if not len(rm_dim) == 0:
         raise ValueError(
@@ -204,8 +204,8 @@ def fit_model(
     verbose=0,
 ):
 
-    for corpus in train_corpuses + test_corpuses:
-        _check_dims(corpus, model_state)
+    '''for corpus in train_corpuses + test_corpuses:
+        _check_dims(corpus, model_state)'''
 
     logger.info('Preprocessing training corpuses...')
     for corpus in train_corpuses:   
