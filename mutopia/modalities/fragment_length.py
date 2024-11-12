@@ -27,7 +27,7 @@ class FragmentLength(ModeConfig):
 
     @property
     def coords(self):
-        return {'fragment-length' : LENGTH_BINS}
+        return {'context' : LENGTH_BINS}
     
     @property
     def make_model(self):
@@ -57,9 +57,9 @@ class FragmentLength(ModeConfig):
             if not component in database:
                 raise ValueError(f"Component {component} not found in database")
             
-            comps.append([database[component][l] for l in cls().coords['fragment-length']])
+            comps.append([database[component][l] for l in cls().coords['context']])
         
-        return np.array(comps)
+        return np.expand_dims(np.array(comps), axis=-1)
 
     @classmethod
     def plot(
@@ -71,9 +71,9 @@ class FragmentLength(ModeConfig):
     ):
         cls.validate_signatures(
             signature,
-            required_dims=('fragment-length',),
+            required_dims=('context',),
         )
-        signature = signature.transpose(...,'fragment-length',)
+        signature = signature.transpose(...,'context',)
         lead_dim = signature.dims[0]
         
         _plot_linear_signature(
@@ -155,7 +155,7 @@ def FragmentLengthModel(
             l2_regularization=l2_regularization,
         )
 
-    fraglength_model = UnconditionalConsequenceModel(
+    '''fraglength_model = UnconditionalConsequenceModel(
         'fragment-length',
         train_corpuses,
         n_components=n_components,
@@ -164,7 +164,18 @@ def FragmentLengthModel(
         reg=reg,
         conditioning_alpha=conditioning_alpha,
         init_components=init_components,
+    )'''
+
+    fraglength_model = UnstrandedContextModel(
+        train_corpuses,
+        n_components=n_components,
+        random_state=random_state,
+        tol=5e-4,
+        reg=reg,
+        conditioning_alpha=conditioning_alpha,
+        init_components=init_components,
     )
+
 
     locals_model = \
         (LDAUpdateSparse if sparse else LDAUpdateDense)(

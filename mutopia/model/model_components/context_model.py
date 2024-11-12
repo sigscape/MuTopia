@@ -395,6 +395,25 @@ class UnstrandedContextModel(StrandedContextModel, SparseDataBase):
 
         return sstats
     
+    
+    def reduce_dense_sstats(self, sstats, corpus, *, weighted_posterior, **kw):
+
+        to_dim = ('component', *self.requires_dims)
+        
+        # K x Cons x L
+        weights = weighted_posterior\
+            .sum(dim=dims_except_for(weighted_posterior.dims, *to_dim))\
+            .transpose(*to_dim)\
+            .data
+
+        # 2 x L
+        idx = CS.fetch_val(corpus, 'mesoscale_idx').data
+        
+        # sstats : K x C x S x M
+        np.add.at(sstats, (slice(None), slice(None), idx), weights)
+
+        return sstats
+    
 
     def prepare_corpusstate(self, corpus):
         return dict(
