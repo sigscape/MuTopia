@@ -175,7 +175,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
     
 
     def _init_params(self, random_state, n_components, n_contexts, dtype):
-        return random_state.normal(
+        return random_state.laplace(
                     0., 0.1, 
                     (
                         n_components, 

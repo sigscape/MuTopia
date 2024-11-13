@@ -179,7 +179,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
     
 
     def _init_params(self, random_state, n_components, context_dim, dtype):
-        return random_state.normal(
+        return random_state.laplace(
                     0, 0.1,
                     (
                         n_components, 

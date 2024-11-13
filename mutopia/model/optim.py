@@ -170,18 +170,7 @@ def _should_stop(stop_condition, scores):
         and scores.index(max(scores)) < (len(scores) - stop_condition)
 
 
-def _check_dims(corpus, model_state):
-    rm_dim = dims_except_for(
-        CS.sample_dims(corpus),
-        model_state.requires_dims,
-    )
-    if not len(rm_dim) == 0:
-        raise ValueError(
-            f'The corpus {CS.get_name(corpus)} has extra dimensions: {", ".join(rm_dim)}.\n'
-            f'The model requires the following dimensions: {", ".join(model_state.required_dims)}.\n'
-            'Having extra data dimensions will increase training time and memory usage,\n'
-            'remove them by summing over them: `corpus.sum(dim="extra_dim")`.'
-        )
+
 
 
 def fit_model( 
@@ -204,8 +193,16 @@ def fit_model(
     verbose=0,
 ):
 
-    '''for corpus in train_corpuses + test_corpuses:
-        _check_dims(corpus, model_state)'''
+    ##
+    # If the data is sparse, we should make sure it's in the right format.
+    # GCSX with locus and sample dimensions compressed.
+    ##
+    logger.info('Validating corpuses...')
+    for corpus in train_corpuses + test_corpuses:
+        check_dims(corpus, model_state)
+        check_sample_data(corpus, float)
+        check_structure(corpus)
+
 
     logger.info('Preprocessing training corpuses...')
     for corpus in train_corpuses:   
@@ -261,6 +258,8 @@ def fit_model(
         )
 
     logger.info(f'Training model with {threads} threads.')
+    logger.info('The first few epochs take longer as things get warmed up -\n\texpect the time per epoch to decrease about 4-fold.')
+    logger.info(f'Model will stop training if no improvement in the last {stop_condition} epochs.')
     train_scores = []
     test_scores = []
 
