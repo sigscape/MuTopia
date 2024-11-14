@@ -9,10 +9,7 @@ from ..corpus_state import CorpusState as CS
 from .base import get_reg_params, get_poisson_targets_weights, _svi_update_fn, \
     RateModel, SparseDataBase, DenseDataBase
 from ._strand_transformer import MesoscaleEncoder
-from ..utils import dims_except_for
-
-import logging
-logger = logging.getLogger(' LocusRegressor')
+from ...utils import dims_except_for
 
 
 class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
@@ -38,7 +35,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         
         self.n_components = n_components
         self.context_dim = corpuses[0].dims['context']
-        self.context_names = corpuses[0].modality().coords['context']
+        self.context_names = list(corpuses[0].coords['context'].data)
         
         self.transformer = MesoscaleEncoder(self.context_dim)\
                                     .fit(corpuses)
@@ -175,7 +172,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
     
 
     def _init_params(self, random_state, n_components, n_contexts, dtype):
-        return random_state.laplace(
+        return random_state.normal(
                     0., 0.1, 
                     (
                         n_components, 

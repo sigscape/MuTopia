@@ -6,11 +6,11 @@ from itertools import product, repeat
 from itertools import chain
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.preprocessing import add_dummy_feature
-
+from ...utils import FeatureType, logger, str_wrapped_list
 from .base import idx_array_to_design
 
-import logging
-logger = logging.getLogger(' LocusRegressor')
+def _custom_combiner(feature, category):
+    return str(feature) + ":" + str(category)
 
 
 class DesignMatrixHelper:
@@ -19,24 +19,28 @@ class DesignMatrixHelper:
     def _expand_feature_combinations(cls, n_strand_features, *categories, 
                                 inverted=False):
         return list(chain(
-                repeat(['+','.','-'] if not inverted else ['-','.','+'], n_strand_features),
+                repeat(
+                    [1,0,-1] if not inverted else [-1,0,1], 
+                    n_strand_features
+                ),
                 categories
             ))
-
 
     @classmethod
     def onehot_encoder(cls, categories):
         def get_null(c):
-            if '.' in c:
-                return '.'
-            else:
-                return 'None'
-        
+            try:
+                return set(c).intersection({'.','None', 0}).pop()
+            except KeyError:
+                return None
+            
         return OneHotEncoder(
             categories=categories,
             drop=[get_null(c) for c in categories],
             sparse_output=False,
+            feature_name_combiner = _custom_combiner,
         )
+    
     
     @classmethod
     def get_idx_map(cls, n_strand_features, *categories, inverted=False):
@@ -47,7 +51,6 @@ class DesignMatrixHelper:
 
         label_to_idx = dict(zip(category_combinations, range(len(category_combinations))))
 
-        #return encode, category_combinations
         return label_to_idx
     
 
@@ -59,9 +62,11 @@ class DesignMatrixHelper:
         encoder = cls.onehot_encoder(categories)
 
         design = encoder.fit_transform(list(product(*categories)))
-        cols = encoder.get_feature_names_out()
         
-        return (add_dummy_feature(design), ['dummy'] + list(cols))
+        return (
+            add_dummy_feature(design), 
+            encoder,
+        )
     
 
     @classmethod
@@ -94,6 +99,8 @@ class DesignMatrixHelper:
     
 
 class MesoscaleEncoder:
+
+    uselog=True
     
     def __init__(self, n_blocks) -> None:
         self.n_blocks = n_blocks
@@ -104,12 +111,25 @@ class MesoscaleEncoder:
         example_features = corpuses[0].features.data_vars
 
         filter_features = lambda c : list([ 
-            name for name, var in example_features.items()
-            if var.attrs['type'] in (c,)
+            fname 
+            for fname, feature in example_features.items()
+            if FeatureType(feature.attrs['normalization']) in (c,)
         ])
 
-        strand_features = filter_features('cardinality')
-        cat_features = filter_features('categorical')
+        strand_features = filter_features(FeatureType.STRAND)
+        cat_features = filter_features(FeatureType.MESOSCALE)
+
+        for strand_feature in strand_features:
+            vals = set(np.unique(example_features[strand_feature].data))
+            if not vals == {-1, 0, 1}:
+                raise ValueError(
+                    f'The strand feature {strand_feature} has values {vals}.\n'
+                    'Strand features must have values in {-1, 0, 1}.'
+                )
+
+        if self.uselog:
+            logger.info('Found strand features:\n\t{}'.format(str_wrapped_list(strand_features)))
+            logger.info('Found mesoscale features:\n\t{}'.format(str_wrapped_list(cat_features)))
 
         self.feature_names_ = strand_features + cat_features
 
@@ -118,23 +138,19 @@ class MesoscaleEncoder:
         design_args = (n_strand_features, *categories)
         
         (self.n_states_, self.n_encoded_features_) = DesignMatrixHelper.encoding_dim(*design_args)
-        self._encoding_matrix_block_, _ = \
+        self._encoding_matrix_block_, encoder = \
             DesignMatrixHelper.get_joint_encoding_matrix(*design_args) 
 
-        self.feature_names_out = ['Baseline'] + [
-            f'{fname}:{cat}' 
-            for fname, cats in zip(self.feature_names_, DesignMatrixHelper._expand_feature_combinations(n_strand_features, *categories)) 
-            for cat in cats
-            if not cat in ('.','None')
-        ]
+        self.feature_names_out = ['Baseline'] \
+                + list(encoder.get_feature_names_out(strand_features + cat_features) )
 
         self.plus_encoder_map_ = DesignMatrixHelper.get_idx_map(*design_args)
         self.minus_encoder_map_ = DesignMatrixHelper.get_idx_map(*design_args, inverted=True)
 
         self.intercept_mask_ = self._get_intercept_mask(
-                                    self.n_blocks, 
-                                    *design_args,
-                                )
+            self.n_blocks, 
+            *design_args,
+        )
 
         self.encoding_matrix_ = self.compose_encoding_matrix(
             self.n_blocks, 
@@ -225,6 +241,8 @@ class MesoscaleEncoder:
 
 
 class NormalizedMesoscaleEncoder(MesoscaleEncoder):
+    
+    uselog=False
     
     @classmethod
     def compose_encoding_matrix(cls, n_blocks, block_matrix):

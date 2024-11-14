@@ -6,12 +6,9 @@ import os
 import logging
 from ..plot.signature_plot import _plot_linear_signature
 from ..model import *
-from .base import ModeConfig
-logger = logging.getLogger(' Mutopia-SBSModel ')
+from ..utils import logger
+from .mode_config import ModeConfig
 
-'''
-
-'''
 COSMIC_SORT_ORDER = [
  'A[C>A]A',
  'A[C>A]C',
@@ -283,6 +280,8 @@ def SBSModel(
     
     random_state = np.random.RandomState(seed)
     
+    logger.info('Initializing model parameters and transformations...')
+    
     mutation_model = StrandedConditionalConsequenceModel(
         'mutation', # require the mutation dimension - this is the stranded conditional consequence
         train_corpuses,
@@ -304,7 +303,6 @@ def SBSModel(
         init_components=init_components,
     )
 
-    logger.info('Initializing model parameters and transformations...')
     theta_model = \
         (GBTThetaModel if locus_model_type == 'gbt' \
         else LinearThetaModel)\

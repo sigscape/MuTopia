@@ -1,9 +1,12 @@
 from .corpus_state import CorpusState as CS
-from .optim import *
+#from .optim import *
+import numpy as np
+import xarray as xr
+from ..utils import ParContext
 from .model_components import *
 from .latent_var_models import *
 from ..plot.coef_matrix_plot import _plot_interaction_matrix
-from joblib import dump, load
+from joblib import dump
 
 import logging
 logger = logging.getLogger(' Mutopia-Model ')
@@ -15,10 +18,6 @@ and provides the high-level interface for interacting with the model.
 This is the entry point for the user to interact with and annotate data.
 '''
 class Model:
-
-    @classmethod
-    def load_model(cls, path):
-        return load(path)
 
     def __init__(
         self,
@@ -38,14 +37,9 @@ class Model:
 
 
     def _setup_corpus(self, corpus):
-
-        args = dict(
-            corpus,
-            self.model_state_,
-        )
-        corpus = CS.init_corpusstate(**args)
-        corpus = CS.update_corpusstate(**args, from_scratch=True)
-
+        args = (corpus, self.model_state_)
+        corpus = CS.init_corpusstate(*args)
+        corpus = CS.update_corpusstate(*args, from_scratch=True)
         return corpus
         
 
@@ -56,7 +50,7 @@ class Model:
 
         dump(self, path)
     
-
+    
     def plot_signature(self, component, **kwargs):
         self.modality_.plot(
             self.model_state_.format_signature(component), 
@@ -67,7 +61,7 @@ class Model:
     def plot_interaction_matrix(self, 
             component, 
             model='context_model', 
-            palette='vlag',
+            palette='coolwarm',
             **kw,
         ):
         return _plot_interaction_matrix(
@@ -90,11 +84,11 @@ class Model:
 
         with ParContext(threads, verbose=verbose) as par:
             exposures = self.model_state_.locals_model\
-                            .predict(
-                                corpus,
-                                self.model_state_,
-                                parallel_context=par
-                            )
+                .predict(
+                    corpus,
+                    self.model_state_,
+                    parallel_context=par
+                )
 
         corpus = corpus.assign_coords({'component' : self.component_names})
         corpus.obsm.update({'exposures' : exposures})
@@ -112,14 +106,14 @@ class Model:
             corpus = self._setup_corpus(corpus)
 
         with ParContext(threads) as par:
-            topics = self.model_state_._get_log_mutation_rate_tensor(
+            lmrt = self.model_state_._get_log_mutation_rate_tensor(
                 corpus,
                 parallel_context=par,
                 with_context=False,
             )
 
         corpus = corpus.assign_coords({'component' : self.component_names})
-        corpus.varm.update({'component_distributions' : topics})
+        corpus.varm.update({'component_distributions' : np.exp(lmrt - lmrt.max(skipna=True)).fillna(0.) })
         logger.info('Added key to varm: "component_distributions"')
         return corpus
 

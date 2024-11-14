@@ -7,7 +7,7 @@ from functools import partial
 from sklearn.base import clone
 import numpy as np
 from ..corpus_state import CorpusState as CS
-from ..utils import dims_except_for
+from ...utils import dims_except_for
 from xarray import DataArray
 from functools import reduce
 
@@ -179,7 +179,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
     
 
     def _init_params(self, random_state, n_components, context_dim, dtype):
-        return random_state.laplace(
+        return random_state.normal(
                     0, 0.1,
                     (
                         n_components, 

@@ -9,7 +9,7 @@ import numpy as np
 from ..corpus_state import CorpusState as CS
 from xarray import DataArray
 from functools import reduce
-from ..utils import dims_except_for
+from ...utils import dims_except_for
 
 class UnconditionalConsequenceModel(RateModel, SparseDataBase):
     '''

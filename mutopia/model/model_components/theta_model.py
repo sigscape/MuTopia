@@ -3,7 +3,7 @@ import inspect
 from .base import get_corpus_intercepts, get_poisson_targets_weights,\
      _svi_update_fn, RateModel, idx_array_to_design, \
      SparseDataBase, DenseDataBase
-from ..utils import dims_except_for
+from ...utils import dims_except_for
 from ..corpus_state import CorpusState as CS
 from ._hist_gbt import CustomHistGradientBooster
 from ._feature_tranformer import get_smoothing_transformer, \

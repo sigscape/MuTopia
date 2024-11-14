@@ -1,7 +1,7 @@
 
 from .corpus_state import CorpusState as CS
 from .eval import *
-from .utils import *
+from ..utils import *
 import logging
 from tqdm import trange
 
@@ -200,9 +200,7 @@ def fit_model(
     logger.info('Validating corpuses...')
     for corpus in train_corpuses + test_corpuses:
         check_dims(corpus, model_state)
-        check_sample_data(corpus, float)
-        check_structure(corpus)
-
+        check_corpus(corpus)
 
     logger.info('Preprocessing training corpuses...')
     for corpus in train_corpuses:   
@@ -217,7 +215,7 @@ def fit_model(
         corpuses=test_corpuses,
         exposures_fn=using_exposures_from(*train_corpuses)
     )
-
+    
     '''
     Sometimes we'd like to skip evaluating the test data
     to decrease the computational burden.

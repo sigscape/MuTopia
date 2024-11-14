@@ -208,7 +208,7 @@ class LocalUpdate(ABC):
         )
         
         return DataArray(
-            list(gammas),
+            np.array(list(gammas)),
             dims=('sample', 'component'),
         )
 

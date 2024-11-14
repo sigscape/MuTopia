@@ -1,4 +1,4 @@
-from .base import ModeConfig
+from .mode_config import ModeConfig
 from itertools import product
 from ..model import *
 import numpy as np
