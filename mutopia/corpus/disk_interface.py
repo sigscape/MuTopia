@@ -24,7 +24,6 @@ def _write_sample(sample_arr, filename):
         )
 
 
-
 def write_dataset(dataset, filename):
 
     dataset['/'].to_dataset().to_netcdf(filename, group='/', **WRITE_KW)

@@ -27,7 +27,7 @@ class CorpusState:
     
     @classmethod
     def is_marginal_corpus(cls, corpus):
-        return not 'sample' in corpus.coords
+        return not 'sample' in corpus.layers.coords
     
     @classmethod
     def list_samples(cls, corpus):

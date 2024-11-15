@@ -307,9 +307,9 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
     def format_signature(self, k):
         # CxMxS
         rho = self._calc_rho(k, 
-                    self.transformer\
-                        .independent_effects_encoding()
-                )
+            self.transformer\
+                .independent_effects_encoding()
+        )
         
         return DataArray(
             rho,
