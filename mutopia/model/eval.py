@@ -77,7 +77,7 @@ def deviance(
 
         fit_deviance = lambda obs, gamma : _sample_deviance(
                             obs.sum(dim=ignore_dims), 
-                            match_dims(corpus, marg_fn(gamma)).sum(dim=ignore_dims)
+                            match_dims(obs, marg_fn(gamma)).sum(dim=ignore_dims)
                         )
         
         return _reduce_sum(parallel_context(
@@ -94,8 +94,10 @@ def deviance(
         '''
         set up the background mutation rate tensor
         '''
+        example_sample = CS.fetch_sample(corpus, CS.list_samples(corpus)[0])
+
         background_rate = match_dims(
-                            corpus, 
+                            example_sample, 
                             corpus.regions.exposures \
                                 * corpus.regions.context_frequencies
                         ).sum(dim=ignore_dims)

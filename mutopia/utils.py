@@ -94,7 +94,7 @@ def ParContext(n_jobs, verbose=0):
 
 
 def check_dims(corpus, model_state):
-    rm_dim = dims_except_for(
+    '''rm_dim = dims_except_for(
         CS.sample_dims(corpus),
         *model_state.requires_dims,
     )
@@ -104,7 +104,7 @@ def check_dims(corpus, model_state):
             f'The model requires the following dimensions: {", ".join(model_state.requires_dims)}.\n'
             'Having extra data dimensions will increase training time and memory usage,\n'
             'remove them by summing over them: `corpus.sum(dim="extra_dim")`.'
-        )
+        )'''
     
     missing_dims = set(model_state.requires_dims).difference(CS.sample_dims(corpus) + ('sample',))
     if not len(missing_dims) == 0:
@@ -213,8 +213,8 @@ def dims_except_for(dims, *keepdims):
     return tuple({*dims}.difference({*keepdims}))
 
 
-def match_dims(corpus, X):
-    data_dims = corpus.modality().dims
+def match_dims(y, X):
+    data_dims = y.sizes
     return X.expand_dims({
         d : data_dims[d]
         for d in dims_except_for(data_dims.keys(), *X.dims)
