@@ -2,7 +2,6 @@
 from functools import partial, reduce
 import numpy as np
 from xarray import DataArray
-from pandas import DataFrame
 from ._glm_compiled import make_optimizer, setup_mixed_solver, get_lsqr_solver
 from ._fast_eln import get_eln_solver
 from ..corpus_state import CorpusState as CS
@@ -39,7 +38,6 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         
         self.transformer = MesoscaleEncoder(self.context_dim)\
                                     .fit(corpuses)
-        
 
         self._coefs = self._init_params(random_state, n_components, self.context_dim, dtype)
 
@@ -69,9 +67,8 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         ridge_solver = partial(
             get_lsqr_solver,
             tol=tol,
-            alpha=conditioning_alpha,
+            alpha=0.,
         ) # f(X) -> f(z, w, beta) -> beta
-
         
         mixed_solver = partial(
             setup_mixed_solver,
@@ -339,6 +336,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
             }
         )
     
+
     def component_coef_summary(self, sig_idx):
 
         c = self.context_dim
@@ -351,10 +349,13 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         ])
         coef_matrix = with_dummy.reshape((c+1,-1)).T
 
-        return DataFrame(
+        return DataArray(
             coef_matrix,
-            index=self.transformer.feature_names_out,
-            columns=self.context_names + ['Shared effect']
+            dims=('feature','context'),
+            coords={
+                'feature' : self.transformer.feature_names_out,
+                'context' : self.context_names + ['Shared effect']
+            }
         )
 
 

@@ -1,12 +1,13 @@
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 
 def _plot_interaction_matrix(
-        coef_matrix : pd.DataFrame,
+        coef_matrix,
         palette='vlag',
     ):
+
+    coef_matrix = coef_matrix.to_pandas()
 
     fig = plt.figure(figsize=(7, 2))
     gs = gridspec.GridSpec(

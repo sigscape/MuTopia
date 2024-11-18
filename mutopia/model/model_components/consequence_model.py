@@ -63,6 +63,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
             ),
             tol=tol,
             max_iter=10000,
+            alpha=conditioning_alpha,
         )
 
         # f(X) -> f( f(X) -> f(z, w, beta) -> beta, f(X) -> f(z, w, beta) -> beta ) -> f(z, w, beta) -> beta
@@ -324,4 +325,3 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
 
     def _format_component(self, k):
         return self._calc_rho(k, self._cons_encoding_matrix)
-

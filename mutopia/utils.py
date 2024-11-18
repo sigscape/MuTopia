@@ -125,13 +125,15 @@ def check_structure(corpus):
             'exposures'
         ],
         'features' : [],
-        'layers' : ['X'],
         'obsm' : [],
         'varm' : [],
     }
 
     if not 'name' in corpus.attrs:
         raise ValueError('The corpus is missing a name attribute.')
+    
+    if not 'X' in corpus:
+        raise ValueError('The corpus is missing the data matrix `X`.')
 
     for key, value in structure.items():
         if not hasattr(corpus, key):
@@ -145,8 +147,8 @@ def check_structure(corpus):
 
 def check_sample_data(corpus, dtype):
 
-    X = corpus.layers.X.data
-    dims = corpus.layers.X.dims
+    X = corpus.X.data
+    dims = corpus.X.dims
 
     if isinstance(X, sparse.SparseArray):
         if isinstance(X, sparse.COO):
@@ -161,7 +163,7 @@ def check_sample_data(corpus, dtype):
     if not X.dtype == dtype:
         X = X.astype(dtype)
 
-    corpus.layers.X.data = X
+    corpus.X.data = X
     return corpus
 
 

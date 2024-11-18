@@ -27,25 +27,25 @@ class CorpusState:
     
     @classmethod
     def is_marginal_corpus(cls, corpus):
-        return not 'sample' in corpus.layers.coords
+        return not 'sample' in corpus.coords
     
     @classmethod
     def list_samples(cls, corpus):
         if cls.is_marginal_corpus(corpus):
             return [None]
         
-        return list(corpus.layers.X.coords['sample'].values)
+        return list(corpus.X.coords['sample'].values)
 
     @classmethod
     def fetch_sample(cls, corpus, sample_name):
         if cls.is_marginal_corpus(corpus) and sample_name is None:
-            return corpus.layers.X
+            return corpus.X
 
-        return corpus.layers.X.sel(sample=sample_name)
+        return corpus.X.sel(sample=sample_name)
     
     @classmethod
     def sample_dims(cls, corpus):
-        return corpus.layers.X.dims
+        return corpus.X.dims
 
     @classmethod
     def init_corpusstate(
@@ -57,13 +57,7 @@ class CorpusState:
         sample_names = cls.list_samples(corpus)
         n_components = model_state.n_components
             
-        state_elements = {
-                    'log_mutrate_normalizer' : xr.DataArray(
-                        np.zeros(n_components),
-                        dims=('component',),
-                    ),
-                }
-        
+        state_elements = {}
         for model in model_state.models.values():
             state_elements.update(
                 model.prepare_corpusstate(corpus)
@@ -74,7 +68,6 @@ class CorpusState:
                 state_elements,
                 coords={
                     **corpus.coords,
-                    'components' : list(range(n_components)),
                     'sample' : sample_names,
                 }
             ),

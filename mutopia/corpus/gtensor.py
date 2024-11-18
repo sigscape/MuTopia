@@ -144,7 +144,7 @@ def add_sample(
         sample = sample.squeeze()
 
     required_dims = \
-        set( get_mode(corpus).dims.keys() )\
+        set( get_mode(corpus).dims )\
         .union({'locus'})
     
     if not set(sample.dims) == required_dims:
@@ -156,27 +156,35 @@ def add_sample(
         .expand_dims({'sample' : [name]})\
         .ascsr('sample','locus')
     
-    layers = xr.concat(
+    root = xr.concat(
         [
-            corpus.layers.to_dataset(), 
+            corpus.to_dataset(), 
             xr.Dataset(
                 {'X' : sample}, 
                 coords={'sample' : [name]}
             ),
-        ], 
+        ],
         dim='sample'
     )
     
-    layers.X.ascsr('sample','locus')
+    root.X.ascsr('sample','locus')
 
+    corpus = DataTree(
+        data=root,
+        children=corpus.children
+    )
+
+    # remove and reinit the obsm section
     update_view(
         corpus,
-        layers=layers,
+        obsm = xr.Dataset(
+            coords=corpus.coords,
+        )
     )
-    logger.info(f'Added sample to layers.X: "{name}"')
+
+    logger.info(f'Added sample to .X: "{name}"')
 
     return corpus
-
 
 
 def update_view(
@@ -193,23 +201,18 @@ def update_view(
     return tree
 
 
-
 def annot_empirical_marginal(
     corpus,
-    layer='X',
 ):
     check_structure(corpus)
-    try:
-        corpus.layers[layer]
-    except KeyError:
-        raise KeyError(f'The corpus does not have a layer {layer}.')
     
     with warnings.simplefilter("ignore"):
         log_em = (
-            np.log( corpus.layers[layer].sum('sample') )\
+            np.log( corpus.X.sum('sample') )\
                 - np.log( corpus.regions.context_frequencies )
         )
-        
+    
+    log_em.data = log_em.data.astype(np.float32)
     empirical_marginal = np.exp(log_em - log_em.max()).fillna(0.)
     del log_em
     

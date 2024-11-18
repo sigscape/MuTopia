@@ -1,12 +1,13 @@
 from .corpus_state import CorpusState as CS
-#from .optim import *
 import numpy as np
 import xarray as xr
 from ..utils import ParContext
 from .model_components import *
 from .latent_var_models import *
 from ..plot.coef_matrix_plot import _plot_interaction_matrix
+from ..corpus import *
 from joblib import dump
+import typing
 
 import logging
 logger = logging.getLogger(' Mutopia-Model ')
@@ -33,7 +34,17 @@ class Model:
     
     @property
     def component_names(self):
-        return self.model_state_.component_names
+        #return self.model_state_.component_names
+        try:
+            self.component_names_
+        except AttributeError:
+            return ['component_{}'.format(i) for i in range(1, self.n_components+1)]
+        
+    def set_component_names(self, names : typing.List[str]):
+        if not len(names) == self.n_components:
+            raise ValueError('The number of names must match the number of components')
+        
+        self.component_names_ = names
 
 
     def _setup_corpus(self, corpus):
@@ -61,7 +72,7 @@ class Model:
     def plot_interaction_matrix(self, 
             component, 
             model='context_model', 
-            palette='coolwarm',
+            palette='vlag',
             **kw,
         ):
         return _plot_interaction_matrix(
@@ -90,8 +101,10 @@ class Model:
                     parallel_context=par
                 )
 
-        corpus = corpus.assign_coords({'component' : self.component_names})
-        corpus.obsm.update({'exposures' : exposures})
+        corpus = corpus.assign_coords({
+            'component' : self.component_names,
+        })
+        corpus.obsm['exposures'] = exposures
         logger.info('Added key to obsm: "exposures"')
         return corpus
     
@@ -113,18 +126,85 @@ class Model:
             )
 
         corpus = corpus.assign_coords({'component' : self.component_names})
-        corpus.varm.update({'component_distributions' : np.exp(lmrt - lmrt.max(skipna=True)).fillna(0.) })
+        corpus.varm['component_distributions'] =\
+             np.exp(lmrt - lmrt.max(skipna=True)).fillna(0.)
+        
         logger.info('Added key to varm: "component_distributions"')
+        return corpus
+    
+
+    @staticmethod
+    def using_exposures_from(corpus):
+        try:
+            corpus.obsm['exposures']
+        except KeyError:
+            raise KeyError('The corpus does not have exposures. Run `model.annot_exposures(corpus)` first.')
+
+        return lambda sample_name : \
+            corpus.obsm['exposures'].sel(sample=sample_name).data
+    
+    
+
+    def annot_marginal_prediction(
+        self,
+        corpus,
+        exposures=None,
+        threads=1,
+    ):
+        
+        try:
+            corpus.varm['component_distributions']
+        except KeyError:
+            corpus = self.annot_component_distributions(corpus, threads)
+
+        if exposures is None:
+            self.using_exposures_from(corpus)
+
+        marginal_exposures = corpus.obsm['exposures'].sum('sample').data
+
+        corpus.varm['predicted_marginal'] = \
+            self.model_state_._marginalize_mutrate(
+                np.log(corpus.varm['component_distributions'].data),
+                marginal_exposures
+            )
+        
+        logger.info('Added key to varm: "predicted_marginal"')
         return corpus
 
 
     def annot_imputed(
         self,
         corpus,
+        exposures=None,
         threads=1,
-    ):
+    ):  
+        try:
+            corpus.varm['component_distributions']
+        except KeyError:
+            corpus = self.annot_component_distributions(corpus, threads)
+
+        if exposures is None:
+            exposures = self.using_exposures_from(corpus)
+
+        log_component_mutrate = np.log(corpus.varm['component_distributions'])
+
+        imputed = xr.concat(
+            [
+                self.model_state_._marginalize_mutrate(
+                    log_component_mutrate,
+                    exposures(sample_name)
+                )
+                for sample_name in CS.list_samples(corpus)
+            ],
+            dim='sample',
+        ).transpose(
+            'sample', *self.modality_.dims, 'locus',
+        )
+
+        corpus['imputed'] = imputed
         logger.info('Added key to layers: "imputed"')
-        pass
+        return corpus
+
 
 
     def annot_SHAP_values(
@@ -145,6 +225,9 @@ class Model:
                         )
         
         def _component_shap(k):
+            
+            logger.info(f'Calculating SHAP values for {self.component_names[k]} ...')
+
             return shap.TreeExplainer(
                     locus_model.rate_models[k],
                     X[background_idx],
@@ -162,12 +245,10 @@ class Model:
         features = corpus.state.coords['feature'].data
 
         corpus = corpus.assign_coords({'locus_features' : features})
-        corpus.varm.update({
-            'SHAP_values' : xr.DataArray(
+        corpus.varm['SHAP_values'] = xr.DataArray(
                 shap_matrix,
                 dims=('component','locus','locus_features'),
             )
-        })
 
         logger.info('Added key to varm: "SHAP_values"')
         return corpus
