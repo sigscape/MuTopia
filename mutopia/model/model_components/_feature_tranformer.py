@@ -1,6 +1,7 @@
 from sklearn.preprocessing import OneHotEncoder, PowerTransformer, MinMaxScaler, \
     QuantileTransformer, StandardScaler, RobustScaler
 from ..corpus_state import CorpusState as CS
+from ...utils import FeatureType, logger, str_wrapped_list
 from mutopia.genome_utils.peeking_sort import streaming_groupby
 from sklearn.compose import ColumnTransformer
 from itertools import chain
@@ -12,9 +13,6 @@ from sklearn import set_config
 from sklearn.base import BaseEstimator, TransformerMixin
 from functools import reduce
 set_config(enable_metadata_routing=True)
-
-import logging
-logger = logging.getLogger(' Mutopia')
 
 '''
 TODO: make this work again ...
@@ -116,16 +114,26 @@ class PasteTransformer(BaseEstimator, TransformerMixin):
             f : X.features[f].data
             for f in self.feature_names
         })
+    
 
-
-def get_paste_transformer(*corpus_states):
+def _get_shared_features(*corpus_states):
 
     shared_features = reduce(
         lambda x,y : x.intersection(y),
-        (set(k for k, v in state.features.items() if not v.attrs['type'] in ('cardinality', 'categorical')) 
-         for state in corpus_states)
+        (
+            set(
+                fname for fname, feature in state.features.items() 
+                if not FeatureType(feature.attrs['normalization']) in (FeatureType.MESOSCALE, FeatureType.STRAND)
+            )
+            for state in corpus_states
+        )
     )
+    return shared_features
 
+
+def get_paste_transformer(*corpus_states):
+    shared_features = _get_shared_features(*corpus_states)
+    logger.info('Found locus features:\n\t{}'.format(str_wrapped_list(shared_features)))
     return PasteTransformer(feature_names=shared_features)
     
 
@@ -138,13 +146,10 @@ def get_normalizing_transformer(
     example_state = corpus_states[0]
     example_features = example_state.features
     
-    feature_names = list([
-        f for f in example_features.keys() 
-        if not example_features[f].attrs['type'] in ('cardinality', 'categorical')
-    ])
+    feature_names = list(_get_shared_features(*corpus_states))
 
     feature_types = [
-        example_features[feature].attrs['type']
+        FeatureType(example_features[feature].attrs['normalization'])
         for feature in feature_names
     ]
 
@@ -153,30 +158,30 @@ def get_normalizing_transformer(
         type_dict[feature_type].append(idx)
 
     categorical_features = PasteTransformer(
-                                feature_names=type_dict['categorical']
-                            ).transform(example_state)
+        feature_names=type_dict[FeatureType.CATEGORICAL]
+    ).transform(example_state)
     
     categories_lists = [
-            list(categorical_features[feature].unique()) 
-            for feature in categorical_features.columns
-        ]
+        list(categorical_features[feature].unique()) 
+        for feature in categorical_features.columns
+    ]
     
     '''if self.add_corpus_intercepts:
         categories_lists = categories_lists + [[state.attrs['name'] for state in corpus_states]]
         categorical_cols = categorical_cols + [len(self.feature_names_)]'''
 
     cat_encoder = clone(categorical_encoder).set_params(
-                        categories=categories_lists
-                    )
+        categories=categories_lists
+    )
 
     return ColumnTransformer(
         [
-            ('power', PowerTransformer(), type_dict['power']),
-            ('minmax', MinMaxScaler(), type_dict['minmax']),
-            ('quantile', QuantileTransformer(output_distribution='uniform'), type_dict['quantile']),
-            ('standardize', StandardScaler(), type_dict['standardize']),
-            ('robust', RobustScaler(), type_dict['robust']),
-            ('categorical', cat_encoder, type_dict['categorical']),
+            ('power', PowerTransformer(), type_dict[FeatureType.POWER]),
+            ('minmax', MinMaxScaler(), type_dict[FeatureType.MINMAX]),
+            ('quantile', QuantileTransformer(output_distribution='uniform'), type_dict[FeatureType.QUANTILE]),
+            ('standardize', StandardScaler(), type_dict[FeatureType.STANDARDIZE]),
+            ('robust', RobustScaler(), type_dict[FeatureType.STANDARDIZE]),
+            ('categorical', cat_encoder, type_dict[FeatureType.CATEGORICAL]),
         ],
         remainder='passthrough',
         verbose_feature_names_out=False,

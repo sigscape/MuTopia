@@ -1,7 +1,7 @@
 
 from .corpus_state import CorpusState as CS
 from .eval import *
-from .utils import *
+from ..utils import *
 import logging
 from tqdm import trange
 
@@ -170,6 +170,9 @@ def _should_stop(stop_condition, scores):
         and scores.index(max(scores)) < (len(scores) - stop_condition)
 
 
+
+
+
 def fit_model( 
     train_corpuses,
     test_corpuses,
@@ -190,6 +193,15 @@ def fit_model(
     verbose=0,
 ):
 
+    ##
+    # If the data is sparse, we should make sure it's in the right format.
+    # GCSX with locus and sample dimensions compressed.
+    ##
+    logger.info('Validating corpuses...')
+    for corpus in train_corpuses + test_corpuses:
+        check_dims(corpus, model_state)
+        check_corpus(corpus)
+
     logger.info('Preprocessing training corpuses...')
     for corpus in train_corpuses:   
         CS.init_corpusstate(corpus, model_state)
@@ -203,7 +215,7 @@ def fit_model(
         corpuses=test_corpuses,
         exposures_fn=using_exposures_from(*train_corpuses)
     )
-
+    
     '''
     Sometimes we'd like to skip evaluating the test data
     to decrease the computational burden.
@@ -244,6 +256,8 @@ def fit_model(
         )
 
     logger.info(f'Training model with {threads} threads.')
+    logger.info('The first few epochs take longer as things get warmed up -\n\texpect the time per epoch to decrease about 4-fold.')
+    logger.info(f'Model will stop training if no improvement in the last {stop_condition} epochs.')
     train_scores = []
     test_scores = []
 
@@ -291,9 +305,7 @@ def fit_model(
                         from_scratch=False,
                     )
 
-                train_score = train_scorer(train_score)
-
-                train_scores.append(train_score)
+                train_scores.append(train_scorer(train_score))
                 
                 if evaluate_test:
                     test_scores.append(test_score)
@@ -310,17 +322,12 @@ def fit_model(
                     logger.info('Early stopping criterion met. The model has converged.')
                     break
         
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt, SystemError):
+            # sometimes interrupting an optimizer throws a system error ...
             pass
 
         finally:
             progress_bar.close()
-        
-        logger.info('Finalizing model state...')
-        model_state.init_normalizers(
-            train_corpuses, 
-            parallel_context=par
-        )
 
     return (
         model_state,

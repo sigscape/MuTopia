@@ -9,10 +9,7 @@ from ..corpus_state import CorpusState as CS
 from .base import get_reg_params, get_poisson_targets_weights, _svi_update_fn, \
     RateModel, SparseDataBase, DenseDataBase
 from ._strand_transformer import MesoscaleEncoder
-from ..utils import dims_except_for
-
-import logging
-logger = logging.getLogger(' LocusRegressor')
+from ...utils import dims_except_for
 
 
 class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
@@ -38,8 +35,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         
         self.n_components = n_components
         self.context_dim = corpuses[0].dims['context']
-        self.context_names = corpuses[0].modality().coords['context']
-        self.dtype = dtype
+        self.context_names = list(corpuses[0].coords['context'].data)
         
         self.transformer = MesoscaleEncoder(self.context_dim)\
                                     .fit(corpuses)
@@ -403,6 +399,25 @@ class UnstrandedContextModel(StrandedContextModel, SparseDataBase):
 
         # Use numpy advanced indexing to update context_sstats
         np.add.at(sstats, (slice(None), context, mesoscale_states), weighted_posterior)
+
+        return sstats
+    
+    
+    def reduce_dense_sstats(self, sstats, corpus, *, weighted_posterior, **kw):
+
+        to_dim = ('component', *self.requires_dims)
+        
+        # K x Cons x L
+        weights = weighted_posterior\
+            .sum(dim=dims_except_for(weighted_posterior.dims, *to_dim))\
+            .transpose(*to_dim)\
+            .data
+
+        # 2 x L
+        idx = CS.fetch_val(corpus, 'mesoscale_idx').data
+        
+        # sstats : K x C x S x M
+        np.add.at(sstats, (slice(None), slice(None), idx), weights)
 
         return sstats
     

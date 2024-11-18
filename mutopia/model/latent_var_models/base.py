@@ -1,5 +1,7 @@
-
 from abc import ABC, abstractmethod
+from joblib import delayed
+from xarray import DataArray
+
 from numba import njit, vectorize
 import numpy as np
 from numba.extending import get_cython_function_address
@@ -188,9 +190,28 @@ def bound(
 
 class LocalUpdate(ABC):
 
-    @abstractmethod
-    def bound(self, gamma, *, corpus, sample, model_state):
-        raise NotImplementedError
+    def predict(
+        self, 
+        corpus, 
+        model_state, 
+        *, 
+        parallel_context
+    ):
+        _, update_fns = self.get_update_fns(
+            (corpus,),
+            model_state,
+            parallel_context=parallel_context,
+        )
+            
+        gammas = map(
+            lambda x : x[1],
+            parallel_context(delayed(update_fn)() for update_fn in update_fns)
+        )
+        
+        return DataArray(
+            np.array(list(gammas)),
+            dims=('sample', 'component'),
+        )
 
 
     @abstractmethod

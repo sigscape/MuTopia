@@ -4,7 +4,7 @@ import sparse as sp
 from functools import reduce, partial
 from joblib import delayed
 from .corpus_state import CorpusState as CS
-from .utils import dims_except_for, match_dims
+from ..utils import dims_except_for, match_dims
 import warnings
 
 def _reduce_sum(g):
@@ -23,41 +23,6 @@ def get_n_mutations(
 
 def perplexity(num_mutations, elbo):
     return np.exp(-elbo/num_mutations)
-
-
-'''def elbo_score(
-    model_state,
-    corpuses,
-    locals_weight=1.0,
-    exposures_fn = CS.fetch_topic_compositions,
-    *,
-    parallel_context,
-):
-    
-    bound = lambda corpus, sample_name : \
-                model_state.locals_model.bound(
-                    exposures_fn(corpus, sample_name),
-                    corpus=corpus,
-                    sample=corpus.samples[sample_name],
-                    model_state=model_state,
-                    locals_weight=locals_weight,
-                )
-    
-    samples = (
-        (corpus, sample_name)
-        for corpus in corpuses 
-        for sample_name in corpus.samples.data_vars.keys()
-    )
-
-    elbo = reduce(
-            lambda x,y : x+y,
-            parallel_context(
-                delayed(bound)(corpus, sample_name)
-                for corpus, sample_name in samples
-            )
-        )
-    
-    return elbo'''
 
 
 def deviance(
@@ -112,7 +77,7 @@ def deviance(
 
         fit_deviance = lambda obs, gamma : _sample_deviance(
                             obs.sum(dim=ignore_dims), 
-                            match_dims(corpus, marg_fn(gamma)).sum(dim=ignore_dims)
+                            match_dims(obs, marg_fn(gamma)).sum(dim=ignore_dims)
                         )
         
         return _reduce_sum(parallel_context(
@@ -129,8 +94,10 @@ def deviance(
         '''
         set up the background mutation rate tensor
         '''
+        example_sample = CS.fetch_sample(corpus, CS.list_samples(corpus)[0])
+
         background_rate = match_dims(
-                            corpus, 
+                            example_sample, 
                             corpus.regions.exposures \
                                 * corpus.regions.context_frequencies
                         ).sum(dim=ignore_dims)

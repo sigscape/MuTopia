@@ -1,5 +1,3 @@
-
-
 from .mode_config import ModeConfig
 from itertools import product
 from ..model import *
@@ -9,42 +7,31 @@ import json
 import logging
 import matplotlib.pyplot as plt
 from ..plot.signature_plot import _plot_linear_signature
-logger = logging.getLogger(' Mutopia-MotifModel ')
+logger = logging.getLogger(' Mutopia-LengthModel ')
 
-CONTEXTS = sorted(
-    map(lambda x : ''.join(x), product('ATCG','ATCG','ATCG', 'ATCG')), 
-    key = lambda x : (x[0], x[1], x[2], x[3])
-    )
+_bin_edges = [
+    (70, 80),  (80, 90),  (90, 100), (100, 105), (105, 110),
+    (110, 115), (115, 120), (120, 125), (125, 130), (130, 135), (135, 140), (140, 145),
+    (145, 150), (150, 155), (155, 160), (160, 165), (165, 170), (170, 175), (175, 180),
+    (180, 185), (185, 190), (190, 195), (195, 200), (200, 205), (205, 210), (210, 220),
+    (220, 230), (230, 240), (240, 250), (250, 260), (260, 270), (270, 280), (280, 290),
+    (290, 300), (300, 310), (310, 320), (320, 330), (330, 340), (340, 350), (350, 700)
+]
+LENGTH_BINS = [f'{l}-{r}' for l, r in _bin_edges]
 
-cmap = plt.colormaps['tab10']
+# Create mutation indices
 
-_context_palette = {
-    'A': cmap(0.3),
-    'C': cmap(0.2),
-    'G': cmap(0.9),
-    'T': cmap(0.4)
-}
+class FragmentLength(ModeConfig):
 
-ALPHA_LIST = [0.5 if fourmer[1] in ['A','G'] else 1 for fourmer in CONTEXTS]
-COLOR_LIST = [_context_palette[fourmer[0]] for fourmer in CONTEXTS]
-for i in range(len(COLOR_LIST)):
-    color_tuple = list(COLOR_LIST[i])
-    color_tuple[-1] = ALPHA_LIST[i]
-    COLOR_LIST[i] = tuple(color_tuple)
-
-
-
-class FragmentMotif(ModeConfig):
-
-    MODE_ID='fragment-motif'
+    MODE_ID='fragment-length'
 
     @property
     def coords(self):
-        return {'context' : CONTEXTS}
+        return {'context' : LENGTH_BINS}
     
     @property
     def make_model(self):
-        return MotifModel
+        return FragmentLengthModel
     
     @property
     def sample_params(self):
@@ -52,15 +39,16 @@ class FragmentMotif(ModeConfig):
     
     @property
     def available_components(self):
-        filepath = os.path.join(os.path.dirname(__file__), 'fragment_motifs.json')
+        filepath = os.path.join(os.path.dirname(__file__), 'fragment_lengths.json')
         with open(filepath, 'r') as f:
             database = json.load(f)
+            
         return list(database.keys())
 
     @classmethod
     def load_components(cls, *init_components):
         
-        filepath = os.path.join(os.path.dirname(__file__), 'fragment_motifs.json')
+        filepath = os.path.join(os.path.dirname(__file__), 'fragment_lengths.json')
         with open(filepath, 'r') as f:
             database = json.load(f)
 
@@ -68,16 +56,16 @@ class FragmentMotif(ModeConfig):
         for component in init_components:
             if not component in database:
                 raise ValueError(f"Component {component} not found in database")
-            comps.append(
-                [database[component][context_mut] for context_mut in cls().coords['context']]
-            )
+            
+            comps.append([database[component][l] for l in cls().coords['context']])
+        
         return np.expand_dims(np.array(comps), axis=-1)
 
     @classmethod
     def plot(
         cls,
         signature,
-        palette = COLOR_LIST,
+        palette = 'lightgrey',
         select = ['Baseline'],
         **kwargs,
     ):
@@ -89,7 +77,7 @@ class FragmentMotif(ModeConfig):
         lead_dim = signature.dims[0]
         
         _plot_linear_signature(
-            CONTEXTS,
+            LENGTH_BINS,
             palette,
             *list(map(
                 lambda s : s.ravel(),
@@ -106,14 +94,14 @@ class FragmentMotif(ModeConfig):
 
 
 
-def MotifModel(
+def FragmentLengthModel(
     train_corpuses,
     test_corpuses,
     n_components=15,
     init_components=None,
     seed=0,
     # context model
-    context_reg=0.0001,
+    reg=0.0001,
     conditioning_alpha=5e-5,
     # locals model
     pi_prior=1.,
@@ -142,6 +130,7 @@ def MotifModel(
     callback=None,
     eval_every=10,
     verbose=0,
+    sparse=True
 ):
     random_state = np.random.RandomState(seed)
 
@@ -166,26 +155,39 @@ def MotifModel(
             l2_regularization=l2_regularization,
         )
 
-    context_model = UnstrandedContextModel(
+    '''fraglength_model = UnconditionalConsequenceModel(
+        'fragment-length',
         train_corpuses,
         n_components=n_components,
         random_state=random_state,
         tol=5e-4,
-        reg=context_reg,
+        reg=reg,
+        conditioning_alpha=conditioning_alpha,
+        init_components=init_components,
+    )'''
+
+    fraglength_model = UnstrandedContextModel(
+        train_corpuses,
+        n_components=n_components,
+        random_state=random_state,
+        tol=5e-4,
+        reg=reg,
         conditioning_alpha=conditioning_alpha,
         init_components=init_components,
     )
 
-    locals_model = LDAUpdateSparse(
-        train_corpuses,
-        n_components=n_components,
-        random_state=random_state,
-        prior_alpha=pi_prior,
-    )
+
+    locals_model = \
+        (LDAUpdateSparse if sparse else LDAUpdateDense)(
+            train_corpuses,
+            n_components=n_components,
+            random_state=random_state,
+            prior_alpha=pi_prior,
+        )
 
     model_state = ModelState(
         train_corpuses,
-        context_model=context_model,
+        fraglength_model=fraglength_model,
         theta_model=theta_model,
         locals_model=locals_model,
     )
@@ -221,7 +223,7 @@ def MotifModel(
 
 def _sample_params(study, trial):
     return {
-        'context_reg' : trial.suggest_float('context_reg', 1e-5, 5e-3, log=True),
+        'reg' : trial.suggest_float('context_reg', 1e-5, 5e-3, log=True),
         'conditioning_alpha' : trial.suggest_float('conditioning_alpha', 1e-6, 1e-3, log=True),
         'empirical_bayes' : trial.suggest_categorical('empirical_bayes', [True, False]),
         'max_features' : trial.suggest_float('max_features', 0.1, 1.),

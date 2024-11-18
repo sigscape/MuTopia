@@ -21,14 +21,31 @@ class CorpusState:
         
         return corpus
     
+    @classmethod
+    def has_corpusstate(cls, corpus):
+        return hasattr(corpus, 'state')
+    
+    @classmethod
+    def is_marginal_corpus(cls, corpus):
+        return not 'sample' in corpus.layers.coords
     
     @classmethod
     def list_samples(cls, corpus):
-        return list(corpus.samples.data_vars.keys())
+        if cls.is_marginal_corpus(corpus):
+            return [None]
+        
+        return list(corpus.layers.X.coords['sample'].values)
 
     @classmethod
     def fetch_sample(cls, corpus, sample_name):
-        return corpus.samples[sample_name]
+        if cls.is_marginal_corpus(corpus) and sample_name is None:
+            return corpus.layers.X
+
+        return corpus.layers.X.sel(sample=sample_name)
+    
+    @classmethod
+    def sample_dims(cls, corpus):
+        return corpus.layers.X.dims
 
     @classmethod
     def init_corpusstate(
@@ -37,7 +54,7 @@ class CorpusState:
                 model_state,
             ):
 
-        sample_names = list(corpus.samples.keys())
+        sample_names = cls.list_samples(corpus)
         n_components = model_state.n_components
             
         state_elements = {

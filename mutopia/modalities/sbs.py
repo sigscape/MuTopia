@@ -6,12 +6,9 @@ import os
 import logging
 from ..plot.signature_plot import _plot_linear_signature
 from ..model import *
-from .base import ModeConfig
-logger = logging.getLogger(' Mutopia-SBSModel ')
+from ..utils import logger
+from .mode_config import ModeConfig
 
-'''
-
-'''
 COSMIC_SORT_ORDER = [
  'A[C>A]A',
  'A[C>A]C',
@@ -150,6 +147,7 @@ class SBSMode(ModeConfig):
 
     MODE_ID = 'sbs'
     MUTOPIA_TO_COSMIC_IDX = MUTOPIA_TO_COSMIC_IDX
+    PALETTE = MUTATION_PALETTE
 
     @property
     def coords(self):
@@ -166,6 +164,14 @@ class SBSMode(ModeConfig):
     @property
     def sample_params(self):
         return _sample_params
+    
+    @property
+    def available_components(self):
+        filepath = os.path.join(os.path.dirname(__file__), 'musical_sbs.json')
+        with open(filepath, 'r') as f:
+            database = json.load(f)
+            
+        return list(database.keys())
 
     @classmethod
     def load_components(cls, *init_components):
@@ -274,6 +280,8 @@ def SBSModel(
     
     random_state = np.random.RandomState(seed)
     
+    logger.info('Initializing model parameters and transformations...')
+    
     mutation_model = StrandedConditionalConsequenceModel(
         'mutation', # require the mutation dimension - this is the stranded conditional consequence
         train_corpuses,
@@ -295,7 +303,6 @@ def SBSModel(
         init_components=init_components,
     )
 
-    logger.info('Initializing model parameters and transformations...')
     theta_model = \
         (GBTThetaModel if locus_model_type == 'gbt' \
         else LinearThetaModel)\
@@ -368,5 +375,5 @@ def _sample_params(study, trial):
         'empirical_bayes' : trial.suggest_categorical('empirical_bayes', [True, False]),
         'max_features' : trial.suggest_float('max_features', 0.1, 1.),
         'locus_subsample' : trial.suggest_categorical('locus_subsample', [None, 0.125, 0.25, 0.5]),
-        'kappa' : trial.suggest_float('kappa', 0.5, 0.9),
+        'kappa' : trial.suggest_float('kappa', 0.4, 0.7),
     }

@@ -6,11 +6,15 @@ class ModeConfig(ABC):
     MODE_ID = None
 
     @property
-    def dims(self):
+    def sizes(self):
         return {
             k : len(v)
             for k,v in self.coords.items()
         }
+    
+    @property
+    def dims(self):
+        return tuple(self.coords.keys())
     
     @property
     @abstractmethod

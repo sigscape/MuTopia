@@ -234,37 +234,6 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
             updates
         )
 
-    
-    def bound(self,
-        gamma,
-        subsample_rate=1.,
-        *,
-        corpus,
-        sample,
-        model_state,
-    ):
-        
-        sample_dict = self._convert_sample(sample)
-        alpha = np.ascontiguousarray(self.alpha[CS.get_name(corpus)])
-        gamma = np.ascontiguousarray(gamma)
-        weights = sample_dict['weights']/subsample_rate
-        
-        conditional_likelihood = \
-            self._conditional_observation_likelihood(
-                corpus, 
-                model_state,
-                **sample_dict
-            )
-
-        return self._calc_sstats(
-            alpha,
-            conditional_likelihood,
-            weights,
-            gamma,
-            sample_dict=sample_dict
-        )[-1]
-    
-
     ## 
     # M-step functionality to satisfy the PrimModel interface
     ##
