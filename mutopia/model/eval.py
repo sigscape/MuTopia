@@ -11,21 +11,27 @@ def _reduce_sum(g):
     return reduce(lambda x,y : x+y, g)
 
 
-def get_n_mutations(
-        corpuses,
-):
-    return _reduce_sum((
-        CS.fetch_sample(corpus, sample_name).data.sum()
-        for corpus in corpuses 
-        for sample_name in CS.list_samples(corpus)
-    ))
-
-
-def perplexity(num_mutations, elbo):
-    return np.exp(-elbo/num_mutations)
-
-
 def deviance(
+    model_state,
+    corpuses,
+    exposures_fn = CS.fetch_topic_compositions,
+    *,
+    parallel_context,
+):
+    dev_fns = model_state.locals_model.get_deviance_fns(
+        corpuses,
+        model_state,
+        exposures_fn=exposures_fn,
+        parallel_context=parallel_context,
+    )
+    
+    res = list(parallel_context(delayed(fn)() for fn in dev_fns))
+    d_fit, d_null = list(zip(*res))
+
+    return 1 - sum(d_fit)/sum(d_null)
+
+
+def _slow_deviance(
     model_state,
     corpuses,
     exposures_fn = CS.fetch_topic_compositions,
@@ -34,6 +40,15 @@ def deviance(
     ignore_dims=[],
     save_dims=None,
 ):
+    '''
+    This function computes the deviance of the model on the corpuses.
+    It is a slow implementation that is useful for debugging and testing,
+    and offers more flexibility in what you're testing.
+
+    However, you can't use this to monitor the progress of model training
+    because it takes too much time and memory. For this, use the more
+    specialized `deviance` function.
+    '''
 
     xr_xlogy_sparse_dense = lambda a,b : xr.apply_ufunc(
                             lambda x,y : x * np.nan_to_num(np.log(y), neginf=-1e30),
@@ -51,15 +66,16 @@ def deviance(
                     if not save_dims is None else None
         
         ysum = obs.data.sum()
-        bias = ysum*np.log( marginal_mutrate.data.sum()/ysum )
-
         ylogy = xr_xlogy_sparse_sparse(obs, obs)\
-                    .sum(skipna=True, dim=sum_dims).data
+                    .sum(skipna=True, dim=sum_dims).data \
+                    - ysum * np.log(ysum)
         
         ylogmu = xr_xlogy_sparse_dense(obs, marginal_mutrate)\
-                    .sum(skipna=True, dim=sum_dims).data
+                    .sum(skipna=True, dim=sum_dims).data \
+                    - ysum * np.log(marginal_mutrate.data.sum())
 
-        return (ylogy - ylogmu + bias)
+        print(ylogy, ylogmu)
+        return (ylogy - ylogmu)
     
     
     def _corpus_fit_deviance(corpus):

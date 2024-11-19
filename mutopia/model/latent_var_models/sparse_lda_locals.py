@@ -4,6 +4,8 @@ from functools import partial, reduce
 from ..model_components.base import _svi_update_fn, PrimitiveModel
 from ._dirichlet_update import update_alpha
 from ..corpus_state import CorpusState as CS
+from ...utils import dims_except_for
+from math import prod
 from .base import *
 import warnings
 
@@ -50,12 +52,30 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
             **idx_dict,
             weights=weights,
         )
+    
+
+    def _get_log_context_effect(
+        self,
+        corpus,
+        **idx_dict,
+    ):
+        
+        idx_arrs = [
+            idx_dict[dim]
+            for dim in corpus.regions.context_frequencies.dims
+        ]
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            
+            return np.log(corpus.regions.context_frequencies.data[*idx_arrs])
 
 
     def _conditional_observation_likelihood(
         self,
         corpus,
         model_state,
+        logsafe=True,
         *,
         weights,
         locus,
@@ -68,24 +88,33 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
         ##
         logp_normalizer = model_state.get_normalizers(corpus)[:,None]
 
-        # np.log(corpus.regions.context_frequencies.data[context, locus]) \
+        context_freq = self._get_log_context_effect(
+            corpus,
+            locus=locus,
+            **idx_dict
+        )
+
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-
+            
             logp_X = reduce(
-                        lambda x,y: x+y,
-                        (
-                            model.predict_sparse(corpus, locus=locus, **idx_dict)
-                            for model in model_state.nonlocals.values()
-                        ),
-                        np.log(corpus.regions.exposures.data[locus]) \
-                        + logp_normalizer
-                    )
+                lambda x,y: x+y,
+                (
+                    model.predict_sparse(corpus, locus=locus, **idx_dict)
+                    for model in model_state.nonlocals.values()
+                ),
+                np.log(corpus.regions.exposures.data[locus]) \
+                    + logp_normalizer \
+                    + context_freq
+            )
+
+        if logsafe:
+            logp_X - logp_X.max()
 
         return np.ascontiguousarray(
-                    np.nan_to_num(np.exp(logp_X - logp_X.max()), nan=0)\
-                        .astype(self.dtype, copy=False)
-                )
+            np.nan_to_num(np.exp(logp_X), nan=0)\
+                .astype(self.dtype, copy=False)
+        )
     
 
     @staticmethod
@@ -233,6 +262,93 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
             samples,
             updates
         )
+    
+
+    def _sample_deviance(
+        self,
+        corpus,
+        sample,
+        model_state,
+        *,
+        gamma,
+        context_sum
+    ):
+        sample_dict = self._convert_sample(sample)
+        conditional_likelihood = \
+            self._conditional_observation_likelihood(
+                corpus, 
+                model_state,
+                logsafe=False, # we want the actual likelihood, don't remove the max for numerical stability
+                **sample_dict
+            )
+        
+        weights = sample_dict['weights']
+        contributions = np.ascontiguousarray(gamma/np.sum(gamma))
+
+        # the context frequencies are missing dimensions that the observations have ...
+        log_context_effect = self._get_log_context_effect(
+            corpus,
+            **sample_dict
+        )
+
+        # 1. figure out the missing dimensions
+        missing_dims = dims_except_for(sample.dims, *corpus.regions.context_frequencies.dims)
+        # 2. figure out the number of possible types of observations missing
+        n_types = prod(corpus.sizes[dim] for dim in missing_dims)
+        # 3. penalize the log context effect for the missing dimensions
+        log_context_effect -= np.log(n_types)
+        
+        # saturated
+        y_sum = np.sum(weights)
+        d_sat = weights @ np.log(weights) - y_sum * np.log(y_sum)
+        # model
+        d_fit = weights @ np.log(conditional_likelihood.T.dot(contributions))
+        # null
+        d_null = weights @ log_context_effect - y_sum * np.log(context_sum)
+
+        return (
+            d_sat - d_fit,
+            d_sat - d_null,
+        )
+
+
+    def get_deviance_fns(
+        self,
+        corpuses,
+        model_state,
+        exposures_fn=CS.fetch_topic_compositions,
+        *,
+        parallel_context,
+    ):
+        '''
+        -> List[F() -> Tuple[float, float]]
+        '''
+        samples = [
+            (corpus, sample_name)
+            for corpus in corpuses
+            for sample_name in CS.list_samples(corpus)
+        ]
+
+        context_sums = {
+            CS.get_name(corpus) : np.sum(
+                corpus.regions.context_frequencies.data,
+            )
+            for corpus in corpuses
+        }
+
+        deviance_fns = (
+            partial(
+                self._sample_deviance,
+                sample=CS.fetch_sample(corpus, sample_name),
+                corpus=corpus,
+                model_state=model_state,
+                gamma=exposures_fn(corpus, sample_name),
+                context_sum=context_sums[CS.get_name(corpus)],
+            )
+            for (corpus, sample_name) in samples
+        )
+
+        return deviance_fns
 
     ## 
     # M-step functionality to satisfy the PrimModel interface

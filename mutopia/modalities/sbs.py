@@ -375,4 +375,5 @@ def _sample_params(study, trial):
         'max_features' : trial.suggest_float('max_features', 0.1, 1.),
         'locus_subsample' : trial.suggest_categorical('locus_subsample', [None, 0.125, 0.25, 0.5]),
         'kappa' : trial.suggest_float('kappa', 0.4, 0.7),
+        'l2_regularization' : trial.suggest_float('l2_regularization', 1e-5, 10, log=True),
     }

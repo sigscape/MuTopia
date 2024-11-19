@@ -263,7 +263,7 @@ def train(
 @click.option(
     "-outdir",
     "--output-dir", 
-    type=click.Path(dir_okay=True, file_okay=False),
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, writable=True),
     default='.',
     help="Directory to save model files"
 )
@@ -434,12 +434,6 @@ def create_study(
         raise click.exceptions.BadOptionUsage(
             "test-corpuses",
             "At least one testing corpus is required",
-        )
-    
-    if not os.access(output_dir, os.W_OK):
-        raise click.exceptions.BadOptionUsage(
-            "output-dir",
-            "Output directory does not exist or is not writable",
         )
 
     mu.create_study(

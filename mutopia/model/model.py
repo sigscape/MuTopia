@@ -57,6 +57,8 @@ class Model:
         args = (corpus, self.model_state_)
         corpus = CS.init_corpusstate(*args)
         corpus = CS.update_corpusstate(*args, from_scratch=True)
+        #with ParContext(1) as par:
+        #    self.model_state_.init_normalizers((corpus,), parallel_context=par)
         return corpus
         
 

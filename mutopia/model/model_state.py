@@ -82,19 +82,24 @@ class ModelState:
     
     
     def predict(self, k, corpus, with_context=True):
+        '''
+        The difference between this method and the _get_propto_log_mutation_rate
+        is that this method returns the log mutation rate for all
+        models, not just those that require normalization.
+        '''
         
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
 
             y_hat = reduce(
-                lambda x,y: x+y, 
-                (
-                    model.predict(k, corpus)
-                    for model in self.nonlocals.values()
-                ),  # sum over models
-                np.log(corpus.regions.exposures) \
-                    + self.get_normalizers(corpus)[k]
-            )
+                    lambda x,y: x+y, 
+                    (
+                        model.predict(k, corpus)
+                        for model in self.nonlocals.values()
+                    ),  # sum over models
+                    np.log(corpus.regions.exposures) \
+                        + self.get_normalizers(corpus)[k]
+                )
             if with_context:
                 y_hat += np.log(corpus.regions.context_frequencies)
 

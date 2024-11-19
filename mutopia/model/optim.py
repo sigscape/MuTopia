@@ -221,11 +221,7 @@ def fit_model(
     to decrease the computational burden.
     '''
     dummy_score_fn = lambda *x, **y : np.nan
-
-    train_scorer = partial(
-        perplexity,
-        get_n_mutations(train_corpuses)
-    )
+    train_scorer = lambda x : -x # we don't really care about train score - test score is what matters
 
     lr_schedule = partial(learning_rate_schedule, tau, kappa)
 
