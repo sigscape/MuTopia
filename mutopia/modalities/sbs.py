@@ -372,7 +372,6 @@ def _sample_params(study, trial):
         'context_reg' : trial.suggest_float('context_reg', 1e-5, 5e-3, log=True),
         'mutation_reg' : trial.suggest_float('mutation_reg', 1e-5, 5e-3, log=True),
         'conditioning_alpha' : trial.suggest_float('conditioning_alpha', 1e-6, 1e-3, log=True),
-        'empirical_bayes' : trial.suggest_categorical('empirical_bayes', [True, False]),
         'max_features' : trial.suggest_float('max_features', 0.1, 1.),
         'locus_subsample' : trial.suggest_categorical('locus_subsample', [None, 0.125, 0.25, 0.5]),
         'kappa' : trial.suggest_float('kappa', 0.4, 0.7),

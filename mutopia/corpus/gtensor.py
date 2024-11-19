@@ -5,14 +5,14 @@ import warnings
 from typing import Union, List, Dict
 from numpy.typing import ArrayLike, NDArray
 from ..utils import FeatureType, check_structure
-from ..modalities import Modality, get_mode
+from ..modalities import get_mode
 import logging
 logger = logging.getLogger(' MuTensor ')
 logger.setLevel(logging.INFO)
 
 
 def gTensor(
-    modality : Modality,
+    modality,
     *,
     name : str,
     chrom : List[str],

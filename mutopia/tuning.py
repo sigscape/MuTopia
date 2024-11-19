@@ -1,5 +1,3 @@
-
-
 import optuna
 import os
 from functools import partial
@@ -8,7 +6,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(' Mutopia-tuning ')
 from optuna.storages import JournalStorage
 from optuna.storages.journal import JournalFileBackend
-
+from .corpus import load_dataset
 
 def _get_nfs_storage(study_name):
     
@@ -21,7 +19,24 @@ def _get_nfs_storage(study_name):
     return storage
 
 
+def dashboard(study_name, storage=None):
+
+    try:
+        from optuna_dashboard import run_server
+    except ImportError:
+        raise ImportError(
+            "To use the dashboard, you must install the optuna_dashboard package: `pip install optuna_dashboard`"
+        )
+    
+    if storage is None:
+        storage = _get_nfs_storage(study_name)
+
+    run_server(storage)
+
+
 def create_study(
+    train_corpuses,
+    test_corpuses,
     seed=0,
     storage=None,
     *,
@@ -32,7 +47,7 @@ def create_study(
 ):
     
     if storage is None:
-        storage = _get_nfs_storage(study_name)    
+        storage = _get_nfs_storage(study_name)
 
     study = optuna.create_study(
         study_name = study_name,
@@ -47,6 +62,8 @@ def create_study(
 
     study.set_user_attr('min_components', min_components)
     study.set_user_attr('max_components', max_components)
+    study.set_user_attr('train_corpuses', train_corpuses)
+    study.set_user_attr('test_corpuses', test_corpuses)
 
     for key, value in model_kw.items():
         study.set_user_attr(key, value)
@@ -64,11 +81,20 @@ def load_study(study_name, storage = None):
                     pruner = optuna.pruners.NopPruner()
                     )
 
-    attrs = study.user_attrs
-    attrs.pop('min_components')
-    attrs.pop('max_components')
+    model_attrs = study.user_attrs
+    
+    study_attrs = {
+        'min_components' : model_attrs.pop('min_components'),
+        'max_components' : model_attrs.pop('max_components'),
+        'train_corpuses' : model_attrs.pop('train_corpuses'),
+        'test_corpuses' : model_attrs.pop('test_corpuses'),
+    }
 
-    return study, attrs
+    return (
+        study, 
+        study_attrs,
+        model_attrs,
+    )
 
 
 def _model_report_callback(
@@ -125,16 +151,17 @@ def _sample_params(study, extra_param_fn, trial):
     
 
 def run_trial(
-    train_corpuses,
-    test_corpuses,
     *,
     storage = None,
     save_model=None,
     study_name,
 ):
 
-    study, model_kw = load_study(study_name, storage)
+    study, study_attrs, model_kw = load_study(study_name, storage)
 
+    train_corpuses = tuple(map(load_dataset, study_attrs['train_corpuses']))
+    test_corpuses = tuple(map(load_dataset, study_attrs['test_corpuses']))
+    
     example_corpus = train_corpuses[0]
 
     model_fn = partial(

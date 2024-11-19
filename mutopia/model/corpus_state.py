@@ -103,4 +103,16 @@ class CorpusState:
         return cls.fetch_val(corpus, 'topic_compositions')\
                     .sel(sample=sample_name)\
                     .data
+    
+    
+    @classmethod
+    def using_exposures_from(cls, *corpuses):
+        
+        corpus_dict = {cls.get_name(corpus) : corpus for corpus in corpuses}
+    
+        return lambda corpus, sample_name : \
+            cls.fetch_topic_compositions(
+                corpus_dict[cls.get_name(corpus)],
+                sample_name
+            )
         

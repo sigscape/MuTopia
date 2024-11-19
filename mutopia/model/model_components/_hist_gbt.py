@@ -280,8 +280,8 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
             # else 1.
             # self._baseline_prediction has shape (1, n_trees_per_iteration)
 
-            if not np.isclose(raw_predictions, 0.).all():
-                warnings.warn('Initial raw predictions are not set to 0. This will bias the predictions of the model.')
+            #if not np.isclose(raw_predictions, 0.).all():
+            #    warnings.warn('Initial raw predictions are not set to 0. This will bias the predictions of the model.')
 
             self._baseline_prediction = np.zeros_like(raw_predictions[0])
 

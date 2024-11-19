@@ -2,6 +2,9 @@ import sparse
 import xarray as xr
 import datatree
 import numpy as np
+from collections import defaultdict
+from ..utils import check_corpus
+
 
 WRITE_KW = dict(
         format='NETCDF4', 
@@ -9,16 +12,17 @@ WRITE_KW = dict(
     )
 
 
-def _write_sample(sample_arr, filename):
-
-    sample_name = sample_arr.attrs['name']
-
-    dset = sample_arr.sparse_to_coo() if isinstance(sample_arr.data, sparse.SparseArray) \
-                else sample_arr.to_dataset(name='data', promote_attrs=True)
+def _write_sample(
+    sample_name,
+    arr, 
+    filename
+):
+    dset = arr.sparse_to_coo() if isinstance(arr.data, sparse.SparseArray) \
+                else arr.to_dataset(name='data', promote_attrs=True)
         
     dset.to_netcdf(
             filename, 
-            group=f'/_raw_samples/{sample_name}', 
+            group=f'/raw/{sample_name}', 
             mode='a',
             **WRITE_KW
         )
@@ -26,69 +30,94 @@ def _write_sample(sample_arr, filename):
 
 def write_dataset(dataset, filename):
 
-    dataset['/'].to_dataset().to_netcdf(filename, group='/', **WRITE_KW)
+    check_corpus(dataset)
 
-    for group in dataset.groups:
-        if group == '/layers': # handled separately
+    dataset.to_dataset()\
+        .drop_vars(dataset.data_vars)\
+        .to_netcdf(
+            filename, 
+            group='/', 
+            mode='w', 
+            **WRITE_KW
+        )
+
+    for group in list(dataset.children.keys()):
+        if group.startswith('/raw') or group == 'state':
             continue
-
+        
         dataset[group].to_dataset()\
-            .to_netcdf(filename, group=group, mode='a', **WRITE_KW)
+            .to_netcdf(
+                filename, 
+                group='/' + group, 
+                mode='a', 
+                encoding={
+                    k : {'dtype' : v.dtype}
+                    for k, v in dataset[group].data_vars.items()
+                },
+                **WRITE_KW
+            )
 
-    for layer in dataset.layers:
+    for layer_name, layer in dataset.to_dataset().data_vars.items():
         for sample_name, sample in zip(
-            layer.coords['sample'],
+            layer.coords['sample'].data,
             layer
         ):
-            _write_sample(sample_name, sample, filename)
-        
+            _write_sample(
+                f'{layer_name}/{sample_name}',
+                sample,
+                filename
+            )
 
 
 def _backend_load_sample(dataset, sample_name):
-
-    dset = dataset._raw_samples[sample_name].to_dataset()
+    
+    dset = dataset[sample_name].to_dataset()
 
     if dset.attrs['format'] == 'COO':
-        return dset.coo_to_sparse()
+        return dset.coo_to_sparse().ascoo()
     else:
         return dset.to_dataarray().squeeze()
 
 
 def load_dataset(filename):
-
-    dataset = datatree.open_datatree(filename, cache=False)
     
-    sample_names = list(dataset._raw_samples.keys())
-    samples=[]
-    for sample_name in sample_names:
-        samples.append(_backend_load_sample(dataset, sample_name))
-        del dataset._raw_samples[sample_name]
+    dataset = datatree.open_datatree(
+            filename, 
+            cache=False
+        )
 
+    sample_names = list(dataset['raw/X'].keys())
+    layers = list(dataset.raw.keys())
 
-    sample_dims = list(samples[0].dims)
-    X = xr.DataArray(
-        sparse.stack(
-            [s.data for s in samples],
-            axis=0,
-        ).change_compressed_axes(
-            (0, sample_dims.index('locus')+1),
-        ),
-        dims=('sample', *sample_dims),
-    )
+    samples=defaultdict(list)
+    for layer in layers:
+        for sample_name in sample_names:
+            samples[layer].append(
+                _backend_load_sample(
+                    dataset, 
+                    f'raw/{layer}/{sample_name}'
+                )
+            )
+            del dataset.raw[layer][sample_name]
+        del dataset.raw[layer]
+    del dataset['raw']
 
-    datatree.DataTree(
-        name='layers',
-        data=xr.Dataset(
-            {'X' : X},
-            coords={'sample' : sample_names},
-        ),
-        parent=dataset,
-    )
+    samples = {
+        k : xr.concat(v, dim='sample')
+        for k,v in samples.items()
+    }
+
+    dataset.update(samples)
+
+    for layer in layers:
+        if isinstance(dataset[layer].data, sparse.SparseArray):
+            dataset[layer].ascsr('sample','locus')
 
     return dataset
     
 
-def from_lr_corpus(corpus):
+
+'''def from_lr_corpus(corpus):
 
     locus_coords = ['{}:{}-{}'.format(r.chromosome, r.start, r.end) for r in corpus.regions]
 
@@ -199,4 +228,4 @@ def from_lr_corpus(corpus):
                 '/obsm' : xr.Dataset(),
                 '/varm' : xr.Dataset(),
             },
-        )
+        )'''

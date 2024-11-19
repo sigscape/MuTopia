@@ -213,7 +213,7 @@ def fit_model(
     test_score_fn = partial(
         deviance,
         corpuses=test_corpuses,
-        exposures_fn=using_exposures_from(*train_corpuses)
+        exposures_fn=CS.using_exposures_from(*train_corpuses)
     )
     
     '''

@@ -1,6 +1,5 @@
 import sparse
 import numpy as np
-from .model.corpus_state import CorpusState as CS
 from joblib import Parallel
 from contextlib import contextmanager
 from enum import Enum
@@ -94,22 +93,22 @@ def ParContext(n_jobs, verbose=0):
 
 
 def check_dims(corpus, model_state):
-    '''rm_dim = dims_except_for(
-        CS.sample_dims(corpus),
+    rm_dim = dims_except_for(
+        corpus.X.dims,
         *model_state.requires_dims,
     )
     if not len(rm_dim) == 0:
-        raise ValueError(
-            f'The corpus {CS.get_name(corpus)} has extra dimensions: {", ".join(rm_dim)}.\n'
+        logger.warning(
+            f'The corpus {corpus.attrs["name"]} has extra dimensions: {", ".join(rm_dim)}.\n'
             f'The model requires the following dimensions: {", ".join(model_state.requires_dims)}.\n'
             'Having extra data dimensions will increase training time and memory usage,\n'
-            'remove them by summing over them: `corpus.sum(dim="extra_dim")`.'
-        )'''
+            'remove them by summing over them: `corpus.sum(dim="extra_dim", keep_attrs=True)`.'
+        )
     
-    missing_dims = set(model_state.requires_dims).difference(CS.sample_dims(corpus) + ('sample',))
+    missing_dims = set(model_state.requires_dims).difference(corpus.X.dims + ('sample',))
     if not len(missing_dims) == 0:
         raise ValueError(
-            f'The corpus {CS.get_name(corpus)} is missing the following dimensions: {", ".join(missing_dims)}.\n'
+            f'The corpus {corpus.attrs["name"]} is missing the following dimensions: {", ".join(missing_dims)}.\n'
             f'The model requires the following dimensions: {", ".join(model_state.requires_dims)}.\n'
         )
     
@@ -197,18 +196,7 @@ def check_corpus(corpus):
     check_sample_data(corpus, float)
 
     for feature in corpus.features.values():
-        check_feature(feature)
-
-
-def using_exposures_from(*corpuses):
-    
-    corpus_dict = {CS.get_name(corpus) : corpus for corpus in corpuses}
-    
-    return lambda corpus, sample_name : \
-        CS.fetch_topic_compositions(
-            corpus_dict[CS.get_name(corpus)],
-            sample_name
-        )
+        check_feature(feature)    
 
 
 def dims_except_for(dims, *keepdims):
@@ -222,3 +210,12 @@ def match_dims(y, X):
         for d in dims_except_for(data_dims.keys(), *X.dims)
     })
 
+
+def using_exposures_from(corpus):
+    try:
+        corpus.obsm['exposures']
+    except KeyError:
+        raise KeyError('The corpus does not have exposures. Run `model.annot_exposures(corpus)` first.')
+
+    return lambda sample_name : \
+        corpus.obsm['exposures'].sel(sample=sample_name).data

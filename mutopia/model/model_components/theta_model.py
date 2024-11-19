@@ -103,13 +103,19 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         return ('locus',)
     
 
+    def _init_log_locus_distribution(self, locus_features):
+        return DataArray(
+            (np.nan_to_num(locus_features, nan=-3.) @ self.init_projection_.T).T,
+            dims=('component','locus'),
+        )
+
     def prepare_corpusstate(self, corpus):
 
         X = self.locus_transformer_\
             .transform(corpus, corpus=corpus)
         
         return dict(
-                locus_features  = DataArray(
+                locus_features = DataArray(
                     X,
                     dims=('locus', 'feature'),
                     coords={
@@ -117,10 +123,7 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
                                         .get_feature_names_out()
                     }
                 ),
-                log_locus_distribution = DataArray(
-                    (np.nan_to_num(X, nan=-3.) @ self.init_projection_.T).T,
-                    dims=('component','locus'),
-                ),
+                log_locus_distribution = self._init_log_locus_distribution(X),
             )
         
     '''
@@ -427,8 +430,11 @@ class GBTThetaModel(ThetaModel):
         # for initializing the mr estimates.
         ##
         if from_scratch:
+            X = self._fetch_feature_matrix(corpus)
+            init_prediction = self._init_log_locus_distribution(X)
+
             theta = np.log(self.rate_models[k].predict(X))\
-                        + CS.fetch_val(corpus, 'log_locus_distribution')[k].data
+                        + init_prediction[k].data
         else:
             theta = self.rate_models[k]._raw_predict_from(
                     X, 

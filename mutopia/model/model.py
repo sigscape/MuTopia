@@ -1,8 +1,10 @@
 from .corpus_state import CorpusState as CS
 import numpy as np
 import xarray as xr
-from ..utils import ParContext
+from ..utils import ParContext, using_exposures_from, \
+    check_corpus, check_dims
 from .model_components import *
+from .eval import deviance
 from .latent_var_models import *
 from ..plot.coef_matrix_plot import _plot_interaction_matrix
 from ..corpus import *
@@ -39,6 +41,10 @@ class Model:
             self.component_names_
         except AttributeError:
             return ['component_{}'.format(i) for i in range(1, self.n_components+1)]
+        
+    def _check_corpus(self, corpus):
+        check_corpus(corpus)
+        check_dims(corpus, self.model_state_)
         
     def set_component_names(self, names : typing.List[str]):
         if not len(names) == self.n_components:
@@ -89,7 +95,8 @@ class Model:
         threads=1,
         verbose=0,
     ):
-        
+        self._check_corpus(corpus)
+
         if not CS.has_corpusstate(corpus):
             corpus = self._setup_corpus(corpus)
 
@@ -114,6 +121,7 @@ class Model:
         corpus,
         threads=1,
     ):
+        self._check_corpus(corpus)
 
         if not CS.has_corpusstate(corpus):
             corpus = self._setup_corpus(corpus)
@@ -131,19 +139,7 @@ class Model:
         
         logger.info('Added key to varm: "component_distributions"')
         return corpus
-    
-
-    @staticmethod
-    def using_exposures_from(corpus):
-        try:
-            corpus.obsm['exposures']
-        except KeyError:
-            raise KeyError('The corpus does not have exposures. Run `model.annot_exposures(corpus)` first.')
-
-        return lambda sample_name : \
-            corpus.obsm['exposures'].sel(sample=sample_name).data
-    
-    
+        
 
     def annot_marginal_prediction(
         self,
@@ -151,14 +147,15 @@ class Model:
         exposures=None,
         threads=1,
     ):
-        
+        self._check_corpus(corpus)
+
         try:
             corpus.varm['component_distributions']
         except KeyError:
             corpus = self.annot_component_distributions(corpus, threads)
 
         if exposures is None:
-            self.using_exposures_from(corpus)
+            using_exposures_from(corpus)
 
         marginal_exposures = corpus.obsm['exposures'].sum('sample').data
 
@@ -178,13 +175,15 @@ class Model:
         exposures=None,
         threads=1,
     ):  
+        self._check_corpus(corpus)
+
         try:
             corpus.varm['component_distributions']
         except KeyError:
             corpus = self.annot_component_distributions(corpus, threads)
 
         if exposures is None:
-            exposures = self.using_exposures_from(corpus)
+            exposures = using_exposures_from(corpus)
 
         log_component_mutrate = np.log(corpus.varm['component_distributions'])
 
@@ -212,6 +211,8 @@ class Model:
         corpus,
         threads=1,
     ):
+        self._check_corpus(corpus)
+
         try:
             import shap
         except ImportError:
@@ -253,6 +254,22 @@ class Model:
         logger.info('Added key to varm: "SHAP_values"')
         return corpus
 
+
+    def score(
+        self,
+        corpus,
+        exposures=None,
+        ignore_dims=[],
+    ):
+        self._check_corpus(corpus)
+
+        return deviance(
+            self.model_state_,
+            (corpus,),
+            exposures_fn = using_exposures_from(corpus) if exposures is None else exposures,
+            ignore_dims=ignore_dims,
+        )
+
     
     def annot_residuals(
         self,
@@ -260,5 +277,7 @@ class Model:
         threads=1,
         keepdims=('locus',),
     ):
+        self._check_corpus(corpus)
+        
         logger.info('Added key to varm: "residuals"')
         pass
