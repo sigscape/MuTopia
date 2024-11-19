@@ -1,6 +1,7 @@
 import click
-import mutopia as mu
+import os
 from typing import *
+import mutopia as mu
 
 
 @click.group("Model training")
@@ -12,6 +13,7 @@ def model():
 @click.option(
     "-train",
     "--train-corpuses",
+    required=True,
     multiple=True,
     type=click.Path(exists=True),
     help="Paths to training corpuses. Invoke multiple times for multiple corpuses: `-train <path1> -train <path2>`",
@@ -19,6 +21,7 @@ def model():
 @click.option(
     "-test",
     "--test-corpuses",
+    required=True,
     type=click.Path(exists=True),
     multiple=True,
     help="Paths to testing corpuses. Invoke multiple times for multiple corpuses: `-test <path1> -test <path2>`",
@@ -26,15 +29,15 @@ def model():
 @click.option(
     "--min-components",
     "-min",
+    required=True,
     type=click.IntRange(1, 1000),
-    default=3,
     help="Minimum number of components",
 )
 @click.option(
     "-max",
     "--max-components",
     type=click.IntRange(1, 1000),
-    default=20,
+    required=True,
     help="Maximum number of components",
 )
 @click.option("--seed", type=int, default=42, help="Random seed")
@@ -195,6 +198,18 @@ def train(
     test_corpuses: List[str],
     **model_kw,
 ):  
+    if not len(train_corpuses) > 0:
+        raise click.exceptions.BadOptionUsage(
+            "train-corpuses",
+            "At least one training corpus is required",
+        )
+
+    if not len(test_corpuses) > 0:
+        raise click.exceptions.BadOptionUsage(
+            "test-corpuses",
+            "At least one testing corpus is required",
+        )
+    
     train_corpuses = tuple(map(mu.corpus.load_dataset, train_corpuses))
     test_corpuses = tuple(map(mu.corpus.load_dataset, test_corpuses))
 
@@ -237,6 +252,20 @@ def train(
     type=click.IntRange(1, 1000),
     default=20,
     help="Maximum number of components",
+)
+@click.option(
+    "--save-model/--no-save-model",
+    type=bool,
+    default=False,
+    is_flag=True,
+    help="Save the model under `<model_prefix>/<study_name>_<trial_number>.pkl`",
+)
+@click.option(
+    "-outdir",
+    "--output-dir", 
+    type=click.Path(dir_okay=True, file_okay=False),
+    default='.',
+    help="Directory to save model files"
 )
 @click.option("--seed", type=int, default=42, help="Random seed")
 @click.option(
@@ -357,13 +386,6 @@ def train(
     help="Subsample rate for locus model",
 )
 @click.option(
-    "-@",
-    "--threads",
-    type=click.IntRange(1, 1000),
-    default=1,
-    help="Number of threads to use",
-)
-@click.option(
     "--kappa",
     type=click.FloatRange(0.0, 1.0),
     default=0.5,
@@ -397,9 +419,29 @@ def create_study(
     min_components: int,
     max_components: int,
     seed: int = 0,
+    save_model: bool = False,
+    output_dir: str = '.',
     init_components: Union[List[str], None] = None,
     **model_kw,
 ):
+    if not len(train_corpuses) > 0:
+        raise click.exceptions.BadOptionUsage(
+            "train-corpuses",
+            "At least one training corpus is required",
+        )
+
+    if not len(test_corpuses) > 0:
+        raise click.exceptions.BadOptionUsage(
+            "test-corpuses",
+            "At least one testing corpus is required",
+        )
+    
+    if not os.access(output_dir, os.W_OK):
+        raise click.exceptions.BadOptionUsage(
+            "output-dir",
+            "Output directory does not exist or is not writable",
+        )
+
     mu.create_study(
         train_corpuses,
         test_corpuses,
@@ -407,6 +449,8 @@ def create_study(
         max_components=max_components,
         study_name=study_name,
         seed=seed,
+        save_model=save_model,
+        output_dir=output_dir,
         init_components=init_components if len(init_components) > 0 else None,
         **model_kw,
     )
@@ -415,18 +459,19 @@ def create_study(
 @model.command("study-trial")
 @click.argument("study_name", type=str)
 @click.option(
-    "--save-model",
-    type=click.Path(exists=True),
-    default=None,
-    help="Path to save the model",
+    "-@",
+    "--threads",
+    type=click.IntRange(1, 1000),
+    default=1,
+    help="Number of threads to use",
 )
 def run_trial(
     study_name: str,
-    save_model: Union[str, None] = None,
+    threads : int = 1,
 ):
     mu.run_trial(
         study_name=study_name,
-        save_model=save_model,
+        threads=threads,
     )
 
 

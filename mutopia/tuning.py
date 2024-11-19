@@ -39,6 +39,8 @@ def create_study(
     test_corpuses,
     seed=0,
     storage=None,
+    save_model=False,
+    output_dir=None,
     *,
     min_components, 
     max_components,
@@ -64,6 +66,8 @@ def create_study(
     study.set_user_attr('max_components', max_components)
     study.set_user_attr('train_corpuses', train_corpuses)
     study.set_user_attr('test_corpuses', test_corpuses)
+    study.set_user_attr('save_model', save_model)
+    study.set_user_attr('output_dir', output_dir)
 
     for key, value in model_kw.items():
         study.set_user_attr(key, value)
@@ -88,6 +92,8 @@ def load_study(study_name, storage = None):
         'max_components' : model_attrs.pop('max_components'),
         'train_corpuses' : model_attrs.pop('train_corpuses'),
         'test_corpuses' : model_attrs.pop('test_corpuses'),
+        'save_model' : model_attrs.pop('save_model'),
+        'output_dir' : model_attrs.pop('output_dir'),
     }
 
     return (
@@ -108,11 +114,31 @@ def _model_report_callback(
         raise optuna.TrialPruned()
 
 
+def _get_save_model_fn(
+    study_name,
+    output_dir,
+):
+    if not os.access(output_dir, os.W_OK):
+        raise PermissionError(f"Cannot write to directory: {output_dir}")
+    
+    def _save_model(trial, model):
+
+        model_path = os.path.join(
+            os.path.abspath(output_dir),
+            f'{study_name.replace("/",".")}_{trial.number}.pkl'
+        )
+        
+        trial.set_user_attr('model_path',  model_path)
+        model.save(model_path)
+
+    return _save_model
+
+    
 def _objective(
     trial, 
     model_fn,
     param_sampling_fn,
-    save_model=None,
+    model_save_fn,
 ):
     params = param_sampling_fn(trial)
 
@@ -120,10 +146,7 @@ def _objective(
     
     (model, _, test_scores) = model_fn(**params, callback=callback)
 
-    if save_model:
-        model_path = os.path.abspath(save_model)
-        trial.set_user_attr('model_path',  model_path)
-        model.save(model_path)
+    model_save_fn(trial, model)
     
     return test_scores[-1]
 
@@ -151,9 +174,9 @@ def _sample_params(study, extra_param_fn, trial):
     
 
 def run_trial(
-    *,
     storage = None,
-    save_model=None,
+    threads = 1,
+    *,
     study_name,
 ):
 
@@ -168,8 +191,17 @@ def run_trial(
         example_corpus.modality().make_model,
         train_corpuses = train_corpuses,
         test_corpuses = test_corpuses,
+        threads = threads,
         **model_kw,
     )
+
+    if not study_attrs['save_model']:
+        model_save_fn = lambda *args: None
+    else:
+        model_save_fn = _get_save_model_fn(
+            study_name,
+            study_attrs['output_dir'],
+        )
 
     param_sampling_fn = partial(
         _sample_params,
@@ -181,7 +213,7 @@ def run_trial(
         _objective,
         model_fn=model_fn,
         param_sampling_fn=param_sampling_fn,
-        save_model=save_model,
+        model_save_fn=model_save_fn,
     )
 
     study.optimize(
