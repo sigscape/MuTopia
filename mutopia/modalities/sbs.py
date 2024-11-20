@@ -241,7 +241,7 @@ class SBSMode(ModeConfig):
 def SBSModel(
     train_corpuses,
     test_corpuses,
-    n_components=15,
+    num_components=15,
     init_components=None,
     seed=0,
     # context model
@@ -286,7 +286,7 @@ def SBSModel(
     mutation_model = StrandedConditionalConsequenceModel(
         'mutation', # require the mutation dimension - this is the stranded conditional consequence
         train_corpuses,
-        n_components=n_components,
+        n_components=num_components,
         random_state=random_state,
         tol=5e-4,
         reg=mutation_reg,
@@ -296,7 +296,7 @@ def SBSModel(
 
     context_model = StrandedContextModel(
         train_corpuses,
-        n_components=n_components,
+        n_components=num_components,
         random_state=random_state,
         tol=5e-4,
         reg=context_reg,
@@ -309,7 +309,7 @@ def SBSModel(
         else LinearThetaModel)\
         (
             train_corpuses,
-            n_components=n_components,
+            n_components=num_components,
             tree_learning_rate=tree_learning_rate,
             max_depth=max_depth,
             max_trees_per_iter=max_trees_per_iter,
@@ -327,7 +327,7 @@ def SBSModel(
     locals_model = \
         (LDAUpdateSparse if sparse else LDAUpdateDense)(
             train_corpuses,
-            n_components=n_components,
+            n_components=num_components,
             random_state=random_state,
             prior_alpha=pi_prior,
         )
@@ -373,7 +373,7 @@ def _sample_params(study, trial):
     return {
         'context_reg' : trial.suggest_float('context_reg', 1e-5, 5e-3, log=True),
         'mutation_reg' : trial.suggest_float('mutation_reg', 1e-5, 5e-3, log=True),
-        'conditioning_alpha' : trial.suggest_float('conditioning_alpha', 1e-6, 1e-3, log=True),
+        'conditioning_alpha' : trial.suggest_float('conditioning_alpha', 1e-6, 1e-4, log=True),
         'max_features' : trial.suggest_float('max_features', 0.1, 1.),
         'locus_subsample' : trial.suggest_categorical('locus_subsample', [None, 0.125, 0.25, 0.5]),
         'kappa' : trial.suggest_float('kappa', 0.4, 0.7),
