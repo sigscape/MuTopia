@@ -5,9 +5,20 @@ from contextlib import contextmanager
 from enum import Enum
 import inspect
 from functools import wraps
+import time
 import logging
-logger = logging.getLogger(' Mutopia ')
+
+logger = logging.getLogger(' Mutopia')
 logger.setLevel(logging.INFO)
+
+'''def time_function(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        res = func(*args, **kwargs)
+        logger.debug(f'{func.__name__} took {time.time()-start:.2f} seconds.')
+        return res
+    return wrapper'''
 
 
 def str_wrapped_list(x, n=4):

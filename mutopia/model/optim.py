@@ -2,16 +2,7 @@
 from .corpus_state import CorpusState as CS
 from .eval import *
 from ..utils import *
-import logging
 from tqdm import trange
-
-logging.basicConfig(
-    level="INFO",
-    format="%(message)s",
-    datefmt="[%X]",
-)
-logger = logging.getLogger(" Mutopia ")
-
 
 def VI_step(
     model_state,
@@ -32,6 +23,15 @@ def VI_step(
         **args,
         norm_update_fn=model_state._update_normalizer
     )
+
+    '''
+    In the previous "offsets" step, the normalizers were updated
+    on a subset of the data. Now we need to update the normalizers
+    on the full data set.
+    '''
+    for corpus in corpuses:
+        CS.update_normalizers(corpus, model_state.get_normalizers(corpus))
+
     '''
     The normalizers are updated in the previous function
     (because the mutation rates are used to get the offsets, 
@@ -78,15 +78,6 @@ def SVI_step(
 ):
 
     '''
-    Fit the normalizing constants on the whole training corpus - 
-    it's really important that this step has low variance.
-    '''
-    #model_state.init_normalizers(
-    #    corpuses, 
-    #    parallel_context=parallel_context
-    #)
-
-    '''
     Generate the sliced corpuses for the E-step.
     '''
     slices = batch_generator(*corpuses)
@@ -108,7 +99,18 @@ def SVI_step(
         **args,
         norm_update_fn=partial(model_state._update_normalizer, **svi_kw),
     )
+
+    '''
+    In the previous "offsets" step, the normalizers were updated
+    on a subset of the data. Now we need to update the normalizers
+    on the full data set.
+    '''
+    for corpus in corpuses:
+        CS.update_normalizers(corpus,  model_state.get_normalizers(corpus))
     
+    '''
+    Okay, now we can calculate the sufficient statistics.
+    '''
     sstats, elbo = model_state.Estep(**args, **svi_kw)
 
     '''
@@ -134,6 +136,9 @@ def SVI_step(
     '''
     Update the state of the original corpuses,
     - not the slices.
+    Note at this point the normalizer and the rate parameters
+    are not in sync - this is on purpose, we only want to update
+    the normalizers on the subset data during the offset calculation.
     '''
     for corpus in corpuses:
         CS.update_corpusstate(corpus, model_state)
@@ -168,9 +173,6 @@ def locus_slice_generator(
 def _should_stop(stop_condition, scores):
     return len(scores) > stop_condition \
         and scores.index(max(scores)) < (len(scores) - stop_condition)
-
-
-
 
 
 def fit_model( 

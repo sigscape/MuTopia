@@ -34,6 +34,11 @@ class ModelState:
             for corpus in corpuses
         }
 
+        self._genome_size = {
+            CS.get_name(corpus) : corpus.regions.context_frequencies.sum().item()
+            for corpus in corpuses
+        }
+
     @property
     def n_components(self):
         return next(iter(self._models.values())).n_components
@@ -61,6 +66,8 @@ class ModelState:
     def get_normalizers(self, corpus):
         return self._normalizers[CS.get_name(corpus)]
     
+    def get_genome_size(self, corpus):
+        return self._genome_size[CS.get_name(corpus)]
 
     def _get_propto_log_mutation_rate(self, k, corpus):
 
@@ -98,7 +105,7 @@ class ModelState:
                         for model in self.nonlocals.values()
                     ),  # sum over models
                     np.log(corpus.regions.exposures) \
-                        + self.get_normalizers(corpus)[k]
+                    + CS.fetch_normalizers(corpus)[k]
                 )
             if with_context:
                 y_hat += np.log(corpus.regions.context_frequencies)
@@ -229,42 +236,35 @@ class ModelState:
                 -logsumexp(log_mutation_rate.data),
                 exp_offsets
             )
-    
-
-    def init_normalizers(self, 
-            corpuses,
-            *,
-            parallel_context
-        ):
-
-        _update_norm = lambda k, corpus : \
-            self._update_normalizer(
-                k, corpus, 
-                -logsumexp(self._get_propto_log_mutation_rate(k, corpus).data)
-            )
-
-        update_fns = (
-            partial(_update_norm, k, corpus)
-            for k in range(self.n_components)
-            for corpus in corpuses
-        )
-
-        for _ in parallel_context(delayed(fn)() for fn in update_fns):
-            pass
-
+        
 
     def _update_normalizer(self, 
-            k, corpus, logsum_mutation_rate, 
-            learning_rate=1., 
-            subsample_rate=1.
-        ):
+        k, corpus, logsum_mutation_rate, 
+        learning_rate=1., 
+        subsample_rate=1.
+    ):
         norm = self._normalizers[CS.get_name(corpus)]
+        
         norm[k] = _svi_update_fn(
                 norm[k],
                 np.log(subsample_rate) + logsum_mutation_rate,
                 learning_rate
             )
         
+    
+    def _calc_normalizers(self, 
+        corpus,
+        *,
+        parallel_context
+    ):
+        norm_fn = lambda k : \
+            -logsumexp(self._get_propto_log_mutation_rate(k, corpus).data)
+
+        return np.array(list(parallel_context(
+            delayed(norm_fn)(k) for k in range(self.n_components)
+        )))
+        
+
     def format_signature(self, k):
         return np.exp(reduce(
             lambda x,y : x+y,

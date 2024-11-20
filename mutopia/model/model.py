@@ -55,10 +55,8 @@ class Model:
 
     def _setup_corpus(self, corpus):
         args = (corpus, self.model_state_)
-        corpus = CS.init_corpusstate(*args)
-        corpus = CS.update_corpusstate(*args, from_scratch=True)
-        #with ParContext(1) as par:
-        #    self.model_state_.init_normalizers((corpus,), parallel_context=par)
+        CS.init_corpusstate(*args)
+        CS.update_corpusstate(*args, from_scratch=True)
         return corpus
         
 
@@ -261,15 +259,13 @@ class Model:
         self,
         corpus,
         exposures=None,
-        ignore_dims=[],
     ):
         self._check_corpus(corpus)
 
         return deviance(
             self.model_state_,
             (corpus,),
-            exposures_fn = using_exposures_from(corpus) if exposures is None else exposures,
-            ignore_dims=ignore_dims,
+            exposures_fn=using_exposures_from(corpus) if exposures is None else exposures,
         )
 
     

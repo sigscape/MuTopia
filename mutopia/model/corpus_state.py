@@ -46,6 +46,21 @@ class CorpusState:
     @classmethod
     def sample_dims(cls, corpus):
         return corpus.X.dims
+    
+
+    @classmethod
+    def update_normalizers(cls, corpus, normalizers):
+        
+        '''train_genome_size = model_state.get_genome_size(corpus)
+        this_genome_size = cls.genome_size(corpus)
+
+        cls.fetch_normalizers(corpus)[:] = \
+            model_state.get_normalizers(corpus) - np.log(this_genome_size/train_genome_size)
+        
+        return corpus'''
+        cls.fetch_normalizers(corpus)[:] = normalizers
+        return corpus
+    
 
     @classmethod
     def init_corpusstate(
@@ -57,7 +72,13 @@ class CorpusState:
         sample_names = cls.list_samples(corpus)
         n_components = model_state.n_components
             
-        state_elements = {}
+        state_elements = {
+            'normalizers' : xr.DataArray(
+                np.zeros(n_components, dtype=float),
+                dims=('component',),
+            ),
+        }
+
         for model in model_state.models.values():
             state_elements.update(
                 model.prepare_corpusstate(corpus)
@@ -69,6 +90,10 @@ class CorpusState:
                 coords={
                     **corpus.coords,
                     'sample' : sample_names,
+                },
+                attrs={
+                    'genome_size' : corpus.regions.context_frequencies\
+                                        .sum().data.item()
                 }
             ),
             name='state',
@@ -77,7 +102,14 @@ class CorpusState:
 
         return corpus
     
-
+    @staticmethod
+    def genome_size(corpus):
+        return corpus.state.attrs['genome_size']
+    
+    @staticmethod
+    def fetch_normalizers(corpus):
+        return corpus.state['normalizers'].data
+    
     @staticmethod
     def fetch_val(corpus, key):
         return corpus.state[key]

@@ -276,6 +276,7 @@ def SBSModel(
     callback=None,
     eval_every=10,
     sparse=True,
+    verbose=0,
 ):
     
     random_state = np.random.RandomState(seed)
@@ -355,6 +356,7 @@ def SBSModel(
             tau=tau,
             callback=callback,
             eval_every=eval_every,
+            verbose=verbose,
         )
 
     return (

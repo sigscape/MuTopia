@@ -86,7 +86,7 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
         # What's going on here: we have the normalized log mutation rate for each signature, configuration, context, locus.
         # For the mutations in this sample, we select over these axes.
         ##
-        logp_normalizer = model_state.get_normalizers(corpus)[:,None]
+        logp_normalizer = CS.fetch_normalizers(corpus)[:,None]
 
         context_freq = self._get_log_context_effect(
             corpus,
@@ -104,8 +104,8 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
                     for model in model_state.nonlocals.values()
                 ),
                 np.log(corpus.regions.exposures.data[locus]) \
-                    + logp_normalizer \
-                    + context_freq
+                + logp_normalizer \
+                + context_freq
             )
 
         if logsafe:

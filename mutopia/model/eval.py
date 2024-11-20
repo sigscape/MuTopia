@@ -14,10 +14,21 @@ def _reduce_sum(g):
 def deviance(
     model_state,
     corpuses,
-    exposures_fn = CS.fetch_topic_compositions,
+    exposures_fn=CS.fetch_topic_compositions,
     *,
     parallel_context,
 ):
+    # we want to make extra sure the normalizers are up to date
+    # before we start computing deviance.
+    for corpus in corpuses:
+        CS.update_normalizers(
+            corpus, 
+            model_state._calc_normalizers(
+                corpus,
+                parallel_context=parallel_context,
+            )
+        )
+
     dev_fns = model_state.locals_model.get_deviance_fns(
         corpuses,
         model_state,
@@ -29,6 +40,7 @@ def deviance(
     d_fit, d_null = list(zip(*res))
 
     return 1 - sum(d_fit)/sum(d_null)
+
 
 
 def _slow_deviance(
