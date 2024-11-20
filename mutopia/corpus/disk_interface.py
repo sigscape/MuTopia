@@ -113,6 +113,7 @@ def load_dataset(filename):
         if isinstance(dataset[layer].data, sparse.SparseArray):
             dataset[layer].ascsr('sample','locus')
 
+    dataset = dataset.load()
     return dataset
     
 

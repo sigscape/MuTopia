@@ -27,18 +27,10 @@ def model():
     help="Paths to testing corpuses. Invoke multiple times for multiple corpuses: `-test <path1> -test <path2>`",
 )
 @click.option(
-    "--min-components",
-    "-min",
-    required=True,
-    type=click.IntRange(1, 1000),
-    help="Minimum number of components",
-)
-@click.option(
-    "-max",
-    "--max-components",
+    '-k',
+    '--num-components',
     type=click.IntRange(1, 1000),
     required=True,
-    help="Maximum number of components",
 )
 @click.option("--seed", type=int, default=42, help="Random seed")
 @click.option(
@@ -60,7 +52,7 @@ def model():
     "-alpha",
     "--conditioning-alpha",
     type=click.FloatRange(0.0, 10.0),
-    default=5e-5,
+    default=1e-5,
     help="Stabilizing parameter - increase if you're getting NaNs",
 )
 @click.option(
@@ -191,11 +183,13 @@ def model():
     is_flag=True,
     help="Use sparse matrices in the updates.",
 )
+@click.option('-v', '--verbose', count=True)
 def train(
     output,
     *,
     train_corpuses: List[str],
     test_corpuses: List[str],
+    init_components : Union[None, List[str]],
     **model_kw,
 ):  
     if not len(train_corpuses) > 0:
@@ -216,6 +210,7 @@ def train(
     model = mu.MutopiaModel(
         train_corpuses,
         test_corpuses,
+        init_components=init_components if len(init_components) > 0 else None,
         **model_kw,
     )
 

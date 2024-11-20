@@ -154,8 +154,8 @@ def _objective(
 def _sample_params(study, extra_param_fn, trial):
 
     params = {
-        'n_components' : trial.suggest_int(
-            'n_components', 
+        'num_components' : trial.suggest_int(
+            'num_components', 
             study.user_attrs['min_components'], 
             study.user_attrs['max_components']
         )
