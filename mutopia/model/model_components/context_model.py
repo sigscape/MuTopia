@@ -62,12 +62,14 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
             **get_reg_params(reg, conditioning_alpha),
             tol=tol,
             random_state=random_state,
+            max_iter=max_iter,
         ) # f(X) -> f(z, w, beta) -> beta
 
         ridge_solver = partial(
             get_lsqr_solver,
             tol=tol,
             alpha=0.,
+            max_iter=max_iter,
         ) # f(X) -> f(z, w, beta) -> beta
         
         mixed_solver = partial(

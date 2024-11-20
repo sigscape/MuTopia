@@ -246,7 +246,7 @@ def SBSModel(
     seed=0,
     # context model
     context_reg=0.0001,
-    conditioning_alpha=5e-5,
+    conditioning_alpha=1e-5,
     # mutation model
     mutation_reg=0.0005,
     # locals model
@@ -277,6 +277,7 @@ def SBSModel(
     eval_every=10,
     sparse=True,
     verbose=0,
+    max_iter=100,
 ):
     
     random_state = np.random.RandomState(seed)
@@ -292,6 +293,7 @@ def SBSModel(
         reg=mutation_reg,
         conditioning_alpha=conditioning_alpha,
         init_components=init_components,
+        max_iter=max_iter,
     )
 
     context_model = StrandedContextModel(
@@ -302,6 +304,7 @@ def SBSModel(
         reg=context_reg,
         conditioning_alpha=conditioning_alpha,
         init_components=init_components,
+        max_iter=max_iter,
     )
 
     theta_model = \
@@ -373,9 +376,9 @@ def _sample_params(study, trial):
     return {
         'context_reg' : trial.suggest_float('context_reg', 1e-5, 5e-3, log=True),
         'mutation_reg' : trial.suggest_float('mutation_reg', 1e-5, 5e-3, log=True),
-        'conditioning_alpha' : trial.suggest_float('conditioning_alpha', 1e-6, 1e-4, log=True),
         'max_features' : trial.suggest_float('max_features', 0.1, 1.),
         'locus_subsample' : trial.suggest_categorical('locus_subsample', [None, 0.125, 0.25, 0.5]),
         'kappa' : trial.suggest_float('kappa', 0.4, 0.7),
         'l2_regularization' : trial.suggest_float('l2_regularization', 1e-5, 10, log=True),
+        'max_iter' : trial.suggest_categorical('max_iter', [25, 50, 100, 300]),
     }

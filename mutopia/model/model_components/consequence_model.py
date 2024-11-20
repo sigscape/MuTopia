@@ -53,6 +53,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
             **get_reg_params(reg, conditioning_alpha),
             tol=tol,
             random_state=random_state,
+            max_iter=max_iter,
         ) # f(X) -> f(z, w, beta) -> beta
 
         ridge_solver = partial(
@@ -62,7 +63,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
                 + [False]*( (~self._is_regularized).sum() - self.consequence_dim )
             ),
             tol=tol,
-            max_iter=10000,
+            max_iter=max_iter,
             alpha=conditioning_alpha,
         )
 
