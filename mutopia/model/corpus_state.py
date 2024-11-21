@@ -2,6 +2,8 @@
 import xarray as xr
 from datatree import DataTree
 import numpy as np
+from ..utils import CorpusInterface
+
 
 class CorpusState:
 
@@ -23,7 +25,11 @@ class CorpusState:
     
     @classmethod
     def has_corpusstate(cls, corpus):
-        return hasattr(corpus, 'state')
+        try:
+            corpus.state
+            return True
+        except AttributeError:
+            return False
     
     @classmethod
     def is_marginal_corpus(cls, corpus):
@@ -38,15 +44,22 @@ class CorpusState:
 
     @classmethod
     def fetch_sample(cls, corpus, sample_name):
+        ##
+        # TODO:
+        # add support for marginal samples in the CorpusInterface
+        ##
+        if issubclass(type(corpus), CorpusInterface):
+            return corpus.fetch_sample(sample_name)
+        
         if cls.is_marginal_corpus(corpus) and sample_name is None:
             return corpus.X
 
         return corpus.X.sel(sample=sample_name)
     
+
     @classmethod
     def sample_dims(cls, corpus):
         return corpus.X.dims
-    
 
     @classmethod
     def update_normalizers(cls, corpus, normalizers):

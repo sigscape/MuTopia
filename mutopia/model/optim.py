@@ -102,8 +102,8 @@ def SVI_step(
 
     '''
     In the previous "offsets" step, the normalizers were updated
-    on a subset of the data. Now we need to update the normalizers
-    on the full data set.
+    on a subset of the data. Now we need to transfer this information
+    to the full data set (this is just a copying step, no computation).
     '''
     for corpus in corpuses:
         CS.update_normalizers(corpus,  model_state.get_normalizers(corpus))
@@ -165,7 +165,7 @@ def locus_slice_generator(
     )
 
     return tuple(
-        corpus.isel(locus=sel_loci)
+        LazySampleSlicer(corpus, locus=sel_loci)
         for corpus in corpuses
     )
 

@@ -165,6 +165,7 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
 
     def _get_update_fn(
         self,
+        gamma,
         learning_rate=1.,
         subsample_rate=1.,
         *,
@@ -214,6 +215,7 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
 
         svi_update = partial(
             self._apply_update,
+            np.ascontiguousarray(gamma),
             update_fn=map_update,
             learning_rate=learning_rate,
             suffstat_fn=suffstat_fn
@@ -245,15 +247,13 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
         ]
 
         updates = (
-            partial(
-                self._get_update_fn(
-                    sample=CS.fetch_sample(corpus, sample_name),
-                    corpus=corpus,
-                    model_state=model_state,
-                    learning_rate=learning_rate,
-                    subsample_rate=subsample_rate,
-                ),
-                np.ascontiguousarray(CS.fetch_topic_compositions(corpus, sample_name)),
+            self._get_update_fn(
+                CS.fetch_topic_compositions(corpus, sample_name),
+                sample=CS.fetch_sample(corpus, sample_name),
+                corpus=corpus,
+                model_state=model_state,
+                learning_rate=learning_rate,
+                subsample_rate=subsample_rate,
             )
             for (corpus, sample_name) in samples
         )

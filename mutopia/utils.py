@@ -2,23 +2,14 @@ import sparse
 import numpy as np
 from joblib import Parallel
 from contextlib import contextmanager
+from abc import ABC, abstractmethod
 from enum import Enum
 import inspect
 from functools import wraps
-import time
 import logging
 
 logger = logging.getLogger(' Mutopia')
 logger.setLevel(logging.INFO)
-
-'''def time_function(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        start = time.time()
-        res = func(*args, **kwargs)
-        logger.debug(f'{func.__name__} took {time.time()-start:.2f} seconds.')
-        return res
-    return wrapper'''
 
 
 def str_wrapped_list(x, n=4):
@@ -230,3 +221,100 @@ def using_exposures_from(corpus):
 
     return lambda sample_name : \
         corpus.obsm['exposures'].sel(sample=sample_name).data
+
+
+class CorpusInterface(ABC):
+    '''
+    Sometimes, we'd like to drop something else into the EM step
+    instead of a G-Tensor corpus. If the object implements the 
+    following interface (and the outputs are the expected type), it will work.
+
+    Note, we don't need to copy "features", "obsm", "varm" etc.
+    because those elements are not used in the EM step.
+    '''
+
+    @property
+    @abstractmethod
+    def sizes(self):
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def dims(self):
+        raise NotImplementedError
+    
+    @property
+    @abstractmethod
+    def coords(self):
+        raise NotImplementedError
+    
+    @property
+    @abstractmethod
+    def regions(self):
+        raise NotImplementedError
+    
+    @property
+    @abstractmethod
+    def state(self):
+        raise NotImplementedError
+    
+    @property
+    @abstractmethod
+    def attrs(self):
+        raise NotImplementedError
+
+    
+class LazySampleSlicer(CorpusInterface):
+    '''
+    Making slices of the corpus is memory-intensive.
+    This problem is exacerbated when we want to slice by locus
+    *then* by sample, since we have to generate a locus subset
+    of the entire dataset and keep that in memory.
+
+    Instead, this interface class allows us to lazily slice the corpus.
+    First, we supply the corpus and the slices we want to apply.
+    
+    Later, we can fetch a sample by name and the slices will be applied
+    to the original data matrix, foregoing the copying step.
+    '''
+
+    def __init__(self, corpus, **slices):
+        # first, make a copy of the corpus
+        sliced = corpus.copy()
+        # get a copy of the X layer
+        self._apply_slices=slices
+        
+        self.X = sliced.X
+        self.corpus = sliced\
+            .drop_nodes(('obsm', 'varm', 'features'))\
+            .drop_vars('X', errors='ignore')\
+            .isel(**self._apply_slices)
+    
+    @property
+    def sizes(self):
+        return self.corpus.sizes
+        
+    @property
+    def dims(self):
+        return self.corpus.dims
+    
+    @property
+    def coords(self):
+        return self.corpus.coords
+    
+    @property
+    def state(self):
+        return self.corpus.state
+    
+    @property
+    def regions(self):
+        return self.corpus.regions
+    
+    @property
+    def attrs(self):
+        return self.corpus.attrs
+    
+    def fetch_sample(self, sample_name):
+        return self.X\
+                    .sel(sample=sample_name)\
+                    .isel(**self._apply_slices)
