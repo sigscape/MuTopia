@@ -144,7 +144,11 @@ def _objective(
 
     callback = partial(_model_report_callback, trial)
     
-    (model, _, test_scores) = model_fn(**params, callback=callback)
+    (model, _, test_scores) = model_fn(
+        **params, 
+        callback=callback, 
+        seed=trial.number
+    )
 
     model_save_fn(trial, model)
     

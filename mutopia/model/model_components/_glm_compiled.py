@@ -195,6 +195,8 @@ def outer_update(
     w = weight_fn(mu)
     z = response_fn(y, eta, mu)
     
+    w = w/np.sum(w)
+
     return (mu, z, w*weights)
 
 
@@ -213,6 +215,7 @@ def iter_fit(
         
         _, z, w = outer_update(beta)
         beta_new = interior_solver(z, w, beta)
+        beta_new = np.clip(beta_new, -700., 700.)
 
         if np.linalg.norm(beta_new - beta) < tol:
             break

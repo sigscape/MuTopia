@@ -2,6 +2,7 @@ import numpy as np
 from sparse import COO, GCXS
 from abc import ABC, abstractmethod
 from numba import njit
+import sys
 from ..corpus_state import CorpusState as CS
 
 class PrimitiveModel(ABC):
@@ -139,7 +140,9 @@ def get_corpus_design(corpuses, encoder : dict, n_repeats = lambda x : 1):
 def _svi_update_fn(old_value, new_value, learning_rate):
     
     if np.isnan(new_value).any():
-        print('NaN value encountered in update!')
+        print('NaN value encountered in update! - if this happens repeatedly later in training, '
+              'consider increasing `conditioning_alpha`.', 
+              file=sys.stderr)
         return old_value
     
     return (1-learning_rate)*old_value + learning_rate*new_value

@@ -50,7 +50,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
 
         eln_solver = partial(
             get_eln_solver,
-            **get_reg_params(reg, conditioning_alpha),
+            **get_reg_params(reg, 1e-5),
             tol=tol,
             random_state=random_state,
             max_iter=max_iter,
