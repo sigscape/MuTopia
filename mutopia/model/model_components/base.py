@@ -18,6 +18,9 @@ class PrimitiveModel(ABC):
     def update_corpusstate(self, corpus, **kwargs):
         pass
 
+    def post_fit(self, corpuses):
+        pass
+
     def prepare_to_save(self):
         pass
     

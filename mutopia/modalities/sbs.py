@@ -7,6 +7,7 @@ import logging
 from ..plot.signature_plot import _plot_linear_signature
 from ..model import *
 from ..utils import logger
+from ..genome_utils.bed12_utils import stream_bed12
 from .mode_config import ModeConfig
 
 COSMIC_SORT_ORDER = [
@@ -216,14 +217,17 @@ class SBSMode(ModeConfig):
             **kwargs
         )
     
-    @classmethod
     def get_context_frequencies(
-        cls,
+        self,
+        n_jobs = 1,
+        *,
         regions_file,
         fasta_file,
-        n_jobs = 1,
     ):
-        pass
+        for i, _ in enumerate(stream_bed12(regions_file)):
+            pass
+        return np.zeros((*list(self.sizes.values()), i+1))
+
 
     @classmethod
     def ingest_observations(

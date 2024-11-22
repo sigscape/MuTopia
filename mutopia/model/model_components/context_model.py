@@ -47,6 +47,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
             .sum(dim=dims_except_for(corpus.regions.context_frequencies.dims, 'context'))\
             .data + 1
         
+        self._context_distribution = self._context_distribution.astype(dtype)
         self._context_distribution/=self._context_distribution.sum()
 
         if not init_components is None:
@@ -96,11 +97,28 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
     def requires_dims(self):
         return ('configuration','context','locus')
     
+    
+    def post_fit(self, corpuses):
 
+        corpus = corpuses[0]
+        
+        locus_effects = CS.fetch_val(corpus, 'log_locus_distribution')\
+            .transpose('locus',...).data
+        
+        freqs = corpus.regions.context_frequencies
+        contexts = freqs\
+            .sum(dim=dims_except_for(freqs.dims, 'context', 'locus'))\
+            .transpose('context','locus').data
+        
+        # CxL @ LxK => CxK => KxC
+        self._context_distribution = (contexts @ np.exp(locus_effects)).T
+        self._context_distribution /= self._context_distribution.sum(axis=1, keepdims=True)
+
+        return self
+    
     def prepare_to_save(self):
-        del self.model 
-        # the model is not serializable because it has nested functions
-
+        del self.model
+    
     ##
     # Satisfaction of SparseDataBase interface
     ##
@@ -327,7 +345,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         signature = self._calc_lambda(k,
                         self.transformer\
                             .independent_effects_encoding()
-                    ) + np.log(self._context_distribution)[:, None]
+                    ) + np.log(self.context_distribution_)[k, :][:,None]
         
         return DataArray(
             signature,

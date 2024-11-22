@@ -1,36 +1,153 @@
 import sparse
 import xarray as xr
 import datatree
-import numpy as np
+from numpy import nan, array, float32
 from collections import defaultdict
-from ..utils import check_corpus
-
+from functools import wraps
+import time
+import netCDF4 as nc
+from ..utils import check_corpus, FeatureType
+from .gtensor import update_view
 
 WRITE_KW = dict(
-        format='NETCDF4', 
-        engine='netcdf4', 
+    format='NETCDF4', 
+    engine='netcdf4', 
+)
+
+'''@contextmanager
+def buffered_writer(filename, timeout=3600):
+    init_time = time.time()
+    opened=False
+    
+    while not opened:
+        try:
+            h5_object = h5.File(filename, 'a')
+            opened = True
+            yield h5_object
+        except OSError:
+            if time.time() - init_time > timeout:
+                raise TimeoutError('Could not open file for writing.')
+            else:
+                time.sleep(1)
+        finally:
+            if opened:
+                h5_object.close()'''
+
+
+def read_attrs(dataset):
+    with nc.Dataset(dataset, 'r') as dset:
+        return {
+            attr : getattr(dset, attr)
+            for attr in dset.ncattrs()
+        }
+    
+
+def retry_until_write(func, n_tries=1000, sleep=1):
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+
+        for _ in range(n_tries):
+            try:
+                return func(*args, **kwargs)
+            except OSError:
+                time.sleep(sleep)
+                pass
+        
+        raise TimeoutError(
+            'Could not open netCDF file for writing.\n'
+            'This is likely because there is too much concurrent write traffic.'
+        )
+    
+    return wrapper
+                
+
+##
+# feature write, remove, and list
+##
+@retry_until_write
+def write_feature(
+    dataset,
+    vals,
+    group : str = 'default',
+    *,
+    name : str,
+    normalization : FeatureType,
+):
+    xr.DataArray(
+        array(vals).astype(normalization.save_dtype),
+        dims=('locus',),
+        name=name,
+        attrs={
+            'normalization' : normalization.value,
+            'group' : group,
+            'active' : 1,
+        }
+    ).to_netcdf(
+        dataset,
+        group='features',
+        mode='a',
+        **WRITE_KW,     
     )
 
 
-def _write_sample(
+@retry_until_write
+def rm_feature(
+    dataset,
+    name : str,
+):
+    with nc.Dataset(dataset, 'a') as dset:
+            
+        if not 'features' in dset.groups:
+            raise ValueError('No `features` group found in dataset - are you sure this is a G-Tensor?')
+
+        features = dset.groups['features']
+        try:
+            features[name].active = 0
+        except IndexError:
+            pass
+
+
+def list_features(dataset):
+    
+    with nc.Dataset(dataset, 'r') as dset:
+        if not 'features' in dset.groups:
+            raise ValueError('No `features` group found in dataset - are you sure this is a G-Tensor?')
+        
+        return {
+            feature_name : feature.__dict__
+            for feature_name, feature in dset.groups['features'].variables.items()
+        }
+##
+#
+##
+
+##
+# Sample write, remove, and list
+##
+def write_sample(
+    filename,
+    arr,
+    *,
     sample_name,
-    arr, 
-    filename
 ):
     dset = arr.sparse_to_coo() if isinstance(arr.data, sparse.SparseArray) \
                 else arr.to_dataset(name='data', promote_attrs=True)
+    
+    dset.data.data = dset.data.data.astype(float32)
         
     dset.to_netcdf(
-            filename, 
-            group=f'/raw/{sample_name}', 
-            mode='a',
-            **WRITE_KW
-        )
+        filename, 
+        group=f'/raw/{sample_name}', 
+        mode='a',
+        **WRITE_KW,
+    )
+
 
 
 def write_dataset(dataset, filename):
 
-    check_corpus(dataset)
+    check_corpus(dataset, enforce_sample=False)
 
     dataset.to_dataset()\
         .drop_vars(dataset.data_vars)\
@@ -62,10 +179,10 @@ def write_dataset(dataset, filename):
             layer.coords['sample'].data,
             layer
         ):
-            _write_sample(
-                f'{layer_name}/{sample_name}',
+            write_sample(
+                filename,
                 sample,
-                filename
+                sample_name=f'{layer_name}/{sample_name}',
             )
 
 
@@ -112,6 +229,16 @@ def load_dataset(filename):
     for layer in layers:
         if isinstance(dataset[layer].data, sparse.SparseArray):
             dataset[layer].ascsr('sample','locus')
+    
+    for fname, feature in list(dataset.features.data_vars.items()):
+        if 'active' in feature.attrs and not bool(feature.attrs['active']):
+            update_view(
+                dataset,
+                features=dataset.features\
+                    .to_dataset().drop_vars(fname)
+            )
+            
+
     dataset = dataset.load()
     return dataset
     

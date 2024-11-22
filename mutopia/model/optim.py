@@ -327,6 +327,10 @@ def fit_model(
         finally:
             progress_bar.close()
 
+    logger.info('Finalizing models ...')
+    for model in model_state.nonlocals.values():
+        model.post_fit(train_corpuses)
+
     return (
         model_state,
         train_scores,

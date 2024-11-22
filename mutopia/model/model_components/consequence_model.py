@@ -107,8 +107,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
         return ('configuration','context', self.dim_name, 'locus')
     
     def prepare_to_save(self):
-        del self.model
-        
+        del self.model    
     
     def predict_sparse(self, corpus,*,context, configuration, locus, **idx_dict):
 

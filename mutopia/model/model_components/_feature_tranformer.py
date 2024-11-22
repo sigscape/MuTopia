@@ -2,7 +2,7 @@ from sklearn.preprocessing import OneHotEncoder, PowerTransformer, MinMaxScaler,
     QuantileTransformer, StandardScaler, RobustScaler
 from ..corpus_state import CorpusState as CS
 from ...utils import FeatureType, logger, str_wrapped_list
-from mutopia.genome_utils.peeking_sort import streaming_groupby
+from mutopia.genome_utils.fancy_iterators import streaming_groupby
 from sklearn.compose import ColumnTransformer
 from itertools import chain
 import pandas as pd
@@ -110,6 +110,13 @@ class PasteTransformer(BaseEstimator, TransformerMixin):
         return self
     
     def transform(self, X):
+        
+        missing_features = set(self.feature_names).difference( set(X.features.keys()) )
+        if len(missing_features) > 0:
+            raise ValueError(
+                f'The following features are missing from the input data: {str_wrapped_list(missing_features)}'
+            )
+
         return pd.DataFrame({
             f : X.features[f].data
             for f in self.feature_names

@@ -103,7 +103,6 @@ class UnconditionalConsequenceModel(RateModel, SparseDataBase):
     
     def prepare_to_save(self):
         del self.model
-        
     
     def predict_sparse(self, corpus,*,locus, **idx_dict):
 

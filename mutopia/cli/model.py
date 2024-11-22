@@ -1,8 +1,6 @@
 import click
-import os
 from typing import *
 import mutopia as mu
-
 
 @click.group("Model training")
 def model():

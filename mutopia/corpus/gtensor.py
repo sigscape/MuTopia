@@ -11,30 +11,29 @@ logger = logging.getLogger(' MuTensor ')
 logger.setLevel(logging.INFO)
 
 
-def gTensor(
+def GTensor(
     modality,
     *,
     name : str,
     chrom : List[str],
     start : List[int],
     end : List[int],
-    block_starts : List[List[int]],
-    block_ends : List[List[int]],
     context_frequencies : NDArray[np.number],
-    exposures : NDArray[np.number],
+    exposures : Union[None, NDArray[np.number]] = None,
 ):
     
-    observation_dims = list(modality.dims.values())
-
+    observation_dims = tuple(modality.sizes.values())
+    dim_names = tuple(modality.sizes.keys())
     if not len(context_frequencies.shape) == len(observation_dims) + 1:
         raise ValueError(
             f'Expected `context_frequencies` to have {len(observation_dims) + 1} dimensions, '
             f'but got {len(context_frequencies.shape)} dimensions instead.'
         )
+    
     if not observation_dims == context_frequencies.shape[:-1]:
         raise ValueError(
-            f'Expected `context_frequencies` to have shape ({", ".join(observation_dims)}, N_loci), '
-            f'but got {context_frequencies.shape} instead.'
+            f'Expected `context_frequencies` to have shape ({", ".join(map(str, observation_dims))}, N_loci), '
+            f'but got {str(context_frequencies.shape)} instead.'
         )
       
     locus_coords = [
@@ -43,8 +42,8 @@ def gTensor(
     ]
 
     shared_coords = {
-        'locus' : locus_coords,
         **modality.coords,
+        'locus' : locus_coords,
     }
     obs_coords = {'sample' : []}
 
@@ -52,41 +51,40 @@ def gTensor(
         context_frequencies, 
         axis=tuple(range(context_frequencies.ndim - 1))
     )
+
+    if exposures is None:
+        exposures = np.ones(len(locus_coords), dtype=np.float64)
     
     corpus = DataTree.from_dict({
             '/' : xr.Dataset(
                 coords=shared_coords,
                 attrs={
                     'name' : name,
-                    'dtype' : modality.value,
+                    'dtype' : modality.MODE_ID,
                 }
             ),
-            '/regions' : xr.Dataset(
-                {
-                    'chrom' : xr.DataArray(np.array(chrom), dims=('locus')),
-                    'start' : xr.DataArray(np.array(start), dims=('locus')),
-                    'end' : xr.DataArray(np.array(end), dims=('locus')),
-                    'length' : xr.DataArray(np.array(region_lengths), dims=('locus')),
-                    'block_starts' : xr.DataArray(np.array(block_starts), dims=('locus')),
-                    'block_ends' : xr.DataArray(np.array(block_ends), dims=('locus')),
-                    'context_frequencies' : xr.DataArray(
-                            data=context_frequencies,
-                            dims=(*observation_dims, 'locus'),
-                        ),
-                    'exposures' : xr.DataArray(
-                        data=np.squeeze(exposures),
-                        dims=('locus',),
+            '/regions' : xr.Dataset({
+                'chrom' : xr.DataArray(np.array(chrom), dims=('locus')),
+                'start' : xr.DataArray(np.array(start), dims=('locus')),
+                'end' : xr.DataArray(np.array(end), dims=('locus')),
+                'length' : xr.DataArray(np.array(region_lengths), dims=('locus')),
+                'context_frequencies' : xr.DataArray(
+                        data=context_frequencies,
+                        dims=(*dim_names, 'locus'),
                     ),
-                },
-            ),
+                'exposures' : xr.DataArray(
+                    data=np.squeeze(exposures),
+                    dims=('locus',),
+                ),
+            }),
             '/features' : xr.Dataset(),
-            '/layers' : xr.Dataset(coords=obs_coords),
             '/obsm' : xr.Dataset(coords=obs_coords),
             '/varm' : xr.Dataset(),
         },
     )
 
     return corpus
+
 
 
 def add_feature(

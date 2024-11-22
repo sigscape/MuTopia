@@ -1,0 +1,243 @@
+#!/usr/bin/env python3
+
+import subprocess
+import tempfile
+from numpy import array
+import numpy as np
+from ..genome_utils.bed12_utils import check_regions_file
+
+
+def make_continous_features(
+    bigwig_file,
+    regions_file,
+    *, 
+    extend=None,
+    **kw,
+):
+    check_regions_file(regions_file)
+
+    with tempfile.NamedTemporaryFile() as bed:
+
+        subprocess.check_output([
+            'bigWigAverageOverBed',
+            f'-sampleAroundCenter={extend}' if extend is not None else '',
+            bigwig_file, 
+            regions_file, 
+            bed.name
+        ])
+
+        with open(bed.name, 'r') as bed:
+            data = bed.readlines()
+            data = map(lambda s : s.strip().split('\t'), data)
+            data = map(lambda s : (s[0], float(s[4])), data)
+            data = sorted(data, key=lambda x : x[0])
+            
+            vals = array(list(map(lambda x : x[1], data)))
+    
+    if not len(vals) > 1:
+        raise RuntimeError(f'No values found in {bigwig_file} for {regions_file}')
+    
+    return vals
+    
+
+def make_continous_features_bedgraph(
+    bedgraph_file,
+    regions_file,
+    *,
+    genome_file,
+    extend=None,
+    null = 'nan',
+):
+    
+    check_regions_file(regions_file)
+
+    if extend is not None:
+
+        center_process = subprocess.Popen(
+            ['awk','-v','OFS=\t',
+            '{ center=int($2+($3-$2)/2); print $1,center,center+1,$4 }', 
+            regions_file],
+            stdout = subprocess.PIPE,
+        )
+
+        slop_process = subprocess.Popen(
+            ['bedtools','slop','-i','-','-g',genome_file,'-b', str(extend)],
+            stdin=center_process.stdout,
+            stdout=subprocess.PIPE,
+        )
+
+        input_process = subprocess.Popen(
+            ['sort', '-k1,1', '-k2,2n'],
+            stdin = slop_process.stdout,
+            stdout = subprocess.PIPE,
+        )
+    else:
+        input_process = subprocess.Popen(
+            ['sort', '-k1,1', '-k2,2n', regions_file],
+            stdout = subprocess.PIPE,
+        )
+
+    map_process = subprocess.Popen(
+        ['bedtools','map',
+            '-a', '-',
+            '-b', bedgraph_file,
+            '-c', '4',
+            '-o', 'mean',
+            '-null', null,
+        ],
+        stdin=input_process.stdout,
+        stdout=subprocess.PIPE,
+    )
+
+    resort_process = subprocess.Popen(
+        ['sort','-k4,4n'],
+        stdin = map_process.stdout,
+        stdout = subprocess.PIPE
+    )
+
+    cut_output = subprocess.check_output(
+        ['cut','-f','5'],
+        stdin=resort_process.stdout
+    )
+
+    vals = array(list(map(
+        lambda x : float(x.strip()),
+        cut_output.decode().strip().split('\n')
+    )))
+
+    if not len(vals) > 1:
+        raise RuntimeError(f'No values found in {bedgraph_file} for {regions_file}')
+
+    return vals
+
+
+
+def make_distance_features(
+    bedfile,
+    regions_file,
+):
+    
+    check_regions_file(regions_file)
+
+    def _find_stranded_closest_feature(strand):
+
+        strand_process = subprocess.Popen(
+            ['awk','-v','OFS=\t',f'{{print $1,$2,$3,NR-1,0,"{strand}"}}', regions_file],
+            stdout = subprocess.PIPE
+        )
+
+        closest_out = subprocess.check_output(
+            ['bedtools','closest',
+             '-a','-',
+             '-b', bedfile, 
+             '-d',
+             '-id',
+             '-D', 'a','-t','first',
+            ],
+            stdin = strand_process.stdout,
+        )
+
+        strand_process.wait()
+
+        return -array(
+                list(map(
+                    lambda x : x.split('\t')[-1], 
+                    closest_out.decode().strip().split('\n')
+                    ))
+                ).astype(float)
+    
+    upstream = _find_stranded_closest_feature('+')
+    downstream = _find_stranded_closest_feature('-')
+
+    nan_mask = (upstream < 0.) | (downstream < 0.) | (upstream + downstream <= 0.)
+
+    progress = upstream/(upstream + downstream + 1) 
+    progress = np.minimum(progress, 1-progress)
+    
+    #progress = 1. - progress if reverse else progress
+
+    total_distance = upstream + downstream
+
+    progress[nan_mask] = 0.
+    total_distance[nan_mask] = 0.
+    
+    return progress, total_distance
+
+
+
+def make_discrete_features(
+    bed_file,
+    regions_file, 
+    *,
+    column=4,
+    null='none',
+    class_priority = None,    
+):
+
+    check_regions_file(regions_file)
+    
+    def _resolve_class_priority(vals):
+
+        vals = set(vals).difference({null})
+
+        if len(vals) == 0:
+            return null
+        elif len(vals) == 1:
+            return vals.pop()
+        else:
+            for _class in class_priority:
+                if _class in vals:
+                    return _class
+            else:
+                raise RuntimeError(f'Could not resolve class priority for {vals} using {class_priority}')
+    
+    # check that the bedfile has 4 columns
+    with open(bed_file, 'r') as f:
+        for line in f:
+            if line.startswith('#'):
+                continue
+            
+            cols = line.strip().split('\t')
+            if len(cols) < column:
+                raise ValueError(
+                    f'Bedfile {bed_file} must have at least {column} columns.'
+                    'The fourth column should be the name of the class for that region.'
+                )
+            break
+
+    cmd = [
+        'bedtools','map',
+        '-a', regions_file,
+        '-b', bed_file,
+        '-o','distinct',
+        '-c',str(column),
+        '-null', str(null),
+        '-delim','|',
+        '-sorted',
+        '-split',
+        ]
+
+    map_out = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+    )
+
+    awk_out = subprocess.check_output(
+        ['awk', ' {print $NF}'],
+        stdin=map_out.stdout,
+    )
+
+    mappings = [x.strip() for x in awk_out.decode().strip().split('\n')]
+    vals = [m.split('|') for m in mappings]
+    classes = set([_v for v in vals for _v in v]).difference({null})
+
+    if class_priority is None:
+        class_priority = list(classes)
+    else:
+        assert set(class_priority) == classes, \
+            f'Class priority must contain all classes in {classes}, non including the null class: {null}'
+        
+    vals = array([_resolve_class_priority(v) for v in vals])
+
+    return vals
+
