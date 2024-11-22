@@ -8,6 +8,12 @@ from ..modalities import Modality
 from ..genome_utils.bed12_utils import stream_bed12
 from ..utils import FeatureType, logger
 
+##
+# TODO:
+# The exposures should be added like a feature.
+# Provide a bed file bigwig file and use this to find the average or sum 
+# within the regions.
+## 
 
 @click.group("G-tensor commands")
 def ingestion():
@@ -61,12 +67,6 @@ def ingestion():
     help='Fasta file to use for calculating context frequencies',
 )
 @click.option(
-    '-w',
-    '--region-weights',
-    type=click.Path(exists=True),
-    help='File containing weights for the regions',
-)
-@click.option(
     '-s',
     '--region-size',
     type=click.IntRange(1,1000000),
@@ -91,7 +91,6 @@ def create(
     cutout_regions : List[str]=[],
     min_region_size=25,
     region_size : int = 10000,
-    region_weights : Union[None, str] = None,
 ):
     logger.info('Creating genomic regions ...')
     regions_file = output + '.regions.bed'
@@ -128,7 +127,6 @@ def create(
         start=start,
         end=end,
         context_frequencies=context_freqs,
-        exposures=region_weights,
     )
 
     gtensor.attrs['regions_file'] = regions_file
@@ -145,7 +143,7 @@ def create(
     write_dataset(gtensor, output)
 
 
-@ingestion.group("features")
+@ingestion.group("feature")
 def featurecmds():
     pass
 
@@ -414,11 +412,11 @@ def rm_features(
         click.echo(f'Removed feature: {feature_name}')
 
 
-@ingestion.group("samples")
+@ingestion.group("sample")
 def samplecmds():
     pass
 
-@samplecmds.command("ingest-sample")
+@samplecmds.command("ingest")
 @click.argument(
     'dataset',
     type=click.Path(exists=True),
@@ -428,41 +426,94 @@ def samplecmds():
     type=click.Path(exists=True),
 )
 @click.option(
+    '-id',
+    '--sample-id',
+    type=str,
+    required=True,
+    help='ID to assign the sample',
+)
+@click.option(
+    '-m',
+    '--mutation-rate-file',
+    type=str,
+    required=True,
+    help='File containing mutation rates',
+)
+@click.option(
+    '-chr',
+    '--chr-prefix',
+    type=str,
+    default='',
+    help='Prefix to add to chromosome names',
+)
+@click.option(
+    '--pass-only/--no-pass-only',
+    type=bool,
+    default=True,
+    help='Whether to only ingest passing mutations',
+)
+@click.option(
+    '-w',
+    '--weight-col',
+    type=str,
+    help='Column to use for mutation weights',
+)
+@click.option(
+    '-sw',
+    '--sample-weight',
+    type=click.FloatRange(0., 1000000, min_open=False),
+    default=1.,
+    help='Weight to assign to the sample',
+)
+@click.option(
     '-name',
     '--sample-name',
     type=str,
-    required=True,
-    help='Name to assign the sample',
+    default=None,
+    help='Name of sample in multi-sample VCF.',
 )
 def ingest_sample(
     dataset : str,
     sample_file : str,
     sample_name : str,
+    chr_prefix : str = '',
+    pass_only : bool = True,
+    weight_col : Union[None, str] = None,
+    mutation_rate_file : Union[None, str] = None,
+    sample_weight : Union[None, float] = 1.,
+    *,
+    sample_id : str,
 ):
     
     attrs = disk.read_attrs(dataset)
-    modality = Modality(attrs['dtype']).get_config()
+    dims = disk.read_dims(dataset)
+
+    modality = Modality(attrs['dtype'].upper()).get_config()
 
     sample_arr = modality.ingest_observations(
         sample_file,
         regions_file=attrs['regions_file'],
         fasta_file=attrs['fasta_file'],
+        chr_prefix=chr_prefix,
+        pass_only=pass_only,
+        weight_col=weight_col,
+        mutation_rate_file=mutation_rate_file,
+        sample_weight=sample_weight,
+        sample_name=sample_name,
+        dim_sizes=dims,
     )
-
-    # do some validation here
-
-    #
 
     disk.write_sample(
         dataset,
         sample_arr,
-        name=f'raw/{sample_name}',
+        sample_name=f'X/{sample_id}',
     )
 
 
 @samplecmds.command("rm-samples")
 def rm_samples():
     pass
+
 
 @samplecmds.command("list-samples")
 def list_samples():

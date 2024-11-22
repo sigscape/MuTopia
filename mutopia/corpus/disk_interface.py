@@ -6,6 +6,7 @@ from collections import defaultdict
 from functools import wraps
 import time
 import netCDF4 as nc
+import warnings
 from ..utils import check_corpus, FeatureType
 from .gtensor import update_view
 
@@ -14,31 +15,20 @@ WRITE_KW = dict(
     engine='netcdf4', 
 )
 
-'''@contextmanager
-def buffered_writer(filename, timeout=3600):
-    init_time = time.time()
-    opened=False
-    
-    while not opened:
-        try:
-            h5_object = h5.File(filename, 'a')
-            opened = True
-            yield h5_object
-        except OSError:
-            if time.time() - init_time > timeout:
-                raise TimeoutError('Could not open file for writing.')
-            else:
-                time.sleep(1)
-        finally:
-            if opened:
-                h5_object.close()'''
-
 
 def read_attrs(dataset):
     with nc.Dataset(dataset, 'r') as dset:
         return {
             attr : getattr(dset, attr)
             for attr in dset.ncattrs()
+        }
+    
+
+def read_dims(dataset):
+    with nc.Dataset(dataset, 'r') as dset:
+        return {
+            dim : len(dset.dimensions[dim])
+            for dim in dset.dimensions.keys()
         }
     
 
@@ -202,22 +192,32 @@ def load_dataset(filename):
             filename, 
             cache=False
         )
-
-    sample_names = list(dataset['raw/X'].keys())
-    layers = list(dataset.raw.keys())
-
     samples=defaultdict(list)
-    for layer in layers:
-        for sample_name in sample_names:
-            samples[layer].append(
-                _backend_load_sample(
-                    dataset, 
-                    f'raw/{layer}/{sample_name}'
+
+    if not hasattr(dataset, 'raw'):
+        layers=[]
+        sample_names=[]
+    else:
+
+        layers = list(dataset.raw.keys())
+
+        try:
+            sample_names = list(dataset['raw/X'].keys())
+        except KeyError:
+            warnings.warn('This dataset has no samples yet, it will not be compatible with many functions.')
+            sample_names = []
+
+        for layer in layers:
+            for sample_name in sample_names:
+                samples[layer].append(
+                    _backend_load_sample(
+                        dataset, 
+                        f'raw/{layer}/{sample_name}'
+                    )
                 )
-            )
-            del dataset.raw[layer][sample_name]
-        del dataset.raw[layer]
-    del dataset['raw']
+                del dataset.raw[layer][sample_name]
+            del dataset.raw[layer]
+        del dataset['raw']
 
     samples = {
         k : xr.concat(v, dim='sample')

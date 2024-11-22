@@ -1,6 +1,6 @@
 import mutopia.corpus as corpus
 from .lib import MutopiaModel, load_model
-from .modalities import get_mode
+from .modalities import get_mode, Modality
 from .utils import FeatureType
 from .tuning import create_study, load_study, run_trial, dashboard
 import mutopia.model as model

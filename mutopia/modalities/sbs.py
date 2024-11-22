@@ -1,112 +1,22 @@
 
 import json
-from itertools import product
 import numpy as np
 import os
-import logging
+from sparse import COO
+from functools import reduce
+from itertools import chain
+from collections import Counter
+from tqdm import tqdm
+from pyfaidx import Fasta
+import xarray as xr
 from ..plot.signature_plot import _plot_linear_signature
 from ..model import *
 from ..utils import logger
 from ..genome_utils.bed12_utils import stream_bed12
 from .mode_config import ModeConfig
+from ._sbs_nucdata import *
+from ._sbs_ingestion import featurize_mutations, _revcomp
 
-COSMIC_SORT_ORDER = [
- 'A[C>A]A',
- 'A[C>A]C',
- 'A[C>A]G',
- 'A[C>A]T',
- 'C[C>A]A',
- 'C[C>A]C',
- 'C[C>A]G',
- 'C[C>A]T',
- 'G[C>A]A',
- 'G[C>A]C',
- 'G[C>A]G',
- 'G[C>A]T',
- 'T[C>A]A',
- 'T[C>A]C',
- 'T[C>A]G',
- 'T[C>A]T',
- 'A[C>G]A',
- 'A[C>G]C',
- 'A[C>G]G',
- 'A[C>G]T',
- 'C[C>G]A',
- 'C[C>G]C',
- 'C[C>G]G',
- 'C[C>G]T',
- 'G[C>G]A',
- 'G[C>G]C',
- 'G[C>G]G',
- 'G[C>G]T',
- 'T[C>G]A',
- 'T[C>G]C',
- 'T[C>G]G',
- 'T[C>G]T',
- 'A[C>T]A',
- 'A[C>T]C',
- 'A[C>T]G',
- 'A[C>T]T',
- 'C[C>T]A',
- 'C[C>T]C',
- 'C[C>T]G',
- 'C[C>T]T',
- 'G[C>T]A',
- 'G[C>T]C',
- 'G[C>T]G',
- 'G[C>T]T',
- 'T[C>T]A',
- 'T[C>T]C',
- 'T[C>T]G',
- 'T[C>T]T',
- 'A[T>A]A',
- 'A[T>A]C',
- 'A[T>A]G',
- 'A[T>A]T',
- 'C[T>A]A',
- 'C[T>A]C',
- 'C[T>A]G',
- 'C[T>A]T',
- 'G[T>A]A',
- 'G[T>A]C',
- 'G[T>A]G',
- 'G[T>A]T',
- 'T[T>A]A',
- 'T[T>A]C',
- 'T[T>A]G',
- 'T[T>A]T',
- 'A[T>C]A',
- 'A[T>C]C',
- 'A[T>C]G',
- 'A[T>C]T',
- 'C[T>C]A',
- 'C[T>C]C',
- 'C[T>C]G',
- 'C[T>C]T',
- 'G[T>C]A',
- 'G[T>C]C',
- 'G[T>C]G',
- 'G[T>C]T',
- 'T[T>C]A',
- 'T[T>C]C',
- 'T[T>C]G',
- 'T[T>C]T',
- 'A[T>G]A',
- 'A[T>G]C',
- 'A[T>G]G',
- 'A[T>G]T',
- 'C[T>G]A',
- 'C[T>G]C',
- 'C[T>G]G',
- 'C[T>G]T',
- 'G[T>G]A',
- 'G[T>G]C',
- 'G[T>G]G',
- 'G[T>G]T',
- 'T[T>G]A',
- 'T[T>G]C',
- 'T[T>G]G',
- 'T[T>G]T']
 
 _transition_palette = {
     ('C','A') : (0.33, 0.75, 0.98),
@@ -118,25 +28,6 @@ _transition_palette = {
 }
 
 MUTATION_PALETTE = [color for color in _transition_palette.values() for i in range(16)]
-
-CONTEXTS = sorted(
-                map(lambda x : ''.join(x), product('ATCG','TC','ATCG')), 
-                key = lambda x : (x[1], x[0], x[2])
-                )
-MUTATIONS = ['T->A/C->A','T->C/C->G','T->G/C->T']
-CONFIGURATIONS = ['C/T-centered','A/G-centered']
-
-def _reformat_mut(context, mut):
-    (t_centered, c_centered) = list(map(lambda s : s[3], mut.split('/')))
-    mut = t_centered if context[1] == 'T' else c_centered
-    cosmic = "{}[{}>{}]{}".format(context[0], context[1], mut, context[2])
-    return cosmic
-
-MUTOPIA_ORDER = [
-    _reformat_mut(context, mut)
-    for context in CONTEXTS
-    for mut in MUTATIONS
-]
 
 MUTOPIA_TO_COSMIC_IDX = np.array([
     MUTOPIA_ORDER.index(cosmic)
@@ -153,6 +44,7 @@ class SBSMode(ModeConfig):
     @property
     def coords(self):
         return {
+            'clustered' : ['no','yes'],
             'configuration' : CONFIGURATIONS,
             'context' : CONTEXTS,
             'mutation' : MUTATIONS,
@@ -217,6 +109,7 @@ class SBSMode(ModeConfig):
             **kwargs
         )
     
+    
     def get_context_frequencies(
         self,
         n_jobs = 1,
@@ -224,22 +117,96 @@ class SBSMode(ModeConfig):
         regions_file,
         fasta_file,
     ):
-        for i, _ in enumerate(stream_bed12(regions_file)):
-            pass
-        return np.zeros((*list(self.sizes.values()), i+1))
+        
+        def _get_window_seq(fasta_object, chrom, start, end):
+            return fasta_object[chrom][max(start-1,0) : end+1].seq.upper()
 
 
-    @classmethod
+        def _rolling(seq, w = 3):
+                for i in range(len(seq) - w + 1):
+                    yield seq[ i : i+w ]
+
+
+        def _reduce_count(counts, seq):
+            if not 'N' in counts:
+                counts[seq]+=1
+            else:
+                counts['N']+=1
+            return counts
+
+
+        def _count_trinucs(bed12_region, fasta_object):
+            
+            segments = map(lambda x : _get_window_seq(fasta_object, *x), bed12_region.segments())
+            trinucs = chain.from_iterable(map(_rolling, segments))
+            counts = reduce(_reduce_count, trinucs, Counter())
+
+            N_counts = counts.pop('N', 0)
+            pseudocount = N_counts/(2*len(self.coords['context']))
+            contexts = self.coords['context']
+
+            return [
+                [counts[context]+pseudocount for context in contexts],
+                [counts[_revcomp(context)]+pseudocount for context in CONTEXTS]
+            ]
+        
+        with Fasta(fasta_file) as fasta_object:
+            trinuc_matrix = [
+                _count_trinucs(w, fasta_object) 
+                for w in tqdm(
+                    stream_bed12(regions_file), 
+                    nrows=100, 
+                    desc = 'Aggregating trinucleotide content'
+                )
+            ]
+
+        # LxDxC => DxCxL
+        trinuc_matrix = np.array(trinuc_matrix)\
+            .transpose(((1,2,0)))\
+            .astype(np.float32) 
+        # DON'T (!) add a pseudocount
+
+        return xr.DataArray(
+            trinuc_matrix,
+            dims = ('configuration', 'context', 'locus'),
+        )
+
+
     def ingest_observations(
-        cls,
+        self,
+        vcf_file,
+        chr_prefix='',
+        pass_only=True,
+        weight_col = None, 
+        mutation_rate_file=None,
+        sample_weight=None,
+        sample_name=None,
         *,
-        input_file,
+        dim_sizes,
         regions_file,
         fasta_file,
-        **kwargs,
     ):
-        pass
-
+        
+        coords, data = featurize_mutations(
+            vcf_file,
+            regions_file,
+            fasta_file,
+            chr_prefix=chr_prefix,
+            weight_col=weight_col,
+            mutation_rate_file=mutation_rate_file,
+            sample_weight=sample_weight,
+            sample_name=sample_name,
+            pass_only=pass_only,
+        )
+        
+        return xr.DataArray(
+            COO(
+                coords,
+                data,
+                shape = tuple(dim_sizes.values()),
+            ),
+            dims = tuple(dim_sizes.keys())
+        )
 
 
 def SBSModel(
@@ -250,7 +217,7 @@ def SBSModel(
     seed=0,
     # context model
     context_reg=0.0001,
-    conditioning_alpha=1e-5,
+    conditioning_alpha=1e-9,
     # mutation model
     mutation_reg=0.0005,
     # locals model

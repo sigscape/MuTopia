@@ -18,13 +18,13 @@ def GTensor(
     chrom : List[str],
     start : List[int],
     end : List[int],
-    context_frequencies : NDArray[np.number],
+    context_frequencies : xr.DataArray,
     exposures : Union[None, NDArray[np.number]] = None,
 ):
     
-    observation_dims = tuple(modality.sizes.values())
-    dim_names = tuple(modality.sizes.keys())
-    if not len(context_frequencies.shape) == len(observation_dims) + 1:
+    #observation_dims = tuple(modality.sizes.values())
+    #dim_names = tuple(modality.sizes.keys())
+    '''if not len(context_frequencies.shape) == len(observation_dims) + 1:
         raise ValueError(
             f'Expected `context_frequencies` to have {len(observation_dims) + 1} dimensions, '
             f'but got {len(context_frequencies.shape)} dimensions instead.'
@@ -34,12 +34,9 @@ def GTensor(
         raise ValueError(
             f'Expected `context_frequencies` to have shape ({", ".join(map(str, observation_dims))}, N_loci), '
             f'but got {str(context_frequencies.shape)} instead.'
-        )
+        )'''
       
-    locus_coords = [
-        f'{chrom}:{start}-{end}' 
-        for (chrom, start, end) in zip(chrom, start, end)
-    ]
+    locus_coords = np.arange(len(chrom))
 
     shared_coords = {
         **modality.coords,
@@ -48,8 +45,8 @@ def GTensor(
     obs_coords = {'sample' : []}
 
     region_lengths = np.sum(
-        context_frequencies, 
-        axis=tuple(range(context_frequencies.ndim - 1))
+        context_frequencies.data, 
+        axis=tuple(range(context_frequencies.data.ndim - 1))
     )
 
     if exposures is None:
@@ -68,10 +65,7 @@ def GTensor(
                 'start' : xr.DataArray(np.array(start), dims=('locus')),
                 'end' : xr.DataArray(np.array(end), dims=('locus')),
                 'length' : xr.DataArray(np.array(region_lengths), dims=('locus')),
-                'context_frequencies' : xr.DataArray(
-                        data=context_frequencies,
-                        dims=(*dim_names, 'locus'),
-                    ),
+                'context_frequencies' : context_frequencies,
                 'exposures' : xr.DataArray(
                     data=np.squeeze(exposures),
                     dims=('locus',),

@@ -277,12 +277,9 @@ def make_regions(
         data = streaming_local_sort(
             data,
             key = lambda s : (s[0].chrom, s[0].start),
-            has_lapsed = group_has_lapsed
+            has_lapsed = lambda curr_group, buff_group : \
+                            group_has_lapsed(curr_group[0], buff_group)
         )
-
-        def trace(x):
-            print(x)
-            return x
         
         #data = map(trace, data)
         # 7. filter out the segments that are too small
