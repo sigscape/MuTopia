@@ -113,13 +113,17 @@ class DesignMatrixHelper:
             base_matrix[np.repeat(np.arange(base_rows), interleave_rows), :]
         )
 
-        shared_effects = sparse.vstack([
-            sparse.csr_matrix(interleave_matrix) 
-            for _ in range(base_rows)
-        ]).tocsr()
+        if shared_effects:
+            
+            shared_effects = sparse.vstack([
+                sparse.csr_matrix(interleave_matrix) 
+                for _ in range(base_rows)
+            ]).tocsr()
+
+            base_matrix_ = sparse.hstack([base_matrix_, shared_effects]).tocsr()
 
         X = sparse.hstack([
-            sparse.hstack([base_matrix_, shared_effects]).tocsr(),
+            base_matrix_,
             sparse.block_diag([interleave_matrix]*base_rows).tocsr(),
         ]).tocsr()
 

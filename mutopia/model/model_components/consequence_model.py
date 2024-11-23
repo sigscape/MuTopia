@@ -1,7 +1,8 @@
 from .base import get_reg_params, _svi_update_fn, RateModel, SparseDataBase, DenseDataBase
-from ._strand_transformer import NormalizedMesoscaleEncoder
+from ._strand_transformer import MesoscaleEncoder, DesignMatrixHelper
 from ._glm_compiled import make_optimizer, setup_mixed_solver, \
     get_lsqr_solver, interative_partial_ls_solver
+from ._kmer_encoder import DiagonalEncoder
 from ._fast_eln import get_eln_solver
 from functools import partial
 from sklearn.base import clone
@@ -36,31 +37,62 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
         super().__init__(*corpuses)
 
         self.n_components = n_components
+
         self.consequence_dim = corpuses[0].dims[dim_name]
         self.consequence_names = corpuses[0].coords[dim_name].values
+
         self.context_dim = corpuses[0].dims['context']
         self.context_names = corpuses[0].coords['context'].values
 
-        self.transformer = NormalizedMesoscaleEncoder(self.consequence_dim)\
-                                .fit(corpuses)
+        self.transformer = MesoscaleEncoder()\
+            .fit(corpuses)
         
-        _cons_encoding_matrix = self.transformer.encoding_matrix_
-        self._is_regularized = ~np.array(self.transformer.intercept_mask_)
-        X = _cons_encoding_matrix.copy()
+        self.context_transformer = DiagonalEncoder()\
+            .fit(self.consequence_names)
+
+        self.encoding_matrix_ = DesignMatrixHelper\
+            .compose_encoding_matrix(
+                self.context_transformer.encoding_matrix,
+                self.transformer.encoding_matrix,
+                shared_effects=False,
+            )
+        
+        X = DesignMatrixHelper\
+            .eye_pad_right(
+                self.encoding_matrix_.copy(),
+                len(self.consequence_names)
+            )
+        
+        self._X = X
+        
+        self._coefs = self._init_params(
+            random_state, 
+            dtype,
+            n_components, 
+            self.context_dim,
+            X.shape[1],
+        )
+
+        self.is_intercept_ = np.array(
+            [True]*self.context_transformer.n_coefs \
+            + [False]*self.transformer.n_coefs * self.consequence_dim \
+            + [True]*self.transformer.n_states_
+        )
 
         eln_solver = partial(
             get_eln_solver,
             **get_reg_params(reg, 1e-5),
             tol=tol,
             random_state=random_state,
-            max_iter=max_iter,
+            max_iter=100,
         ) # f(X) -> f(z, w, beta) -> beta
+
 
         ridge_solver = partial(
             interative_partial_ls_solver,
             group_mask = np.array(
-                [True]*self.consequence_dim \
-                + [False]*( (~self._is_regularized).sum() - self.consequence_dim )
+                [True]*self.context_transformer.n_coefs \
+                + [False]*self.transformer.n_states_
             ),
             tol=tol,
             max_iter=max_iter,
@@ -70,7 +102,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
         # f(X) -> f( f(X) -> f(z, w, beta) -> beta, f(X) -> f(z, w, beta) -> beta ) -> f(z, w, beta) -> beta
         mixed_solver = partial(
             setup_mixed_solver,
-            is_regularized = self._is_regularized,
+            is_regularized = ~self.is_intercept_,
             reg_solver = eln_solver,
             unreg_solver = ridge_solver,
         )
@@ -82,21 +114,11 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
             max_iter=max_iter,
         )
 
-        # convert to dense for other computations, but keep sparse for regression updates
-        self._cons_encoding_matrix=_cons_encoding_matrix\
-                                    .toarray()[:,:-self.transformer.n_states_]
-
-        self._coefs = self._init_params(
-            random_state, 
-            n_components, 
-            self.context_dim, 
-            dtype
-        )
-
-        if not init_components is None:
+        '''if not init_components is None:
             self.init_from_signatures(
                 corpuses[0].modality().load_components(*init_components)
-            )
+            )'''
+
 
     @property
     def requires_normalization(self):
@@ -179,15 +201,10 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
             ] = np.log( renormalized )
     
 
-    def _init_params(self, random_state, n_components, context_dim, dtype):
+    def _init_params(self, random_state, dtype, *shape):
         return random_state.normal(
-                    0, 0.1,
-                    (
-                        n_components, 
-                        context_dim,
-                        self.transformer.get_num_coefs()
-                    )
-                ).astype(dtype, copy = False)
+            0, 0.1, shape,
+        ).astype(dtype, copy = False)
     
 
     def _get_log_cons_distribution(self, corpus_state):
@@ -306,11 +323,15 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
 
 
     def format_signature(self, k):
+
+        encoding_matrix = DesignMatrixHelper\
+            .compose_encoding_matrix(
+                self.context_transformer.encoding_matrix,
+                self.transformer\
+                    .independent_effects_encoding()
+            )
         # CxMxS
-        rho = self._calc_rho(k, 
-            self.transformer\
-                .independent_effects_encoding()
-        )
+        rho = self._calc_rho(k, encoding_matrix)
         
         return DataArray(
             rho,
@@ -324,4 +345,4 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
     
 
     def _format_component(self, k):
-        return self._calc_rho(k, self._cons_encoding_matrix)
+        return self._calc_rho(k, self.encoding_matrix_)

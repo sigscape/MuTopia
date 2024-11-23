@@ -47,7 +47,7 @@ class SBSMode(ModeConfig):
             #'clustered' : ['no','yes'],
             'configuration' : CONFIGURATIONS,
             'context' : CONTEXTS,
-            #'mutation' : MUTATIONS,
+            'mutation' : MUTATIONS,
         }
     
     @property
@@ -255,7 +255,7 @@ def SBSModel(
     
     logger.info('Initializing model parameters and transformations...')
     
-    '''mutation_model = StrandedConditionalConsequenceModel(
+    mutation_model = StrandedConditionalConsequenceModel(
         'mutation', # require the mutation dimension - this is the stranded conditional consequence
         train_corpuses,
         n_components=num_components,
@@ -265,7 +265,7 @@ def SBSModel(
         conditioning_alpha=conditioning_alpha,
         init_components=init_components,
         max_iter=max_iter,
-    )'''
+    )
 
     context_model = StrandedContextModel(
         train_corpuses,
@@ -310,7 +310,7 @@ def SBSModel(
     model_state = ModelState(
         train_corpuses,
         context_model=context_model,
-        #mutation_model=mutation_model,
+        mutation_model=mutation_model,
         theta_model=theta_model,
         locals_model=locals_model,
     )

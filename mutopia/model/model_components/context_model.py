@@ -53,7 +53,8 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         self.encoding_matrix_ = DesignMatrixHelper\
             .compose_encoding_matrix(
                 self.context_transformer.encoding_matrix,
-                self.transformer.encoding_matrix
+                self.transformer.encoding_matrix,
+                shared_effects=True
             )
 
         X = DesignMatrixHelper.one_pad_right(
@@ -77,11 +78,11 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
             **get_reg_params(reg, conditioning_alpha),
             tol=tol,
             random_state=random_state,
+            max_iter=100,
         ) # f(X) -> f(z, w, beta) -> beta
 
         ridge_solver = partial(
             partial_ls_solver,
-            #tol=tol,
             alpha=conditioning_alpha,
         ) # f(X) -> f(z, w, beta) -> beta
 
@@ -97,35 +98,19 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
             solver=split_solver,
         )
 
-        '''
-        if not init_components is None:
-            self.init_from_signatures(
-                corpuses[0].modality().load_components(*init_components)
-            )
-        is_intercept = np.array( self.transformer.intercept_mask_ + [True] )
-        X = self.transformer.one_pad_right(self.transformer.get_encoding_matrix(1))
-        '''
-        
-        '''
-        mixed_solver = partial(
-            setup_mixed_solver,
-            is_regularized = ~self.is_intercept_,
-            reg_solver = eln_solver, # f(X) -> f(z, w, beta) -> beta
-            unreg_solver = ridge_solver, # f(X) -> f(z, w, beta) -> beta
-        )
-        
-        solver = partial(
-            right_intercept_solver,
-            solver=mixed_solver,
-        )
-        '''
-
         self.model = make_optimizer(
             X,
             solver,
             tol=tol,
             max_iter=max_iter,
         )
+
+        '''
+        if not init_components is None:
+            self.init_from_signatures(
+                corpuses[0].modality().load_components(*init_components)
+            )
+        '''
 
 
     @property
@@ -355,9 +340,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
     
     
     def _format_component(self, k):        
-        return self._calc_lambda(
-                    k, self.encoding_matrix_
-                )
+        return self._calc_lambda(k, self.encoding_matrix_)
     
 
     def format_signature(self, k):
@@ -384,21 +367,6 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
     
     def component_coef_summary(self, k):
 
-        '''c = self.context_dim
-        r = self.transformer.n_encoded_features_
-
-        with_dummy = np.concatenate([
-            self.coefs_[sig_idx, :c*r],
-            np.ones(1),
-            self.coefs_[sig_idx, c*r:],
-        ])
-        coef_matrix = with_dummy.reshape((c+1,-1)).T
-
-        return DataFrame(
-            coef_matrix,
-            index=self.transformer.feature_names_out,
-            columns=self.context_names + ['Shared effect']
-        )'''
         c = self.context_transformer.n_states + 1
         r = self.transformer.n_coefs
 

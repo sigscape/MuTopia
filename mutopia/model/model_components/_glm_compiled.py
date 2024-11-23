@@ -71,6 +71,7 @@ def get_lsqr_solver(
     return interior_solver
 
 
+
 @njit(nogil=True)
 def _partial_ls_update(
     XT,
@@ -85,10 +86,8 @@ def partial_ls_solver(
     X,
     alpha=1e-4,
 ):
-
     X.eliminate_zeros()
     X = X.tocsc()
-
     return partial(
         _partial_ls_update,
         sp2tup(X.T.tocsr()),
