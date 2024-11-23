@@ -59,18 +59,41 @@ def get_CSR_linop(
 def get_lsqr_solver(
     X, 
     alpha=5e-5,
-    tol=1e-6,
-    max_iter=1000,
+    tol=1e-6
     ): # f(X, alpha, tol) -> f(z, w, beta) -> beta
     
     get_linop_fn = get_CSR_linop(X)
-    solve = partial(lsqr, atol=tol, btol=tol, damp=np.sqrt(alpha), iter_lim=max_iter)
+    solve = partial(lsqr, atol=tol, btol=tol, damp=np.sqrt(alpha))
 
     def interior_solver(z, w, beta):
         return solve(get_linop_fn(w), z*w, x0=beta*0.97)[0]
     
     return interior_solver
 
+
+@njit(nogil=True)
+def _partial_ls_update(
+    XT,
+    z, w, beta,
+    alpha=1e-4,
+):
+    X_denom = design_csr(XT, w) + np.sum(w)*alpha
+    return design_csr(XT, z*w)/X_denom
+
+
+def partial_ls_solver(
+    X,
+    alpha=1e-4,
+):
+
+    X.eliminate_zeros()
+    X = X.tocsc()
+
+    return partial(
+        _partial_ls_update,
+        sp2tup(X.T.tocsr()),
+        alpha=alpha,
+    )
 
 
 @njit(nogil=True)
@@ -102,7 +125,7 @@ def _iterative_partial_ls(
     return beta
 
 
-def ls_partial_solver(
+def interative_partial_ls_solver(
     X,
     max_iter=10,
     tol=1e-4,
@@ -135,6 +158,29 @@ def ls_partial_solver(
         alpha=alpha,
         tol=tol,
     )
+
+
+def right_intercept_solver(
+    X,
+    *,
+    solver,
+):
+    
+    X = X.tocsc()[:,:-1].tocsr()  
+    f_X = partial(csr_matmul, sp2tup(X))
+    solver = solver(X)
+
+    def interior_solver(z, w, beta):
+        new_beta = beta.copy()
+        intercept = w/np.sum(w) @ (z - f_X(new_beta[:-1]))
+        
+        new_beta[-1] = intercept
+        new_beta[:-1] = solver(z - intercept, w, new_beta[:-1])
+
+        return new_beta
+    
+    return interior_solver
+
 
 ##
 # Mixed solver - some weights are regularized, some are not
@@ -195,8 +241,6 @@ def outer_update(
     w = weight_fn(mu)
     z = response_fn(y, eta, mu)
     
-    w = w/np.sum(w)
-
     return (mu, z, w*weights)
 
 
@@ -215,7 +259,6 @@ def iter_fit(
         
         _, z, w = outer_update(beta)
         beta_new = interior_solver(z, w, beta)
-        beta_new = np.clip(beta_new, -700., 700.)
 
         if np.linalg.norm(beta_new - beta) < tol:
             break

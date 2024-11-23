@@ -1,7 +1,7 @@
 from .base import get_reg_params, _svi_update_fn, RateModel, SparseDataBase, DenseDataBase
 from ._strand_transformer import NormalizedMesoscaleEncoder
 from ._glm_compiled import make_optimizer, setup_mixed_solver, \
-    get_lsqr_solver, ls_partial_solver
+    get_lsqr_solver, interative_partial_ls_solver
 from ._fast_eln import get_eln_solver
 from functools import partial
 from sklearn.base import clone
@@ -57,7 +57,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
         ) # f(X) -> f(z, w, beta) -> beta
 
         ridge_solver = partial(
-            ls_partial_solver,
+            interative_partial_ls_solver,
             group_mask = np.array(
                 [True]*self.consequence_dim \
                 + [False]*( (~self._is_regularized).sum() - self.consequence_dim )

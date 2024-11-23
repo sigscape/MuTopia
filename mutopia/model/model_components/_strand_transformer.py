@@ -64,48 +64,74 @@ class DesignMatrixHelper:
         design = encoder.fit_transform(list(product(*categories)))
         
         return (
-            add_dummy_feature(design), 
+            design,
             encoder,
         )
     
-
     @classmethod
     def encoding_dim(cls, n_strand_features, *categories):
         return (
             np.prod([3]*n_strand_features + [len(c) for c in categories]),
-            np.sum([2]*n_strand_features + [len(c)-1 for c in categories]) + 1,
+            np.sum([2]*n_strand_features + [len(c)-1 for c in categories]),
         )
     
+    @classmethod
+    def one_pad_right(cls, X):
+        out = sparse.hstack([
+            X,
+            sparse.csc_matrix(np.ones((X.shape[0],1)))
+        ]).tocsr()
+        out.eliminate_zeros()
+        return out
+    
     
     @classmethod
-    def compose_encoding_matrix(cls, n_blocks, block_matrix, shared_effects=True):
-        blocks = sparse.block_diag([block_matrix]*n_blocks)
-        if shared_effects:
-            return sparse.hstack([
-                blocks,
-                sparse.csr_matrix( np.vstack([block_matrix[:,1:]]*n_blocks) ),
-            ]).tocsr()
-        else:
-            return blocks.tocsr()
+    def eye_pad_right(cls, X, n_repeats):
+        eye_len = X.shape[0]//n_repeats
+        assert eye_len*n_repeats == X.shape[0], 'X must be divisible by n_repeats'
+
+        out = sparse.hstack([
+            X,
+            sparse.vstack([sparse.eye(eye_len) for _ in range(n_repeats)]).tocsr()
+        ]).tocsr()
+
+        out.eliminate_zeros()
+        return out
 
 
     @classmethod
-    def get_intercept_mask(cls, n_blocks, n_strand_features, *categories, shared_effects=True):
+    def compose_encoding_matrix(cls, 
+            base_matrix, 
+            interleave_matrix, 
+            shared_effects=True
+        ):
         
-        (_, R) = cls.encoding_dim(n_strand_features, *categories)
-        
-        single_block = [True] + [False]*(R-1)
-        return single_block*n_blocks + ([False]*(R-1) if shared_effects else [])
-    
+        base_rows = base_matrix.shape[0]
+        interleave_rows = interleave_matrix.shape[0]
+
+        base_matrix_ = sparse.csr_matrix(
+            base_matrix[np.repeat(np.arange(base_rows), interleave_rows), :]
+        )
+
+        shared_effects = sparse.vstack([
+            sparse.csr_matrix(interleave_matrix) 
+            for _ in range(base_rows)
+        ]).tocsr()
+
+        X = sparse.hstack([
+            sparse.hstack([base_matrix_, shared_effects]).tocsr(),
+            sparse.block_diag([interleave_matrix]*base_rows).tocsr(),
+        ]).tocsr()
+
+        X.eliminate_zeros()
+        return X
+
+
 
 class MesoscaleEncoder:
 
     uselog=True
     
-    def __init__(self, n_blocks) -> None:
-        self.n_blocks = n_blocks
-
-
     def fit(self, corpuses):
         
         example_features = corpuses[0].features.data_vars
@@ -141,70 +167,32 @@ class MesoscaleEncoder:
         self._encoding_matrix_block_, encoder = \
             DesignMatrixHelper.get_joint_encoding_matrix(*design_args) 
 
-        self.feature_names_out = ['Baseline'] \
-                + list(encoder.get_feature_names_out(strand_features + cat_features) )
+        self.feature_names_out_ = list(encoder.get_feature_names_out(strand_features + cat_features) )
 
         self.plus_encoder_map_ = DesignMatrixHelper.get_idx_map(*design_args)
         self.minus_encoder_map_ = DesignMatrixHelper.get_idx_map(*design_args, inverted=True)
 
-        self.intercept_mask_ = self._get_intercept_mask(
-            self.n_blocks, 
-            *design_args,
-        )
-
-        self.encoding_matrix_ = self.compose_encoding_matrix(
-            self.n_blocks, 
-            self._encoding_matrix_block_,
-        )
-
-        self.encoding_matrix_.eliminate_zeros()
-
         return self
     
-    def get_encoding_matrix(self, num_corpuses):
-        out = sparse.vstack([self.encoding_matrix_]*num_corpuses).tocsr()
-        out.eliminate_zeros()
-        return out
+    @property
+    def encoding_matrix(self):
+        return self._encoding_matrix_block_
     
-    def get_num_coefs(self):
-        return self.encoding_matrix_.shape[1]
-
-    @classmethod
-    def one_pad_right(cls, X):
-        out = sparse.hstack([
-            X,
-            sparse.csc_matrix(np.ones((X.shape[0],1)))
-        ]).tocsr()
-        out.eliminate_zeros()
-        return out
-
-    @classmethod
-    def compose_encoding_matrix(cls, n_blocks, block_matrix):
-        blocks = sparse.block_diag([block_matrix]*n_blocks)
-        out = sparse.hstack([
-            blocks,
-            sparse.csr_matrix( np.vstack([block_matrix[:,1:]]*n_blocks) ),
-        ]).tocsr()
-
-        out.eliminate_zeros()
-        return out
-
-
-    @classmethod
-    def _get_intercept_mask(cls, n_blocks, n_strand_features, *categories):
-        (_, R) = DesignMatrixHelper.encoding_dim(n_strand_features, *categories)
-        single_block = [True] + [False]*(R-1)
-        return single_block*n_blocks + [False]*(R-1)    
+    @property
+    def n_coefs(self):
+        return self._encoding_matrix_block_.shape[1]
+    
+    @property
+    def n_states(self):
+        return self._encoding_matrix_block_.shape[0]
 
 
     def plus_encoder_(self, x):
-        return np.array([self.plus_encoder_map_[tuple(_x)] for _x in x])
-    
+        return np.array([self.plus_encoder_map_[tuple(_x)] for _x in x])    
     
     def minus_encoder_(self, x):
         return np.array([self.minus_encoder_map_[tuple(_x)] for _x in x])
     
-
     def paste(self, corpus):
         return pd.DataFrame({
                 feature_name : corpus.features[feature_name].data
@@ -223,21 +211,14 @@ class MesoscaleEncoder:
             self.n_states_
         )
     
-    
     def independent_effects_encoding(self):
-
-        s=self.n_encoded_features_ - 1
-
-        block_matrix=np.hstack([
-                np.ones(s+1)[:,None],
-                np.vstack([np.zeros(s), np.eye(s)]),
-            ])
-        
-        return self.compose_encoding_matrix(
-                    self.n_blocks, 
-                    block_matrix
-                )
+        return np.vstack([
+            np.zeros((1, self.n_encoded_features_)),
+            np.eye(self.n_encoded_features_)
+        ])
     
+    def get_feature_names_out(self):
+        return self.feature_names_out_
 
 
 class NormalizedMesoscaleEncoder(MesoscaleEncoder):
