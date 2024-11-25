@@ -63,6 +63,7 @@ def write_feature(
     *,
     name : str,
     normalization : FeatureType,
+    **attrs,
 ):
     xr.DataArray(
         array(vals).astype(normalization.save_dtype),
@@ -72,6 +73,7 @@ def write_feature(
             'normalization' : normalization.value,
             'group' : group,
             'active' : 1,
+            **attrs,
         }
     ).to_netcdf(
         dataset,

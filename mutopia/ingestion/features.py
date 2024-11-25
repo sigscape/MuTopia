@@ -176,7 +176,7 @@ def make_discrete_features(
 
     check_regions_file(regions_file)
     
-    def _resolve_class_priority(vals):
+    def _resolve_class_priority(vals, _class_priority):
 
         vals = set(vals).difference({null})
 
@@ -185,7 +185,7 @@ def make_discrete_features(
         elif len(vals) == 1:
             return vals.pop()
         else:
-            for _class in class_priority:
+            for _class in _class_priority:
                 if _class in vals:
                     return _class
             else:
@@ -232,12 +232,32 @@ def make_discrete_features(
     classes = set([_v for v in vals for _v in v]).difference({null})
 
     if class_priority is None:
-        class_priority = list(classes)
+        class_priority = sorted(list(classes))
     else:
         assert set(class_priority) == classes, \
             f'Class priority must contain all classes in {classes}, non including the null class: {null}'
         
-    vals = array([_resolve_class_priority(v) for v in vals])
+    vals = array([_resolve_class_priority(v, class_priority) for v in vals])
+
+    return (vals, list(reversed(class_priority + [null])))
+
+
+
+def make_strand_features(
+    bed_file,
+    regions_file, 
+    *,
+    column=4,
+):
+    vals, _ =  make_discrete_features(
+        bed_file,
+        regions_file,
+        column=column,
+        null='.',
+        class_priority=['-','+'],
+    )
+
+    VAL_MAP = {'-' : -1, '.' : 0, '+' : 1,}
+    vals = np.array([VAL_MAP[v] for v in vals])
 
     return vals
-

@@ -27,7 +27,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         max_iter=100,
         tol=1e-3,
         reg : float = 0.0001, 
-        conditioning_alpha : float = 5e-5,
+        conditioning_alpha : float = 1e-9,
         dtype = float,
         init_components = None,
         *,
@@ -68,14 +68,14 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
             dtype
         )
 
-        self.is_intercept_ = np.array(
+        '''self.is_intercept_ = np.array(
             [True]*self.context_transformer.n_coefs \
             + [False]*self.transformer.n_coefs * (self.context_transformer.n_states+1)
         )
 
         eln_solver = partial(
             get_eln_solver,
-            **get_reg_params(reg, conditioning_alpha),
+            **get_reg_params(reg, 1e-5),
             tol=tol,
             random_state=random_state,
             max_iter=100,
@@ -91,6 +91,14 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
             is_regularized = ~self.is_intercept_,
             unreg_solver = ridge_solver, # f(X) -> f(z, w, beta) -> beta
             reg_solver = eln_solver, # f(X) -> f(z, w, beta) -> beta
+        )'''
+
+        split_solver = partial(
+            get_eln_solver,
+            **get_reg_params(reg, 1e-5),
+            tol=tol,
+            random_state=random_state,
+            max_iter=max_iter,
         )
 
         solver = partial(
@@ -112,7 +120,6 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
             )
         '''
 
-
     @property
     def requires_normalization(self):
         return True
@@ -123,6 +130,23 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         return ('configuration','context','locus')
     
 
+    def post_fit(self, corpuses):
+
+        corpus = corpuses[0]
+
+        locus_effects = CS.fetch_val(corpus, 'log_locus_distribution')\
+            .transpose('locus',...).data
+
+        freqs = corpus.regions.context_frequencies
+        contexts = freqs\
+            .sum(dim=dims_except_for(freqs.dims, 'context', 'locus'))\
+            .transpose('context','locus').data
+
+        # CxL @ LxK => CxK => KxC
+        self._comp_context_distribution = (contexts @ np.exp(locus_effects)).T
+        self._comp_context_distribution /= self._comp_context_distribution.sum(axis=1, keepdims=True)
+
+    
     def prepare_to_save(self):
         del self.model 
         # the model is not serializable because it has nested functions

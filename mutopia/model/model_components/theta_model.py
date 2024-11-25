@@ -3,13 +3,12 @@ import inspect
 from .base import get_corpus_intercepts, get_poisson_targets_weights,\
      _svi_update_fn, RateModel, idx_array_to_design, \
      SparseDataBase, DenseDataBase
-from ...utils import dims_except_for
+from ...utils import dims_except_for, str_wrapped_list
 from ..corpus_state import CorpusState as CS
 from ._hist_gbt import CustomHistGradientBooster
-from ._feature_tranformer import get_smoothing_transformer, \
-    get_paste_transformer, get_normalizing_transformer, \
-    get_categorical_features, get_feature_interaction_groups, \
-    StratifiedTransformer
+from ._feature_tranformer import get_feature_transformer, \
+    get_categorical_feature_idxs, get_feature_interaction_group_idxs, \
+    StratifiedTransformer, PasteTransformer
 
 from functools import partial
 import numpy as np
@@ -46,40 +45,38 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
             for i, corpus in enumerate(corpuses)
         }
 
+        (self.base_transformer_, feature_names_in) = \
+            get_feature_transformer(
+                *corpuses,
+                smoothing_size=smoothing_size,
+                additional_transformers=transformers,
+                categorical_encoder=self.categorical_encoder,
+                add_corpus_intercepts=add_corpus_intercepts,
+            )
+
+        # Fit the transformer to get an example 
+        # on which to fit the GBT binning.
         corpus = corpuses[0]
-
-        self.base_transformer_ = Pipeline([
-            ('paste', get_paste_transformer(*corpuses)),
-            ('smoother', get_smoothing_transformer(
-                    *corpuses,
-                    window_size=smoothing_size
-                )
-            ),
-            ('normalize', get_normalizing_transformer(
-                    *corpuses,
-                    categorical_encoder=self.categorical_encoder,
-                    add_corpus_intercepts=add_corpus_intercepts,
-                )
-            ),
-            *[(f'user_transformer_{i}', t) for i, t in enumerate(transformers)]
-        ])
-
-        self.base_transformer_.fit(corpus, corpus=corpus)
-        self.n_features_ = len(self.base_transformer_[2].get_feature_names_out())
-
+        X = self.base_transformer_\
+                    .fit(corpus, corpus=corpus)\
+                    .transform(corpus, corpus=corpus)
+        
+        self.n_features_ = X.shape[1]
+        self.feature_names_out_ = self.base_transformer_.get_feature_names_out(feature_names_in)
+        
         self.rate_models = [
             self._make_model(
                 **model_kw,
-                X = self.base_transformer_.transform(corpus, corpus=corpus),
-                interaction_groups = get_feature_interaction_groups(corpus, self.base_transformer_),
-                categorical_features = get_categorical_features(self.base_transformer_),
+                X = X,
+                interaction_groups = get_feature_interaction_group_idxs(corpus, self.base_transformer_),
+                categorical_features = get_categorical_feature_idxs(self.base_transformer_),
                 random_state = random_state,
             )
             for _ in range(n_components)
         ]
 
         self.locus_transformer_ = StratifiedTransformer(self.base_transformer_)
-        
+
         '''
         We want to initialize the locus effects with something instead of just 0s
         (if you initialize with 0s, the model can only use exposure differences to 
@@ -119,8 +116,7 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
                     X,
                     dims=('locus', 'feature'),
                     coords={
-                        'feature' : self.base_transformer_[2]\
-                                        .get_feature_names_out()
+                        'feature' : self.feature_names_out_,
                     }
                 ),
                 log_locus_distribution = self._init_log_locus_distribution(X),
@@ -157,13 +153,13 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
             self.corpus_encoder_,
             n_repeats=lambda corpus : corpus.dims['locus'],
         )
-    
+
     def _get_intercept_design(self, *corpuses):
         return idx_array_to_design(
             self._get_intercept_idx(*corpuses),
             len(corpuses),
         ).to_scipy_sparse().tocsc()
-    
+
 
     def _fetch_feature_matrix(self, *corpuses):
         return np.vstack([
@@ -320,7 +316,11 @@ class LinearThetaModel(ThetaModel):
 
 class GBTThetaModel(ThetaModel):
 
-    categorical_encoder = OrdinalEncoder(max_categories=254)
+    categorical_encoder = partial(
+        OrdinalEncoder, 
+        max_categories=254,
+        dtype=np.float32,
+    )
 
     @classmethod
     def list_params(cls):

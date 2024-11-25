@@ -59,11 +59,12 @@ def get_CSR_linop(
 def get_lsqr_solver(
     X, 
     alpha=5e-5,
-    tol=1e-6
+    tol=1e-6,
+    max_iter=1000,
     ): # f(X, alpha, tol) -> f(z, w, beta) -> beta
     
     get_linop_fn = get_CSR_linop(X)
-    solve = partial(lsqr, atol=tol, btol=tol, damp=np.sqrt(alpha))
+    solve = partial(lsqr, atol=tol, btol=tol, damp=np.sqrt(alpha), iter_lim=max_iter)
 
     def interior_solver(z, w, beta):
         return solve(get_linop_fn(w), z*w, x0=beta*0.97)[0]
@@ -239,6 +240,8 @@ def outer_update(
     mu = mean_fn(eta)
     w = weight_fn(mu)
     z = response_fn(y, eta, mu)
+
+    w = w/np.sum(w)
     
     return (mu, z, w*weights)
 
@@ -258,6 +261,7 @@ def iter_fit(
         
         _, z, w = outer_update(beta)
         beta_new = interior_solver(z, w, beta)
+        beta_new = np.clip(beta_new, -700., 700.)
 
         if np.linalg.norm(beta_new - beta) < tol:
             break

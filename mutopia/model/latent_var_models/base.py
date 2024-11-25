@@ -226,6 +226,18 @@ class LocalUpdate(ABC):
         raise NotImplementedError
     
 
+    @abstractmethod
+    def get_deviance_fns(
+        self,
+        corpuses,
+        model_state,
+        exposures_fn=None,
+        *,
+        parallel_context,
+    ):
+        raise NotImplementedError
+    
+
     @staticmethod
     def reduce_model_sstats(
         model,

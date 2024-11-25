@@ -90,6 +90,14 @@ class DenseDataBase(ABC):
         raise NotADirectoryError
 
 
+def get_feature_classes(corpus, feature):
+    feature = corpus.features[feature]
+    try:
+        return list(feature.attrs['classes'])
+    except KeyError:
+        raise ValueError(f'Feature {feature.name} in {CS.get_name(corpus)} does not have classes defined!')
+    
+
 ## Shared methods for rate models ##
 def get_reg_params(l1_rate, l2_rate):
         return dict(

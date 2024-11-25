@@ -5,13 +5,13 @@ from itertools import product
 from itertools import product, repeat
 from itertools import chain
 from sklearn.preprocessing import OneHotEncoder
-from sklearn.preprocessing import add_dummy_feature
 from ...utils import FeatureType, logger, str_wrapped_list
-from .base import idx_array_to_design
+from .base import idx_array_to_design, get_feature_classes
+from ..corpus_state import CorpusState as CS
+
 
 def _custom_combiner(feature, category):
     return str(feature) + ":" + str(category)
-
 
 class DesignMatrixHelper:
 
@@ -140,14 +140,14 @@ class MesoscaleEncoder:
         
         example_features = corpuses[0].features.data_vars
 
-        filter_features = lambda c : list([ 
+        filter_features_by_type = lambda dtype : list([ 
             fname 
             for fname, feature in example_features.items()
-            if FeatureType(feature.attrs['normalization']) in (c,)
+            if FeatureType(feature.attrs['normalization']) == dtype
         ])
 
-        strand_features = filter_features(FeatureType.STRAND)
-        cat_features = filter_features(FeatureType.MESOSCALE)
+        strand_features = filter_features_by_type(FeatureType.STRAND)
+        cat_features = filter_features_by_type(FeatureType.MESOSCALE)
 
         for strand_feature in strand_features:
             vals = set(np.unique(example_features[strand_feature].data))
@@ -158,13 +158,14 @@ class MesoscaleEncoder:
                 )
 
         if self.uselog:
-            logger.info('Found strand features:\n\t{}'.format(str_wrapped_list(strand_features)))
-            logger.info('Found mesoscale features:\n\t{}'.format(str_wrapped_list(cat_features)))
+            logger.info('Found strand features:{}'.format(str_wrapped_list(strand_features)))
+            logger.info('Found mesoscale features:{}'.format(str_wrapped_list(cat_features)))
 
         self.feature_names_ = strand_features + cat_features
 
         n_strand_features = len(strand_features)
-        categories = [sorted(list(set(example_features[f].data)))[::-1] for f in cat_features]
+        categories = [get_feature_classes(corpuses[0], fname) for fname in cat_features]
+
         design_args = (n_strand_features, *categories)
         
         (self.n_states_, self.n_encoded_features_) = DesignMatrixHelper.encoding_dim(*design_args)
@@ -190,14 +191,35 @@ class MesoscaleEncoder:
     def n_states(self):
         return self._encoding_matrix_block_.shape[0]
 
+    
+    def _encode_from_dict(self, encoder_map, d):
+        try:
+            return encoder_map[tuple(d)]
+        except KeyError:
+            raise ValueError(
+                'An encoding was not found for the record:\n\t{}\n'
+                'Which indicates there is a class in one corpus that is not present in another.'\
+                    .format('\n\t'.join([f'{k}:{str(v)}' for k,v in zip(self.feature_names_, d)]))
+            )
 
     def plus_encoder_(self, x):
-        return np.array([self.plus_encoder_map_[tuple(_x)] for _x in x])    
+        return np.array([
+            self._encode_from_dict(self.plus_encoder_map_, _x) 
+            for _x in x
+        ])    
     
     def minus_encoder_(self, x):
-        return np.array([self.minus_encoder_map_[tuple(_x)] for _x in x])
+        return np.array([
+            self._encode_from_dict(self.minus_encoder_map_, _x) 
+            for _x in x
+        ])
     
     def paste(self, corpus):
+        
+        for fname in self.feature_names_:
+            if fname not in corpus.features:
+                raise ValueError(f'Feature {fname} not found in corpus {CS.get_name(corpus)}')
+            
         return pd.DataFrame({
                 feature_name : corpus.features[feature_name].data
                 for feature_name in self.feature_names_
@@ -224,41 +246,3 @@ class MesoscaleEncoder:
     def get_feature_names_out(self):
         return self.feature_names_out_
 
-
-class NormalizedMesoscaleEncoder(MesoscaleEncoder):
-    
-    uselog=False
-    
-    @classmethod
-    def compose_encoding_matrix(cls, n_blocks, block_matrix):
-        blocks = sparse.block_diag([block_matrix]*n_blocks)
-        out = sparse.hstack([
-            blocks,
-            sparse.csr_matrix( np.vstack([np.eye(block_matrix.shape[0])]*n_blocks) ),
-        ]).tocsr()
-
-        out.eliminate_zeros()
-        return out
-
-
-    @classmethod
-    def _get_intercept_mask(cls, n_blocks, n_strand_features, *categories):
-        (S, R) = DesignMatrixHelper.encoding_dim(n_strand_features, *categories)
-        single_block = [True] + [False]*(R-1)
-        return single_block*n_blocks + [True]*S
-    
-
-    def independent_effects_encoding(self):
-
-        s=self.n_encoded_features_ - 1
-
-        block_matrix=np.hstack([
-                np.ones(s+1)[:,None],
-                np.vstack([np.zeros(s), np.eye(s)]),
-            ])
-        
-        return self.compose_encoding_matrix(
-                    self.n_blocks, 
-                    block_matrix
-                )[:,:-self.n_encoded_features_]
-    

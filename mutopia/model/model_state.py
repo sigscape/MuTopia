@@ -130,17 +130,23 @@ class ModelState:
     
     
     @staticmethod
-    def _marginalize_mutrate(log_mutrate_tensor, exposures):
-        return xr.apply_ufunc(
-            lambda gamma, mu : np.nan_to_num(
-                np.dot(mu, gamma/gamma.sum()),
-                copy=False,
-                nan=0.
-            ),
-            exposures,
-            np.exp(log_mutrate_tensor - log_mutrate_tensor.max()),
-            input_core_dims=[[], ('component',)],
-        )
+    def _log_marginalize_mutrate(log_mutrate_tensor, exposures):
+        
+        def logsafe_matmul(y, log_x):
+            alpha = log_x.max()
+            return alpha + np.log(
+                np.dot(np.nan_to_num(np.exp(log_x - alpha), nan=0., copy=False), y)
+            )
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+
+            return xr.apply_ufunc(
+                logsafe_matmul,
+                exposures/np.sum(exposures),
+                log_mutrate_tensor,
+                input_core_dims=[[], ['component']],
+            )
     
 
     def get_sstats_dict(self, corpuses):

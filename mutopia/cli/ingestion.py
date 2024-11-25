@@ -147,7 +147,11 @@ def create(
 def featurecmds():
     pass
 
-@featurecmds.command("ingest-continuous")
+@featurecmds.group("add")
+def add_feature():
+    pass
+
+@add_feature.command("continuous")
 @click.argument(
     'dataset',
     type=click.Path(exists=True),
@@ -212,7 +216,7 @@ def ingest_continuous_feature(
     )
 
 
-@featurecmds.command("ingest-discrete")
+@add_feature.command("discrete")
 @click.argument(
     'dataset',
     type=click.Path(exists=True),
@@ -245,7 +249,7 @@ def ingest_continuous_feature(
 @click.option(
     '-col',
     '--column',
-    type=int,
+    type=click.IntRange(4,1000),
     default=4,
     help='Column in the bedfile to use for the class',
 )
@@ -280,7 +284,7 @@ def ingest_discrete(
     
     corpus_attrs = disk.read_attrs(dataset)
 
-    feature_vals = ingest.make_discrete_features(
+    feature_vals, classes = ingest.make_discrete_features(
         ingest_file,
         corpus_attrs['regions_file'],
         column=column,
@@ -294,10 +298,11 @@ def ingest_discrete(
         group=group,
         name=feature_name,
         normalization=FeatureType.MESOSCALE if mesoscale else FeatureType.CATEGORICAL,
+        classes=classes,
     )
 
 
-@featurecmds.command("ingest-distance")
+@add_feature.command("distance")
 @click.argument(
     'dataset',
     type=click.Path(exists=True),
@@ -356,8 +361,65 @@ def ingest_distance(
     )
 
 
+@add_feature.command("strand")
+@click.argument(
+    'dataset',
+    type=click.Path(exists=True),
+)
+@click.argument(
+    'ingest_file',
+    type=click.Path(exists=True),
+)
+@click.option(
+    '-name',
+    '--feature-name',
+    type=str,
+    required=True,
+    help='Name to assign the feature',
+)
+@click.option(
+    '-g',
+    '--group',
+    default='all',
+    type=str,
+    help='Group to assign the feature to',
+)
+@click.option(
+    '-col',
+    '--column',
+    type=click.IntRange(4,1000),
+    default=4,
+    help='Column in the bedfile to use for the class',
+)
+def add_strand_feature(
+    ingest_file : str,
+    group : str = 'all',
+    column : int = 4,
+    *,
+    dataset : str,
+    feature_name : str,
+):
+    if not ingest.FileType.from_extension(ingest_file) == ingest.FileType.BED:
+        raise ValueError('Discrete features must be ingested from Bed files.')
+    
+    corpus_attrs = disk.read_attrs(dataset)
 
-@featurecmds.command("list-features")
+    feature_vals = ingest.make_strand_features(
+        ingest_file,
+        corpus_attrs['regions_file'],
+        column=column,
+    )
+
+    disk.write_feature(
+        dataset,
+        feature_vals,
+        group=group,
+        name=feature_name,
+        normalization=FeatureType.STRAND,
+    )
+
+
+@featurecmds.command("ls")
 @click.argument(
     'dataset',
     type=click.Path(exists=True),
@@ -390,7 +452,7 @@ def list_features(
 
 
 
-@featurecmds.command("rm-features")
+@featurecmds.command("rm")
 @click.argument(
     'dataset',
     type=click.Path(exists=True),
@@ -416,7 +478,7 @@ def rm_features(
 def samplecmds():
     pass
 
-@samplecmds.command("ingest")
+@samplecmds.command("add")
 @click.argument(
     'dataset',
     type=click.Path(exists=True),
@@ -510,11 +572,11 @@ def ingest_sample(
     )
 
 
-@samplecmds.command("rm-samples")
+@samplecmds.command("rm")
 def rm_samples():
     pass
 
 
-@samplecmds.command("list-samples")
+@samplecmds.command("list")
 def list_samples():
     pass

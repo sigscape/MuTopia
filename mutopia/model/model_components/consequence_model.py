@@ -24,7 +24,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
         dim_name,
         corpuses,
         reg : float = 0.0005,
-        conditioning_alpha = 5e-5,
+        conditioning_alpha = 1e-9,
         tol = 5e-4,
         max_iter=100,
         dtype = float,
@@ -84,7 +84,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
             **get_reg_params(reg, 1e-5),
             tol=tol,
             random_state=random_state,
-            max_iter=100,
+            max_iter=max_iter,
         ) # f(X) -> f(z, w, beta) -> beta
 
 
@@ -328,8 +328,10 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
             .compose_encoding_matrix(
                 self.context_transformer.encoding_matrix,
                 self.transformer\
-                    .independent_effects_encoding()
+                    .independent_effects_encoding(),
+                shared_effects=False
             )
+        
         # CxMxS
         rho = self._calc_rho(k, encoding_matrix)
         
@@ -337,7 +339,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
             rho,
             dims=('context', self.dim_name, 'mesoscale_state'),
             coords={
-                'mesoscale_state' : self.transformer.feature_names_out,
+                'mesoscale_state' : ['Baseline'] + self.transformer.get_feature_names_out(),
                 'context' : self.context_names,
                 self.dim_name : self.consequence_names,
             }

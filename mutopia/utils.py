@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 import inspect
 from functools import wraps
+from collections import defaultdict
 import logging
 
 logger = logging.getLogger(' Mutopia')
@@ -13,6 +14,7 @@ logger.setLevel(logging.INFO)
 
 
 class FeatureType(Enum):
+    LOG1P_CPM = 'log1p_cpm'
     MESOSCALE = 'mesoscale'
     STRAND = 'strand'
     CATEGORICAL = 'categorical'
@@ -25,6 +27,7 @@ class FeatureType(Enum):
     @classmethod
     def continuous_types(cls):
         return (
+            FeatureType.LOG1P_CPM,
             FeatureType.POWER, 
             FeatureType.MINMAX, 
             FeatureType.QUANTILE, 
@@ -61,7 +64,7 @@ class FeatureType(Enum):
 
 def str_wrapped_list(x, n=4):
     x = list(x)
-    return ",\n\t".join([', '.join(x[i:i+n]) for i in range(0, len(x), n)])
+    return "\n\t" + ",\n\t".join([', '.join(x[i:i+n]) for i in range(0, len(x), n)])
 
 
 @contextmanager
@@ -142,6 +145,9 @@ def check_sample_data(corpus, dtype):
         if not X.compressed_axes == compress:
             X = X.change_compressed_axes(compress)
 
+    else:
+        X = np.ascontiguousarray(X)
+
     if not X.dtype == dtype:
         X = X.astype(dtype)
 
@@ -178,21 +184,88 @@ def check_corpus(corpus, enforce_sample=True):
     check_structure(corpus)
     
     if enforce_sample:
-        check_sample_data(corpus, float)
+        check_sample_data(corpus, np.float32)
 
     for feature in corpus.features.values():
-        check_feature(feature)    
+        check_feature(feature)
+
+
+def check_feature_consistency(*corpuses):
+
+    type_dict = defaultdict(set)
+    for feature_name, dtype in list(
+        (feature_name, FeatureType(feature.attrs['normalization']))
+        for corpus in corpuses
+        for feature_name, feature in corpus.features.data_vars.items()
+    ):
+        type_dict[feature_name].add(dtype)
+
+    for feature_name, types in type_dict.items():
+        if not len(types) == 1:
+            raise ValueError(
+                f'The feature {feature_name} has inconsistent normalization types across corpuses: {str_wrapped_list(types)}'
+            )
+        
+    def _get_classes(corpus, feature):
+        try:
+            return feature.attrs['classes']
+        except KeyError as err:
+            raise KeyError(
+                f'The feature {feature.name} in corpus {corpus.attrs["name"]} is missing the `classes` attribute.'
+            ) from err
+
+
+    priority_dict = defaultdict(list)
+    for feature_name, classes in list(
+        (feature_name, tuple(_get_classes(corpus, feature)))
+        for corpus in corpuses
+        for feature_name, feature in corpus.features.data_vars.items()
+        if FeatureType(feature.attrs['normalization']) in (FeatureType.CATEGORICAL, FeatureType.MESOSCALE)
+    ):
+        priority_dict[feature_name].append(classes)
+
+    for feature_name, priorities in priority_dict.items():
+        if not all(p == priorities[0] for p in priorities):
+            raise ValueError(
+                f'The feature {feature_name} has inconsistent class priorities across corpuses:\n\t' \
+                    + '\n\t'.join(map(
+                        lambda p : ', '.join(map(str, p)), 
+                        priorities
+                    ))
+            )
+        
+    corpus_membership = {
+        corpus.attrs['name'] : {feature_name for feature_name in corpus.features.data_vars.keys()}
+        for corpus in corpuses
+    }
+    shared_features = set.intersection(*corpus_membership.values())
+
+    for corpus_name, features in corpus_membership.items():
+        extra_features = features.difference(shared_features)
+        if len(extra_features) > 0:
+            logger.warning(
+                f'The corpus {corpus_name} has extra features: {", ".join(extra_features)}.\n'
+                'Extra features will be ignored during training.'
+            )
+        
+
+def check_dim_consistency(*corpuses):
+    req_dims = tuple(corpuses[0].X.sizes)
+    for corpus in corpuses:
+        if not req_dims == tuple(corpus.X.sizes):
+            raise ValueError(
+                f'The corpuses have different dimensions: {str_wrapped_list(map(str, map(set, map(dict.keys, map(lambda x : x.X.sizes, corpuses)))))}'
+            )
 
 
 def dims_except_for(dims, *keepdims):
     return tuple({*dims}.difference({*keepdims}))
 
 
-def match_dims(y, X):
-    data_dims = y.sizes
+def match_dims(X,**dim_sizes):
     return X.expand_dims({
-        d : data_dims[d]
-        for d in dims_except_for(data_dims.keys(), *X.dims)
+        d : dim_sizes[d]
+        for d in dims_except_for(dim_sizes.keys(), *X.dims)
     })
 
 
@@ -298,9 +371,12 @@ class LazySampleSlicer(CorpusInterface):
         return self.corpus.attrs
     
     def fetch_sample(self, sample_name):
-        return self.X\
-                    .sel(sample=sample_name)\
-                    .isel(**self._apply_slices)
+        if not sample_name is None:
+            return self.X\
+                        .sel(sample=sample_name)\
+                        .isel(**self._apply_slices)
+        else:
+            return self.X.isel(**self._apply_slices)
 
 
 def borrow_kwargs(*borrow_sigs):

@@ -57,18 +57,21 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
     def _get_log_context_effect(
         self,
         corpus,
+        *,
+        locus,
         **idx_dict,
     ):
         
-        idx_arrs = [
-            idx_dict[dim]
-            for dim in corpus.regions.context_frequencies.dims
-        ]
+        freqs = corpus.regions.context_frequencies\
+                    .transpose(...,'locus')
+        
+        idx_arrs = [idx_dict[dim] for dim in freqs.dims[:-1]]
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             
-            return np.log(corpus.regions.context_frequencies.data[*idx_arrs])
+            return np.log(freqs.data[*idx_arrs, locus]) \
+                + np.log(corpus.regions.exposures.data[locus])
 
 
     def _conditional_observation_likelihood(
@@ -88,7 +91,7 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
         ##
         logp_normalizer = CS.fetch_normalizers(corpus)[:,None]
 
-        context_freq = self._get_log_context_effect(
+        offset = self._get_log_context_effect(
             corpus,
             locus=locus,
             **idx_dict
@@ -103,9 +106,8 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
                     model.predict_sparse(corpus, locus=locus, **idx_dict)
                     for model in model_state.nonlocals.values()
                 ),
-                np.log(corpus.regions.exposures.data[locus]) \
-                + logp_normalizer \
-                + context_freq
+                logp_normalizer \
+                    + offset
             )
 
         if logsafe:
@@ -302,9 +304,9 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
         y_sum = np.sum(weights)
         d_sat = weights @ np.log(weights) - y_sum * np.log(y_sum)
         # model
-        d_fit = weights @ np.log(conditional_likelihood.T.dot(contributions))
+        d_fit = weights @ ( np.log(conditional_likelihood.T.dot(contributions)) - log_context_effect )
         # null
-        d_null = weights @ log_context_effect - y_sum * np.log(context_sum)
+        d_null = -y_sum * np.log(context_sum)
 
         return (
             d_sat - d_fit,

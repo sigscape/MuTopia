@@ -1,5 +1,6 @@
 import xarray as xr
 from abc import ABC, abstractmethod
+from sparse import SparseArray
 
 class ModeConfig(ABC):
 
@@ -66,6 +67,9 @@ class ModeConfig(ABC):
                 f"Expected signature to have at most {len(required_dims) + 1} dimensions "
                 f"({', '.join(required_dims)}, +1 other), but got {', '.join(signature.dims)}"
             )
+        
+        if isinstance(signature.data, SparseArray):
+            signature.data = signature.data.todense()
 
 
     @classmethod

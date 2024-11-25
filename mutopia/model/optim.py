@@ -203,6 +203,8 @@ def fit_model(
     for corpus in train_corpuses + test_corpuses:
         check_dims(corpus, model_state)
         check_corpus(corpus)
+    check_feature_consistency(*train_corpuses, *test_corpuses)
+    check_dim_consistency(*train_corpuses, *test_corpuses)
 
     logger.info('Preprocessing training corpuses...')
     for corpus in train_corpuses:   
@@ -279,8 +281,10 @@ def fit_model(
 
                 train_score, test_score = step_fn(
                     parallel_context=par,
-                    update_prior = epoch >= begin_prior_updates \
-                        and empirical_bayes,
+                    update_prior = \
+                        epoch >= begin_prior_updates \
+                        and empirical_bayes \
+                        and not any(CS.is_marginal_corpus(corpus) for corpus in train_corpuses),
                     learning_rate = lr_schedule(epoch),
                     test_score_fn=test_score_fn if evaluate_test else dummy_score_fn,
                 )
@@ -290,10 +294,10 @@ def fit_model(
                         'The model has diverged - some parameter is NaN. '
                         'This usually means that the model is under-regularized.\n'
                         'Try increasing one of the regularization parameters:\n'
+                        '  - conditioning_alpha\n'
                         '  - mutation_reg\n'
                         '  - context_reg\n'
                         '  - l2_regularization\n'
-                        '  - conditioning_alpha\n'
                     )
 
                 for test_corpus in test_corpuses:
@@ -327,9 +331,10 @@ def fit_model(
         finally:
             progress_bar.close()
 
-    logger.info('Finalizing models ...')
-    for model in model_state.nonlocals.values():
-        model.post_fit(train_corpuses)
+    if num_epochs > 0:
+        logger.info('Finalizing models ...')
+        for model in model_state.nonlocals.values():
+            model.post_fit(train_corpuses)
 
     return (
         model_state,

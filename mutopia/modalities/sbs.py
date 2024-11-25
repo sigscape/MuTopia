@@ -44,7 +44,7 @@ class SBSMode(ModeConfig):
     @property
     def coords(self):
         return {
-            #'clustered' : ['no','yes'],
+            'clustered' : ['no','yes'],
             'configuration' : CONFIGURATIONS,
             'context' : CONTEXTS,
             'mutation' : MUTATIONS,
@@ -87,8 +87,11 @@ class SBSMode(ModeConfig):
     @classmethod
     def plot(cls,
         signature,
-        palette = MUTATION_PALETTE,
-        select = ['Baseline'],
+        *select,
+        palette = 'tab10',
+        sig_names = None,
+        normalize = False,
+        title=None,
         **kwargs,
     ):
         cls.validate_signatures(
@@ -96,16 +99,38 @@ class SBSMode(ModeConfig):
             required_dims=('context', 'mutation'),
         )
         signature = signature.transpose(...,'context','mutation')
-        lead_dim = signature.dims[0]
-        
-        _plot_linear_signature(
-            COSMIC_SORT_ORDER,
-            palette,
-            *list(map(
+        has_extra_dims = len(signature.dims) > 2
+
+        if len(select) > 0 and not has_extra_dims:
+            raise ValueError('`select` is only valid if the signature has one extra dimension to choose from.')
+
+        if len(select) > 0:            
+            lead_dim = signature.dims[0]
+
+            if sig_names and not len(select) == len(sig_names):
+                raise ValueError('If both `sig_names` and `select` are specified, they must have the same length.')
+            
+            pl_signatures = list(map(
                 lambda s : s.ravel()[MUTOPIA_TO_COSMIC_IDX],
                 signature.loc[{lead_dim : list(select)}].data
-            )),
-            sig_names=select,
+            ))
+
+            sig_names = sig_names or select
+
+        elif not has_extra_dims:
+            pl_signatures = [signature.data.ravel()[MUTOPIA_TO_COSMIC_IDX]]
+            select = ['']
+        else:
+            raise ValueError('If the signature has extra dimensions, `select` must be specified.')
+        
+        if normalize:
+            pl_signatures = [s/s.sum() for s in pl_signatures]
+            
+        _plot_linear_signature(
+            COSMIC_SORT_ORDER,
+            'tab10' if len(pl_signatures) > 1 else MUTATION_PALETTE,
+            *pl_signatures,
+            sig_names=sig_names,
             **kwargs
         )
     
@@ -209,6 +234,12 @@ class SBSMode(ModeConfig):
         )
 
 
+def _make_feature_name(subsequence_code):
+    default = {0 : 'N', 1 : 'N', 2 : 'N'}
+    default.update(subsequence_code)
+    return ''.join([default[i] for i in range(3)])
+
+
 def SBSModel(
     train_corpuses,
     test_corpuses,
@@ -267,9 +298,15 @@ def SBSModel(
         max_iter=max_iter,
     )
 
+    kmer_encoder = KmerEncoder(
+        ['ACTG','CT','ACTG'],
+        kmer_extractor=tuple,
+        feature_name_fn=_make_feature_name,
+    )
+
     context_model = StrandedContextModel(
         train_corpuses,
-        DiagonalEncoder(),
+        kmer_encoder,
         n_components=num_components,
         random_state=random_state,
         tol=5e-4,

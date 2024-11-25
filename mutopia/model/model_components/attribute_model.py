@@ -1,5 +1,5 @@
 from .base import get_reg_params, _svi_update_fn, RateModel, SparseDataBase
-from ._strand_transformer import NormalizedMesoscaleEncoder
+from ._strand_transformer import MesoscaleEncoder
 from ._glm_compiled import make_optimizer, setup_mixed_solver, \
     get_lsqr_solver, interative_partial_ls_solver
 from ._fast_eln import get_eln_solver

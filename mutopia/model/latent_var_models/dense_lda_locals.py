@@ -1,8 +1,10 @@
 from xarray import DataArray
 import numpy as np
-from functools import partial, reduce
+from functools import partial
+import warnings
 from ..model_components.base import _svi_update_fn, PrimitiveModel
 from ..corpus_state import CorpusState as CS
+from ...utils import match_dims
 from ._dirichlet_update import update_alpha
 from .base import *
 
@@ -30,9 +32,8 @@ class LDAUpdateDense(PrimitiveModel, LocalUpdate):
             for corpus in corpuses
         }
     
-    @staticmethod
-    def _convert_sample(sample):
-        return np.ascontiguousarray(sample.data)
+    def _convert_sample(self, sample):
+        return np.ascontiguousarray(sample.data, dtype=self.dtype)
 
 
     @staticmethod
@@ -85,6 +86,7 @@ class LDAUpdateDense(PrimitiveModel, LocalUpdate):
 
     def _get_update_fn(
         self,
+        gamma,
         learning_rate=1.,
         subsample_rate=1.,
         *,
@@ -127,6 +129,7 @@ class LDAUpdateDense(PrimitiveModel, LocalUpdate):
 
         svi_update = partial(
             self._apply_update,
+            np.ascontiguousarray(gamma),
             update_fn=map_update,
             learning_rate=learning_rate,
             suffstat_fn=suffstat_fn
@@ -151,17 +154,20 @@ class LDAUpdateDense(PrimitiveModel, LocalUpdate):
             for sample_name in CS.list_samples(corpus)
         ]
 
-        sample_dims = (*corpuses[0].modality().dims, 'locus')
+        obs_dims = CS.observation_dims(corpuses[0])
+        sample_dims = (*obs_dims, 'locus')
 
-        transform = lambda x : np.ascontiguousarray(np.nan_to_num(np.exp(x - x.max()), nan=0.))
+        logsafe_transform = lambda x : np.ascontiguousarray(
+            np.nan_to_num(np.exp(x - np.nanmax(x)), nan=0., neginf=0.)
+        )
         
         likelihood_tensors = {
-            CS.get_name(corpus) : transform(
+            CS.get_name(corpus) : logsafe_transform(
                 model_state\
                 ._get_log_mutation_rate_tensor(
                     corpus, 
                     parallel_context=parallel_context,
-                    with_context=False
+                    with_context=False,
                 )\
                 .transpose('component', *sample_dims)\
                 .data
@@ -170,18 +176,14 @@ class LDAUpdateDense(PrimitiveModel, LocalUpdate):
         }
 
         updates = (
-            partial(
-                self._get_update_fn(
-                    sample=CS.fetch_sample(corpus, sample_name),
-                    corpus=corpus,
-                    learning_rate=learning_rate,
-                    subsample_rate=subsample_rate,
-                    conditional_likelihood=likelihood_tensors[CS.get_name(corpus)],
-                    dims=sample_dims,
-                ),
-                np.ascontiguousarray(
-                    CS.fetch_topic_compositions(corpus, sample_name)
-                ),
+            self._get_update_fn(
+                CS.fetch_topic_compositions(corpus, sample_name),
+                sample=CS.fetch_sample(corpus, sample_name),
+                corpus=corpus,
+                learning_rate=learning_rate,
+                subsample_rate=subsample_rate,
+                conditional_likelihood=likelihood_tensors[CS.get_name(corpus)],
+                dims=sample_dims,
             )
             for (corpus, sample_name) in samples
         )
@@ -190,6 +192,112 @@ class LDAUpdateDense(PrimitiveModel, LocalUpdate):
             samples,
             updates
         )
+    
+    
+    def _sample_deviance(
+        self,
+        corpus,
+        sample,
+        model_state,
+        *,
+        gamma,
+        log_mutrate_tensor,
+        context_sum,
+        context_effects,
+    ):
+        
+        weights = self._convert_sample(sample)
+        gamma = np.ascontiguousarray(gamma)
+
+        log_marginal_mutrate = model_state\
+            ._log_marginalize_mutrate(
+                log_mutrate_tensor,
+                gamma
+            )
+        
+        # saturated
+        y_sum = np.sum(weights)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+
+            d_sat = np.nansum(weights * np.log(weights)) - y_sum * np.log(y_sum)
+            # model
+            d_fit = np.nansum(weights * log_marginal_mutrate.data)
+            # null
+            d_null = np.nansum(weights * context_effects) - y_sum * np.log(context_sum)
+
+        return (
+            d_sat - d_fit,
+            d_sat - d_null,
+        )
+    
+
+    def get_deviance_fns(
+        self,
+        corpuses,
+        model_state,
+        exposures_fn=CS.fetch_topic_compositions,
+        *,
+        parallel_context,
+    ):
+        '''
+        -> List[F() -> Tuple[float, float]]
+        '''
+        samples = [
+            (corpus, sample_name)
+            for corpus in corpuses
+            for sample_name in CS.list_samples(corpus)
+        ]
+
+        obs_dims = CS.observation_dims(corpuses[0])
+        sample_dims = (*obs_dims, 'locus')
+        
+        log_mutrate_tensors = {
+            CS.get_name(corpus) : model_state\
+                ._get_log_mutation_rate_tensor(
+                    corpus, 
+                    parallel_context=parallel_context,
+                    with_context=True
+                )\
+                .transpose('component', *sample_dims)
+            for corpus in corpuses
+        }      
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            
+            context_effects = {
+                CS.get_name(corpus) : match_dims(
+                    np.log(corpus.regions.context_frequencies) + np.log(corpus.regions.exposures),
+                    **{d : corpus.sizes[d] for d in sample_dims}
+                )\
+                .transpose(*sample_dims)\
+                .data
+                for corpus in corpuses
+            }
+
+            context_sums = {
+                CS.get_name(corpus) : np.nansum(np.exp(context_effects[CS.get_name(corpus)].data))
+                for corpus in corpuses
+            }
+
+        deviance_fns = (
+            partial(
+                self._sample_deviance,
+                sample=CS.fetch_sample(corpus, sample_name),
+                corpus=corpus,
+                model_state=model_state,
+                gamma=exposures_fn(corpus, sample_name),
+                context_sum=context_sums[CS.get_name(corpus)],
+                log_mutrate_tensor=log_mutrate_tensors[CS.get_name(corpus)],
+                context_effects=context_effects[CS.get_name(corpus)],
+            )
+            for (corpus, sample_name) in samples
+        )
+
+        return deviance_fns
+
 
 
     ## 
@@ -235,10 +343,10 @@ class LDAUpdateDense(PrimitiveModel, LocalUpdate):
         **sample_sstats
     ):
         return model.reduce_dense_sstats(
-                carry, 
-                corpus,
-                **sample_sstats
-            )
+            carry, 
+            corpus,
+            **sample_sstats
+        )
 
 
     def partial_fit(

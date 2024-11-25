@@ -68,9 +68,17 @@ class Model:
         dump(self, path)
     
     
-    def plot_signature(self, component, **kwargs):
+    def plot_signature(self, 
+        component, 
+        *select, 
+        **kwargs
+    ):
+        if len(select) == 0:
+            select = ['Baseline']
+
         self.modality_.plot(
             self.model_state_.format_signature(component), 
+            *select,
             **kwargs
         )
 

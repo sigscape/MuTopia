@@ -60,6 +60,10 @@ class CorpusState:
     @classmethod
     def sample_dims(cls, corpus):
         return corpus.X.dims
+    
+    @classmethod
+    def observation_dims(cls, corpus):
+        return [d for d in cls.sample_dims(corpus) if not d in ('locus', 'sample')]
 
     @classmethod
     def update_normalizers(cls, corpus, normalizers):
