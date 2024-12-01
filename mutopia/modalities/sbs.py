@@ -224,14 +224,7 @@ class SBSMode(ModeConfig):
             pass_only=pass_only,
         )
         
-        return xr.DataArray(
-            COO(
-                coords,
-                data,
-                shape = tuple(dim_sizes.values()),
-            ),
-            dims = tuple(dim_sizes.keys())
-        )
+        return self._arr_to_xr(dim_sizes, coords, data)
 
 
 def _make_feature_name(subsequence_code):
@@ -264,7 +257,8 @@ def SBSModel(
     n_iter_no_change=1,
     use_groups=True,
     smoothing_size=1000,
-    add_corpus_intercepts=True,
+    add_corpus_intercepts=False,
+    convolution_width=1,
     l2_regularization=1,
     # optimization settings
     empirical_bayes = True,
@@ -332,7 +326,8 @@ def SBSModel(
             use_groups=use_groups,
             random_state=random_state,
             smoothing_size=smoothing_size,
-            #add_corpus_intercepts=add_corpus_intercepts,
+            add_corpus_intercepts=add_corpus_intercepts,
+            convolution_width=convolution_width,
             l2_regularization=l2_regularization,
         )
 

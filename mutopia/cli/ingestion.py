@@ -1,6 +1,7 @@
 import click
 from typing import *
 from functools import partial
+import numpy as np
 import mutopia.ingestion as ingest
 from mutopia.corpus import GTensor, write_dataset
 import mutopia.corpus.disk_interface as disk
@@ -18,6 +19,16 @@ from ..utils import FeatureType, logger
 @click.group("G-tensor commands")
 def ingestion():
     pass
+
+@ingestion.command("linearize-beds")
+@click.argument(
+    'bed_files',
+    type=click.Path(exists=True),
+    nargs=-1,
+)
+def linearize_beds(bed_files : List[str]):
+    ingest.linearize_beds(*bed_files)
+
 
 @ingestion.command("create")
 @click.argument(
@@ -80,6 +91,13 @@ def ingestion():
     default=25,
     help='Minimum size of the regions to create',
 )
+@click.option(
+    '-b',
+    '--base-regions',
+    type=click.Path(exists=True),
+    default=None,
+    help='File containing regions to use as a base for the G-Tensor.\nIf none provided, uniform regions of size `region-size` will be created.',
+)
 def create(
     *,
     name : str,
@@ -91,6 +109,7 @@ def create(
     cutout_regions : List[str]=[],
     min_region_size=25,
     region_size : int = 10000,
+    base_regions : Union[None, str] = None,
 ):
     logger.info('Creating genomic regions ...')
     regions_file = output + '.regions.bed'
@@ -102,6 +121,7 @@ def create(
             blacklist_file=blacklist_file,
             min_windowsize=min_region_size,
             output=r,
+            base_regions=base_regions,
         )
 
     logger.info('Calculating context frequencies ...')
@@ -142,6 +162,13 @@ def create(
     
     write_dataset(gtensor, output)
 
+@ingestion.command("convert")
+def convert():
+    pass
+
+@ingestion.command("set-attr")
+def set_attrs():
+    pass
 
 @ingestion.group("feature")
 def featurecmds():
@@ -159,6 +186,7 @@ def add_feature():
 @click.argument(
     'ingest_file',
     type=click.Path(exists=True),
+    nargs=-1,
 )
 @click.option(
     '-name',
@@ -181,35 +209,61 @@ def add_feature():
     type=str,
     help='Group to assign the feature to',
 )
-def ingest_continuous_feature(
+@click.option(
+    '-col',
+    '--column',
+    type=click.IntRange(4,1000),
+    default=4,
+    help='Column in the bedfile to use for the class',
+)
+def continuous_feature(
     dataset : str,
-    ingest_file : str,
+    ingest_file : List[str],
     normalization : str ='power',
     group='all',
+    column : int = 4,
     *,
     feature_name : str,
 ):
     
-    file_type = ingest.FileType.from_extension(ingest_file)
-    
-    if not file_type in (ingest.FileType.BEDGRAPH, ingest.FileType.BIGWIG):
-        raise ValueError(f'File type {file_type} not supported for continuous feature ingestion.')
-    
-    if not FeatureType(normalization) in file_type.allowed_normalizations:
-        raise ValueError(f'Normalization {normalization} not supported for file type {file_type}')
+    def read_file(ingest_file):
 
-    corpus_attrs = disk.read_attrs(dataset)
+        file_type = ingest.FileType.from_extension(ingest_file)
+        
+        if not file_type in (ingest.FileType.BEDGRAPH, ingest.FileType.BIGWIG, ingest.FileType.BED):
+            raise ValueError(f'File type {file_type} not supported for continuous feature ingestion.')
+        
+        if not FeatureType(normalization) in file_type.allowed_normalizations:
+            raise ValueError(f'Normalization {normalization} not supported for file type {file_type}')
 
-    feature_vals = file_type.get_ingestion_fn()(
-        ingest_file,
-        corpus_attrs['regions_file'],
-        genome_file=corpus_attrs['genome_file'],
-        extend=corpus_attrs['region_size'],
+        corpus_attrs = disk.read_attrs(dataset)
+
+        feature_vals = file_type.get_ingestion_fn(
+            is_distance_feature=False,
+            is_discrete_feature=False,
+        )(
+            ingest_file,
+            disk.read_regions_file(dataset),
+            genome_file=corpus_attrs['genome_file'],
+            column=column,
+            #extend=corpus_attrs['region_size'],
+        )
+
+        return feature_vals
+    
+    vals = np.mean([read_file(f) for f in ingest_file], axis=0)
+
+    def arr_render(arr):
+        return ", ".join("{:.2f}".format(x) for x in arr)
+    
+    logger.info(
+        f'First values of feature {feature_name}: {arr_render(vals[:5])}\n'
+        f'First non-null values: {arr_render(vals[~np.isnan(vals)][:5])}'
     )
 
     disk.write_feature(
         dataset,
-        feature_vals,
+        vals,
         group=group,
         name=feature_name,
         normalization=FeatureType(normalization),   
@@ -224,6 +278,11 @@ def ingest_continuous_feature(
 @click.argument(
     'ingest_file',
     type=click.Path(exists=True),
+)
+@click.argument(
+    'classes',
+    type=str,
+    nargs=-1,
 )
 @click.option(
     '-name',
@@ -254,26 +313,19 @@ def ingest_continuous_feature(
     help='Column in the bedfile to use for the class',
 )
 @click.option(
-    '-p',
-    '--class-priority',
-    type=str,
-    multiple=True,
-    help='Priority of classes in the bedfile',
-)
-@click.option(
     '-g',
     '--group',
     default='all',
     type=str,
     help='Group to assign the feature to',
 )
-def ingest_discrete(
+def add_discrete_feature(
     ingest_file : str,
     group : str = 'all',
     mesoscale : bool = True,
-    null : str = 'none',
+    null : str = 'None',
     column : int = 4,
-    class_priority : List[str] = [],
+    classes : List[str] = [],
     *,
     dataset : str,
     feature_name : str,
@@ -286,10 +338,10 @@ def ingest_discrete(
 
     feature_vals, classes = ingest.make_discrete_features(
         ingest_file,
-        corpus_attrs['regions_file'],
+        disk.read_regions_file(dataset),
         column=column,
         null=null,
-        class_priority=class_priority if len(class_priority) > 0 else None,
+        class_priority=classes if len(classes) > 0 else None,
     )
 
     disk.write_feature(
@@ -325,7 +377,7 @@ def ingest_discrete(
     type=str,
     help='Group to assign the feature to',
 )
-def ingest_distance(
+def add_distance_feature(
     ingest_file : str,
     group : str = 'all',
     *,
@@ -335,12 +387,10 @@ def ingest_distance(
     if not ingest.FileType.from_extension(ingest_file) == ingest.FileType.BED:
         raise ValueError('Discrete features must be ingested from Bed files.')
 
-    corpus_attrs = disk.read_attrs(dataset)
-
     (progress_between, distance_between) = \
         ingest.make_distance_features(
             ingest_file,
-            corpus_attrs['regions_file'],
+            disk.read_regions_file(dataset),
         )
     
     write_fn = partial(
@@ -402,11 +452,9 @@ def add_strand_feature(
     if not ingest.FileType.from_extension(ingest_file) == ingest.FileType.BED:
         raise ValueError('Discrete features must be ingested from Bed files.')
     
-    corpus_attrs = disk.read_attrs(dataset)
-
     feature_vals = ingest.make_strand_features(
         ingest_file,
-        corpus_attrs['regions_file'],
+        disk.read_regions_file(dataset),
         column=column,
     )
 
@@ -548,13 +596,11 @@ def ingest_sample(
 ):
     
     attrs = disk.read_attrs(dataset)
-    dims = disk.read_dims(dataset)
-
     modality = Modality(attrs['dtype'].upper()).get_config()
 
     sample_arr = modality.ingest_observations(
         sample_file,
-        regions_file=attrs['regions_file'],
+        regions_file=disk.read_regions_file(dataset),
         fasta_file=attrs['fasta_file'],
         chr_prefix=chr_prefix,
         pass_only=pass_only,
@@ -562,7 +608,7 @@ def ingest_sample(
         mutation_rate_file=mutation_rate_file,
         sample_weight=sample_weight,
         sample_name=sample_name,
-        dim_sizes=dims,
+        dim_sizes=disk.read_dims(dataset),
     )
 
     disk.write_sample(

@@ -5,9 +5,9 @@ import tempfile
 from numpy import array
 import numpy as np
 from ..genome_utils.bed12_utils import check_regions_file
+from ..utils import safe_read
 
-
-def make_continous_features(
+def make_continous_features_bigwig(
     bigwig_file,
     regions_file,
     *, 
@@ -16,20 +16,25 @@ def make_continous_features(
 ):
     check_regions_file(regions_file)
 
-    with tempfile.NamedTemporaryFile() as bed:
+    with tempfile.NamedTemporaryFile() as bed, \
+         tempfile.NamedTemporaryFile() as regions:
+        
+        with open(regions.name, 'w') as r:
+            subprocess.check_call(
+                ['cut', '-f', '1-4', regions_file], 
+                stdout=r
+            )
 
         subprocess.check_output([
             'bigWigAverageOverBed',
-            f'-sampleAroundCenter={extend}' if extend is not None else '',
             bigwig_file, 
-            regions_file, 
+            regions.name, 
             bed.name
         ])
 
         with open(bed.name, 'r') as bed:
-            data = bed.readlines()
-            data = map(lambda s : s.strip().split('\t'), data)
-            data = map(lambda s : (s[0], float(s[4])), data)
+            data = map(lambda s : s.strip().split('\t'), bed)
+            data = map(lambda s : (int(s[0]), float(s[5])), data)
             data = sorted(data, key=lambda x : x[0])
             
             vals = array(list(map(lambda x : x[1], data)))
@@ -38,54 +43,58 @@ def make_continous_features(
         raise RuntimeError(f'No values found in {bigwig_file} for {regions_file}')
     
     return vals
+
+
+def make_continuous_features_bed(
+    bed_file,
+    regions_file,
+    *,
+    null = 'nan',
+    column : int = 4,
+    **kw,
+):
+    check_regions_file(regions_file)
+
+    map_out = subprocess.check_output(
+        [
+            'bedtools',
+            'map',
+            '-a', regions_file,
+            '-b', bed_file,
+            '-c', str(column),
+            '-o', 'mean',
+            '-null', null
+        ]
+    )
+
+    vals = []
+    for line in map_out.decode().strip().split('\n'):
+        vals.append(float(line.strip().split('\t')[-1]))
+    vals = array(vals)
+
+    if not len(vals) > 1:
+        raise RuntimeError(f'No values found in {bed_file} for {regions_file}')
     
+    return vals
+
 
 def make_continous_features_bedgraph(
     bedgraph_file,
     regions_file,
     *,
-    genome_file,
-    extend=None,
     null = 'nan',
+    **kw,
 ):
-    
     check_regions_file(regions_file)
-
-    if extend is not None:
-
-        center_process = subprocess.Popen(
-            ['awk','-v','OFS=\t',
-            '{ center=int($2+($3-$2)/2); print $1,center,center+1,$4 }', 
-            regions_file],
-            stdout = subprocess.PIPE,
-        )
-
-        slop_process = subprocess.Popen(
-            ['bedtools','slop','-i','-','-g',genome_file,'-b', str(extend)],
-            stdin=center_process.stdout,
-            stdout=subprocess.PIPE,
-        )
-
-        input_process = subprocess.Popen(
-            ['sort', '-k1,1', '-k2,2n'],
-            stdin = slop_process.stdout,
-            stdout = subprocess.PIPE,
-        )
-    else:
-        input_process = subprocess.Popen(
-            ['sort', '-k1,1', '-k2,2n', regions_file],
-            stdout = subprocess.PIPE,
-        )
 
     map_process = subprocess.Popen(
         ['bedtools','map',
-            '-a', '-',
+            '-a', regions_file,
             '-b', bedgraph_file,
             '-c', '4',
             '-o', 'mean',
             '-null', null,
         ],
-        stdin=input_process.stdout,
         stdout=subprocess.PIPE,
     )
 
@@ -116,7 +125,9 @@ def make_distance_features(
     bedfile,
     regions_file,
 ):
-    
+    ##
+    # TODO: Handle gzipped files!
+    ##
     check_regions_file(regions_file)
 
     def _find_stranded_closest_feature(strand):
@@ -170,14 +181,12 @@ def make_discrete_features(
     regions_file, 
     *,
     column=4,
-    null='none',
+    null='None',
     class_priority = None,    
 ):
-
     check_regions_file(regions_file)
     
     def _resolve_class_priority(vals, _class_priority):
-
         vals = set(vals).difference({null})
 
         if len(vals) == 0:
@@ -192,7 +201,7 @@ def make_discrete_features(
                 raise RuntimeError(f'Could not resolve class priority for {vals} using {class_priority}')
     
     # check that the bedfile has 4 columns
-    with open(bed_file, 'r') as f:
+    with safe_read(bed_file) as f:
         for line in f:
             if line.startswith('#'):
                 continue
@@ -215,7 +224,7 @@ def make_discrete_features(
         '-delim','|',
         '-sorted',
         '-split',
-        ]
+    ]
 
     map_out = subprocess.Popen(
         cmd,
@@ -239,7 +248,7 @@ def make_discrete_features(
         
     vals = array([_resolve_class_priority(v, class_priority) for v in vals])
 
-    return (vals, list(reversed(class_priority + [null])))
+    return (vals, list(reversed(list(class_priority) + [null])))
 
 
 

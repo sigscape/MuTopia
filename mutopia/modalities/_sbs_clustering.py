@@ -43,7 +43,7 @@ def get_passed_SNVs(
                 bufsize=10000,
                 stderr = sys.stderr,
             )
-        
+
     query_process = subprocess.Popen(
         ['bcftools','query','-f', chr_prefix + query_string],
         stdin = filter_process.stdout,

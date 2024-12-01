@@ -28,6 +28,7 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
     def __init__(self,
         corpuses,
         add_corpus_intercepts=False,
+        convolution_width=1,
         model_kw={},
         dtype = float,
         smoothing_size=1000,
@@ -48,10 +49,10 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         (self.base_transformer_, feature_names_in) = \
             get_feature_transformer(
                 *corpuses,
-                smoothing_size=smoothing_size,
                 additional_transformers=transformers,
                 categorical_encoder=self.categorical_encoder,
                 add_corpus_intercepts=add_corpus_intercepts,
+                convolution_width=convolution_width
             )
 
         # Fit the transformer to get an example 

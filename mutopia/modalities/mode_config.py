@@ -1,6 +1,6 @@
 import xarray as xr
 from abc import ABC, abstractmethod
-from sparse import SparseArray
+from sparse import SparseArray, COO
 
 class ModeConfig(ABC):
 
@@ -16,6 +16,16 @@ class ModeConfig(ABC):
     @property
     def dims(self):
         return tuple(self.coords.keys())
+    
+    def _arr_to_xr(self,dim_sizes, coords, data):
+        return xr.DataArray(
+            COO(
+                coords,
+                data,
+                shape = (*self.sizes.values(), dim_sizes['locus']),
+            ),
+            dims = (*self.sizes.keys(), 'locus'),
+        )
     
     @property
     @abstractmethod

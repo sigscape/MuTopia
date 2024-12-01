@@ -156,16 +156,17 @@ def locus_slice_generator(
         subsample_rate=0.25,
     ):
 
-    n_loci = corpuses[0].dims['locus']
+    def get_random_loci(corpus):
+        n_loci = corpus.dims['locus']
+        sel_loci = random_state.choice(
+            n_loci,
+            int(subsample_rate*n_loci),
+            replace=False
+        )
+        return sel_loci
     
-    sel_loci = random_state.choice(
-        n_loci,
-        int(subsample_rate*n_loci),
-        replace=False
-    )
-
     return tuple(
-        LazySampleSlicer(corpus, locus=sel_loci)
+        LazySampleSlicer(corpus, locus=get_random_loci(corpus))
         for corpus in corpuses
     )
 

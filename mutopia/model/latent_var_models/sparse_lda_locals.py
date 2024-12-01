@@ -81,7 +81,6 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
         logsafe=True,
         *,
         weights,
-        locus,
         **idx_dict,
     ):
 
@@ -93,7 +92,6 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
 
         offset = self._get_log_context_effect(
             corpus,
-            locus=locus,
             **idx_dict
         )
 
@@ -103,7 +101,7 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
             logp_X = reduce(
                 lambda x,y: x+y,
                 (
-                    model.predict_sparse(corpus, locus=locus, **idx_dict)
+                    model.predict_sparse(corpus, **idx_dict)
                     for model in model_state.nonlocals.values()
                 ),
                 logp_normalizer \

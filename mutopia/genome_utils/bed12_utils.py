@@ -1,7 +1,7 @@
 from collections import defaultdict
 import subprocess
-import numpy as np
 from dataclasses import dataclass, field
+from ..utils import safe_read
 
 @dataclass
 class BED12Record:
@@ -61,7 +61,7 @@ def parse_bed12_line(line):
 
 def stream_bed12(bed12_file, sep = '\t'):
     
-    with open(bed12_file, 'r') as f:
+    with safe_read(bed12_file) as f:
         
         for lineno, txt in enumerate(f):
             if not txt[0] == '#':
@@ -77,7 +77,7 @@ def check_regions_file(regions_file):
 
     encountered_idx = defaultdict(lambda : False)
 
-    with open(regions_file, 'r') as f:
+    with safe_read(regions_file) as f:
 
         for i, line in enumerate(f):
             
@@ -106,13 +106,13 @@ def check_regions_file(regions_file):
     assert all([encountered_idx[i] for i in range(largest_bin + 1)]), \
         f'Expected regions file to have a contiguous set of indices from 0 to {largest_bin}.\n'
     
-    try:
-        subprocess.check_output(['sort', '-k','1,1', '-k','2,2n', '-c', regions_file])
-    except subprocess.CalledProcessError:
-        raise ValueError(
-            f'Expected regions file to be sorted by chromosome and start position.\n'
-            f'Use \'sort -k1,1 -k2,2n -o <filename> <filename>\' to sort the file.\n'
-        )
+    #try:
+    #    subprocess.check_output(['sort', '-k','1,1', '-k','2,2n', '-c', regions_file])
+    #except subprocess.CalledProcessError:
+    #    raise ValueError(
+    #        f'Expected regions file to be sorted by chromosome and start position.\n'
+    #        f'Use \'sort -k1,1 -k2,2n -o <filename> <filename>\' to sort the file.\n'
+    #    )
 
 
 '''def read_exposure_file(exposure_file, windows):

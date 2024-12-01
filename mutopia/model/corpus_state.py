@@ -44,10 +44,6 @@ class CorpusState:
 
     @classmethod
     def fetch_sample(cls, corpus, sample_name):
-        ##
-        # TODO:
-        # add support for marginal samples in the CorpusInterface
-        ##
         if issubclass(type(corpus), CorpusInterface):
             return corpus.fetch_sample(sample_name)
         

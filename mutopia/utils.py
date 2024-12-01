@@ -8,6 +8,12 @@ import inspect
 from functools import wraps
 from collections import defaultdict
 import logging
+from gzip import open as gzopen
+
+@contextmanager
+def safe_read(filename):
+    yield gzopen(filename, 'rt') if filename.endswith('.gz') \
+        else open(filename, 'r')
 
 logger = logging.getLogger(' Mutopia')
 logger.setLevel(logging.INFO)

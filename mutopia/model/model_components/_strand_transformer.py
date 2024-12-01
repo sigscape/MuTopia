@@ -30,7 +30,7 @@ class DesignMatrixHelper:
     def onehot_encoder(cls, categories):
         def get_null(c):
             try:
-                return set(c).intersection({'.','None', 0}).pop()
+                return set(c).intersection({'.','None',0,'none'}).pop()
             except KeyError:
                 return None
             

@@ -198,6 +198,22 @@ def streaming_local_sort(
     for val in buffer:
         yield val
 
+def repeat_last(iter, n):
+    iter = PeekIterator(iter)
+    last = None
+    while iter.has_next():
+        last = next(iter)
+        yield last
+    for _ in range(n):
+        yield last
+
+def repeat_first(iter, n):
+    iter = PeekIterator(iter)
+    first = next(iter)
+    for _ in range(n+1):
+        yield first
+    while iter.has_next():
+        yield next(iter)
 
 def streaming_groupby(
     iterator,

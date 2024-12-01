@@ -6,8 +6,9 @@ import sys
 from numpy import quantile
 from collections import Counter
 import typing
-from functools import partial
+from functools import partial, wraps
 from dataclasses import dataclass
+from gzip import open as gzopen
 from ..genome_utils.fancy_iterators import *
 from ..utils import logger, str_wrapped_list
 
@@ -58,7 +59,8 @@ def _make_fixed_size_windows(
 
 
 def stream_bedfile(bedfile):
-    with open(bedfile, 'r') as f:
+
+    with (open if not bedfile.endswith('.gz') else gzopen)(bedfile, 'rt') as f:
         for line in f:
             if line.startswith('#'):
                 continue
@@ -69,6 +71,18 @@ def stream_bedfile(bedfile):
             chrom, start, end = cols[:3]
             start = int(start); end = int(end)
             yield chrom, start, end, feature
+
+@dataclass
+class Region:
+    chrom : str
+    start : int
+    end : int
+
+    def __hash__(self):
+        return hash((self.chrom, self.start, self.end))
+    
+    def __str__(self):
+        return f'{self.chrom}:{self.start}-{self.end}'
 
 
 @dataclass
@@ -86,13 +100,24 @@ class Segment:
     chrom : str
     start : int
     end : int
+    parent_region : Region
     feature_combination : typing.Any
 
     def __len__(self):
         return self.end - self.start
+    
+    def __str__(self):
+        return f'{self.chrom}:{self.start}-{self.end}'
 
 
-def _get_endpoints(*bedfiles):
+def _get_endpoints(base_regions, *bedfiles):
+
+    key=lambda x : (x.chrom, x.start)
+
+    def _iter_base_regions(base_regions):
+        for chrom, start, end, *_ in stream_bedfile(base_regions):
+            yield Endpoint(chrom, start, end, '__base__', Region(chrom,start,end), True)
+            yield Endpoint(chrom, end, end, '__base__', Region(chrom,start,end), False)
 
     def _iter_endpoints_bedfile(bedfile, track_id):
         # okay the problem is that this is not current sorted ...
@@ -101,38 +126,47 @@ def _get_endpoints(*bedfiles):
             yield Endpoint(chrom, end, end, track_id, feature, False)
 
 
-    '''def ordered_endpoints(bedfile, track_id):
-        return map(lambda x : (x[0],x[1],x[3],x[4],x[5]),
-            chain.from_iterable(
-                buffered_aggregator(
-                    _iter_endpoints_bedfile(bedfile, track_id),
-                    has_lapsed = lambda x, y : x[0] != y[0] or ( (x[1] - (y[1] + y[2])) > 0 and x[-1]),
-                    key = lambda x : (x[0], x[1]),
-                    order_key = lambda x : (x[0], x[1]),
-                )
-            )
-        )'''
-    
-    def order_endpoints(bedfile, track_id):
-        return streaming_local_sort(
-            _iter_endpoints_bedfile(bedfile, track_id),
-            has_lapsed = lambda curr, buffval : \
-                curr.chrom != buffval.chrom or \
-                (curr.start - buffval.end) > 0,
-            key = lambda x : (x.chrom, x.start),
+    def order_endpoints(endpoints):
+        return sorted_iterator(
+            streaming_local_sort(
+                endpoints,
+                has_lapsed = lambda curr, buffval : \
+                    curr.chrom != buffval.chrom or \
+                    (curr.start - buffval.end) > 0,
+                key=key,
+            ),
+            key=key
         )
     
-    #for bedfile in bedfiles:
-    #    for a in sorted_iterator( ordered_endpoints(bedfile, 'yeah'), key = lambda x : (x[0],x[1]) ):
-    #        pass
-    #assert False
+    def wrap_error(f, msg):
+        @wraps(f)
+        def _f(*args, **kwargs):
+            try:
+                return f(*args, **kwargs)
+            except Exception as e:
+                raise ValueError(f'{msg}: {str(e)}') from e
+            
+        return _f
 
-    endpoints = [
-        order_endpoints(bedfile, os.path.basename(bedfile)) 
-        for bedfile in bedfiles
-    ]
+    endpoints = \
+        [
+            wrap_error(
+                order_endpoints, 
+                'Error raised when processing base regions'
+            )(_iter_base_regions(base_regions))
+        ] + \
+        [
+            wrap_error(
+                order_endpoints, 
+                f'Error raised when processing {bedfile}'
+            )(_iter_endpoints_bedfile(bedfile, os.path.basename(bedfile)),)
+            for bedfile in bedfiles
+        ]
     
-    return interleave_streams(*endpoints, key = lambda x : (x.chrom, x.start))
+    return interleave_streams( 
+        *endpoints, 
+        key=key,
+    )
 
 
 def _endpoints_to_segments(endpoints): # change default min_windowsize 3 to 4
@@ -160,12 +194,27 @@ def _endpoints_to_segments(endpoints): # change default min_windowsize 3 to 4
             if is_nested_start or is_nested_end:
                 pass
             else:
-                feature_combination = tuple(sorted(active_features.keys()))
+                feature_combination = tuple(sorted(
+                    active_features.keys(),
+                    key=lambda x : (x[0], str(x[1]))
+                ))
 
                 if not feature_combination in feature_combination_ids:
                     feature_combination_ids[feature_combination] = len(feature_combination_ids)
 
-                yield Segment(chrom, prev_pos, pos, feature_combination_ids[feature_combination])
+                base_region = next(
+                    (f for t,f in active_features.keys() if t == '__base__'), 
+                    None
+                )
+
+                if not base_region is None:
+                    yield Segment(
+                        chrom, 
+                        prev_pos, 
+                        pos, 
+                        base_region,
+                        feature_combination_ids[feature_combination]
+                    )
 
         if is_start:
             active_features[(track_id,feature)] += 1
@@ -180,25 +229,26 @@ def _endpoints_to_segments(endpoints): # change default min_windowsize 3 to 4
 
 def format_bed12_record(region_id, segments):
 
-    chrs = list(map(lambda s : s.chrom, segments))
     starts = list(map(lambda s : s.start, segments))
     ends = list(map(lambda s : s.end, segments))
-            
-    region_start=min(starts); region_end=max(ends)
-    region_chr = chrs[0]
+
+    parent = segments[0].parent_region
     num_blocks = len(segments)
+
+    thick_start = min(starts)
+    thick_end = max(ends)
     
     block_sizes = ','.join(map(lambda x : str(x[0] - x[1]), zip(ends, starts)))
-    block_starts = ','.join(map(lambda s : str(s - region_start), starts))
+    block_starts = ','.join(map(lambda s : str(s - parent.start), starts))
 
     return (
-        region_chr,    # chr
-        region_start,  # start
-        region_end,    # end
+        parent.chrom,    # chr
+        parent.start,  # start
+        parent.end,    # end
         region_id,     # name
         '0','+',       # value, strand
-        region_start,  # thickStart
-        region_start,  # thickEnd
+        thick_start,  # thickStart
+        thick_end,  # thickEnd
         '0,0,0',       # itemRgb,
         num_blocks,    # blockCount
         block_sizes,   # blockSizes
@@ -206,10 +256,24 @@ def format_bed12_record(region_id, segments):
     )
 
 
+def linearize_beds(*bedfiles, output=sys.stdout):
+        
+    logger.info(f'Building regions ...')
+    # 1. get the endpoints from the bedfiles
+    data = _get_endpoints(*bedfiles)
+    
+    # 3. convert the endpoints to segments
+    data = _endpoints_to_segments(data)
+
+    for segment in data:
+        print(segment.chrom, segment.start, segment.end, sep='\t', file=output)
+
+
 def make_regions(
     *bedfiles,
     genome_file,  
     blacklist_file, 
+    base_regions=None,
     output=sys.stdout, 
     window_size=10000,
     min_windowsize=25,
@@ -239,17 +303,19 @@ def make_regions(
 
     with tempfile.NamedTemporaryFile('w') as windows_file:
 
-        logger.info(f'Making initial coarse-grained regions ...')
-        _make_fixed_size_windows(
-            genome_file=genome_file,
-            window_size=window_size,
-            output=windows_file,
-        )
-        windows_file.flush()
+        if base_regions is None:
+            logger.info(f'Making initial coarse-grained regions ...')
+            _make_fixed_size_windows(
+                genome_file=genome_file,
+                window_size=window_size,
+                output=windows_file,
+            )
+            windows_file.flush()
+            base_regions = windows_file.name
         
         logger.info(f'Building regions ...')
         # 1. get the endpoints from the bedfiles
-        data = _get_endpoints(windows_file.name, *bedfiles)
+        data = _get_endpoints(base_regions, *bedfiles)
 
         # 2. filter out the endpoints that are not on the allowed chromosomes
         data = filter(lambda x : x.chrom in allowed_chroms, data)
@@ -260,7 +326,7 @@ def make_regions(
         # 4. filter out the segments that are in the blacklist
         data = filter_intersection(
             data, 
-            map(lambda v : Segment(*v[:3], None), stream_bedfile(blacklist_file)),
+            map(lambda v : Segment(*v[:3], None, None), stream_bedfile(blacklist_file)),
             blacklist=True,
             key = RegionOverlapComparitor
         )
@@ -273,16 +339,24 @@ def make_regions(
         )
         data = map(lambda x : x[1], data)
 
-        # 6. double-check that things are still sorted after the groupby
         data = streaming_local_sort(
             data,
             key = lambda s : (s[0].chrom, s[0].start),
             has_lapsed = lambda curr_group, buff_group : \
                             group_has_lapsed(curr_group[0], buff_group)
         )
+
+        # 6. double-check that things are still sorted after the groupby.
+        data = sorted_iterator(
+            data,
+            key=lambda s : (s[0].chrom, s[0].start)
+        )
+        
+        # 6b. sort the segments within each group - just to be sure.
+        data = map(partial(sorted, key=lambda s : s.start), data)
         
         #data = map(trace, data)
-        # 7. filter out the segments that are too small
+        # 7. filter out the groups that are too small
         data = filter(lambda segments : sum(map(len, segments)) > min_windowsize, data)
 
         # 8. collect some stats on the window sizes

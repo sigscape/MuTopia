@@ -7,13 +7,18 @@ from functools import wraps
 import time
 import netCDF4 as nc
 import warnings
-from ..utils import check_corpus, FeatureType
+import os
+from ..utils import check_corpus, FeatureType, logger
 from .gtensor import update_view
 
 WRITE_KW = dict(
     format='NETCDF4', 
     engine='netcdf4', 
 )
+
+def read_regions_file(dataset):
+    regions_file = read_attrs(dataset)['regions_file']
+    return os.path.join(os.path.dirname(dataset), regions_file)
 
 
 def read_attrs(dataset):
@@ -37,10 +42,15 @@ def retry_until_write(func, n_tries=1000, sleep=1):
     @wraps(func)
     def wrapper(*args, **kwargs):
 
-        for _ in range(n_tries):
+        for t in range(n_tries):
             try:
                 return func(*args, **kwargs)
             except OSError:
+                if t > 10:
+                    logger.warning(
+                        'Could not open netCDF file for writing - likely because of concurrent write traffic.\n'
+                        'If the G-tensor is in-use, this will block writing.'
+                    )
                 time.sleep(sleep)
                 pass
         
@@ -117,6 +127,7 @@ def list_features(dataset):
 ##
 # Sample write, remove, and list
 ##
+@retry_until_write
 def write_sample(
     filename,
     arr,
@@ -194,13 +205,12 @@ def load_dataset(filename):
             filename, 
             cache=False
         )
+    
     samples=defaultdict(list)
-
     if not hasattr(dataset, 'raw'):
         layers=[]
         sample_names=[]
     else:
-
         layers = list(dataset.raw.keys())
 
         try:
@@ -225,7 +235,8 @@ def load_dataset(filename):
         k : xr.concat(v, dim='sample')
         for k,v in samples.items()
     }
-
+   
+    dataset = dataset.assign_coords({'sample': sample_names})
     dataset.update(samples)
 
     for layer in layers:

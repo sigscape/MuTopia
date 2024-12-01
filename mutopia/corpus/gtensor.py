@@ -41,8 +41,8 @@ def GTensor(
     shared_coords = {
         **modality.coords,
         'locus' : locus_coords,
+        'sample' : [],
     }
-    obs_coords = {'sample' : []}
 
     region_lengths = np.sum(
         context_frequencies.data, 
@@ -71,8 +71,8 @@ def GTensor(
                     dims=('locus',),
                 ),
             }),
+            '/obsm' : xr.Dataset(),
             '/features' : xr.Dataset(),
-            '/obsm' : xr.Dataset(coords=obs_coords),
             '/varm' : xr.Dataset(),
         },
     )
