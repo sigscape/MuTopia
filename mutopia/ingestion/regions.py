@@ -9,6 +9,7 @@ import typing
 from functools import partial, wraps
 from dataclasses import dataclass
 from gzip import open as gzopen
+from itertools import chain
 from ..genome_utils.fancy_iterators import *
 from ..utils import logger, str_wrapped_list
 
@@ -256,14 +257,36 @@ def format_bed12_record(region_id, segments):
     )
 
 
-def linearize_beds(*bedfiles, output=sys.stdout):
+def linearize_beds(
+    *bedfiles, 
+    output=sys.stdout,
+    max_region_size=25000,
+):
+
+    def chop_if_too_large(segment):
         
-    logger.info(f'Building regions ...')
+        if len(segment)/max_region_size < 1.5:
+            yield segment
+        
+        else:
+            n_cuts = len(segment) // max_region_size
+            cut_size = len(segment) // n_cuts + 1
+
+            for i in range(n_cuts):
+                yield Segment(
+                    segment.chrom,
+                    segment.start + i*cut_size,
+                    min(segment.end, segment.start + (i+1)*cut_size),
+                    segment.parent_region,
+                    segment.feature_combination
+                )
     # 1. get the endpoints from the bedfiles
     data = _get_endpoints(*bedfiles)
     
     # 3. convert the endpoints to segments
     data = _endpoints_to_segments(data)
+
+    data = chain.from_iterable(map(chop_if_too_large, data))
 
     for segment in data:
         print(segment.chrom, segment.start, segment.end, sep='\t', file=output)

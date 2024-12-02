@@ -26,8 +26,14 @@ def ingestion():
     type=click.Path(exists=True),
     nargs=-1,
 )
-def linearize_beds(bed_files : List[str]):
-    ingest.linearize_beds(*bed_files)
+def linearize_beds(
+    bed_files : List[str],
+    max_region_size=25000,
+):
+    ingest.linearize_beds(
+        *bed_files,
+        max_region_size=max_region_size,
+    )
 
 
 @ingestion.command("create")
