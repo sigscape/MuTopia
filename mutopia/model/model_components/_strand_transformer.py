@@ -20,7 +20,7 @@ class DesignMatrixHelper:
                                 inverted=False):
         return list(chain(
                 repeat(
-                    [1,0,-1] if not inverted else [-1,0,1], 
+                    [-1,0,1] if not inverted else [1,0,-1], 
                     n_strand_features
                 ),
                 categories
