@@ -138,7 +138,7 @@ def annotate_mutations(
 
     query_process = get_passed_SNVs(
         vcf_file,
-        '%CHROM\t%POS0\t%POS\t%REF\t%ALT',
+        '%CHROM\t%POS0\t%POS\t%REF\t%ALT\n',
         pass_only=False,
         chr_prefix=chr_prefix,
         output=subprocess.PIPE,
@@ -152,7 +152,7 @@ def annotate_mutations(
             
             if not line:
                 break
-
+            
             CHROM, POS0, _, REF, ALT = line.strip().split('\t')
 
             (context, alt, configuration_idx) = \
@@ -161,11 +161,14 @@ def annotate_mutations(
                     fasta_object=fa
                 )
             
-            (context_idx, mutation_idx) = _convert_to_idx(context, alt)
-
-            records.append(
-                (CHROM, int(POS0), configuration_idx, context_idx, mutation_idx, '{0}[{1}>{3}]{2}'.format(*context, alt))
-            )
+            try:
+                (context_idx, mutation_idx) = _convert_to_idx(context, alt)
+            except KeyError as err:
+                logger.warn(err)
+            else:
+                records.append(
+                    (CHROM, int(POS0), configuration_idx, context_idx, mutation_idx, '{0}[{1}>{3}]{2}'.format(*context, alt))
+                )
 
     query_process.communicate()
 
@@ -224,6 +227,9 @@ def featurize_annotated_mutations(
                 output=out,
             ).communicate()
 
+        with open(query_file.name,'r') as f:
+            print(len(f.readlines()), file=sys.stdout)
+
         intersect_process = subprocess.Popen(
             ['bedtools',
             'intersect',
@@ -239,29 +245,32 @@ def featurize_annotated_mutations(
     
         coords=[]
         weights=[]
+        n_success = n_failure = 0
 
         while True:
             
-            line = intersect_process.stdout.readline()
+            line = intersect_process.stdout.readline().strip()
 
             if not line:
                 break
 
-            fields=line.strip().split('\t')
+            fields=line.split('\t')
             locus_idx = int(fields[3])
 
-            #try:
+            try:
 
-            info, cluster_size, weight = fields[-3:]
-            configuration, context, mutation = list(map(int, info.split(',')))
-            cluster_size = int(cluster_size)
-            weight = float(weight)
+                info, cluster_size, weight = fields[-3:]
+                configuration, context, mutation = list(map(int, info.split(',')))
+                cluster_size = int(cluster_size)
+                weight = float(weight)
             
-            #except ValueError as err:
-            #    logger.warning(err)
-            #else:
-            coords.append( (cluster_size > 3, configuration, context, mutation, locus_idx) )
-            weights.append( weight if cluster_size <= 3 else weight/cluster_size )
+            except ValueError as err:
+                n_failure+=1
+                logger.warning(f'Error while parsing record: {line}:\n\t' + str(err).strip())
+            else:
+                n_success+=1
+                coords.append( (cluster_size > 3, configuration, context, mutation, locus_idx) )
+                weights.append( weight if cluster_size <= 3 else weight/cluster_size )
 
         intersect_process.communicate()
 
@@ -281,6 +290,8 @@ def featurize_annotated_mutations(
 
     if not sample_weight is None:
         weights*=sample_weight
+
+    logger.info(f'Successfully ingested {n_success} mutations, {n_failure} mutations could not be parsed.')
 
     return (
         coords.astype(np.int32),

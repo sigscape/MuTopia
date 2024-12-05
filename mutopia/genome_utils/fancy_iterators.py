@@ -49,7 +49,7 @@ class RegionOverlapComparitor:
         other  ____
         '''
         return self.chrom == other.chrom and \
-                    (self.end >= other.start and self.start < other.end)
+                    (self.end > other.start and self.start < other.end)
     
     def __ge__(self, other):
         return (self > other) or (self == other)

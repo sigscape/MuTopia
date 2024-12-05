@@ -4,6 +4,7 @@ from functools import partial
 import numpy as np
 import mutopia.ingestion as ingest
 from mutopia.corpus import GTensor, write_dataset
+import netCDF4 as nc
 import mutopia.corpus.disk_interface as disk
 from ..modalities import Modality
 from ..genome_utils.bed12_utils import stream_bed12
@@ -173,8 +174,26 @@ def convert():
     pass
 
 @ingestion.command("set-attr")
-def set_attrs():
-    pass
+@click.argument(
+    'dataset',
+    type=click.Path(exists=True),
+)
+@click.option(
+    '-set',
+    '--set-attribute',
+    'attrs',
+    type=(str,str),
+    multiple=True,
+)
+def set_attrs(
+    *,
+    dataset,
+    attrs,
+):
+    with nc.Dataset(dataset, 'a') as dset:
+        for k,v in attrs:
+            setattr(dset, k, v)
+    
 
 @ingestion.group("feature")
 def featurecmds():

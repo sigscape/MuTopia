@@ -351,7 +351,7 @@ def make_regions(
             data, 
             map(lambda v : Segment(*v[:3], None, None), stream_bedfile(blacklist_file)),
             blacklist=True,
-            key = RegionOverlapComparitor
+            key=RegionOverlapComparitor
         )
 
         # 5. group the segments by feature combination

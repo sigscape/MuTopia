@@ -47,13 +47,25 @@ def get_passed_SNVs(
     query_process = subprocess.Popen(
         ['bcftools','query','-f', chr_prefix + query_string],
         stdin = filter_process.stdout,
-        stdout = output,
+        stdout = subprocess.PIPE,
         stderr = sys.stderr,
         universal_newlines=True,
         bufsize=10000,
     )
 
-    return query_process
+    # ahh so annoying - it would be nice to delegate sorting to the user
+    # but it can be difficult to make sure the VCFs are in lexigraphical order.
+    # Instead, I'll bite the bullet and sort here.
+    sort_process = subprocess.Popen(
+        ['sort','-k1,1','-k2,2n'],
+        stdin=query_process.stdout,
+        stdout=output,
+        stderr = sys.stderr,
+        universal_newlines=True,
+        bufsize=10000,
+    )
+
+    return sort_process
 
 
 def transfer_annotations_to_vcf(
