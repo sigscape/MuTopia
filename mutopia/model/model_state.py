@@ -350,6 +350,7 @@ class ModelState:
             samples, 
             parallel_context(delayed(update)() for update in updates)
         ):
+                
                 elbo += bound
                 # Update the topic compositions for the sample
                 CS.update_topic_compositions(

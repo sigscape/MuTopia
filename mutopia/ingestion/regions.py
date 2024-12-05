@@ -111,14 +111,22 @@ class Segment:
         return f'{self.chrom}:{self.start}-{self.end}'
 
 
-def _get_endpoints(base_regions, *bedfiles):
-
+def _get_endpoints(
+    *bedfiles,
+    blacklist=None,
+    base_regions=None,
+):
     key=lambda x : (x.chrom, x.start)
 
-    def _iter_base_regions(base_regions):
+    def _iter_base_regions():
         for chrom, start, end, *_ in stream_bedfile(base_regions):
             yield Endpoint(chrom, start, end, '__base__', Region(chrom,start,end), True)
             yield Endpoint(chrom, end, end, '__base__', Region(chrom,start,end), False)
+
+    def _iter_blacklist_regions():
+        for chrom, start, end, i in stream_bedfile(blacklist):
+            yield Endpoint(chrom, start, end, '__blacklist__', i, True)
+            yield Endpoint(chrom, end, end, '__blacklist__', i, False)
 
     def _iter_endpoints_bedfile(bedfile, track_id):
         # okay the problem is that this is not current sorted ...
@@ -136,33 +144,32 @@ def _get_endpoints(base_regions, *bedfiles):
                     (curr.start - buffval.end) > 0,
                 key=key,
             ),
-            key=key
-        )
+            key=key)
     
-    def wrap_error(f, msg):
-        @wraps(f)
+    def wrap_error(msg):
+        @wraps(order_endpoints)
         def _f(*args, **kwargs):
             try:
-                return f(*args, **kwargs)
+                return order_endpoints(*args, **kwargs)
             except Exception as e:
                 raise ValueError(f'{msg}: {str(e)}') from e
-            
         return _f
 
-    endpoints = \
-        [
-            wrap_error(
-                order_endpoints, 
-                'Error raised when processing base regions'
-            )(_iter_base_regions(base_regions))
-        ] + \
-        [
-            wrap_error(
-                order_endpoints, 
-                f'Error raised when processing {bedfile}'
-            )(_iter_endpoints_bedfile(bedfile, os.path.basename(bedfile)),)
-            for bedfile in bedfiles
-        ]
+    endpoints = [
+        wrap_error(f'Error raised when processing {bedfile}')\
+            (_iter_endpoints_bedfile(bedfile, os.path.basename(bedfile)),)
+        for bedfile in bedfiles
+    ]
+    
+    if not blacklist is None:
+        endpoints.append(
+            wrap_error(f'Error raised when processing {blacklist}')(_iter_blacklist_regions())
+        )
+
+    if not base_regions is None:
+        endpoints.append(
+            wrap_error(f'Error raised when processing {base_regions}')(_iter_base_regions())
+        )
     
     return interleave_streams( 
         *endpoints, 
@@ -208,7 +215,9 @@ def _endpoints_to_segments(endpoints): # change default min_windowsize 3 to 4
                     None
                 )
 
-                if not base_region is None:
+                if not base_region is None and not any(
+                    t=='__blacklist__' for t,_ in active_features.keys()
+                ):
                     yield Segment(
                         chrom, 
                         prev_pos, 
@@ -323,7 +332,6 @@ def make_regions(
     def group_has_lapsed(curr, group):
         return curr.chrom != group[0].chrom or (curr.start - group[0].start) > 2*window_size
 
-
     with tempfile.NamedTemporaryFile('w') as windows_file:
 
         if base_regions is None:
@@ -338,21 +346,17 @@ def make_regions(
         
         logger.info(f'Building regions ...')
         # 1. get the endpoints from the bedfiles
-        data = _get_endpoints(base_regions, *bedfiles)
+        data = _get_endpoints(
+            *bedfiles, 
+            blacklist=blacklist_file,
+            base_regions=base_regions
+        )
 
         # 2. filter out the endpoints that are not on the allowed chromosomes
         data = filter(lambda x : x.chrom in allowed_chroms, data)
         
         # 3. convert the endpoints to segments
         data = _endpoints_to_segments(data)
-
-        # 4. filter out the segments that are in the blacklist
-        data = filter_intersection(
-            data, 
-            map(lambda v : Segment(*v[:3], None, None), stream_bedfile(blacklist_file)),
-            blacklist=True,
-            key=RegionOverlapComparitor
-        )
 
         # 5. group the segments by feature combination
         data = streaming_groupby(
@@ -401,5 +405,6 @@ f'''Window size report
 Num windows   | {len(window_sizes)}
 Smallest      | {min(window_sizes)}
 Largest       | {max(window_sizes)}    
-''' + '\n'.join(('Quantile={: <4} | {}'.format(str(k),str(int(v))) for k,v in zip(q, windowsize_dist)))
+''' + '\n'.join(('Quantile={: <4} | {}'.format(str(k),str(int(v))) for k,v in zip(q, windowsize_dist))),
+    file=sys.stderr
     )
