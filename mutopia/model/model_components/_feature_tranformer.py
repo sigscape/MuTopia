@@ -78,11 +78,14 @@ class PasteTransformer(BaseEstimator, TransformerMixin, OneToOneFeatureMixin):
         self.feature_names = feature_names
         self.add_corpus_intercepts = add_corpus_intercepts
 
-    def fit(self, X, y=None):
+    def fit(self, X, y=None,*,corpus):
         self.n_features_in_ = len(self.feature_names)
         return self
     
-    def transform(self, X):
+    def fit_transform(self, X, y=None,*,corpus):
+        return self.fit(X, corpus=corpus).transform(X, corpus=corpus)
+    
+    def transform(self, X,*,corpus):
         missing_features = set(self.feature_names).difference( set(X.features.keys()) )
         if len(missing_features) > 0:
             raise ValueError(
@@ -98,7 +101,16 @@ class PasteTransformer(BaseEstimator, TransformerMixin, OneToOneFeatureMixin):
             df.insert(0, 'corpus', CS.get_name(X)) 
 
         return df
-    
+
+
+def get_paste_transformer(feature_names, add_corpus_intercepts=False):
+    return PasteTransformer(
+            feature_names=feature_names, 
+            add_corpus_intercepts=add_corpus_intercepts
+        )\
+        .set_fit_request(corpus=True)\
+        .set_transform_request(corpus=True)
+
 
 class Convolve(BaseEstimator, TransformerMixin, OneToOneFeatureMixin):
 
@@ -111,7 +123,7 @@ class Convolve(BaseEstimator, TransformerMixin, OneToOneFeatureMixin):
         self.n_features_in_ = X.shape[1]
         return self
     
-    def fit_transform(self, X, y = None,*, corpus):
+    def fit_transform(self, X, y = None,*,corpus):
         return self.fit(X, corpus=corpus).transform(X, corpus=corpus)
 
     def transform(self, X, y=None,*,corpus):
@@ -242,9 +254,8 @@ def get_normalizing_transformer(
             ('minmax', MinMaxScaler(), type_dict[FeatureType.MINMAX]),
             ('quantile', QuantileTransformer(output_distribution='uniform'), type_dict[FeatureType.QUANTILE]),
             ('standardize', StandardScaler(), type_dict[FeatureType.STANDARDIZE]),
-            ('robust', RobustScaler(), type_dict[FeatureType.STANDARDIZE]),
+            ('robust', RobustScaler(), type_dict[FeatureType.ROBUST]),
         ],
-        remainder='passthrough',
         verbose_feature_names_out=False,
     )
 
@@ -268,7 +279,7 @@ def get_feature_transformer(
     pipeline_ = Pipeline([
         (
             'paste', 
-            PasteTransformer(
+            get_paste_transformer(
                 feature_names=feature_names_in,
                 add_corpus_intercepts=add_corpus_intercepts
             )
@@ -300,7 +311,8 @@ def get_feature_transformer(
                         ),
                         (
                             'convolve',
-                            get_convolving_transformer(convolution_width)
+                            get_convolving_transformer(convolution_width) if convolution_width > 1 else \
+                                FunctionTransformer(lambda x,*y : x, feature_names_out='one-to-one')
                         ),
                     ]),
                     slice(slice_idx, None)

@@ -31,6 +31,7 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         convolution_width=1,
         model_kw={},
         dtype = float,
+        init_variance=0.05,
         smoothing_size=1000,
         transformers=[],
         *,
@@ -65,12 +66,15 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         self.n_features_ = X.shape[1]
         self.feature_names_out_ = self.base_transformer_.get_feature_names_out(feature_names_in)
         
+        categorical_features = get_categorical_feature_idxs(self.base_transformer_)
+        self.n_categorical_features_ = len(categorical_features)
+
         self.rate_models = [
             self._make_model(
                 **model_kw,
                 X = X,
                 interaction_groups = get_feature_interaction_group_idxs(corpus, self.base_transformer_),
-                categorical_features = get_categorical_feature_idxs(self.base_transformer_),
+                categorical_features = categorical_features,
                 random_state = random_state,
             )
             for _ in range(n_components)
@@ -85,11 +89,10 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         to follow feature distributions, let's just initialize them with a simple
         Laplace projection of the feature matrix.
         '''
-        self.init_projection_ = random_state.laplace(
-                0., 0.1,
-                (self.n_components, self.n_features_),
+        self.init_projection_ = random_state.normal(
+                0., init_variance,
+                (self.n_components, self.n_features_ - self.n_categorical_features_),
             ).astype(self.dtype)
-
 
 
     @property
@@ -102,8 +105,9 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
     
 
     def _init_log_locus_distribution(self, locus_features):
+        X = locus_features[:, self.n_categorical_features_:]
         return DataArray(
-            (np.nan_to_num(locus_features, nan=-3.) @ self.init_projection_.T).T,
+            (np.nan_to_num(X, nan=-3.) @ self.init_projection_.T).T,
             dims=('component','locus'),
         )
 

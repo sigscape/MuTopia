@@ -27,6 +27,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         max_iter=100,
         tol=1e-3,
         reg : float = 0.0001, 
+        init_variance : float = 0.1,
         conditioning_alpha : float = 1e-9,
         dtype = float,
         init_components = None,
@@ -64,42 +65,45 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         self._coefs = self._init_params(
             random_state, 
             n_components, 
+            init_variance,
             X.shape[1], 
             dtype
         )
 
-        '''self.is_intercept_ = np.array(
-            [True]*self.context_transformer.n_coefs \
-            + [False]*self.transformer.n_coefs * (self.context_transformer.n_states+1)
-        )
+        if isinstance(self.context_transformer, DiagonalEncoder):
+            self.is_intercept_ = np.array(
+                [True]*self.context_transformer.n_coefs \
+                + [False]*self.transformer.n_coefs * (self.context_transformer.n_states+1)
+            )
 
-        eln_solver = partial(
-            get_eln_solver,
-            **get_reg_params(reg, 1e-5),
-            tol=tol,
-            random_state=random_state,
-            max_iter=100,
-        ) # f(X) -> f(z, w, beta) -> beta
+            eln_solver = partial(
+                get_eln_solver,
+                **get_reg_params(reg, 1e-5),
+                tol=tol,
+                random_state=random_state,
+                max_iter=100,
+            ) # f(X) -> f(z, w, beta) -> beta
 
-        ridge_solver = partial(
-            partial_ls_solver,
-            alpha=conditioning_alpha,
-        ) # f(X) -> f(z, w, beta) -> beta
+            ridge_solver = partial(
+                partial_ls_solver,
+                alpha=conditioning_alpha,
+            ) # f(X) -> f(z, w, beta) -> beta
 
-        split_solver = partial(
-            setup_mixed_solver,
-            is_regularized = ~self.is_intercept_,
-            unreg_solver = ridge_solver, # f(X) -> f(z, w, beta) -> beta
-            reg_solver = eln_solver, # f(X) -> f(z, w, beta) -> beta
-        )'''
-
-        split_solver = partial(
-            get_eln_solver,
-            **get_reg_params(reg, 1e-5),
-            tol=tol,
-            random_state=random_state,
-            max_iter=max_iter,
-        )
+            split_solver = partial(
+                setup_mixed_solver,
+                is_regularized = ~self.is_intercept_,
+                unreg_solver = ridge_solver, # f(X) -> f(z, w, beta) -> beta
+                reg_solver = eln_solver, # f(X) -> f(z, w, beta) -> beta
+            )
+        else:
+            raise NotImplementedError('Only diagonal encoders are supported')
+            split_solver = partial(
+                get_eln_solver,
+                **get_reg_params(reg, 1e-5),
+                tol=tol,
+                random_state=random_state,
+                max_iter=max_iter,
+            )
 
         solver = partial(
             right_intercept_solver,
@@ -220,9 +224,9 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         return self
     
 
-    def _init_params(self, random_state, n_components, n_coefs, dtype):
+    def _init_params(self, random_state, n_components, init_variance, n_coefs, dtype):
         return random_state.normal(
-                0., 0.1, 
+                0., init_variance, 
                 (n_components,  n_coefs),
             ).astype(dtype, copy=False)
 

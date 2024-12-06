@@ -25,6 +25,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
         corpuses,
         reg : float = 0.0005,
         conditioning_alpha = 1e-9,
+        init_variance : float=0.1,
         tol = 5e-4,
         max_iter=100,
         dtype = float,
@@ -68,6 +69,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
         self._coefs = self._init_params(
             random_state, 
             dtype,
+            init_variance,
             n_components, 
             self.context_dim,
             X.shape[1],
@@ -201,9 +203,9 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
             ] = np.log( renormalized )
     
 
-    def _init_params(self, random_state, dtype, *shape):
+    def _init_params(self, random_state, dtype, init_variance, *shape):
         return random_state.normal(
-            0, 0.1, shape,
+            0, init_variance, shape,
         ).astype(dtype, copy = False)
     
 
