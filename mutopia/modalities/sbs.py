@@ -274,6 +274,7 @@ def SBSModel(
     sparse=True,
     verbose=0,
     max_iter=100,
+    init_variance=(0.1, 0.1, 0.1)
 ):
     
     random_state = np.random.RandomState(seed)
@@ -284,6 +285,7 @@ def SBSModel(
         'mutation', # require the mutation dimension - this is the stranded conditional consequence
         train_corpuses,
         n_components=num_components,
+        init_variance=init_variance[0],
         random_state=random_state,
         tol=5e-4,
         reg=mutation_reg,
@@ -292,17 +294,18 @@ def SBSModel(
         max_iter=max_iter,
     )
 
-    kmer_encoder = KmerEncoder(
+    '''kmer_encoder = KmerEncoder(
         ['ACTG','CT','ACTG'],
         kmer_extractor=tuple,
         feature_name_fn=_make_feature_name,
-    )
+    )'''
 
     context_model = StrandedContextModel(
         train_corpuses,
-        kmer_encoder,
+        DiagonalEncoder(),
         n_components=num_components,
         random_state=random_state,
+        init_variance=init_variance[1],
         tol=5e-4,
         reg=context_reg,
         conditioning_alpha=conditioning_alpha,
@@ -315,6 +318,7 @@ def SBSModel(
         else LinearThetaModel)\
         (
             train_corpuses,
+            init_variance=init_variance[2],
             n_components=num_components,
             tree_learning_rate=tree_learning_rate,
             max_depth=max_depth,
@@ -382,7 +386,12 @@ def _sample_params(study, trial):
         'mutation_reg' : trial.suggest_float('mutation_reg', 1e-5, 5e-3, log=True),
         'max_features' : trial.suggest_float('max_features', 0.1, 1.),
         'locus_subsample' : trial.suggest_categorical('locus_subsample', [None, 0.125, 0.25, 0.5]),
-        'kappa' : trial.suggest_float('kappa', 0.4, 0.7),
         'l2_regularization' : trial.suggest_float('l2_regularization', 1e-5, 10, log=True),
         'max_iter' : trial.suggest_categorical('max_iter', [25, 50, 100, 300]),
+        'init_variance' : (
+            trial.suggest_float('init_variance_mutation', 1e-3, 0.2e-1, log=True),
+            trial.suggest_float('init_variance_context', 1e-3, 0.2e-1, log=True),
+            trial.suggest_float('init_variance_theta', 1e-3, 0.2e-1, log=True),
+        ),
+        'convolution_width' : trial.suggest_int('convolution_width', 0, 3),
     }
