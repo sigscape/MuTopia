@@ -224,7 +224,7 @@ def add_feature():
     '-norm',
     '--normalization',
     type=click.Choice([x.value for x in FeatureType.continuous_types()]),
-    default='power',
+    default='log1p_cpm',
     help='Normalization to apply to the feature',
 )
 @click.option(
@@ -244,7 +244,7 @@ def add_feature():
 def continuous_feature(
     dataset : str,
     ingest_file : List[str],
-    normalization : str ='power',
+    normalization : str ='log1p_cpm',
     group='all',
     column : int = 4,
     *,

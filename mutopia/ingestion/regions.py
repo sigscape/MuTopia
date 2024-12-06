@@ -177,7 +177,7 @@ def _get_endpoints(
     )
 
 
-def _endpoints_to_segments(endpoints): # change default min_windowsize 3 to 4
+def _endpoints_to_segments(endpoints, has_base_regions=True): # change default min_windowsize 3 to 4
 
     active_features = Counter()
     feature_combination_ids = dict()
@@ -215,7 +215,7 @@ def _endpoints_to_segments(endpoints): # change default min_windowsize 3 to 4
                     None
                 )
 
-                if not base_region is None and not any(
+                if (not has_base_regions or not base_region is None) and not any(
                     t=='__blacklist__' for t,_ in active_features.keys()
                 ):
                     yield Segment(
@@ -293,7 +293,7 @@ def linearize_beds(
     data = _get_endpoints(*bedfiles)
     
     # 3. convert the endpoints to segments
-    data = _endpoints_to_segments(data)
+    data = _endpoints_to_segments(data, has_base_regions=False)
 
     data = chain.from_iterable(map(chop_if_too_large, data))
 

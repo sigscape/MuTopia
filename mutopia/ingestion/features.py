@@ -85,39 +85,12 @@ def make_continous_features_bedgraph(
     null = 'nan',
     **kw,
 ):
-    check_regions_file(regions_file)
-
-    map_process = subprocess.Popen(
-        ['bedtools','map',
-            '-a', regions_file,
-            '-b', bedgraph_file,
-            '-c', '4',
-            '-o', 'mean',
-            '-null', null,
-        ],
-        stdout=subprocess.PIPE,
+    return make_continuous_features_bed(
+        bedgraph_file,
+        regions_file,
+        null=null,
+        column=4,
     )
-
-    resort_process = subprocess.Popen(
-        ['sort','-k4,4n'],
-        stdin = map_process.stdout,
-        stdout = subprocess.PIPE
-    )
-
-    cut_output = subprocess.check_output(
-        ['cut','-f','5'],
-        stdin=resort_process.stdout
-    )
-
-    vals = array(list(map(
-        lambda x : float(x.strip()),
-        cut_output.decode().strip().split('\n')
-    )))
-
-    if not len(vals) > 1:
-        raise RuntimeError(f'No values found in {bedgraph_file} for {regions_file}')
-
-    return vals
 
 
 
