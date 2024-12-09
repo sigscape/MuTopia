@@ -273,7 +273,7 @@ def SBSModel(
     eval_every=10,
     sparse=True,
     verbose=0,
-    max_iter=100,
+    max_iter=25,
     init_variance=(0.1, 0.1, 0.1)
 ):
     
@@ -387,11 +387,11 @@ def _sample_params(study, trial):
         'max_features' : trial.suggest_float('max_features', 0.1, 1.),
         'locus_subsample' : trial.suggest_categorical('locus_subsample', [None, 0.125, 0.25, 0.5]),
         'l2_regularization' : trial.suggest_float('l2_regularization', 1e-5, 10, log=True),
-        'max_iter' : trial.suggest_categorical('max_iter', [25, 50, 100, 300]),
+        #'max_iter' : trial.suggest_categorical('max_iter', [25, 50, 100, 300]),
         'init_variance' : (
-            trial.suggest_float('init_variance_mutation', 1e-3, 0.2e-1, log=True),
-            trial.suggest_float('init_variance_context', 1e-3, 0.2e-1, log=True),
-            trial.suggest_float('init_variance_theta', 1e-3, 0.2e-1, log=True),
+            trial.suggest_float('init_variance_mutation', 1e-3, 5e-1, log=True),
+            trial.suggest_float('init_variance_context', 1e-3, 5e-1, log=True),
+            trial.suggest_float('init_variance_theta', 1e-3, 5e-1, log=True),
         ),
         'convolution_width' : trial.suggest_int('convolution_width', 0, 3),
     }
