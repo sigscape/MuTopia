@@ -59,7 +59,12 @@ def VI_step(
     )
 
     for corpus in corpuses:
-        CS.update_corpusstate(corpus, model_state)
+        CS.update_corpusstate(
+            corpus, 
+            model_state, 
+            from_scratch=False,
+            parallel_context=parallel_context,
+        )
 
     return elbo, test_elbo
 
@@ -141,7 +146,12 @@ def SVI_step(
     the normalizers on the subset data during the offset calculation.
     '''
     for corpus in corpuses:
-        CS.update_corpusstate(corpus, model_state)
+        CS.update_corpusstate(
+            corpus, 
+            model_state, 
+            from_scratch=False,
+            parallel_context=parallel_context,
+        )
 
     return elbo, test_score
 
@@ -306,6 +316,7 @@ def fit_model(
                         test_corpus,
                         model_state,
                         from_scratch=False,
+                        parallel_context=par,
                     )
 
                 train_scores.append(train_scorer(train_score))

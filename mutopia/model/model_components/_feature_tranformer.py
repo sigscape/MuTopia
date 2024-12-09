@@ -40,6 +40,22 @@ def get_categorical_feature_idxs(
     return out_idx
 
 
+def get_known_categories(
+    transformer,
+    n_features_out,
+):
+    
+    cat_encoder = transformer['split_transformer']\
+        .named_transformers_['categorical']
+    
+    known_categories = [None]*n_features_out
+
+    for idx, feature_idx in enumerate(get_categorical_feature_idxs(transformer)):
+        known_categories[feature_idx] = np.arange(len(cat_encoder.categories_[idx]))
+
+    return known_categories
+
+
 def get_shared_features(*corpus_states):
 
     shared_features = reduce(

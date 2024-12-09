@@ -301,7 +301,7 @@ class ModelState:
             learning_rate=1.,
             subsample_rate=1.,
             update_prior=True,
-            use_parallel=False,
+            use_parallel=True,
         ):
 
         if update_prior:

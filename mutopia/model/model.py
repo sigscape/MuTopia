@@ -77,7 +77,7 @@ class Model:
         if len(select) == 0:
             select = ['Baseline']
 
-        self.modality_.plot(
+        return self.modality_.plot(
             self.model_state_.format_signature(component), 
             *select,
             **kwargs
