@@ -1,6 +1,7 @@
 import click
 from typing import *
 import mutopia as mu
+import os
 
 @click.group("Model training")
 def model():
@@ -430,14 +431,14 @@ def create_study(
         )
 
     mu.create_study(
-        train_corpuses,
-        test_corpuses,
+        list(map(os.path.abspath, train_corpuses)),
+        list(map(os.path.abspath, test_corpuses)),
         min_components=min_components,
         max_components=max_components,
         study_name=study_name,
         seed=seed,
         save_model=save_model,
-        output_dir=output_dir,
+        output_dir=os.path.abspath(output_dir),
         init_components=init_components if len(init_components) > 0 else None,
         **model_kw,
     )

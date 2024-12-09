@@ -7,8 +7,10 @@ from functools import wraps
 import time
 import netCDF4 as nc
 import warnings
+import tqdm
 import os
-from ..utils import check_corpus, FeatureType, logger
+from joblib import delayed
+from ..utils import check_corpus, FeatureType, logger, ParContext
 from .gtensor import update_view
 
 WRITE_KW = dict(
@@ -189,60 +191,72 @@ def write_dataset(dataset, filename):
             )
 
 
-def _backend_load_sample(dataset, sample_name):
+def _backend_load_sample(filename, sample_name):
     
-    dset = dataset[sample_name].to_dataset()
-
-    if dset.attrs['format'] == 'COO':
-        return dset.coo_to_sparse().ascoo()
-    else:
-        return dset.to_dataarray().squeeze()
+    with xr.open_dataset(filename, group=sample_name, engine='netcdf4') as sample:
+        sample = sample.load()
+        if sample.attrs['format'] == 'COO':
+            return sample.coo_to_sparse().ascoo()
+        else:
+            return sample.to_dataarray().squeeze()
 
 
 def load_dataset(filename):
     
-    dataset = datatree.open_datatree(
-            filename, 
-            cache=False
-        )
-    
+    ## 1. explore the structure using the netCDF interface
+    with nc.Dataset(filename, 'r') as dset:
+        if not 'raw' in dset.groups:
+            layers=[]
+            sample_names=[]
+        else:
+            layers = list(dset['raw'].groups.keys())
+
+            try:
+                sample_names = list(dset['raw']['X'].groups.keys())
+            except KeyError:
+                warnings.warn('This dataset has no samples yet, it will not be compatible with many functions.')
+                sample_names = []
+
+    ## 2. open the bones 
+    with xr.open_dataset(filename, engine='netcdf4') as root, \
+        xr.open_dataset(filename, group='regions', engine='netcdf4') as regions, \
+        xr.open_dataset(filename, group='obsm', engine='netcdf4') as obsm, \
+        xr.open_dataset(filename, group='features', engine='netcdf4') as features, \
+        xr.open_dataset(filename, group='varm', engine='netcdf4') as varm:
+
+        ## 2. load the bones using xarray dataset calls
+        dataset = datatree.DataTree.from_dict({
+            '/' : root.load(),
+            '/regions' : regions.load(),
+            '/obsm' : obsm.load(),
+            '/features' : features.load(),
+            '/varm' : varm.load(),
+        })
+
+    ## read the layers piecemeal 
     samples=defaultdict(list)
-    if not hasattr(dataset, 'raw'):
-        layers=[]
-        sample_names=[]
-    else:
-        layers = list(dataset.raw.keys())
-
-        try:
-            sample_names = list(dataset['raw/X'].keys())
-        except KeyError:
-            warnings.warn('This dataset has no samples yet, it will not be compatible with many functions.')
-            sample_names = []
-
+    with ParContext(5) as par:
         for layer in layers:
-            for sample_name in sample_names:
+            for sample_name in tqdm.tqdm(sample_names, desc=f'Loading layer `{layer}`', ncols=100):
                 samples[layer].append(
                     _backend_load_sample(
-                        dataset, 
+                        filename, 
                         f'raw/{layer}/{sample_name}'
                     )
                 )
-                del dataset.raw[layer][sample_name]
-            del dataset.raw[layer]
-        del dataset['raw']
-
+            
     samples = {
-        k : xr.concat(v, dim='sample')
-        for k,v in samples.items()
+        layer : xr.concat(v, dim='sample')
+        for layer,v in samples.items()
     }
-   
+
     dataset = dataset.assign_coords({'sample': sample_names})
     dataset.update(samples)
 
     for layer in layers:
         if isinstance(dataset[layer].data, sparse.SparseArray):
             dataset[layer].ascsr('sample','locus')
-    
+
     for fname, feature in list(dataset.features.data_vars.items()):
         if 'active' in feature.attrs and not bool(feature.attrs['active']):
             update_view(
@@ -250,12 +264,9 @@ def load_dataset(filename):
                 features=dataset.features\
                     .to_dataset().drop_vars(fname)
             )
-            
 
-    dataset = dataset.load()
     return dataset
     
-
 
 '''def from_lr_corpus(corpus):
 
