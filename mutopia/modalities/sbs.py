@@ -83,6 +83,29 @@ class SBSMode(ModeConfig):
             )
 
         return np.array(comps)
+    
+
+    @classmethod
+    def _flatten_observations(cls, signature):
+        
+        cls.validate_signatures(
+            signature,
+            required_dims=('context', 'mutation'),
+        )
+        signature = signature.transpose(...,'context','mutation')
+
+        signature = signature.stack(observation=('context','mutation'))\
+            .isel(observation=MUTOPIA_TO_COSMIC_IDX)
+        
+        signature = signature.reset_index('observation')\
+            .assign_coords(observation=\
+                signature\
+                    .indexes['observation']\
+                    .map(lambda x : format_as_cosmic(*x))
+            )
+        
+        return signature
+
 
     @classmethod
     def plot(cls,
@@ -94,12 +117,9 @@ class SBSMode(ModeConfig):
         title=None,
         **kwargs,
     ):
-        cls.validate_signatures(
-            signature,
-            required_dims=('context', 'mutation'),
-        )
-        signature = signature.transpose(...,'context','mutation')
-        has_extra_dims = len(signature.dims) > 2
+        
+        signature = cls._flatten_observations(signature)
+        has_extra_dims = len(signature.dims) > 1
 
         if len(select) > 0 and not has_extra_dims:
             raise ValueError('`select` is only valid if the signature has one extra dimension to choose from.')
@@ -110,10 +130,7 @@ class SBSMode(ModeConfig):
             if sig_names and not len(select) == len(sig_names):
                 raise ValueError('If both `sig_names` and `select` are specified, they must have the same length.')
             
-            pl_signatures = list(map(
-                lambda s : s.ravel()[MUTOPIA_TO_COSMIC_IDX],
-                signature.loc[{lead_dim : list(select)}].data
-            ))
+            pl_signatures = list(signature.loc[{lead_dim : list(select)}].data)
 
             sig_names = sig_names or select
 
@@ -270,11 +287,11 @@ def SBSModel(
     kappa = 0.5,
     tau = 1.,
     callback=None,
-    eval_every=10,
+    eval_every=1,
     sparse=True,
     verbose=0,
-    max_iter=100,
-    init_variance=(0.1, 0.1, 0.1)
+    max_iter=25,
+    init_variance=(0.05, 0.05, 0.05)
 ):
     
     random_state = np.random.RandomState(seed)
@@ -294,15 +311,16 @@ def SBSModel(
         max_iter=max_iter,
     )
 
-    '''kmer_encoder = KmerEncoder(
-        ['ACTG','CT','ACTG'],
-        kmer_extractor=tuple,
-        feature_name_fn=_make_feature_name,
-    )'''
+    #kmer_encoder = KmerEncoder(
+    #    ['ACTG','CT','ACTG'],
+    #    kmer_extractor=tuple,
+    #    feature_name_fn=_make_feature_name,
+    #)
+    kmer_encoder = DiagonalEncoder()
 
     context_model = StrandedContextModel(
         train_corpuses,
-        DiagonalEncoder(),
+        kmer_encoder,
         n_components=num_components,
         random_state=random_state,
         init_variance=init_variance[1],
@@ -384,14 +402,7 @@ def _sample_params(study, trial):
     return {
         'context_reg' : trial.suggest_float('context_reg', 1e-5, 5e-3, log=True),
         'mutation_reg' : trial.suggest_float('mutation_reg', 1e-5, 5e-3, log=True),
+        'l2_regularization' : trial.suggest_float('l2_regularization', 1e-5, 10, log=True),
         'max_features' : trial.suggest_float('max_features', 0.1, 1.),
         'locus_subsample' : trial.suggest_categorical('locus_subsample', [None, 0.125, 0.25, 0.5]),
-        'l2_regularization' : trial.suggest_float('l2_regularization', 1e-5, 10, log=True),
-        'max_iter' : trial.suggest_categorical('max_iter', [25, 50, 100, 300]),
-        'init_variance' : (
-            trial.suggest_float('init_variance_mutation', 1e-3, 0.2e-1, log=True),
-            trial.suggest_float('init_variance_context', 1e-3, 0.2e-1, log=True),
-            trial.suggest_float('init_variance_theta', 1e-3, 0.2e-1, log=True),
-        ),
-        'convolution_width' : trial.suggest_int('convolution_width', 0, 3),
     }

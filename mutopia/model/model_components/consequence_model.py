@@ -76,7 +76,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
         )
 
         self.is_intercept_ = np.array(
-            [True]*self.context_transformer.n_coefs \
+            [True]*self.consequence_dim \
             + [False]*self.transformer.n_coefs * self.consequence_dim \
             + [True]*self.transformer.n_states_
         )
@@ -86,18 +86,17 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
             **get_reg_params(reg, 1e-5),
             tol=tol,
             random_state=random_state,
-            max_iter=max_iter,
+            max_iter=100,
         ) # f(X) -> f(z, w, beta) -> beta
 
 
+        intercept_groups = [True]*self.consequence_dim \
+                + [False]*self.transformer.n_states_
         ridge_solver = partial(
             interative_partial_ls_solver,
-            group_mask = np.array(
-                [True]*self.context_transformer.n_coefs \
-                + [False]*self.transformer.n_states_
-            ),
+            group_mask = np.array(intercept_groups),
             tol=tol,
-            max_iter=max_iter,
+            max_iter=10,
             alpha=conditioning_alpha,
         )
 
@@ -291,7 +290,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
 
         corpus_names = [CS.get_name(state) for state in corpuses]
         # CxSxM
-        stats_reduced = reduce(sum, [sstats[n][k] for n in corpus_names])
+        stats_reduced = reduce(lambda x,y : x+y, [sstats[n][k] for n in corpus_names])
 
         for c in range(self.context_dim):
             
@@ -347,6 +346,28 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
             }
         )
     
+
+    def get_baseline_summary(self, k):
+        return self.format_signature(k).sel(mesoscale_state='Baseline')
+
+    def get_interaction_summary(self, k):
+
+        c = self.context_dim
+        q = self.consequence_dim
+        r = self.transformer.n_coefs
+
+        X = self.coefs_[k][:,-r*q:].reshape((c,q,r))
+        X = np.concat([np.zeros((1,q,r)), X], axis =0)
+
+        return DataArray(
+            data=X,
+            dims=('context', self.dim_name, 'feature'),
+            coords={
+                'context' : ['Shared effect'] + list(self.context_names),
+                self.dim_name : self.consequence_names,
+                'feature' : self.transformer.get_feature_names_out(),
+            }
+        )
 
     def _format_component(self, k):
         return self._calc_rho(k, self.encoding_matrix_)

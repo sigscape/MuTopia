@@ -71,6 +71,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         )
 
         if isinstance(self.context_transformer, DiagonalEncoder):
+            
             self.is_intercept_ = np.array(
                 [True]*self.context_transformer.n_coefs \
                 + [False]*self.transformer.n_coefs * (self.context_transformer.n_states+1)
@@ -96,7 +97,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
                 reg_solver = eln_solver, # f(X) -> f(z, w, beta) -> beta
             )
         else:
-            raise NotImplementedError('Only diagonal encoders are supported')
+            #raise NotImplementedError('Only diagonal encoders are supported')
             split_solver = partial(
                 get_eln_solver,
                 **get_reg_params(reg, 1e-5),
@@ -346,8 +347,8 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
 
         corpus_names = [CS.get_name(state) for state in corpuses]
 
-        eta = reduce(sum, (exp_offsets[n][k].ravel() for n in corpus_names))
-        target = reduce(sum, (sstats[n][k].ravel() for n in corpus_names))
+        eta = reduce(lambda x,y : x+y, (exp_offsets[n][k].ravel() for n in corpus_names))
+        target = reduce(lambda x,y : x+y, (sstats[n][k].ravel() for n in corpus_names))
 
         yield partial(
             self._run_regression,
@@ -393,15 +394,22 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
             }
         )
     
-    def component_coef_summary(self, k):
+    
+    def get_baseline_summary(self, k):
+        return self.format_signature(k).sel(mesoscale_state='Baseline')
+
+    def get_interaction_summary(self, k):
 
         c = self.context_transformer.n_states + 1
         r = self.transformer.n_coefs
 
-        return DataFrame(
-            self.coefs_[k][-r*c:].reshape((c,r)).T,
-            index=self.transformer.get_feature_names_out(),
-            columns=['Baseline'] + self.context_names
+        return DataArray(
+            data=self.coefs_[k][-r*c:].reshape((c,r)).T,
+            dims=('feature','context'),
+            coords={
+                'feature'  : self.transformer.get_feature_names_out(),
+                'context'  : ['Shared effect'] + self.context_names
+            }
         )
 
 

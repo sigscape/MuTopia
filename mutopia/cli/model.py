@@ -103,7 +103,7 @@ def model():
 @click.option(
     "--add-corpus-intercepts",
     type=bool,
-    default=True,
+    default=False,
     is_flag=True,
     help="Model interactions for each corpus",
 )
@@ -333,7 +333,7 @@ def train(
 @click.option(
     "--add-corpus-intercepts",
     type=bool,
-    default=True,
+    default=False,
     is_flag=True,
     help="Model interactions for each corpus",
 )

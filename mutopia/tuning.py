@@ -193,8 +193,8 @@ def run_trial(
 
     model_fn = partial(
         example_corpus.modality().make_model,
-        train_corpuses = train_corpuses,
-        test_corpuses = test_corpuses,
+        train_corpuses,
+        test_corpuses,
         threads = threads,
         **model_kw,
     )

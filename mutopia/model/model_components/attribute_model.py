@@ -256,7 +256,7 @@ class UnconditionalConsequenceModel(RateModel, SparseDataBase):
 
         corpus_names = [state.attrs['name'] for state in corpuses]
         # CxSxM
-        stats_reduced = reduce(sum, [sstats[n][k] for n in corpus_names])
+        stats_reduced = reduce(lambda x,y : x+y, [sstats[n][k] for n in corpus_names])
             
         # CxSxM => MxS => M*S
         target=stats_reduced.ravel()

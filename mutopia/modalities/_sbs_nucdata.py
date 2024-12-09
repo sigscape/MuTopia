@@ -112,7 +112,10 @@ CONTEXTS = sorted(
 MUTATIONS = ['N->A','N->G','N->T/C']
 CONFIGURATIONS = ['C/T-centered','A/G-centered']
 
-def _reformat_mut(context, mut):
+def format_as_cosmic(context, mut):
+    if context=='Shared effect':
+        context = 'NNN'
+    
     mut = mut[3:]
     if mut =='T/C':
         mut = 'T' if context[1] == 'C' else 'C'
@@ -120,7 +123,7 @@ def _reformat_mut(context, mut):
     return cosmic
 
 MUTOPIA_ORDER = [
-    _reformat_mut(context, mut)
+    format_as_cosmic(context, mut)
     for context in CONTEXTS
     for mut in MUTATIONS
 ]
