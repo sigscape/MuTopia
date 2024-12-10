@@ -227,6 +227,8 @@ class LDAUpdateDense(PrimitiveModel, LocalUpdate):
             # null
             d_null = np.nansum(weights * context_effects) - y_sum * np.log(context_sum)
         
+        print(d_sat, d_fit, d_null)
+        
         return (
             d_sat - d_fit,
             d_sat - d_null,

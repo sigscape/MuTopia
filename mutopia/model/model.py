@@ -8,6 +8,7 @@ from .eval import deviance
 from .latent_var_models import *
 from ..plot.coef_matrix_plot import _plot_interaction_matrix
 from ..corpus import *
+from functools import partial  
 from joblib import dump
 import typing
 
@@ -56,7 +57,12 @@ class Model:
     def _setup_corpus(self, corpus):
         args = (corpus, self.model_state_)
         CS.init_corpusstate(*args)
-        CS.update_corpusstate(*args, from_scratch=True)
+        with ParContext(1) as par:
+            CS.update_corpusstate(
+                *args, 
+                from_scratch=True,
+                parallel_context=par,
+            )
         return corpus
         
 
@@ -76,7 +82,7 @@ class Model:
         if len(select) == 0:
             select = ['Baseline']
 
-        self.modality_.plot(
+        return self.modality_.plot(
             self.model_state_.format_signature(component), 
             *select,
             **kwargs
@@ -84,14 +90,28 @@ class Model:
 
 
     def plot_interaction_matrix(self, 
-            component, 
-            model='context_model', 
+            component,
             palette='vlag',
             **kw,
         ):
+
+        flatten = partial(self.modality_._flatten_observations)
+
+        interactions = self.model_state_.format_interactions(component)
+        
+        shared_effects = interactions.sel(context='Shared effect').to_pandas()
+        interactions = flatten(interactions.drop_sel(context='Shared effect')).to_pandas()
+        
+        baseline = flatten(
+            self.model_state_.format_signature(component).sel(
+                mesoscale_state='Baseline',
+            )
+        ).to_pandas()
+
         return _plot_interaction_matrix(
-            self.model_state_.models[model]\
-                .component_coef_summary(component),
+            interactions,
+            baseline,
+            shared_effects.iloc[:,0],
             palette=palette,
             **kw
         )
@@ -162,14 +182,11 @@ class Model:
         except KeyError:
             corpus = self.annot_component_distributions(corpus, threads)
 
-        if exposures is None:
-            using_exposures_from(corpus)
-
         marginal_exposures = corpus.obsm['exposures'].sum('sample').data
 
         corpus.varm['predicted_marginal'] = \
-            self.model_state_._marginalize_mutrate(
-                np.log(corpus.varm['component_distributions'].data),
+            self.model_state_._log_marginalize_mutrate(
+                np.log(corpus.varm['component_distributions']),
                 marginal_exposures
             )
         

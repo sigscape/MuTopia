@@ -8,7 +8,7 @@ from ..corpus_state import CorpusState as CS
 from ._hist_gbt import CustomHistGradientBooster
 from ._feature_tranformer import get_feature_transformer, \
     get_categorical_feature_idxs, get_feature_interaction_group_idxs, \
-    StratifiedTransformer, PasteTransformer
+    get_known_categories, StratifiedTransformer
 
 from functools import partial
 import numpy as np
@@ -52,7 +52,7 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
                 *corpuses,
                 additional_transformers=transformers,
                 categorical_encoder=self.categorical_encoder,
-                add_corpus_intercepts=add_corpus_intercepts,
+                add_corpus_intercepts=add_corpus_intercepts and len(corpuses) > 1,
                 convolution_width=convolution_width
             )
 
@@ -69,12 +69,15 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         categorical_features = get_categorical_feature_idxs(self.base_transformer_)
         self.n_categorical_features_ = len(categorical_features)
 
+        known_categories = get_known_categories(self.base_transformer_, len(self.feature_names_out_))
+
         self.rate_models = [
             self._make_model(
                 **model_kw,
                 X = X,
                 interaction_groups = get_feature_interaction_group_idxs(corpus, self.base_transformer_),
                 categorical_features = categorical_features,
+                known_categories = known_categories,
                 random_state = random_state,
             )
             for _ in range(n_components)
@@ -126,15 +129,27 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
                 ),
                 log_locus_distribution = self._init_log_locus_distribution(X),
             )
+    
+
+    def _check_input(self, X):
+        return self.rate_models[0]._preprocess_X(X, reset=False)
         
     '''
     Because of the way the GBT model works, we want to cache and store the predictions
     rather than generate them from the model.
     '''
     def update_corpusstate(self, corpus, from_scratch=False):
+
+        X = self._check_input(self._fetch_feature_matrix(corpus))
+
         for k in range(self.n_components):
             CS.fetch_val(corpus, 'log_locus_distribution')[k].data[:] = \
-                self._predict(k, corpus, from_scratch=from_scratch)
+                self._predict(
+                    k, corpus, 
+                    from_scratch=from_scratch,
+                    X=X,
+                    check_input=False
+                )
             
 
     '''
@@ -369,6 +384,7 @@ class GBTThetaModel(ThetaModel):
                   tree_learning_rate,
                   use_groups,
                   random_state,
+                  known_categories,
                   **tree_kw
                 ):
         model = CustomHistGradientBooster(
@@ -384,7 +400,7 @@ class GBTThetaModel(ThetaModel):
                     **tree_kw
                 )
         
-        model.fit_binning(X)
+        model.fit_binning(X, known_categories)
 
         return model
 
@@ -425,9 +441,16 @@ class GBTThetaModel(ThetaModel):
         )
 
 
-    def _predict(self, k, corpus, from_scratch = False):
+    def _predict(self, 
+            k, corpus, 
+            from_scratch = False,
+            X=None, 
+            check_input = True
+        ):
 
-        X = self._fetch_feature_matrix(corpus)
+
+        if X is None:
+            X = self._fetch_feature_matrix(corpus)
 
         ##
         # TODO:
@@ -435,7 +458,6 @@ class GBTThetaModel(ThetaModel):
         # for initializing the mr estimates.
         ##
         if from_scratch:
-            X = self._fetch_feature_matrix(corpus)
             init_prediction = self._init_log_locus_distribution(X)
 
             theta = np.log(self.rate_models[k].predict(X))\
@@ -444,7 +466,8 @@ class GBTThetaModel(ThetaModel):
             theta = self.rate_models[k]._raw_predict_from(
                     X, 
                     CS.fetch_val(corpus, 'log_locus_distribution')[k].data[:,None], 
-                    from_iteration = self.predict_from[k]
+                    from_iteration = self.predict_from[k],
+                    check_input = check_input,
                 ).ravel()
 
         return theta

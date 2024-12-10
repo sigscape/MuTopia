@@ -40,6 +40,22 @@ def get_categorical_feature_idxs(
     return out_idx
 
 
+def get_known_categories(
+    transformer,
+    n_features_out,
+):
+    
+    cat_encoder = transformer['split_transformer']\
+        .named_transformers_['categorical']
+    
+    known_categories = [None]*n_features_out
+
+    for idx, feature_idx in enumerate(get_categorical_feature_idxs(transformer)):
+        known_categories[feature_idx] = np.arange(len(cat_encoder.categories_[idx]))
+
+    return known_categories
+
+
 def get_shared_features(*corpus_states):
 
     shared_features = reduce(
@@ -84,6 +100,16 @@ class PasteTransformer(BaseEstimator, TransformerMixin, OneToOneFeatureMixin):
     
     def fit_transform(self, X, y=None,*,corpus):
         return self.fit(X, corpus=corpus).transform(X, corpus=corpus)
+    
+    def get_feature_names_out(self, input_features):
+        assert hasattr(self, 'n_features_in_')
+        if not self.n_features_in_ == len(input_features):
+            raise ValueError('The number of input features must match the number of columns in the input data!')
+        
+        if self.add_corpus_intercepts:
+            return ['corpus'] + list(self.feature_names)
+        
+        return self.feature_names
     
     def transform(self, X,*,corpus):
         missing_features = set(self.feature_names).difference( set(X.features.keys()) )
@@ -260,6 +286,9 @@ def get_normalizing_transformer(
     )
 
 
+def _identity(x):
+    return x
+
 def get_feature_transformer(
     *corpuses,
     categorical_encoder=OneHotEncoder,
@@ -311,8 +340,8 @@ def get_feature_transformer(
                         ),
                         (
                             'convolve',
-                            get_convolving_transformer(convolution_width) if convolution_width > 1 else \
-                                FunctionTransformer(lambda x,*y : x, feature_names_out='one-to-one')
+                            get_convolving_transformer(convolution_width) if convolution_width > 0 else \
+                                FunctionTransformer(_identity, feature_names_out='one-to-one')
                         ),
                     ]),
                     slice(slice_idx, None)

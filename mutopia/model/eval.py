@@ -39,7 +39,7 @@ def deviance(
     res = list(parallel_context(delayed(fn)() for fn in dev_fns))
     d_fit, d_null = list(zip(*res))
 
-    return 1 - sum(d_fit)/sum(d_null)
+    return (1 - sum(d_fit)/sum(d_null))*10
 
 
 

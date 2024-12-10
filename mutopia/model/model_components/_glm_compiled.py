@@ -149,6 +149,8 @@ def interative_partial_ls_solver(
     X.eliminate_zeros()
     X = X.tocsc()
 
+    assert len(group_mask) == X.shape[1]
+
     return partial(
         _iterative_partial_ls,
         *tup_X_XT(X[:, group_mask]),
@@ -202,6 +204,9 @@ def setup_mixed_solver(
 
     reg = is_regularized
     X_csc = X.tocsc()
+
+    assert len(is_regularized) == X.shape[1]
+
     X_reg = X_csc[:,reg].tocsr()
     X_unreg = X_csc[:, ~reg].tocsr()
     del X_csc

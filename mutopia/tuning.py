@@ -74,16 +74,20 @@ def create_study(
 
 
 
-def load_study(study_name, storage = None):
+def load_study(study_name, storage = None, prune=True):
     
     if storage is None:
         storage = _get_nfs_storage(study_name)    
 
     study = optuna.load_study(
-                    study_name=study_name, 
-                    storage=storage,
-                    pruner = optuna.pruners.NopPruner()
-                    )
+        study_name=study_name, 
+        storage=storage,
+        pruner = optuna.pruners.HyperbandPruner(
+            min_resource=25,
+            max_resource=2000,
+            reduction_factor=3,
+        ) if prune else optuna.pruners.NopPruner(),
+    )
 
     model_attrs = study.user_attrs
     
@@ -193,8 +197,8 @@ def run_trial(
 
     model_fn = partial(
         example_corpus.modality().make_model,
-        train_corpuses = train_corpuses,
-        test_corpuses = test_corpuses,
+        train_corpuses,
+        test_corpuses,
         threads = threads,
         **model_kw,
     )

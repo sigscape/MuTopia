@@ -279,6 +279,17 @@ class ModelState:
                 for model in self.nonlocals.values()
             )
         ))
+    
+
+    def format_interactions(self, k):
+        return reduce(
+            lambda x,y : x+y,
+            (
+                model.get_interaction_summary(k)
+                for model in self.nonlocals.values()
+                if hasattr(model, 'get_interaction_summary')
+            )
+        )
         
 
     def Mstep(self,
@@ -290,7 +301,7 @@ class ModelState:
             learning_rate=1.,
             subsample_rate=1.,
             update_prior=True,
-            use_parallel=False,
+            use_parallel=True,
         ):
 
         if update_prior:

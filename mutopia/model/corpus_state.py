@@ -3,7 +3,7 @@ import xarray as xr
 from datatree import DataTree
 import numpy as np
 from ..utils import CorpusInterface
-
+from joblib import delayed
 
 class CorpusState:
 
@@ -13,13 +13,23 @@ class CorpusState:
         corpus,
         model_state,
         from_scratch=False,
+        *,
+        parallel_context,
     ):
         
-        for model in model_state.models.values():
+        '''for model in model_state.models.values():
             model.update_corpusstate(
                 corpus, 
                 from_scratch=from_scratch
-            )
+            )'''
+        
+        for _ in parallel_context(
+            delayed(model.update_corpusstate)(
+                corpus,
+                from_scratch=from_scratch
+            ) for model in model_state.models.values()
+        ):
+            pass
         
         return corpus
     
@@ -33,7 +43,8 @@ class CorpusState:
     
     @classmethod
     def is_marginal_corpus(cls, corpus):
-        return not 'sample' in corpus.coords
+        return not 'sample' in corpus.coords or len(corpus.coords['sample']) == 0 \
+            or not 'sample' in corpus.X.dims
     
     @classmethod
     def list_samples(cls, corpus):
