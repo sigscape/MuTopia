@@ -97,13 +97,13 @@ def _process_query_line(line, fasta_object):
         query.POS = int(query.POS)
         query.POS0 = int(query.POS0)
         query.CLUSTER_SIZE = int(query.CLUSTER_SIZE)
-    except TypeError as err:
+    except (TypeError, ValueError) as err:
         raise WeirdMutationError(
             f'Could not parse the following line: {line}'
         ) from err
 
     try:
-        query.WEIGHT = float(query.WEIGHT)
+        query.WEIGHT = min(float(query.WEIGHT), 1.)
     except ValueError as err:
         raise BadWeightError(
             f'Could not parse the following weight: {query.WEIGHT}'
@@ -245,7 +245,7 @@ def featurize_annotated_mutations(
     
         coords=[]
         weights=[]
-        n_success = n_failure = 0
+        n_success = n_failure = n_cluster = 0
 
         while True:
             
