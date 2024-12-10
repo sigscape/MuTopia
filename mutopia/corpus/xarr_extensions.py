@@ -120,6 +120,13 @@ class AsCSR(BaseAccessor):
         return self._xrds
     
 
+@xr.register_dataarray_accessor("asdense")
+class AsCSR(BaseAccessor):
+    def __call__(self):
+        self._xrds.data = self._xrds.data.todense()
+        return self._xrds
+    
+
 @datatree.register_datatree_accessor("modality")
 class Mod(BaseAccessor):
     def __call__(self):

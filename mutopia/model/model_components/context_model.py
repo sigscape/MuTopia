@@ -70,12 +70,12 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
             dtype
         )
 
-        if isinstance(self.context_transformer, DiagonalEncoder):
-            
-            self.is_intercept_ = np.array(
+        self.is_intercept_ = np.array(
                 [True]*self.context_transformer.n_coefs \
                 + [False]*self.transformer.n_coefs * (self.context_transformer.n_states+1)
             )
+
+        if isinstance(self.context_transformer, DiagonalEncoder):
 
             eln_solver = partial(
                 get_eln_solver,
@@ -98,12 +98,28 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
             )
         else:
             #raise NotImplementedError('Only diagonal encoders are supported')
-            split_solver = partial(
+            eln = partial(
                 get_eln_solver,
-                **get_reg_params(reg, 1e-5),
                 tol=tol,
                 random_state=random_state,
-                max_iter=max_iter,
+                max_iter=100,
+            )
+
+            strand_solver = partial(
+                eln,
+                **get_reg_params(reg, 1e-5),
+            ) # f(X) -> f(z, w, beta) -> beta
+
+            context_solver = partial(
+                eln,
+                **get_reg_params(0.001, 1e-5),
+            )
+
+            split_solver = partial(
+                setup_mixed_solver,
+                is_regularized = ~self.is_intercept_,
+                unreg_solver = context_solver, # f(X) -> f(z, w, beta) -> beta
+                reg_solver = strand_solver, # f(X) -> f(z, w, beta) -> beta
             )
 
         solver = partial(

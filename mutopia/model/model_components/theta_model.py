@@ -52,7 +52,7 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
                 *corpuses,
                 additional_transformers=transformers,
                 categorical_encoder=self.categorical_encoder,
-                add_corpus_intercepts=add_corpus_intercepts,
+                add_corpus_intercepts=add_corpus_intercepts and len(corpuses) > 1,
                 convolution_width=convolution_width
             )
 

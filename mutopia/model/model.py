@@ -57,7 +57,12 @@ class Model:
     def _setup_corpus(self, corpus):
         args = (corpus, self.model_state_)
         CS.init_corpusstate(*args)
-        CS.update_corpusstate(*args, from_scratch=True)
+        with ParContext(1) as par:
+            CS.update_corpusstate(
+                *args, 
+                from_scratch=True,
+                parallel_context=par,
+            )
         return corpus
         
 
@@ -177,14 +182,11 @@ class Model:
         except KeyError:
             corpus = self.annot_component_distributions(corpus, threads)
 
-        if exposures is None:
-            using_exposures_from(corpus)
-
         marginal_exposures = corpus.obsm['exposures'].sum('sample').data
 
         corpus.varm['predicted_marginal'] = \
-            self.model_state_._marginalize_mutrate(
-                np.log(corpus.varm['component_distributions'].data),
+            self.model_state_._log_marginalize_mutrate(
+                np.log(corpus.varm['component_distributions']),
                 marginal_exposures
             )
         

@@ -43,7 +43,8 @@ class CorpusState:
     
     @classmethod
     def is_marginal_corpus(cls, corpus):
-        return not 'sample' in corpus.coords
+        return not 'sample' in corpus.coords or len(corpus.coords['sample']) == 0 \
+            or not 'sample' in corpus.X.dims
     
     @classmethod
     def list_samples(cls, corpus):

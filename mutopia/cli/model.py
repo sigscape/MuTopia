@@ -326,12 +326,6 @@ def train(
     help="Use groups in locus model",
 )
 @click.option(
-    "--smoothing-size",
-    type=click.IntRange(1, 100000),
-    default=1000,
-    help="Smooth locus features using this window size (in bp).",
-)
-@click.option(
     "--add-corpus-intercepts",
     type=bool,
     default=False,
@@ -392,13 +386,6 @@ def train(
     help='"Offset" parameter for stochastic variational inference',
 )
 @click.option(
-    "-eval",
-    "--eval-every",
-    type=click.IntRange(1, 1000),
-    default=10,
-    help="Evaluate every N epochs",
-)
-@click.option(
     "--sparse/--no-sparse",
     type=bool,
     default=True,
@@ -433,6 +420,7 @@ def create_study(
     mu.create_study(
         list(map(os.path.abspath, train_corpuses)),
         list(map(os.path.abspath, test_corpuses)),
+        eval_every=1,
         min_components=min_components,
         max_components=max_components,
         study_name=study_name,

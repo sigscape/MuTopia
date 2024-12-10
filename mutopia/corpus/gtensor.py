@@ -198,11 +198,11 @@ def annot_empirical_marginal(
 ):
     check_structure(corpus)
     
-    with warnings.simplefilter("ignore"):
-        log_em = (
-            np.log( corpus.X.sum('sample') )\
-                - np.log( corpus.regions.context_frequencies )
-        )
+    #with warnings.simplefilter("ignore"):
+    log_em = (
+        np.log( corpus.X.sum('sample') )\
+            - np.log( corpus.regions.context_frequencies )
+    )
     
     log_em.data = log_em.data.astype(np.float32)
     empirical_marginal = np.exp(log_em - log_em.max()).fillna(0.)

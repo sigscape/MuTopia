@@ -401,8 +401,7 @@ def SBSModel(
 def _sample_params(study, trial):
     return {
         'context_reg' : trial.suggest_float('context_reg', 1e-5, 5e-3, log=True),
-        'mutation_reg' : trial.suggest_float('mutation_reg', 1e-5, 5e-3, log=True),
-        'l2_regularization' : trial.suggest_float('l2_regularization', 1e-5, 10, log=True),
-        'max_features' : trial.suggest_float('max_features', 0.1, 1.),
-        'locus_subsample' : trial.suggest_categorical('locus_subsample', [None, 0.125, 0.25, 0.5]),
+        'mutation_reg' : trial.suggest_float('mutation_reg', 1e-5, 5e-2, log=True),
+        'l2_regularization' : trial.suggest_float('l2_regularization', 1e-5, 100., log=True),
+        'max_features' : trial.suggest_categorical('max_features', [0.25, 0.33, 0.5]),
     }
