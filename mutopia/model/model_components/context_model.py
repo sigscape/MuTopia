@@ -112,7 +112,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
 
             context_solver = partial(
                 eln,
-                **get_reg_params(0.001, 1e-5),
+                **get_reg_params(0.005, 1e-5),
             )
 
             split_solver = partial(
@@ -399,7 +399,8 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         
         # C x S
         signature = self._calc_lambda(k, encoding_matrix) \
-                        + np.log(self._context_distribution)[:, None]
+                        + np.log(self._comp_context_distribution[k, :])[:, None]
+                        #+ np.log(self._context_distribution)[:, None]
         
         return DataArray(
             signature,

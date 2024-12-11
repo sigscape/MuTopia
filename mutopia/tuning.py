@@ -83,7 +83,7 @@ def load_study(study_name, storage = None, prune=True):
         study_name=study_name, 
         storage=storage,
         pruner = optuna.pruners.HyperbandPruner(
-            min_resource=25,
+            min_resource=40,
             max_resource=2000,
             reduction_factor=3,
         ) if prune else optuna.pruners.NopPruner(),

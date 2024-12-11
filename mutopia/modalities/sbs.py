@@ -311,7 +311,7 @@ def SBSModel(
         max_iter=max_iter,
     )
 
-    #kmer_encoder = KmerEncoder(
+    #mer_encoder = KmerEncoder(
     #    ['ACTG','CT','ACTG'],
     #    kmer_extractor=tuple,
     #    feature_name_fn=_make_feature_name,
@@ -400,8 +400,8 @@ def SBSModel(
 
 def _sample_params(study, trial):
     return {
-        'context_reg' : trial.suggest_float('context_reg', 1e-5, 5e-3, log=True),
-        'mutation_reg' : trial.suggest_float('mutation_reg', 1e-5, 5e-2, log=True),
+        #'context_reg' : trial.suggest_float('context_reg', 1e-5, 5e-3, log=True),
+        #'mutation_reg' : trial.suggest_float('mutation_reg', 1e-5, 5e-2, log=True),
         'l2_regularization' : trial.suggest_float('l2_regularization', 1e-5, 100., log=True),
         'max_features' : trial.suggest_categorical('max_features', [0.25, 0.33, 0.5]),
     }
