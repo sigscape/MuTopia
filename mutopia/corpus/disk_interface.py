@@ -23,22 +23,6 @@ def read_regions_file(dataset):
     return os.path.join(os.path.dirname(dataset), regions_file)
 
 
-def read_attrs(dataset):
-    with nc.Dataset(dataset, 'r') as dset:
-        return {
-            attr : getattr(dset, attr)
-            for attr in dset.ncattrs()
-        }
-    
-
-def read_dims(dataset):
-    with nc.Dataset(dataset, 'r') as dset:
-        return {
-            dim : len(dset.dimensions[dim])
-            for dim in dset.dimensions.keys()
-        }
-    
-
 def retry_until_write(func, n_tries=1000, sleep=1):
 
     @wraps(func)
@@ -62,7 +46,23 @@ def retry_until_write(func, n_tries=1000, sleep=1):
         )
     
     return wrapper
-                
+
+
+@retry_until_write
+def read_attrs(dataset):
+    with nc.Dataset(dataset, 'r') as dset:
+        return {
+            attr : getattr(dset, attr)
+            for attr in dset.ncattrs()
+        }
+    
+@retry_until_write
+def read_dims(dataset):
+    with nc.Dataset(dataset, 'r') as dset:
+        return {
+            dim : len(dset.dimensions[dim])
+            for dim in dset.dimensions.keys()
+        }
 
 ##
 # feature write, remove, and list
