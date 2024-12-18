@@ -8,6 +8,7 @@ import inspect
 from functools import wraps
 from collections import defaultdict
 import logging
+import subprocess
 from gzip import open as gzopen
 
 @contextmanager
@@ -281,7 +282,7 @@ def using_exposures_from(corpus):
     except KeyError:
         raise KeyError('The corpus does not have exposures. Run `model.annot_exposures(corpus)` first.')
 
-    return lambda sample_name : \
+    return lambda _, sample_name : \
         corpus.obsm['exposures'].sel(sample=sample_name).data
 
 
@@ -417,3 +418,23 @@ def borrow_kwargs(*borrow_sigs):
         return wrapper
 
     return decorator
+
+
+@contextmanager
+def stream_subprocess_output(process):
+    
+    while True:
+        line = process.stdout.readline().strip()
+        if not line:
+            break
+        yield line
+
+    process.stdout.close()
+    process.wait()
+
+    if process.returncode:
+        raise subprocess.CalledProcessError(
+            process.returncode, 
+            process.args,
+            process.stderr.read().decode('utf-8')
+        )

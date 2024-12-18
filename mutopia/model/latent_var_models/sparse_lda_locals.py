@@ -296,7 +296,7 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
         # 2. figure out the number of possible types of observations missing
         n_types = prod(corpus.sizes[dim] for dim in missing_dims)
         # 3. penalize the log context effect for the missing dimensions
-        log_context_effect -= np.log(n_types)
+        #log_context_effect -= np.log(n_types)
         
         # saturated
         y_sum = np.sum(weights)
@@ -304,7 +304,7 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
         # model
         d_fit = weights @ ( np.log(conditional_likelihood.T.dot(contributions)) - log_context_effect )
         # null
-        d_null = -y_sum * np.log(context_sum)
+        d_null = -y_sum * np.log(context_sum) - y_sum*np.log(n_types)
 
         return (
             d_sat - d_fit,

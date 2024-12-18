@@ -214,6 +214,7 @@ def fit_model(
     for corpus in train_corpuses + test_corpuses:
         check_dims(corpus, model_state)
         check_corpus(corpus)
+    
     check_feature_consistency(*train_corpuses, *test_corpuses)
     check_dim_consistency(*train_corpuses, *test_corpuses)
 
@@ -225,10 +226,11 @@ def fit_model(
     for test_corpus in test_corpuses:
         CS.init_corpusstate(test_corpus, model_state)
 
+
     test_score_fn = partial(
-        deviance,
+        deviance_samples,
         corpuses=test_corpuses,
-        exposures_fn=CS.using_exposures_from(*train_corpuses)
+        #exposures_fn=CS.using_exposures_from(*train_corpuses)
     )
     
     '''
@@ -336,7 +338,7 @@ def fit_model(
                     logger.info('Early stopping criterion met. The model has converged.')
                     break
         
-        except (KeyboardInterrupt, SystemError):
+        except (KeyboardInterrupt, SystemError, SystemExit):
             # sometimes interrupting an optimizer throws a system error ...
             pass
 

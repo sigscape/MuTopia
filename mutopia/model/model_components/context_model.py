@@ -27,6 +27,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         max_iter=100,
         tol=1e-3,
         reg : float = 0.0001, 
+        kmer_reg = 0.005,
         init_variance : float = 0.1,
         conditioning_alpha : float = 1e-9,
         dtype = float,
@@ -71,9 +72,9 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         )
 
         self.is_intercept_ = np.array(
-                [True]*self.context_transformer.n_coefs \
-                + [False]*self.transformer.n_coefs * (self.context_transformer.n_states+1)
-            )
+            [True]*self.context_transformer.n_coefs \
+            + [False]*self.transformer.n_coefs * (self.context_transformer.n_states+1)
+        )
 
         if isinstance(self.context_transformer, DiagonalEncoder):
 
@@ -112,7 +113,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
 
             context_solver = partial(
                 eln,
-                **get_reg_params(0.005, 1e-5),
+                **get_reg_params(kmer_reg, 1e-5),
             )
 
             split_solver = partial(

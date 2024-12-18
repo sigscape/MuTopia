@@ -216,8 +216,11 @@ def train(
     model.save(output)
 
 
+@model.group("study")
+def study():
+    pass
 
-@model.command("study-create")
+@study.command("create")
 @click.argument("study_name", type=str)#, help="Name of the study")
 @click.option(
     "-train",
@@ -392,6 +395,13 @@ def train(
     is_flag=True,
     help="Use sparse matrices in the updates.",
 )
+@click.option(
+    '--extensive/--no-extensive',
+    type=bool,
+    default=False,
+    is_flag=True,
+    help="Use extensive mode",
+)
 def create_study(
     study_name: str,
     *,
@@ -402,6 +412,7 @@ def create_study(
     seed: int = 0,
     save_model: bool = False,
     output_dir: str = '.',
+    extensive: bool = False,
     init_components: Union[List[str], None] = None,
     **model_kw,
 ):
@@ -427,12 +438,13 @@ def create_study(
         seed=seed,
         save_model=save_model,
         output_dir=os.path.abspath(output_dir),
+        extensive=extensive,
         init_components=init_components if len(init_components) > 0 else None,
         **model_kw,
     )
 
 
-@model.command("study-trial")
+@study.command("run")
 @click.argument("study_name", type=str)
 @click.option(
     "-@",
@@ -451,7 +463,7 @@ def run_trial(
     )
 
 
-@model.command("study-dashboard")
+@study.command("dashboard")
 @click.argument("study_name", type=str)
 def dashboard(
     study_name: str,

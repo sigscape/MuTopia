@@ -37,12 +37,12 @@ def get_passed_SNVs(
         filter_basecmd += ['-i', filter_string]
 
     filter_process = subprocess.Popen(
-                filter_basecmd + [vcf_file],
-                stdout = subprocess.PIPE,
-                universal_newlines=True,
-                bufsize=10000,
-                stderr = sys.stderr,
-            )
+            filter_basecmd + [vcf_file],
+            stdout = subprocess.PIPE,
+            universal_newlines=True,
+            bufsize=10000,
+            stderr = sys.stderr,
+        )
 
     query_process = subprocess.Popen(
         ['bcftools','query','-f', chr_prefix + query_string],

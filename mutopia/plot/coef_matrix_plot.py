@@ -44,6 +44,8 @@ def _plot_interaction_matrix(
     interaction_ax = fig.add_subplot(gs[1,1])
     interactions = interaction_matrix
 
+    extrema = max(np.max(interaction_matrix.abs()), np.max(shared_effects.abs()), 0.5)
+
     heat_x = np.arange(interactions.shape[0]) - 0.5
     heat_y = np.arange(interactions.shape[1]) - 0.5
     interaction_ax.pcolormesh(
@@ -53,8 +55,8 @@ def _plot_interaction_matrix(
         cmap=palette,
         shading='auto',
         rasterized=True,
-        vmin=-0.5,
-        vmax=0.5,
+        vmin=-extrema,
+        vmax=extrema,
         edgecolor='white',
         linewidth=0.1,
     )
@@ -74,8 +76,8 @@ def _plot_interaction_matrix(
         common_y,
         shared_effects.values[:,None],
         cmap=palette,
-        vmin=-0.5,
-        vmax=0.5,
+        vmin=-extrema,
+        vmax=extrema,
         edgecolor='white',
         linewidth=0.1,
     )

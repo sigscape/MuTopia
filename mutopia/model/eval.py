@@ -11,7 +11,27 @@ def _reduce_sum(g):
     return reduce(lambda x,y : x+y, g)
 
 
-def deviance(
+def _deviance(
+    model_state,
+    corpuses,
+    exposures_fn=CS.fetch_topic_compositions,
+    *,
+    parallel_context,
+):
+    dev_fns = model_state.locals_model.get_deviance_fns(
+        corpuses,
+        model_state,
+        exposures_fn=exposures_fn,
+        parallel_context=parallel_context,
+    )
+    
+    res = list(parallel_context(delayed(fn)() for fn in dev_fns))
+    d_fit, d_null = list(zip(*res))
+
+    return (1 - sum(d_fit)/sum(d_null))*10
+
+
+def deviance_locus(
     model_state,
     corpuses,
     exposures_fn=CS.fetch_topic_compositions,
@@ -29,18 +49,42 @@ def deviance(
             )
         )
 
-    dev_fns = model_state.locals_model.get_deviance_fns(
-        corpuses,
+    return _deviance(
         model_state,
+        corpuses,
         exposures_fn=exposures_fn,
         parallel_context=parallel_context,
     )
+
+
+def deviance_samples(
+    model_state,
+    corpuses,
+    *,
+    parallel_context,
+):
+    for corpus in corpuses:
+        CS.update_normalizers(
+            corpus, 
+            model_state._calc_normalizers(
+                corpus,
+                parallel_context=parallel_context,
+            )
+        )
     
-    res = list(parallel_context(delayed(fn)() for fn in dev_fns))
-    d_fit, d_null = list(zip(*res))
+    for corpus in corpuses:
+        exposures = model_state.locals_model.predict(
+            corpus,
+            model_state,
+            parallel_context=parallel_context,
+        )
+        CS.fetch_val(corpus, 'topic_compositions')[...] = exposures.data.T
 
-    return (1 - sum(d_fit)/sum(d_null))*10
-
+    return _deviance(
+        model_state,
+        corpuses,
+        parallel_context=parallel_context,
+    )
 
 
 def _slow_deviance(

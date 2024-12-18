@@ -2,7 +2,6 @@
 import json
 import numpy as np
 import os
-from sparse import COO
 from functools import reduce
 from itertools import chain
 from collections import Counter
@@ -135,7 +134,7 @@ class SBSMode(ModeConfig):
             sig_names = sig_names or select
 
         elif not has_extra_dims:
-            pl_signatures = [signature.data.ravel()[MUTOPIA_TO_COSMIC_IDX]]
+            pl_signatures = [signature.data.ravel()]
             select = ['']
         else:
             raise ValueError('If the signature has extra dimensions, `select` must be specified.')
@@ -176,7 +175,6 @@ class SBSMode(ModeConfig):
                 counts['N']+=1
             return counts
 
-
         def _count_trinucs(bed12_region, fasta_object):
             
             segments = map(lambda x : _get_window_seq(fasta_object, *x), bed12_region.segments())
@@ -189,7 +187,7 @@ class SBSMode(ModeConfig):
 
             return [
                 [counts[context]+pseudocount for context in contexts],
-                [counts[_revcomp(context)]+pseudocount for context in CONTEXTS]
+                [counts[_revcomp(context)]+pseudocount for context in contexts]
             ]
         
         with Fasta(fasta_file) as fasta_object:
@@ -258,7 +256,9 @@ def SBSModel(
     seed=0,
     # context model
     context_reg=0.0001,
+    kmer_reg=0.005,
     conditioning_alpha=1e-9,
+    context_encoder='diagonal',
     # mutation model
     mutation_reg=0.0005,
     # locals model
@@ -279,7 +279,7 @@ def SBSModel(
     l2_regularization=1,
     # optimization settings
     empirical_bayes = True,
-    begin_prior_updates = 10,
+    begin_prior_updates = 20,
     stop_condition=50,
     num_epochs = 2000,
     locus_subsample = None,
@@ -311,12 +311,16 @@ def SBSModel(
         max_iter=max_iter,
     )
 
-    #mer_encoder = KmerEncoder(
-    #    ['ACTG','CT','ACTG'],
-    #    kmer_extractor=tuple,
-    #    feature_name_fn=_make_feature_name,
-    #)
-    kmer_encoder = DiagonalEncoder()
+    if context_encoder == 'diagonal':
+        kmer_encoder = DiagonalEncoder()
+    elif context_encoder == 'kmer':
+        kmer_encoder = KmerEncoder(
+            ['ACTG','CT','ACTG'],
+            kmer_extractor=tuple,
+            feature_name_fn=_make_feature_name,
+        )
+    else:
+        raise ValueError(f'Unknown context encoder: {context_encoder}')
 
     context_model = StrandedContextModel(
         train_corpuses,
@@ -326,6 +330,7 @@ def SBSModel(
         init_variance=init_variance[1],
         tol=5e-4,
         reg=context_reg,
+        kmer_reg=kmer_reg,
         conditioning_alpha=conditioning_alpha,
         init_components=init_components,
         max_iter=max_iter,
@@ -398,10 +403,27 @@ def SBSModel(
     )
 
 
-def _sample_params(study, trial):
-    return {
-        #'context_reg' : trial.suggest_float('context_reg', 1e-5, 5e-3, log=True),
-        #'mutation_reg' : trial.suggest_float('mutation_reg', 1e-5, 5e-2, log=True),
+def _sample_params(study, trial, extensive=False):
+
+    params = {
         'l2_regularization' : trial.suggest_float('l2_regularization', 1e-5, 100., log=True),
         'max_features' : trial.suggest_categorical('max_features', [0.25, 0.33, 0.5]),
     }
+
+    if extensive:
+        params.update({
+            'init_variance' : (
+                trial.suggest_float('init_variance_mutation', 0.01, 0.1),
+                trial.suggest_float('init_variance_context', 0.01, 0.1),
+                trial.suggest_float('init_variance_theta', 0.01, 0.1),
+            ),
+            'context_reg' : trial.suggest_float('context_reg', 1e-5, 5e-3, log=True),
+            'mutation_reg' : trial.suggest_float('mutation_reg', 1e-5, 5e-2, log=True),
+            'context_encoder' : trial.suggest_categorical('context_encoder', ['diagonal', 'kmer']),
+            'kmer_reg' : trial.suggest_float('kmer_reg', 1e-4, 5e-2, log=True),
+            'conditioning_alpha' : trial.suggest_float('conditioning_alpha', 1e-10, 1e-7, log=True),
+            'tree_learning_rate' : trial.suggest_float('tree_learning_rate', 0.05, 0.2),
+            'convolution_width' : trial.suggest_int('convolution_width', 0, 3),
+        })
+    
+    return params

@@ -41,6 +41,7 @@ def create_study(
     storage=None,
     save_model=False,
     output_dir=None,
+    extensive=False,
     *,
     min_components, 
     max_components,
@@ -67,6 +68,7 @@ def create_study(
     study.set_user_attr('train_corpuses', train_corpuses)
     study.set_user_attr('test_corpuses', test_corpuses)
     study.set_user_attr('save_model', save_model)
+    study.set_user_attr('extensive', extensive)
     study.set_user_attr('output_dir', output_dir)
 
     for key, value in model_kw.items():
@@ -98,6 +100,7 @@ def load_study(study_name, storage = None, prune=True):
         'test_corpuses' : model_attrs.pop('test_corpuses'),
         'save_model' : model_attrs.pop('save_model'),
         'output_dir' : model_attrs.pop('output_dir'),
+        'extensive' : model_attrs.pop('extensive'),
     }
 
     return (
@@ -214,7 +217,7 @@ def run_trial(
     param_sampling_fn = partial(
         _sample_params,
         study,
-        example_corpus.modality().sample_params,
+        partial(example_corpus.modality().sample_params, extensive=study_attrs['extensive']),
     )
 
     obj_fn = partial(

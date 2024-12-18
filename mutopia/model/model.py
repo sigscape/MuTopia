@@ -4,7 +4,7 @@ import xarray as xr
 from ..utils import ParContext, using_exposures_from, \
     check_corpus, check_dims
 from .model_components import *
-from .eval import deviance
+from .eval import deviance_locus
 from .latent_var_models import *
 from ..plot.coef_matrix_plot import _plot_interaction_matrix
 from ..corpus import *
@@ -56,13 +56,20 @@ class Model:
 
     def _setup_corpus(self, corpus):
         args = (corpus, self.model_state_)
+        
         CS.init_corpusstate(*args)
+        
         with ParContext(1) as par:
             CS.update_corpusstate(
                 *args, 
                 from_scratch=True,
                 parallel_context=par,
             )
+        
+        CS.update_normalizers(
+            corpus, 
+            self.model_state_.get_normalizers(corpus)
+        )
         return corpus
         
 
@@ -125,6 +132,9 @@ class Model:
     ):
         self._check_corpus(corpus)
 
+        self.model_state_.locals_model.estep_iterations=10000
+        self.model_state_.locals_model.difference_tol=1e-5
+
         if not CS.has_corpusstate(corpus):
             corpus = self._setup_corpus(corpus)
 
@@ -177,6 +187,9 @@ class Model:
     ):
         self._check_corpus(corpus)
 
+        if not CS.has_corpusstate(corpus):
+            corpus = self._setup_corpus(corpus)
+
         try:
             corpus.varm['component_distributions']
         except KeyError:
@@ -201,6 +214,9 @@ class Model:
         threads=1,
     ):  
         self._check_corpus(corpus)
+
+        if not CS.has_corpusstate(corpus):
+            corpus = self._setup_corpus(corpus)
 
         try:
             corpus.varm['component_distributions']
@@ -238,6 +254,9 @@ class Model:
     ):
         self._check_corpus(corpus)
 
+        if not CS.has_corpusstate(corpus):
+            corpus = self._setup_corpus(corpus)
+
         try:
             import shap
         except ImportError:
@@ -270,10 +289,10 @@ class Model:
         
         features = corpus.state.coords['feature'].data
 
-        corpus = corpus.assign_coords({'locus_features' : features})
+        corpus = corpus.assign_coords({'transformed_features' : features})
         corpus.varm['SHAP_values'] = xr.DataArray(
                 shap_matrix,
-                dims=('component','locus','locus_features'),
+                dims=('component','locus','transformed_features'),
             )
 
         logger.info('Added key to varm: "SHAP_values"')
@@ -287,11 +306,16 @@ class Model:
     ):
         self._check_corpus(corpus)
 
-        return deviance(
-            self.model_state_,
-            (corpus,),
-            exposures_fn=using_exposures_from(corpus) if exposures is None else exposures,
-        )
+        if not CS.has_corpusstate(corpus):
+            corpus = self._setup_corpus(corpus)
+
+        with ParContext(1) as par:
+            return deviance_locus(
+                self.model_state_,
+                (corpus,),
+                exposures_fn=using_exposures_from(corpus) if exposures is None else exposures,
+                parallel_context=par,
+            )
 
     
     def annot_residuals(
