@@ -2,6 +2,7 @@ import numpy as np
 from sparse import COO, GCXS
 from abc import ABC, abstractmethod
 from numba import njit
+import sys
 from ..corpus_state import CorpusState as CS
 
 class PrimitiveModel(ABC):
@@ -15,6 +16,9 @@ class PrimitiveModel(ABC):
         return dict()
 
     def update_corpusstate(self, corpus, **kwargs):
+        pass
+
+    def post_fit(self, corpuses):
         pass
 
     def prepare_to_save(self):
@@ -86,6 +90,14 @@ class DenseDataBase(ABC):
         raise NotADirectoryError
 
 
+def get_feature_classes(corpus, feature):
+    feature = corpus.features[feature]
+    try:
+        return list(feature.attrs['classes'])
+    except KeyError:
+        raise ValueError(f'Feature {feature.name} in {CS.get_name(corpus)} does not have classes defined!')
+    
+
 ## Shared methods for rate models ##
 def get_reg_params(l1_rate, l2_rate):
         return dict(
@@ -139,7 +151,9 @@ def get_corpus_design(corpuses, encoder : dict, n_repeats = lambda x : 1):
 def _svi_update_fn(old_value, new_value, learning_rate):
     
     if np.isnan(new_value).any():
-        print('NaN value encountered in update!')
+        print('NaN value encountered in update! - if this happens repeatedly later in training, '
+              'consider increasing `conditioning_alpha`.', 
+              file=sys.stderr)
         return old_value
     
     return (1-learning_rate)*old_value + learning_rate*new_value

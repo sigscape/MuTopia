@@ -1,7 +1,8 @@
 from .base import get_reg_params, _svi_update_fn, RateModel, SparseDataBase, DenseDataBase
-from ._strand_transformer import NormalizedMesoscaleEncoder
+from ._strand_transformer import MesoscaleEncoder, DesignMatrixHelper
 from ._glm_compiled import make_optimizer, setup_mixed_solver, \
-    get_lsqr_solver, ls_partial_solver
+    get_lsqr_solver, interative_partial_ls_solver
+from ._kmer_encoder import DiagonalEncoder
 from ._fast_eln import get_eln_solver
 from functools import partial
 from sklearn.base import clone
@@ -23,7 +24,8 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
         dim_name,
         corpuses,
         reg : float = 0.0005,
-        conditioning_alpha = 5e-5,
+        conditioning_alpha = 1e-9,
+        init_variance : float=0.1,
         tol = 5e-4,
         max_iter=100,
         dtype=np.float32,
@@ -36,41 +38,73 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
         super().__init__(*corpuses)
 
         self.n_components = n_components
+
         self.consequence_dim = corpuses[0].dims[dim_name]
         self.consequence_names = corpuses[0].coords[dim_name].values
+
         self.context_dim = corpuses[0].dims['context']
         self.context_names = corpuses[0].coords['context'].values
         self.dtype = dtype
 
-        self.transformer = NormalizedMesoscaleEncoder(self.consequence_dim)\
-                                .fit(corpuses)
+        self.transformer = MesoscaleEncoder()\
+            .fit(corpuses)
         
-        _cons_encoding_matrix = self.transformer.encoding_matrix_
-        self._is_regularized = ~np.array(self.transformer.intercept_mask_)
-        X = _cons_encoding_matrix.copy()
-        X.data = X.data.astype(dtype, copy=False)
+        self.context_transformer = DiagonalEncoder()\
+            .fit(self.consequence_names)
+
+        self.encoding_matrix_ = DesignMatrixHelper\
+            .compose_encoding_matrix(
+                self.context_transformer.encoding_matrix,
+                self.transformer.encoding_matrix,
+                shared_effects=False,
+            )
+        
+        X = DesignMatrixHelper\
+            .eye_pad_right(
+                self.encoding_matrix_.copy(),
+                len(self.consequence_names)
+            )
+        
+        self._X = X
+        
+        self._coefs = self._init_params(
+            random_state, 
+            dtype,
+            init_variance,
+            n_components, 
+            self.context_dim,
+            X.shape[1],
+        )
+
+        self.is_intercept_ = np.array(
+            [True]*self.consequence_dim \
+            + [False]*self.transformer.n_coefs * self.consequence_dim \
+            + [True]*self.transformer.n_states_
+        )
 
         eln_solver = partial(
             get_eln_solver,
-            **get_reg_params(reg, conditioning_alpha),
+            **get_reg_params(reg, 1e-5),
             tol=tol,
             random_state=random_state,
+            max_iter=100,
         ) # f(X) -> f(z, w, beta) -> beta
 
+
+        intercept_groups = [True]*self.consequence_dim \
+                + [False]*self.transformer.n_states_
         ridge_solver = partial(
-            ls_partial_solver,
-            group_mask = np.array(
-                [True]*self.consequence_dim \
-                + [False]*( (~self._is_regularized).sum() - self.consequence_dim )
-            ),
+            interative_partial_ls_solver,
+            group_mask = np.array(intercept_groups),
             tol=tol,
-            max_iter=10000,
+            max_iter=10,
+            alpha=conditioning_alpha,
         )
 
         # f(X) -> f( f(X) -> f(z, w, beta) -> beta, f(X) -> f(z, w, beta) -> beta ) -> f(z, w, beta) -> beta
         mixed_solver = partial(
             setup_mixed_solver,
-            is_regularized = self._is_regularized,
+            is_regularized = ~self.is_intercept_,
             reg_solver = eln_solver,
             unreg_solver = ridge_solver,
         )
@@ -82,21 +116,11 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
             max_iter=max_iter,
         )
 
-        # convert to dense for other computations, but keep sparse for regression updates
-        self._cons_encoding_matrix=_cons_encoding_matrix\
-                                    .toarray()[:,:-self.transformer.n_states_]
-
-        self._coefs = self._init_params(
-            random_state, 
-            n_components, 
-            self.context_dim, 
-            dtype
-        )
-
-        if not init_components is None:
+        '''if not init_components is None:
             self.init_from_signatures(
                 corpuses[0].modality().load_components(*init_components)
-            )
+            )'''
+
 
     @property
     def requires_normalization(self):
@@ -107,8 +131,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
         return ('configuration','context', self.dim_name, 'locus')
     
     def prepare_to_save(self):
-        del self.model
-        
+        del self.model    
     
     def predict_sparse(self, corpus,*,context, configuration, locus, **idx_dict):
 
@@ -185,15 +208,10 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
             ] = np.log( renormalized.astype(self.dtype) )
     
 
-    def _init_params(self, random_state, n_components, context_dim, dtype):
+    def _init_params(self, random_state, dtype, init_variance, *shape):
         return random_state.normal(
-                    0, 0.1,
-                    (
-                        n_components, 
-                        context_dim,
-                        self.transformer.get_num_coefs()
-                    )
-                ).astype(dtype, copy = False)
+            0, init_variance, shape,
+        ).astype(dtype, copy = False)
     
 
     def _get_log_cons_distribution(self, corpus_state):
@@ -312,22 +330,50 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
 
 
     def format_signature(self, k):
+
+        encoding_matrix = DesignMatrixHelper\
+            .compose_encoding_matrix(
+                self.context_transformer.encoding_matrix,
+                self.transformer\
+                    .independent_effects_encoding(),
+                shared_effects=False
+            )
+        
         # CxMxS
-        rho = self._calc_rho(k, 
-            self.transformer\
-                .independent_effects_encoding()
-        )
+        rho = self._calc_rho(k, encoding_matrix)
         
         return DataArray(
             rho,
             dims=('context', self.dim_name, 'mesoscale_state'),
             coords={
-                'mesoscale_state' : self.transformer.feature_names_out,
+                'mesoscale_state' : ['Baseline'] + self.transformer.get_feature_names_out(),
                 'context' : self.context_names,
                 self.dim_name : self.consequence_names,
             }
         )
     
 
+    def get_baseline_summary(self, k):
+        return self.format_signature(k).sel(mesoscale_state='Baseline')
+
+    def get_interaction_summary(self, k):
+
+        c = self.context_dim
+        q = self.consequence_dim
+        r = self.transformer.n_coefs
+
+        X = self.coefs_[k][:,-r*q:].reshape((c,q,r))
+        X = np.concat([np.zeros((1,q,r)), X], axis =0)
+
+        return DataArray(
+            data=X,
+            dims=('context', self.dim_name, 'feature'),
+            coords={
+                'context' : ['Shared effect'] + list(self.context_names),
+                self.dim_name : self.consequence_names,
+                'feature' : self.transformer.get_feature_names_out(),
+            }
+        )
+
     def _format_component(self, k):
-        return self._calc_rho(k, self._cons_encoding_matrix)
+        return self._calc_rho(k, self.encoding_matrix_)

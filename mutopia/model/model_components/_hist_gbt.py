@@ -11,6 +11,7 @@ from sklearn.utils.validation import (
     _check_monotonic_cst,
     _check_sample_weight,
     check_consistent_length,
+    _check_y
 )
 from sklearn.ensemble._hist_gradient_boosting._gradient_boosting import _update_raw_predictions
 from sklearn.ensemble._hist_gradient_boosting.binning import _BinMapper
@@ -155,7 +156,9 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
         acc_compute_hist_time = 0.0  # time spent computing histograms
         # time spent predicting X for gradient and hessians update
         acc_prediction_time = 0.0
-        X, y = self._validate_data(X, y, dtype=[X_DTYPE], force_all_finite=False)
+        #X, y = self._validate_data(X, y, dtype=[X_DTYPE], force_all_finite=False)
+        X = self._preprocess_X(X, reset=False)
+        y = _check_y(y, estimator=self)
         y = self._encode_y(y)
         check_consistent_length(X, y)
         # Do not create unit sample weights by default to later skip some
@@ -179,7 +182,7 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
         if not (self.warm_start and self._is_fitted()):
             self._random_seed = rng.randint(np.iinfo(np.uint32).max, dtype="u8")
 
-        self._validate_parameters()
+        #self._validate_parameters()
         monotonic_cst = _check_monotonic_cst(self, self.monotonic_cst)
 
         # used for validation in predict
@@ -280,8 +283,8 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
             # else 1.
             # self._baseline_prediction has shape (1, n_trees_per_iteration)
 
-            if not np.isclose(raw_predictions, 0.).all():
-                warnings.warn('Initial raw predictions are not set to 0. This will bias the predictions of the model.')
+            #if not np.isclose(raw_predictions, 0.).all():
+            #    warnings.warn('Initial raw predictions are not set to 0. This will bias the predictions of the model.')
 
             self._baseline_prediction = np.zeros_like(raw_predictions[0])
 
@@ -556,20 +559,55 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
         return self
     
 
-    def fit_binning(self, X):
+    def _preprocess_X(self, X, *, reset):
+        """Preprocess and validate X.
+
+        Parameters
+        ----------
+        X : {array-like, pandas DataFrame} of shape (n_samples, n_features)
+            Input data.
+
+        reset : bool
+            Whether to reset the `n_features_in_` and `feature_names_in_ attributes.
+
+        Returns
+        -------
+        X : ndarray of shape (n_samples, n_features)
+            Validated input data.
+
+        known_categories : list of ndarray of shape (n_categories,)
+            List of known categories for each categorical feature.
+        """
+        # If there is a preprocessor, we let the preprocessor handle the validation.
+        # Otherwise, we validate the data ourselves.
+        check_X_kwargs = dict(dtype=[X_DTYPE], force_all_finite=False)
+        
+        if reset:
+            self.is_categorical_ = self._check_categorical_features(X)
+            self.n_features_in_ = X.shape[1]
+
+        return self._validate_data(X, reset=False, **check_X_kwargs)
+    
+
+    def fit_binning(self, X, known_categories):
 
         n_threads = _openmp_effective_n_threads()
         #self.is_categorical_, known_categories = self._check_categories(X)
-        (X, known_categories) = self._preprocess_X(X, reset=True)
+        X = self._preprocess_X(X, reset=True)
+
+        known_categories = [
+            np.array(c, dtype=X_DTYPE) if c is not None else None
+            for c in known_categories
+        ]
 
         n_bins = self.max_bins + 1  # + 1 for missing values
         self._bin_mapper = _BinMapper(
-                n_bins=n_bins,
-                is_categorical=self.is_categorical_,
-                known_categories=known_categories,
-                random_state=42,
-                n_threads=n_threads,
-            ).fit(X)
+            n_bins=n_bins,
+            is_categorical=self.is_categorical_,
+            known_categories=known_categories,
+            random_state=42,
+            n_threads=n_threads,
+        ).fit(X)
         
         return self
 
@@ -589,9 +627,6 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
         # (binmapper, histbuilder...) accept n_bins instead, which is the
         # actual total number of bins. Everywhere in the code, the
         # convention is that n_bins == max_bins + 1
-
-        
-
         try:
             self._bin_mapper
         except AttributeError:
@@ -621,13 +656,16 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
         return X_binned
         
     
-    def _raw_predict_from(self, X, raw_predictions, from_iteration = 0):
+    def _raw_predict_from(self, 
+            X, raw_predictions, 
+            from_iteration = 0,
+            check_input = True,
+        ):
 
         is_binned = getattr(self, "_in_fit", False)
-        if not is_binned:
-            X = self._validate_data(
-                X, dtype=X_DTYPE, force_all_finite=False, reset=False
-            )
+        
+        if check_input:
+            X = self._preprocess_X(X, reset=False)
 
         check_is_fitted(self)
 

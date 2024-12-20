@@ -3,13 +3,12 @@ import inspect
 from .base import get_corpus_intercepts, get_poisson_targets_weights,\
      _svi_update_fn, RateModel, idx_array_to_design, \
      SparseDataBase, DenseDataBase
-from ...utils import dims_except_for
+from ...utils import dims_except_for, str_wrapped_list
 from ..corpus_state import CorpusState as CS
 from ._hist_gbt import CustomHistGradientBooster
-from ._feature_tranformer import get_smoothing_transformer, \
-    get_paste_transformer, get_normalizing_transformer, \
-    get_categorical_features, get_feature_interaction_groups, \
-    StratifiedTransformer
+from ._feature_tranformer import get_feature_transformer, \
+    get_categorical_feature_idxs, get_feature_interaction_group_idxs, \
+    get_known_categories, StratifiedTransformer
 
 from functools import partial
 import numpy as np
@@ -29,8 +28,10 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
     def __init__(self,
         corpuses,
         add_corpus_intercepts=False,
+        convolution_width=1,
         model_kw={},
-        dtype = np.float32,
+        dtype = float,
+        init_variance=0.05,
         smoothing_size=1000,
         transformers=[],
         *,
@@ -46,41 +47,44 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
             for i, corpus in enumerate(corpuses)
         }
 
+        (self.base_transformer_, feature_names_in) = \
+            get_feature_transformer(
+                *corpuses,
+                additional_transformers=transformers,
+                categorical_encoder=self.categorical_encoder,
+                add_corpus_intercepts=add_corpus_intercepts and len(corpuses) > 1,
+                convolution_width=convolution_width
+            )
+
+        # Fit the transformer to get an example 
+        # on which to fit the GBT binning.
         corpus = corpuses[0]
+        X = self.base_transformer_\
+                    .fit(corpus, corpus=corpus)\
+                    .transform(corpus, corpus=corpus)
+        
+        self.n_features_ = X.shape[1]
+        self.feature_names_out_ = self.base_transformer_.get_feature_names_out(feature_names_in)
+        
+        categorical_features = get_categorical_feature_idxs(self.base_transformer_)
+        self.n_categorical_features_ = len(categorical_features)
 
-        self.base_transformer_ = Pipeline([
-            ('paste', get_paste_transformer(*corpuses)),
-            ('smoother', get_smoothing_transformer(
-                    *corpuses,
-                    window_size=smoothing_size
-                )
-            ),
-            ('normalize', get_normalizing_transformer(
-                    *corpuses,
-                    categorical_encoder=self.categorical_encoder,
-                    add_corpus_intercepts=add_corpus_intercepts,
-                )
-            ),
-            *[(f'user_transformer_{i}', t) for i, t in enumerate(transformers)]
-        ])
-
-        self.base_transformer_.fit(corpus, corpus=corpus)
-        self.n_features_ = len(self.base_transformer_[2].get_feature_names_out())
+        known_categories = get_known_categories(self.base_transformer_, len(self.feature_names_out_))
 
         self.rate_models = [
             self._make_model(
                 **model_kw,
-                X = self.base_transformer_.transform(corpus, corpus=corpus)\
-                        .astype(self.dtype),
-                interaction_groups = get_feature_interaction_groups(corpus, self.base_transformer_),
-                categorical_features = get_categorical_features(self.base_transformer_),
+                X = X,
+                interaction_groups = get_feature_interaction_group_idxs(corpus, self.base_transformer_),
+                categorical_features = categorical_features,
+                known_categories = known_categories,
                 random_state = random_state,
             )
             for _ in range(n_components)
         ]
 
         self.locus_transformer_ = StratifiedTransformer(self.base_transformer_)
-        
+
         '''
         We want to initialize the locus effects with something instead of just 0s
         (if you initialize with 0s, the model can only use exposure differences to 
@@ -88,11 +92,10 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         to follow feature distributions, let's just initialize them with a simple
         Laplace projection of the feature matrix.
         '''
-        self.init_projection_ = random_state.laplace(
-                0., 0.1,
-                (self.n_components, self.n_features_),
+        self.init_projection_ = random_state.normal(
+                0., init_variance,
+                (self.n_components, self.n_features_ - self.n_categorical_features_),
             ).astype(self.dtype)
-
 
 
     @property
@@ -104,34 +107,49 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         return ('locus',)
     
 
+    def _init_log_locus_distribution(self, locus_features):
+        X = locus_features[:, self.n_categorical_features_:]
+        return DataArray(
+            (np.nan_to_num(X, nan=-3.) @ self.init_projection_.T).T,
+            dims=('component','locus'),
+        )
+
     def prepare_corpusstate(self, corpus):
 
         X = self.locus_transformer_\
             .transform(corpus, corpus=corpus)
         
         return dict(
-                locus_features  = DataArray(
+                locus_features = DataArray(
                     X,
                     dims=('locus', 'feature'),
                     coords={
-                        'feature' : self.base_transformer_[2]\
-                                        .get_feature_names_out()
+                        'feature' : self.feature_names_out_,
                     }
                 ),
-                log_locus_distribution = DataArray(
-                    (np.nan_to_num(X, nan=-3.) @ self.init_projection_.T).T,
-                    dims=('component','locus'),
-                ),
+                log_locus_distribution = self._init_log_locus_distribution(X),
             )
+    
+
+    def _check_input(self, X):
+        return self.rate_models[0]._preprocess_X(X, reset=False)
         
     '''
     Because of the way the GBT model works, we want to cache and store the predictions
     rather than generate them from the model.
     '''
     def update_corpusstate(self, corpus, from_scratch=False):
+
+        X = self._check_input(self._fetch_feature_matrix(corpus))
+
         for k in range(self.n_components):
             CS.fetch_val(corpus, 'log_locus_distribution')[k].data[:] = \
-                self._predict(k, corpus, from_scratch=from_scratch)
+                self._predict(
+                    k, corpus, 
+                    from_scratch=from_scratch,
+                    X=X,
+                    check_input=False
+                )
             
 
     '''
@@ -156,13 +174,12 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
             n_repeats=lambda corpus : corpus.dims['locus'],
         )
 
-
     def _get_intercept_design(self, *corpuses):
         return idx_array_to_design(
             self._get_intercept_idx(*corpuses),
             len(corpuses),
         ).to_scipy_sparse().tocsc()
-    
+
 
     def _fetch_feature_matrix(self, *corpuses):
         return np.vstack([
@@ -325,7 +342,11 @@ class LinearThetaModel(ThetaModel):
 
 class GBTThetaModel(ThetaModel):
 
-    categorical_encoder = OrdinalEncoder(max_categories=254)
+    categorical_encoder = partial(
+        OrdinalEncoder, 
+        max_categories=254,
+        dtype=np.float32,
+    )
 
     @classmethod
     def list_params(cls):
@@ -369,6 +390,7 @@ class GBTThetaModel(ThetaModel):
                   tree_learning_rate,
                   use_groups,
                   random_state,
+                  known_categories,
                   **tree_kw
                 ):
         model = CustomHistGradientBooster(
@@ -384,7 +406,7 @@ class GBTThetaModel(ThetaModel):
                     **tree_kw
                 )
         
-        model.fit_binning(X)
+        model.fit_binning(X, known_categories)
 
         return model
 
@@ -427,9 +449,16 @@ class GBTThetaModel(ThetaModel):
         )
 
 
-    def _predict(self, k, corpus, from_scratch = False):
+    def _predict(self, 
+            k, corpus, 
+            from_scratch = False,
+            X=None, 
+            check_input = True
+        ):
 
-        X = self._fetch_feature_matrix(corpus)
+
+        if X is None:
+            X = self._fetch_feature_matrix(corpus)
 
         ##
         # TODO:
@@ -437,13 +466,16 @@ class GBTThetaModel(ThetaModel):
         # for initializing the mr estimates.
         ##
         if from_scratch:
+            init_prediction = self._init_log_locus_distribution(X)
+
             theta = np.log(self.rate_models[k].predict(X))\
-                        + CS.fetch_val(corpus, 'log_locus_distribution')[k].data
+                        + init_prediction[k].data
         else:
             theta = self.rate_models[k]._raw_predict_from(
                     X, 
                     CS.fetch_val(corpus, 'log_locus_distribution')[k].data[:,None], 
-                    from_iteration = self.predict_from[k]
+                    from_iteration = self.predict_from[k],
+                    check_input = check_input,
                 ).ravel()
 
         return theta

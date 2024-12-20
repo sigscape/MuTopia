@@ -5,88 +5,80 @@ import warnings
 from typing import Union, List, Dict
 from numpy.typing import ArrayLike, NDArray
 from ..utils import FeatureType, check_structure
-from ..modalities import Modality, get_mode
+from ..modalities import get_mode
 import logging
 logger = logging.getLogger(' MuTensor ')
 logger.setLevel(logging.INFO)
 
 
-def gTensor(
-    modality : Modality,
+def GTensor(
+    modality,
     *,
     name : str,
     chrom : List[str],
     start : List[int],
     end : List[int],
-    block_starts : List[List[int]],
-    block_ends : List[List[int]],
-    context_frequencies : NDArray[np.number],
-    exposures : NDArray[np.number],
+    context_frequencies : xr.DataArray,
+    exposures : Union[None, NDArray[np.number]] = None,
 ):
     
-    observation_dims = list(modality.dims.values())
-
-    if not len(context_frequencies.shape) == len(observation_dims) + 1:
+    #observation_dims = tuple(modality.sizes.values())
+    #dim_names = tuple(modality.sizes.keys())
+    '''if not len(context_frequencies.shape) == len(observation_dims) + 1:
         raise ValueError(
             f'Expected `context_frequencies` to have {len(observation_dims) + 1} dimensions, '
             f'but got {len(context_frequencies.shape)} dimensions instead.'
         )
+    
     if not observation_dims == context_frequencies.shape[:-1]:
         raise ValueError(
-            f'Expected `context_frequencies` to have shape ({", ".join(observation_dims)}, N_loci), '
-            f'but got {context_frequencies.shape} instead.'
-        )
+            f'Expected `context_frequencies` to have shape ({", ".join(map(str, observation_dims))}, N_loci), '
+            f'but got {str(context_frequencies.shape)} instead.'
+        )'''
       
-    locus_coords = [
-        f'{chrom}:{start}-{end}' 
-        for (chrom, start, end) in zip(chrom, start, end)
-    ]
+    locus_coords = np.arange(len(chrom))
 
     shared_coords = {
-        'locus' : locus_coords,
         **modality.coords,
+        'locus' : locus_coords,
+        'sample' : [],
     }
-    obs_coords = {'sample' : []}
 
     region_lengths = np.sum(
-        context_frequencies, 
-        axis=tuple(range(context_frequencies.ndim - 1))
+        context_frequencies.data, 
+        axis=tuple(range(context_frequencies.data.ndim - 1))
     )
+
+    if exposures is None:
+        exposures = np.ones(len(locus_coords), dtype=np.float64)
     
     corpus = DataTree.from_dict({
             '/' : xr.Dataset(
                 coords=shared_coords,
                 attrs={
                     'name' : name,
-                    'dtype' : modality.value,
+                    'dtype' : modality.MODE_ID,
                 }
             ),
-            '/regions' : xr.Dataset(
-                {
-                    'chrom' : xr.DataArray(np.array(chrom), dims=('locus')),
-                    'start' : xr.DataArray(np.array(start), dims=('locus')),
-                    'end' : xr.DataArray(np.array(end), dims=('locus')),
-                    'length' : xr.DataArray(np.array(region_lengths), dims=('locus')),
-                    'block_starts' : xr.DataArray(np.array(block_starts), dims=('locus')),
-                    'block_ends' : xr.DataArray(np.array(block_ends), dims=('locus')),
-                    'context_frequencies' : xr.DataArray(
-                            data=context_frequencies,
-                            dims=(*observation_dims, 'locus'),
-                        ),
-                    'exposures' : xr.DataArray(
-                        data=np.squeeze(exposures),
-                        dims=('locus',),
-                    ),
-                },
-            ),
+            '/regions' : xr.Dataset({
+                'chrom' : xr.DataArray(np.array(chrom), dims=('locus')),
+                'start' : xr.DataArray(np.array(start), dims=('locus')),
+                'end' : xr.DataArray(np.array(end), dims=('locus')),
+                'length' : xr.DataArray(np.array(region_lengths), dims=('locus')),
+                'context_frequencies' : context_frequencies,
+                'exposures' : xr.DataArray(
+                    data=np.squeeze(exposures),
+                    dims=('locus',),
+                ),
+            }),
+            '/obsm' : xr.Dataset(),
             '/features' : xr.Dataset(),
-            '/layers' : xr.Dataset(coords=obs_coords),
-            '/obsm' : xr.Dataset(coords=obs_coords),
             '/varm' : xr.Dataset(),
         },
     )
 
     return corpus
+
 
 
 def add_feature(
@@ -144,7 +136,7 @@ def add_sample(
         sample = sample.squeeze()
 
     required_dims = \
-        set( get_mode(corpus).dims.keys() )\
+        set( get_mode(corpus).dims )\
         .union({'locus'})
     
     if not set(sample.dims) == required_dims:
@@ -156,27 +148,35 @@ def add_sample(
         .expand_dims({'sample' : [name]})\
         .ascsr('sample','locus')
     
-    layers = xr.concat(
+    root = xr.concat(
         [
-            corpus.layers.to_dataset(), 
+            corpus.to_dataset(), 
             xr.Dataset(
                 {'X' : sample}, 
                 coords={'sample' : [name]}
             ),
-        ], 
+        ],
         dim='sample'
     )
     
-    layers.X.ascsr('sample','locus')
+    root.X.ascsr('sample','locus')
 
+    corpus = DataTree(
+        data=root,
+        children=corpus.children
+    )
+
+    # remove and reinit the obsm section
     update_view(
         corpus,
-        layers=layers,
+        obsm = xr.Dataset(
+            coords=corpus.coords,
+        )
     )
-    logger.info(f'Added sample to layers.X: "{name}"')
+
+    logger.info(f'Added sample to .X: "{name}"')
 
     return corpus
-
 
 
 def update_view(
@@ -193,23 +193,18 @@ def update_view(
     return tree
 
 
-
 def annot_empirical_marginal(
     corpus,
-    layer='X',
 ):
     check_structure(corpus)
-    try:
-        corpus.layers[layer]
-    except KeyError:
-        raise KeyError(f'The corpus does not have a layer {layer}.')
     
-    with warnings.simplefilter("ignore"):
-        log_em = (
-            np.log( corpus.layers[layer].sum('sample') )\
-                - np.log( corpus.regions.context_frequencies )
-        )
-        
+    #with warnings.simplefilter("ignore"):
+    log_em = (
+        np.log( corpus.X.sum('sample') )\
+            - np.log( corpus.regions.context_frequencies )
+    )
+    
+    log_em.data = log_em.data.astype(np.float32)
     empirical_marginal = np.exp(log_em - log_em.max()).fillna(0.)
     del log_em
     

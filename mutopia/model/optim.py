@@ -2,16 +2,7 @@
 from .corpus_state import CorpusState as CS
 from .eval import *
 from ..utils import *
-import logging
 from tqdm import trange
-
-logging.basicConfig(
-    level="INFO",
-    format="%(message)s",
-    datefmt="[%X]",
-)
-logger = logging.getLogger(" Mutopia ")
-
 
 def VI_step(
     model_state,
@@ -32,6 +23,15 @@ def VI_step(
         **args,
         norm_update_fn=model_state._update_normalizer
     )
+
+    '''
+    In the previous "offsets" step, the normalizers were updated
+    on a subset of the data. Now we need to update the normalizers
+    on the full data set.
+    '''
+    for corpus in corpuses:
+        CS.update_normalizers(corpus, model_state.get_normalizers(corpus))
+
     '''
     The normalizers are updated in the previous function
     (because the mutation rates are used to get the offsets, 
@@ -59,7 +59,12 @@ def VI_step(
     )
 
     for corpus in corpuses:
-        CS.update_corpusstate(corpus, model_state)
+        CS.update_corpusstate(
+            corpus, 
+            model_state, 
+            from_scratch=False,
+            parallel_context=parallel_context,
+        )
 
     return elbo, test_elbo
 
@@ -76,15 +81,6 @@ def SVI_step(
     learning_rate,
     subsample_rate,
 ):
-
-    '''
-    Fit the normalizing constants on the whole training corpus - 
-    it's really important that this step has low variance.
-    '''
-    #model_state.init_normalizers(
-    #    corpuses, 
-    #    parallel_context=parallel_context
-    #)
 
     '''
     Generate the sliced corpuses for the E-step.
@@ -108,7 +104,18 @@ def SVI_step(
         **args,
         norm_update_fn=partial(model_state._update_normalizer, **svi_kw),
     )
+
+    '''
+    In the previous "offsets" step, the normalizers were updated
+    on a subset of the data. Now we need to transfer this information
+    to the full data set (this is just a copying step, no computation).
+    '''
+    for corpus in corpuses:
+        CS.update_normalizers(corpus,  model_state.get_normalizers(corpus))
     
+    '''
+    Okay, now we can calculate the sufficient statistics.
+    '''
     sstats, elbo = model_state.Estep(**args, **svi_kw)
 
     '''
@@ -134,9 +141,17 @@ def SVI_step(
     '''
     Update the state of the original corpuses,
     - not the slices.
+    Note at this point the normalizer and the rate parameters
+    are not in sync - this is on purpose, we only want to update
+    the normalizers on the subset data during the offset calculation.
     '''
     for corpus in corpuses:
-        CS.update_corpusstate(corpus, model_state)
+        CS.update_corpusstate(
+            corpus, 
+            model_state, 
+            from_scratch=False,
+            parallel_context=parallel_context,
+        )
 
     return elbo, test_score
 
@@ -151,16 +166,17 @@ def locus_slice_generator(
         subsample_rate=0.25,
     ):
 
-    n_loci = corpuses[0].dims['locus']
+    def get_random_loci(corpus):
+        n_loci = corpus.dims['locus']
+        sel_loci = random_state.choice(
+            n_loci,
+            int(subsample_rate*n_loci),
+            replace=False
+        )
+        return sel_loci
     
-    sel_loci = random_state.choice(
-        n_loci,
-        int(subsample_rate*n_loci),
-        replace=False
-    )
-
     return tuple(
-        corpus.isel(locus=sel_loci)
+        LazySampleSlicer(corpus, locus=get_random_loci(corpus))
         for corpus in corpuses
     )
 
@@ -168,9 +184,6 @@ def locus_slice_generator(
 def _should_stop(stop_condition, scores):
     return len(scores) > stop_condition \
         and scores.index(max(scores)) < (len(scores) - stop_condition)
-
-
-
 
 
 def fit_model( 
@@ -201,6 +214,9 @@ def fit_model(
     for corpus in train_corpuses + test_corpuses:
         check_dims(corpus, model_state)
         check_corpus(corpus)
+    
+    check_feature_consistency(*train_corpuses, *test_corpuses)
+    check_dim_consistency(*train_corpuses, *test_corpuses)
 
     logger.info('Preprocessing training corpuses...')
     for corpus in train_corpuses:   
@@ -210,10 +226,11 @@ def fit_model(
     for test_corpus in test_corpuses:
         CS.init_corpusstate(test_corpus, model_state)
 
+
     test_score_fn = partial(
-        deviance,
+        deviance_locus,
         corpuses=test_corpuses,
-        exposures_fn=using_exposures_from(*train_corpuses)
+        exposures_fn=CS.using_exposures_from(*train_corpuses)
     )
     
     '''
@@ -221,11 +238,7 @@ def fit_model(
     to decrease the computational burden.
     '''
     dummy_score_fn = lambda *x, **y : np.nan
-
-    train_scorer = partial(
-        perplexity,
-        get_n_mutations(train_corpuses)
-    )
+    train_scorer = lambda x : -x # we don't really care about train score - test score is what matters
 
     lr_schedule = partial(learning_rate_schedule, tau, kappa)
 
@@ -281,8 +294,10 @@ def fit_model(
 
                 train_score, test_score = step_fn(
                     parallel_context=par,
-                    update_prior = epoch >= begin_prior_updates \
-                        and empirical_bayes,
+                    update_prior = \
+                        epoch >= begin_prior_updates \
+                        and empirical_bayes \
+                        and not any(CS.is_marginal_corpus(corpus) for corpus in train_corpuses),
                     learning_rate = lr_schedule(epoch),
                     test_score_fn=test_score_fn if evaluate_test else dummy_score_fn,
                 )
@@ -292,10 +307,10 @@ def fit_model(
                         'The model has diverged - some parameter is NaN. '
                         'This usually means that the model is under-regularized.\n'
                         'Try increasing one of the regularization parameters:\n'
+                        '  - conditioning_alpha\n'
                         '  - mutation_reg\n'
                         '  - context_reg\n'
                         '  - l2_regularization\n'
-                        '  - conditioning_alpha\n'
                     )
 
                 for test_corpus in test_corpuses:
@@ -303,6 +318,7 @@ def fit_model(
                         test_corpus,
                         model_state,
                         from_scratch=False,
+                        parallel_context=par,
                     )
 
                 train_scores.append(train_scorer(train_score))
@@ -322,12 +338,17 @@ def fit_model(
                     logger.info('Early stopping criterion met. The model has converged.')
                     break
         
-        except (KeyboardInterrupt, SystemError):
+        except (KeyboardInterrupt, SystemError, SystemExit):
             # sometimes interrupting an optimizer throws a system error ...
             pass
 
         finally:
             progress_bar.close()
+
+    if num_epochs > 0:
+        logger.info('Finalizing models ...')
+        for model in model_state.nonlocals.values():
+            model.post_fit(train_corpuses)
 
     return (
         model_state,

@@ -2,6 +2,8 @@
 import xarray as xr
 from datatree import DataTree
 import numpy as np
+from ..utils import CorpusInterface
+from joblib import delayed
 
 class CorpusState:
 
@@ -11,41 +13,78 @@ class CorpusState:
         corpus,
         model_state,
         from_scratch=False,
+        *,
+        parallel_context,
     ):
         
-        for model in model_state.models.values():
+        '''for model in model_state.models.values():
             model.update_corpusstate(
                 corpus, 
                 from_scratch=from_scratch
-            )
+            )'''
+        
+        for _ in parallel_context(
+            delayed(model.update_corpusstate)(
+                corpus,
+                from_scratch=from_scratch
+            ) for model in model_state.models.values()
+        ):
+            pass
         
         return corpus
     
     @classmethod
     def has_corpusstate(cls, corpus):
-        return hasattr(corpus, 'state')
+        try:
+            corpus.state
+            return True
+        except AttributeError:
+            return False
     
     @classmethod
     def is_marginal_corpus(cls, corpus):
-        return not 'sample' in corpus.layers.coords
+        return not 'sample' in corpus.coords or len(corpus.coords['sample']) == 0 \
+            or not 'sample' in corpus.X.dims
     
     @classmethod
     def list_samples(cls, corpus):
         if cls.is_marginal_corpus(corpus):
             return [None]
         
-        return list(corpus.layers.X.coords['sample'].values)
+        return list(corpus.X.coords['sample'].values)
 
     @classmethod
     def fetch_sample(cls, corpus, sample_name):
+        if issubclass(type(corpus), CorpusInterface):
+            return corpus.fetch_sample(sample_name)
+        
         if cls.is_marginal_corpus(corpus) and sample_name is None:
-            return corpus.layers.X
+            return corpus.X
 
-        return corpus.layers.X.sel(sample=sample_name)
+        return corpus.X.sel(sample=sample_name)
     
+
     @classmethod
     def sample_dims(cls, corpus):
-        return corpus.layers.X.dims
+        return corpus.X.dims
+    
+    @classmethod
+    def observation_dims(cls, corpus):
+        return [d for d in cls.sample_dims(corpus) if not d in ('locus', 'sample')]
+
+    @classmethod
+    def update_normalizers(cls, corpus, normalizers):
+        
+        '''train_genome_size = model_state.get_genome_size(corpus)
+        this_genome_size = cls.genome_size(corpus)
+
+        cls.fetch_normalizers(corpus)[:] = \
+            model_state.get_normalizers(corpus) - np.log(this_genome_size/train_genome_size)
+        
+        return corpus'''
+        cls.fetch_normalizers(corpus)[:] = normalizers
+        return corpus
+    
 
     @classmethod
     def init_corpusstate(
@@ -58,12 +97,12 @@ class CorpusState:
         n_components = model_state.n_components
             
         state_elements = {
-                    'log_mutrate_normalizer' : xr.DataArray(
-                        np.zeros(n_components),
-                        dims=('component',),
-                    ),
-                }
-        
+            'normalizers' : xr.DataArray(
+                np.zeros(n_components, dtype=float),
+                dims=('component',),
+            ),
+        }
+
         for model in model_state.models.values():
             state_elements.update(
                 model.prepare_corpusstate(corpus)
@@ -74,8 +113,11 @@ class CorpusState:
                 state_elements,
                 coords={
                     **corpus.coords,
-                    'components' : list(range(n_components)),
                     'sample' : sample_names,
+                },
+                attrs={
+                    'genome_size' : corpus.regions.context_frequencies\
+                                        .sum().data.item()
                 }
             ),
             name='state',
@@ -84,7 +126,14 @@ class CorpusState:
 
         return corpus
     
-
+    @staticmethod
+    def genome_size(corpus):
+        return corpus.state.attrs['genome_size']
+    
+    @staticmethod
+    def fetch_normalizers(corpus):
+        return corpus.state['normalizers'].data
+    
     @staticmethod
     def fetch_val(corpus, key):
         return corpus.state[key]
@@ -110,4 +159,16 @@ class CorpusState:
         return cls.fetch_val(corpus, 'topic_compositions')\
                     .sel(sample=sample_name)\
                     .data
+    
+    
+    @classmethod
+    def using_exposures_from(cls, *corpuses):
+        
+        corpus_dict = {cls.get_name(corpus) : corpus for corpus in corpuses}
+    
+        return lambda corpus, sample_name : \
+            cls.fetch_topic_compositions(
+                corpus_dict[cls.get_name(corpus)],
+                sample_name
+            )
         

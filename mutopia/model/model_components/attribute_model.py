@@ -1,7 +1,7 @@
 from .base import get_reg_params, _svi_update_fn, RateModel, SparseDataBase
-from ._strand_transformer import NormalizedMesoscaleEncoder
+from ._strand_transformer import MesoscaleEncoder
 from ._glm_compiled import make_optimizer, setup_mixed_solver, \
-    get_lsqr_solver, ls_partial_solver
+    get_lsqr_solver, interative_partial_ls_solver
 from ._fast_eln import get_eln_solver
 from functools import partial
 from sklearn.base import clone
@@ -54,7 +54,7 @@ class UnconditionalConsequenceModel(RateModel, SparseDataBase):
         ) # f(X) -> f(z, w, beta) -> beta
 
         ridge_solver = partial(
-            ls_partial_solver,
+            interative_partial_ls_solver,
             group_mask = np.array(
                 [True]*self.consequence_dim \
                 + [False]*( (~self._is_regularized).sum() - self.consequence_dim )
@@ -103,7 +103,6 @@ class UnconditionalConsequenceModel(RateModel, SparseDataBase):
     
     def prepare_to_save(self):
         del self.model
-        
     
     def predict_sparse(self, corpus,*,locus, **idx_dict):
 
@@ -257,7 +256,7 @@ class UnconditionalConsequenceModel(RateModel, SparseDataBase):
 
         corpus_names = [state.attrs['name'] for state in corpuses]
         # CxSxM
-        stats_reduced = reduce(sum, [sstats[n][k] for n in corpus_names])
+        stats_reduced = reduce(lambda x,y : x+y, [sstats[n][k] for n in corpus_names])
             
         # CxSxM => MxS => M*S
         target=stats_reduced.ravel()

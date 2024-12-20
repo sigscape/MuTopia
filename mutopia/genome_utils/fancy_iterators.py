@@ -1,7 +1,9 @@
 from collections import defaultdict
 import bisect
+from functools import wraps
 
 def expand_args(func):
+    @wraps(func)
     def wrapper(x):
         return func(*x)
     return wrapper
@@ -18,16 +20,22 @@ class RegionOverlapComparitor:
     This class is used to wrap a region and change the comparison behavior of the region.
     When wrapped, a region is equal to another region if the two regions overlap.
     '''
-    @classmethod
-    def unwrap(cls, wrapped):
-        return wrapped.unwrap()
 
-    def __init__(self, chrom, start, end, *args):
-        self.chrom = chrom
-        self.start = start
-        self.end = end
-        self.args = args
+    def __init__(self, wraps):
+        self._wraps = wraps
 
+    @property
+    def chrom(self):
+        return self._wraps.chrom
+    
+    @property
+    def start(self):
+        return self._wraps.start
+    
+    @property
+    def end(self):
+        return self._wraps.end
+    
     def __gt__(self, other):
         return self.chrom > other.chrom or \
             (self.chrom == other.chrom and self.start >= other.end)
@@ -41,13 +49,11 @@ class RegionOverlapComparitor:
         other  ____
         '''
         return self.chrom == other.chrom and \
-                    (self.end >= other.start and self.start < other.end)
+                    (self.end > other.start and self.start < other.end)
     
     def __ge__(self, other):
         return (self > other) or (self == other)
     
-    def unwrap(self):
-        return (self.chrom, self.start, self.end, *self.args)
 
 
 def sorted_iterator(iter, key = lambda x : x):
@@ -134,14 +140,19 @@ def interleave_streams(*iterators, key = lambda x : x):
             yield next(min(streams, key = lambda x : key(x.peek())))
 
 
-def filter_intersection(filter_iter, compare_iter, blacklist=True):
+def filter_intersection(
+    filter_iter, 
+    compare_iter, 
+    blacklist=True,
+    key=lambda x : x,
+):
 
     iter1 = PeekIterator(filter_iter)
     iter2 = PeekIterator(compare_iter)
 
     while iter1.has_next():
 
-        while iter2.has_next() and iter1.peek() > iter2.peek():
+        while iter2.has_next() and key(iter1.peek()) > key(iter2.peek()):
             next(iter2)
 
         if iter2.has_next():
@@ -152,7 +163,7 @@ def filter_intersection(filter_iter, compare_iter, blacklist=True):
             #no overlap and whitelist => skip
             #no overlap and blacklist => yield
             #this is just XOR operation
-            if (val == iter2.peek()) ^ blacklist:
+            if (key(val) == key(iter2.peek())) ^ blacklist:
                 yield val
 
         elif blacklist:
@@ -175,18 +186,34 @@ def streaming_local_sort(
 
         # pop the next value from the iterator
         val = next(iter)
+
+        # yield all the values that have lapsed
+        while len(buffer) > 0 and has_lapsed(val, buffer[0]):
+            yield buffer.pop(0)
         
         # put the new value in the sorted buffer
         bisect.insort_left(buffer, val, key = key)
-
-        # yield all the values that have lapsed
-        while has_lapsed(key(val), key(buffer[0])):
-            yield buffer.pop(0)
 
     # yield the remaining values
     for val in buffer:
         yield val
 
+def repeat_last(iter, n):
+    iter = PeekIterator(iter)
+    last = None
+    while iter.has_next():
+        last = next(iter)
+        yield last
+    for _ in range(n):
+        yield last
+
+def repeat_first(iter, n):
+    iter = PeekIterator(iter)
+    first = next(iter)
+    for _ in range(n+1):
+        yield first
+    while iter.has_next():
+        yield next(iter)
 
 def streaming_groupby(
     iterator,

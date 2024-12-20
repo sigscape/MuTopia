@@ -11,21 +11,127 @@ def _reduce_sum(g):
     return reduce(lambda x,y : x+y, g)
 
 
-def get_n_mutations(
-        corpuses,
+def _update_normalizers(model_state, corpuses, *, parallel_context):
+    for corpus in corpuses:
+        CS.update_normalizers(
+            corpus, 
+            model_state._calc_normalizers(
+                corpus,
+                parallel_context=parallel_context,
+            )
+        )
+
+
+def _deviance(
+    model_state,
+    corpuses,
+    exposures_fn=CS.fetch_topic_compositions,
+    *,
+    parallel_context,
 ):
-    return _reduce_sum((
-        CS.fetch_sample(corpus, sample_name).data.sum()
-        for corpus in corpuses 
-        for sample_name in CS.list_samples(corpus)
-    ))
+    dev_fns = model_state.locals_model.get_deviance_fns(
+        corpuses,
+        model_state,
+        exposures_fn=exposures_fn,
+        parallel_context=parallel_context,
+    )
+    
+    res = list(parallel_context(delayed(fn)() for fn in dev_fns))
+    d_fit, d_null = list(zip(*res))
+
+    return (1 - sum(d_fit)/sum(d_null))*10
 
 
-def perplexity(num_mutations, elbo):
-    return np.exp(-elbo/num_mutations)
+def deviance_locus(
+    model_state,
+    corpuses,
+    exposures_fn=CS.fetch_topic_compositions,
+    *,
+    parallel_context,
+):
+    # we want to make extra sure the normalizers are up to date
+    # before we start computing deviance.
+    
+    _update_normalizers(model_state, corpuses, parallel_context=parallel_context)
+
+    return _deviance(
+        model_state,
+        corpuses,
+        exposures_fn=exposures_fn,
+        parallel_context=parallel_context,
+    )
 
 
-def deviance(
+def deviance_samples(
+    model_state,
+    corpuses,
+    *,
+    parallel_context,
+):
+    _update_normalizers(model_state, corpuses, parallel_context=parallel_context)
+    
+    for corpus in corpuses:
+        exposures = model_state.locals_model.predict(
+            corpus,
+            model_state,
+            parallel_context=parallel_context,
+        )
+        CS.fetch_val(corpus, 'topic_compositions')[...] = exposures.data.T
+
+    return _deviance(
+        model_state,
+        corpuses,
+        parallel_context=parallel_context,
+    )
+
+
+'''
+def _deviance_residuals(
+    self,
+    corpus,
+    sample,
+    model_state,
+    *,
+    gamma,
+    conditional_likelihood,
+    weights,
+    log_context_effect,
+    sample_dict,
+):
+    
+    contributions = np.ascontiguousarray(gamma/np.sum(gamma))        
+    y_sum = np.sum(weights)
+    
+    log_y = np.log(weights)
+    log_pi_hat = ( np.log(conditional_likelihood.T.dot(contributions)) - log_context_effect + np.log(y_sum) )
+
+    resid = np.sqrt(2*(weights * log_y - weights * log_pi_hat)) * np.sign(log_y - log_pi_hat)
+
+    return self._unconvert_sample(sample_dict, resid)
+'''
+
+def residuals(
+    model_state,
+    corpuses,
+    exposures_fn=CS.fetch_topic_compositions,
+    *,
+    parallel_context,
+):
+    
+    _update_normalizers(model_state, corpuses, parallel_context=parallel_context)
+
+    resid_fns = model_state.locals_model.get_residual_fns(
+        corpuses,
+        model_state,
+        exposures_fn=exposures_fn,
+        parallel_context=parallel_context,
+    )
+
+    return _reduce_sum(parallel_context(delayed(fn)() for fn in resid_fns))
+
+
+
+def _slow_deviance(
     model_state,
     corpuses,
     exposures_fn = CS.fetch_topic_compositions,
@@ -34,6 +140,15 @@ def deviance(
     ignore_dims=[],
     save_dims=None,
 ):
+    '''
+    This function computes the deviance of the model on the corpuses.
+    It is a slow implementation that is useful for debugging and testing,
+    and offers more flexibility in what you're testing.
+
+    However, you can't use this to monitor the progress of model training
+    because it takes too much time and memory. For this, use the more
+    specialized `deviance` function.
+    '''
 
     xr_xlogy_sparse_dense = lambda a,b : xr.apply_ufunc(
                             lambda x,y : x * np.nan_to_num(np.log(y), neginf=-1e30),
@@ -51,15 +166,16 @@ def deviance(
                     if not save_dims is None else None
         
         ysum = obs.data.sum()
-        bias = ysum*np.log( marginal_mutrate.data.sum()/ysum )
-
         ylogy = xr_xlogy_sparse_sparse(obs, obs)\
-                    .sum(skipna=True, dim=sum_dims).data
+                    .sum(skipna=True, dim=sum_dims).data \
+                    - ysum * np.log(ysum)
         
         ylogmu = xr_xlogy_sparse_dense(obs, marginal_mutrate)\
-                    .sum(skipna=True, dim=sum_dims).data
+                    .sum(skipna=True, dim=sum_dims).data \
+                    - ysum * np.log(marginal_mutrate.data.sum())
 
-        return (ylogy - ylogmu + bias)
+        print(ylogy, ylogmu)
+        return (ylogy - ylogmu)
     
     
     def _corpus_fit_deviance(corpus):

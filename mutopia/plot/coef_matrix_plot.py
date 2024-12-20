@@ -1,14 +1,16 @@
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
 from matplotlib import gridspec
 
 def _plot_interaction_matrix(
-        coef_matrix : pd.DataFrame,
+        interaction_matrix : pd.DataFrame,
+        baseline_matrix : pd.Series,
+        shared_effects : pd.Series,
         palette='vlag',
     ):
 
-    fig = plt.figure(figsize=(7, 2))
+    fig = plt.figure(figsize=(10, 3))
     gs = gridspec.GridSpec(
                 2,3,
                 width_ratios=[0.22,7, 0.1], 
@@ -19,11 +21,12 @@ def _plot_interaction_matrix(
 
     base_ax = fig.add_subplot(gs[0,1])
 
-    baseline = coef_matrix.loc['Baseline'].iloc[:-1]
+    baseline = baseline_matrix
     baseline_x = np.arange(len(baseline))
+
     base_ax.bar(
         baseline_x,
-        np.exp(baseline),
+        height=baseline.values.ravel(),
         color='lightgray',
         edgecolor='grey',
         linewidth=0.5
@@ -35,11 +38,13 @@ def _plot_interaction_matrix(
         xlim = (-0.5, len(baseline)-0.5),
         xticks=[],
     )
-    base_ax.set_ylabel('Base\nmutation rate', rotation=0, labelpad=0, fontsize=9, ha='right', va='center')
+    base_ax.set_ylabel('Base\nmutation rate', rotation=0, labelpad=0.1, fontsize=9, ha='right', va='center')
 
 
     interaction_ax = fig.add_subplot(gs[1,1])
-    interactions = coef_matrix.iloc[1:,:-1]
+    interactions = interaction_matrix
+
+    extrema = max(np.max(interaction_matrix.abs()), np.max(shared_effects.abs()), 0.5)
 
     heat_x = np.arange(interactions.shape[0]) - 0.5
     heat_y = np.arange(interactions.shape[1]) - 0.5
@@ -50,13 +55,13 @@ def _plot_interaction_matrix(
         cmap=palette,
         shading='auto',
         rasterized=True,
-        vmin=-0.5,
-        vmax=0.5,
+        vmin=-extrema,
+        vmax=extrema,
         edgecolor='white',
-        linewidth=0.25,
+        linewidth=0.1,
     )
     interaction_ax.set_xticks(baseline_x - 0.5)
-    interaction_ax.set_xticklabels(baseline.index, rotation=90, fontsize=9)
+    interaction_ax.set_xticklabels(baseline.index, rotation=90, fontsize=5)
     interaction_ax.set(yticks=[])
     interaction_ax.set_xlabel('Nucleotide context', fontsize=9)
     for spine in interaction_ax.spines.values():
@@ -64,22 +69,22 @@ def _plot_interaction_matrix(
 
     common_ax = fig.add_subplot(gs[1,0])
     common_x = np.arange(2)
-    common_y = np.arange(coef_matrix.shape[0]) - 0.5
+    common_y = np.arange(interaction_matrix.shape[0] + 1) - 0.5
 
     common_ax.pcolormesh(
         common_x,
         common_y,
-        coef_matrix.iloc[1:,:]['Shared effect'].values[:,None],
+        shared_effects.values[:,None],
         cmap=palette,
-        vmin=-0.5,
-        vmax=0.5,
+        vmin=-extrema,
+        vmax=extrema,
         edgecolor='white',
-        linewidth=0.25,
+        linewidth=0.1,
     )
     for spine in common_ax.spines.values():
         spine.set_visible(False)
-    common_ax.set_yticks(np.arange(interactions.shape[0]))
-    common_ax.set_yticklabels(interactions.index, fontsize=9)
+    common_ax.set_yticks(np.arange(interaction_matrix.shape[0]))
+    common_ax.set_yticklabels(interaction_matrix.index, fontsize=9)
     common_ax.set(xticks=[0.5])
     common_ax.set_ylabel('Features', fontsize=9)
     common_ax.set_xticklabels(['Shared\neffect'], rotation=90, fontsize=9)

@@ -1,5 +1,5 @@
 from .sbs import SBSMode
-from .fragment_motif import FragmentMotif
+from .fragment_motif import InFragmentMotif, OutFragmentMotif
 from .fragment_length import FragmentLength
 from enum import Enum
 
@@ -19,8 +19,10 @@ class Modality(Enum):
     def get_config(self):
         if self == Modality.SBS:
             return SBSMode()
-        elif self in (Modality.FRAGMENT_MOTIF_OUT5P, Modality.FRAGMENT_MOTIF_IN5P):
-            return FragmentMotif()
+        elif self == Modality.FRAGMENT_MOTIF_IN5P:
+            return InFragmentMotif()
+        elif self == Modality.FRAGMENT_MOTIF_OUT5P:
+            return OutFragmentMotif()
         elif self == Modality.FRAGMENT_LENGTH:
             return FragmentLength()
         else:

@@ -34,6 +34,11 @@ class ModelState:
             for corpus in corpuses
         }
 
+        self._genome_size = {
+            CS.get_name(corpus) : corpus.regions.context_frequencies.sum().item()
+            for corpus in corpuses
+        }
+
     @property
     def n_components(self):
         return next(iter(self._models.values())).n_components
@@ -61,6 +66,8 @@ class ModelState:
     def get_normalizers(self, corpus):
         return self._normalizers[CS.get_name(corpus)]
     
+    def get_genome_size(self, corpus):
+        return self._genome_size[CS.get_name(corpus)]
 
     def _get_propto_log_mutation_rate(self, k, corpus):
 
@@ -82,19 +89,24 @@ class ModelState:
     
     
     def predict(self, k, corpus, with_context=True):
+        '''
+        The difference between this method and the _get_propto_log_mutation_rate
+        is that this method returns the log mutation rate for all
+        models, not just those that require normalization.
+        '''
         
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
 
             y_hat = reduce(
-                lambda x,y: x+y, 
-                (
-                    model.predict(k, corpus)
-                    for model in self.nonlocals.values()
-                ),  # sum over models
-                np.log(corpus.regions.exposures) \
-                    + self.get_normalizers(corpus)[k]
-            )
+                    lambda x,y: x+y, 
+                    (
+                        model.predict(k, corpus)
+                        for model in self.nonlocals.values()
+                    ),  # sum over models
+                    np.log(corpus.regions.exposures) \
+                    + CS.fetch_normalizers(corpus)[k]
+                )
             if with_context:
                 y_hat += np.log(corpus.regions.context_frequencies)
 
@@ -118,17 +130,23 @@ class ModelState:
     
     
     @staticmethod
-    def _marginalize_mutrate(log_mutrate_tensor, exposures):
-        return xr.apply_ufunc(
-            lambda gamma, mu : np.nan_to_num(
-                np.dot(mu, gamma/gamma.sum()),
-                copy=False,
-                nan=0.
-            ),
-            exposures,
-            np.exp(log_mutrate_tensor - log_mutrate_tensor.max()),
-            input_core_dims=[[], ('component',)],
-        )
+    def _log_marginalize_mutrate(log_mutrate_tensor, exposures):
+        
+        def logsafe_matmul(y, log_x):
+            alpha = log_x.max()
+            return alpha + np.log(
+                np.dot(np.nan_to_num(np.exp(log_x - alpha), nan=0., copy=False), y)
+            )
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+
+            return xr.apply_ufunc(
+                logsafe_matmul,
+                exposures/np.sum(exposures),
+                log_mutrate_tensor,
+                input_core_dims=[[], ['component']],
+            )
     
 
     def get_sstats_dict(self, corpuses):
@@ -224,42 +242,35 @@ class ModelState:
                 -logsumexp(log_mutation_rate.data),
                 exp_offsets
             )
-    
-
-    def init_normalizers(self, 
-            corpuses,
-            *,
-            parallel_context
-        ):
-
-        _update_norm = lambda k, corpus : \
-            self._update_normalizer(
-                k, corpus, 
-                -logsumexp(self._get_propto_log_mutation_rate(k, corpus).data)
-            )
-
-        update_fns = (
-            partial(_update_norm, k, corpus)
-            for k in range(self.n_components)
-            for corpus in corpuses
-        )
-
-        for _ in parallel_context(delayed(fn)() for fn in update_fns):
-            pass
-
+        
 
     def _update_normalizer(self, 
-            k, corpus, logsum_mutation_rate, 
-            learning_rate=1., 
-            subsample_rate=1.
-        ):
+        k, corpus, logsum_mutation_rate, 
+        learning_rate=1., 
+        subsample_rate=1.
+    ):
         norm = self._normalizers[CS.get_name(corpus)]
+        
         norm[k] = _svi_update_fn(
                 norm[k],
                 np.log(subsample_rate) + logsum_mutation_rate,
                 learning_rate
             )
         
+    
+    def _calc_normalizers(self, 
+        corpus,
+        *,
+        parallel_context
+    ):
+        norm_fn = lambda k : \
+            -logsumexp(self._get_propto_log_mutation_rate(k, corpus).data)
+
+        return np.array(list(parallel_context(
+            delayed(norm_fn)(k) for k in range(self.n_components)
+        )))
+        
+
     def format_signature(self, k):
         return np.exp(reduce(
             lambda x,y : x+y,
@@ -268,6 +279,17 @@ class ModelState:
                 for model in self.nonlocals.values()
             )
         ))
+    
+
+    def format_interactions(self, k):
+        return reduce(
+            lambda x,y : x+y,
+            (
+                model.get_interaction_summary(k)
+                for model in self.nonlocals.values()
+                if hasattr(model, 'get_interaction_summary')
+            )
+        )
         
 
     def Mstep(self,
@@ -279,7 +301,7 @@ class ModelState:
             learning_rate=1.,
             subsample_rate=1.,
             update_prior=True,
-            use_parallel=False,
+            use_parallel=True,
         ):
 
         if update_prior:
@@ -339,6 +361,7 @@ class ModelState:
             samples, 
             parallel_context(delayed(update)() for update in updates)
         ):
+                
                 elbo += bound
                 # Update the topic compositions for the sample
                 CS.update_topic_compositions(

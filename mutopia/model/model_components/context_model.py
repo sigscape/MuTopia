@@ -3,12 +3,14 @@ from functools import partial, reduce
 import numpy as np
 from xarray import DataArray
 from pandas import DataFrame
-from ._glm_compiled import make_optimizer, setup_mixed_solver, get_lsqr_solver
+from ._glm_compiled import make_optimizer, setup_mixed_solver, get_lsqr_solver, \
+        right_intercept_solver, partial_ls_solver
 from ._fast_eln import get_eln_solver
 from ..corpus_state import CorpusState as CS
 from .base import get_reg_params, get_poisson_targets_weights, _svi_update_fn, \
     RateModel, SparseDataBase, DenseDataBase
-from ._strand_transformer import MesoscaleEncoder
+from ._strand_transformer import MesoscaleEncoder, DesignMatrixHelper
+from ._kmer_encoder import DiagonalEncoder
 from ...utils import dims_except_for
 
 
@@ -21,11 +23,14 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
      
     def __init__(self,
         corpuses,
+        context_encoder,
         max_iter=100,
-        tol=5e-4,
+        tol=1e-3,
         reg : float = 0.0001, 
-        conditioning_alpha : float = 5e-5,
-        dtype=np.float32,
+        kmer_reg = 0.005,
+        init_variance : float = 0.1,
+        conditioning_alpha : float = 1e-9,
+        dtype = float,
         init_components = None,
         *,
         n_components : int,
@@ -36,62 +41,106 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         self.n_components = n_components
         self.context_dim = corpuses[0].dims['context']
         self.context_names = list(corpuses[0].coords['context'].data)
-        
-        self.transformer = MesoscaleEncoder(self.context_dim)\
-                                    .fit(corpuses)
-
-        self._coefs = self._init_params(
-            random_state, 
-            n_components, 
-            self.context_dim, 
-            self.dtype
-        )
 
         corpus=corpuses[0] # just grab the first one to use for initialization
         self._context_distribution = \
             corpus.regions.context_frequencies\
             .sum(dim=dims_except_for(corpus.regions.context_frequencies.dims, 'context'))\
-            .data.astype(self.dtype) + 1.
-        
+            .data + 1
         self._context_distribution/=self._context_distribution.sum()
+        
+        self.context_transformer = context_encoder.fit(self.context_names)
+        self.transformer = MesoscaleEncoder().fit(corpuses)
 
-        if not init_components is None:
-            self.init_from_signatures(
-                corpuses[0].modality().load_components(*init_components)
+        self.encoding_matrix_ = DesignMatrixHelper\
+            .compose_encoding_matrix(
+                self.context_transformer.encoding_matrix,
+                self.transformer.encoding_matrix,
+                shared_effects=True
             )
 
-        is_intercept = np.array( self.transformer.intercept_mask_ + [True] )
-        X = self.transformer.one_pad_right(self.transformer.get_encoding_matrix(1))
-        X.data = X.data.astype(self.dtype)
-
-        eln_solver = partial(
-            get_eln_solver,
-            **get_reg_params(reg, conditioning_alpha),
-            tol=tol,
-            random_state=random_state,
-        ) # f(X) -> f(z, w, beta) -> beta
-
-        ridge_solver = partial(
-            get_lsqr_solver,
-            tol=tol,
-            alpha=conditioning_alpha,
-        ) # f(X) -> f(z, w, beta) -> beta
-
-        
-        mixed_solver = partial(
-            setup_mixed_solver,
-            is_regularized = ~is_intercept,
-            reg_solver = eln_solver, # f(X) -> f(z, w, beta) -> beta
-            unreg_solver = ridge_solver, # f(X) -> f(z, w, beta) -> beta
+        X = DesignMatrixHelper.one_pad_right(
+            self.encoding_matrix_.copy()
         )
-        
+
+        self._coefs = self._init_params(
+            random_state, 
+            n_components, 
+            init_variance,
+            X.shape[1], 
+            dtype
+        )
+
+        self.is_intercept_ = np.array(
+            [True]*self.context_transformer.n_coefs \
+            + [False]*self.transformer.n_coefs * (self.context_transformer.n_states+1)
+        )
+
+        if isinstance(self.context_transformer, DiagonalEncoder):
+
+            eln_solver = partial(
+                get_eln_solver,
+                **get_reg_params(reg, 1e-5),
+                tol=tol,
+                random_state=random_state,
+                max_iter=100,
+            ) # f(X) -> f(z, w, beta) -> beta
+
+            ridge_solver = partial(
+                partial_ls_solver,
+                alpha=conditioning_alpha,
+            ) # f(X) -> f(z, w, beta) -> beta
+
+            split_solver = partial(
+                setup_mixed_solver,
+                is_regularized = ~self.is_intercept_,
+                unreg_solver = ridge_solver, # f(X) -> f(z, w, beta) -> beta
+                reg_solver = eln_solver, # f(X) -> f(z, w, beta) -> beta
+            )
+        else:
+            #raise NotImplementedError('Only diagonal encoders are supported')
+            eln = partial(
+                get_eln_solver,
+                tol=tol,
+                random_state=random_state,
+                max_iter=100,
+            )
+
+            strand_solver = partial(
+                eln,
+                **get_reg_params(reg, 1e-5),
+            ) # f(X) -> f(z, w, beta) -> beta
+
+            context_solver = partial(
+                eln,
+                **get_reg_params(kmer_reg, 1e-5),
+            )
+
+            split_solver = partial(
+                setup_mixed_solver,
+                is_regularized = ~self.is_intercept_,
+                unreg_solver = context_solver, # f(X) -> f(z, w, beta) -> beta
+                reg_solver = strand_solver, # f(X) -> f(z, w, beta) -> beta
+            )
+
+        solver = partial(
+            right_intercept_solver,
+            solver=split_solver,
+        )
+
         self.model = make_optimizer(
             X,
-            mixed_solver,
+            solver,
             tol=tol,
             max_iter=max_iter,
         )
 
+        '''
+        if not init_components is None:
+            self.init_from_signatures(
+                corpuses[0].modality().load_components(*init_components)
+            )
+        '''
 
     @property
     def requires_normalization(self):
@@ -101,6 +150,23 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
     def requires_dims(self):
         return ('configuration','context','locus')
 
+    def post_fit(self, corpuses):
+
+        corpus = corpuses[0]
+
+        locus_effects = CS.fetch_val(corpus, 'log_locus_distribution')\
+            .transpose('locus',...).data
+
+        freqs = corpus.regions.context_frequencies
+        contexts = freqs\
+            .sum(dim=dims_except_for(freqs.dims, 'context', 'locus'))\
+            .transpose('context','locus').data
+
+        # CxL @ LxK => CxK => KxC
+        self._comp_context_distribution = (contexts @ np.exp(locus_effects)).T
+        self._comp_context_distribution /= self._comp_context_distribution.sum(axis=1, keepdims=True)
+
+    
     def prepare_to_save(self):
         del self.model 
         # the model is not serializable because it has nested functions
@@ -179,14 +245,11 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         return self
     
 
-    def _init_params(self, random_state, n_components, n_contexts, dtype):
+    def _init_params(self, random_state, n_components, init_variance, n_coefs, dtype):
         return random_state.normal(
-                    0., 0.1, 
-                    (
-                        n_components, 
-                        self.transformer.get_num_coefs() + 1 #self.n_corpuses
-                    ),
-                ).astype(dtype)
+                0., init_variance, 
+                (n_components,  n_coefs),
+            ).astype(dtype, copy=False)
 
 
     @property
@@ -305,8 +368,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         corpus_names = [CS.get_name(state) for state in corpuses]
 
         eta = reduce(lambda x,y : x+y, (exp_offsets[n][k].ravel() for n in corpus_names))
-        target = reduce(lambda x,y : x+y, (sstats[n][k].ravel() for n in corpus_names))\
-                    .astype(self.dtype)
+        target = reduce(lambda x,y : x+y, (sstats[n][k].ravel() for n in corpus_names))
 
         yield partial(
             self._run_regression,
@@ -328,45 +390,49 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
     
     
     def _format_component(self, k):        
-        return self._calc_lambda(
-                    k, self.transformer.encoding_matrix_
-                )
+        return self._calc_lambda(k, self.encoding_matrix_)
     
 
     def format_signature(self, k):
+
+        encoding_matrix = DesignMatrixHelper\
+            .compose_encoding_matrix(
+                self.context_transformer.encoding_matrix,
+                self.transformer\
+                    .independent_effects_encoding()
+            )
+        
         # C x S
-        signature = self._calc_lambda(k,
-                        self.transformer\
-                            .independent_effects_encoding()
-                    ) + np.log(self._context_distribution)[:, None]
+        signature = self._calc_lambda(k, encoding_matrix) \
+                        + np.log(self._comp_context_distribution[k, :])[:, None]
+                        #+ np.log(self._context_distribution)[:, None]
         
         return DataArray(
             signature,
             dims=('context','mesoscale_state'),
             coords={
                 'context' : self.context_names,
-                'mesoscale_state' : self.transformer.feature_names_out
+                'mesoscale_state' : ['Baseline'] + self.transformer.get_feature_names_out()
             }
         )
     
-    def component_coef_summary(self, sig_idx):
+    
+    def get_baseline_summary(self, k):
+        return self.format_signature(k).sel(mesoscale_state='Baseline')
 
-        c = self.context_dim
-        r = self.transformer.n_encoded_features_
+    def get_interaction_summary(self, k):
 
-        with_dummy = np.concatenate([
-            self.coefs_[sig_idx, :c*r],
-            np.ones(1),
-            self.coefs_[sig_idx, c*r:],
-        ])
-        coef_matrix = with_dummy.reshape((c+1,-1)).T
+        c = self.context_transformer.n_states + 1
+        r = self.transformer.n_coefs
 
-        return DataFrame(
-            coef_matrix,
-            index=self.transformer.feature_names_out,
-            columns=self.context_names + ['Shared effect']
+        return DataArray(
+            data=self.coefs_[k][-r*c:].reshape((c,r)).T,
+            dims=('feature','context'),
+            coords={
+                'feature'  : self.transformer.get_feature_names_out(),
+                'context'  : ['Shared effect'] + self.context_names
+            }
         )
-
 
 
 class UnstrandedContextModel(StrandedContextModel, SparseDataBase):

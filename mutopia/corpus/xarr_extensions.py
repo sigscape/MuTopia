@@ -60,7 +60,13 @@ class OnDiskSparse(BaseAccessor):
         self,
     ):
 
-        sparse_matrix = self._xrds.data.tocoo()
+        if not isinstance(self._xrds.data, sparse.SparseArray):
+            raise TypeError("Data is not in a sparse format")
+        
+        if not isinstance(self._xrds.data, sparse.COO):
+            sparse_matrix = self._xrds.data.tocoo()
+        else:
+            sparse_matrix = self._xrds.data
 
         return xr.Dataset(
             {
@@ -111,6 +117,13 @@ class AsCSR(BaseAccessor):
             ])
         )
 
+        return self._xrds
+    
+
+@xr.register_dataarray_accessor("asdense")
+class AsCSR(BaseAccessor):
+    def __call__(self):
+        self._xrds.data = self._xrds.data.todense()
         return self._xrds
     
 
