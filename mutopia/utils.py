@@ -420,7 +420,6 @@ def borrow_kwargs(*borrow_sigs):
     return decorator
 
 
-@contextmanager
 def stream_subprocess_output(process):
     
     while True:

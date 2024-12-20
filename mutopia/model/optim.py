@@ -228,9 +228,9 @@ def fit_model(
 
 
     test_score_fn = partial(
-        deviance_samples,
+        deviance_locus,
         corpuses=test_corpuses,
-        #exposures_fn=CS.using_exposures_from(*train_corpuses)
+        exposures_fn=CS.using_exposures_from(*train_corpuses)
     )
     
     '''

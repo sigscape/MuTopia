@@ -186,13 +186,13 @@ def streaming_local_sort(
 
         # pop the next value from the iterator
         val = next(iter)
+
+        # yield all the values that have lapsed
+        while len(buffer) > 0 and has_lapsed(val, buffer[0]):
+            yield buffer.pop(0)
         
         # put the new value in the sorted buffer
         bisect.insort_left(buffer, val, key = key)
-
-        # yield all the values that have lapsed
-        while has_lapsed(val, buffer[0]):
-            yield buffer.pop(0)
 
     # yield the remaining values
     for val in buffer:

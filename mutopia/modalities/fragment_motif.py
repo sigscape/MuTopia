@@ -1,7 +1,7 @@
-
+import sys
 from math import prod
 from .mode_config import ModeConfig
-from itertools import product
+from itertools import product, chain, starmap
 from ..model import *
 import numpy as np
 import os
@@ -17,7 +17,8 @@ import xarray as xr
 import tempfile
 from pyfaidx import Fasta
 import subprocess
-from ..utils import stream_subprocess_output
+from ..utils import stream_subprocess_output, logger
+from ..genome_utils.fancy_iterators import streaming_local_sort
 from ..genome_utils.bed12_utils import stream_bed12
 from ..plot.signature_plot import _plot_linear_signature
 logger = logging.getLogger(' Mutopia-MotifModel ')
@@ -44,9 +45,63 @@ for i in range(len(COLOR_LIST)):
     COLOR_LIST[i] = tuple(color_tuple)
 
 
-class FragmentMotif(ModeConfig):
+def parse_bamfile(
+    bam_file,
+    *weight_tags,
+    output=sys.stdout,
+):
 
-    MODE_ID='fragment-motif'
+    def _get_fragment_end(record):
+        if record.is_forward:
+            pos = (
+                record.reference_start,
+                record.reference_start+1,
+                '+'
+            )
+        else:
+            pos = (
+                record.reference_end-1,
+                record.reference_end,
+                '-',
+            )
+        
+        return (
+            record.reference_name,
+            *pos,
+            *[record.get_tag(tag) for tag in weight_tags],
+        )
+
+    try:
+        import pysam
+    except ImportError:
+        raise ImportError('"pysam" is required for ingesting observations from BAM files')
+    
+    with pysam.AlignmentFile(bam_file, 'rb') as bam:
+
+        logger.info('Parsing BAM file ...')
+        
+        data = filter(
+            lambda r : not r.is_unmapped and not r.is_secondary and not r.is_supplementary \
+                and not r.is_duplicate \
+                and r.is_paired and r.mapping_quality > 0,
+            bam
+        )
+
+        data = map(_get_fragment_end, data)
+
+        data = streaming_local_sort(
+            data,
+            key = lambda x : x[1],
+            has_lapsed= lambda curr, buffval : \
+                curr[0] != buffval[0] or curr[1] - buffval[1] > 1000,
+        )
+
+        for record in data:
+            print(*record, sep='\t', file=output)
+        
+
+
+class FragmentMotif(ModeConfig):
 
     @property
     def coords(self):
@@ -83,28 +138,32 @@ class FragmentMotif(ModeConfig):
             )
         return np.expand_dims(np.array(comps), axis=-1)
 
+
     @classmethod
-    def plot(
-        cls,
+    def plot(cls,
         signature,
-        palette = COLOR_LIST,
-        select = ['Baseline'],
+        *select,
+        palette = 'tab10',
+        sig_names = None,
+        normalize = False,
+        title=None,
         **kwargs,
     ):
         cls.validate_signatures(
             signature,
             required_dims=('context',),
         )
-        signature = signature.transpose(...,'context',)
-        lead_dim = signature.dims[0]
-        
+        pl_signatures, sig_names = cls._parse_signatures(
+            signature,
+            select=select,
+            sig_names=sig_names,
+            normalize=normalize,
+        )
         _plot_linear_signature(
             CONTEXTS,
-            palette,
-            *list(map(
-                lambda s : s.ravel(),
-                signature.loc[{lead_dim : list(select)}].data
-            )),
+            palette if len(pl_signatures) > 1 else COLOR_LIST,
+            *pl_signatures,
+            sig_names=sig_names,
             **kwargs
         )
 
@@ -125,70 +184,90 @@ class FragmentMotif(ModeConfig):
         except ImportError:
             raise ImportError('"pysam" is required for ingesting observations from BAM files')
         
-        
-        with tempfile.NamedTemporaryFile('w') as query_file, \
+        with tempfile.NamedTemporaryFile('w') as bam_genome, \
+            tempfile.NamedTemporaryFile('w') as sorted_regions_file, \
+            Fasta(fasta_file) as fa, \
             pysam.AlignmentFile(bam_file, 'rb') as bam:
 
-            write_record = partial(print, sep = '\t', file = query_file)
+            # 1. print out the chromosomes in the order defined by the BAM file
+            for contig in bam.header.references:
+                print(
+                    contig, 
+                    bam.header.get_reference_length(contig), 
+                    sep='\t', 
+                    file=bam_genome
+                )
+            bam_genome.flush()
 
-            for record in filter(
-                lambda r : not r.is_unmapped, 
-                bam
-            ):
-                
-                if record.is_forward:
-                    write_record(
-                        record.reference_name,
-                        record.reference_start,
-                        record.reference_start+1,
-                        '+',
-                        *[record.get_tag(tag) for tag in weight_tags],
-                    )
-                else:
-                    write_record(
-                        record.reference_name,
-                        record.reference_end-1,
-                        record.reference_end,
-                        '-',
-                        *[record.get_tag(tag) for tag in weight_tags],
-                    )
+            # 2. re-sort the regions file to match the order of the BAM file
+            subprocess.check_call(
+                [
+                    'bedtools', 
+                    'sort', 
+                    '-i', regions_file,
+                    '-g', bam_genome.name,
+                ],
+                stdout=sorted_regions_file,
+                universal_newlines=True,
+                bufsize=10000,
+            )
+            sorted_regions_file.flush()
 
-        intersect_process = subprocess.Popen(
-            ['bedtools',
-            'intersect',
-            '-a', regions_file, 
-            '-b', query_file.name, 
-            '-sorted',
-            '-wa',
-            '-wb',
-            '-split'],
-            stdout=subprocess.PIPE,
-            universal_newlines=True,
-            bufsize=10000,
-        )
-        
-        n_tags = len(weight_tags)
-        n_success = 0; n_failure = 0
+            # 3. parse the BAM file - get the fragment ends,
+            #    filter and sort them, and get the final weight
+            parse_process = subprocess.Popen(
+                [
+                    'gtensor-fragments',
+                    'parse-bam',
+                    bam_file,
+                    *weight_tags,
+                ],
+                stdout=subprocess.PIPE,
+                universal_newlines=True,
+                bufsize=10000,
+            )
 
-        obs_matrix = np.zeros(
-            (self.dims['context'], dim_sizes['locus']),
-            dtype = np.float32,
-        )
-
-        with stream_subprocess_output(intersect_process) as lines, \
-            Fasta(fasta_file) as fa:
+            # 4. intersect the sorted regions with the parsed fragments
+            intersect_process = subprocess.Popen(
+                [
+                'bedtools',
+                'intersect',
+                '-a', sorted_regions_file.name,
+                '-b', 'stdin', 
+                '-sorted',
+                '-wa',
+                '-wb',
+                '-split',
+                '-g', bam_genome.name,
+                ],
+                stdin=parse_process.stdout,
+                stdout=subprocess.PIPE,
+                universal_newlines=True,
+                bufsize=10000,
+            )
             
-            for line in lines:
+            n_tags = len(weight_tags)
+            n_success = 0; n_failure = 0
+
+            obs_matrix = np.zeros(
+                (self.sizes['context'], dim_sizes['locus']),
+                dtype = np.float32,
+            )
+
+            for line in stream_subprocess_output(intersect_process):
                 
                 fields = line.strip().split('\t')
-
-                locus_idx = int(fields[3])
-                contig = fields[0]
-
+                
+                if len(fields) < 4 + n_tags:
+                    raise ValueError(f'Error while parsing record: {line}\nThe input regions file may be malformed')
+                
                 try:
+                    locus_idx = int(fields[3])
+                    contig = fields[0]
+
                     read_direction, *tags = fields[-(n_tags + 1):]
 
-                    pos = int(fields[-(n_tags - 3)])
+                    pos = int(fields[-(n_tags + 3)])
                     is_rev = read_direction == '-'
                     weight = prod(map(float, tags))
 
@@ -199,10 +278,40 @@ class FragmentMotif(ModeConfig):
                 else:
                     n_success+=1
                 
-                rslop = 4 * (in_motifs ^ is_rev)
-                lslop = -4 * (in_motifs ^ (not is_rev))
+                shift = int(is_rev)
+                rslop = 4 * (in_motifs ^ is_rev) + shift
+                lslop = -4 * (in_motifs ^ (not is_rev)) + shift
 
-                kmer = fa[contig][pos+lslop : pos+rslop].seq.upper()
+                #              OUT MOTIFS
+                #     1:5
+                #   * * * *
+                #           5____________12
+                #                           * * * *
+                #                            13:17
+                # 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6
+
+
+                #              IN MOTIFS            
+                #       2:6
+                #     * * * * 
+                #     2_____________9
+                #             * * * *
+                #               6:10
+                # 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5
+                
+                #               LSLOP,RSLOP
+                #       rev  | False | True
+                # -----------+-------+-------
+                # in_motifs  |       |
+                #    True    |  0,4  | -3,1
+                #   False    | -4,0  |  1,5
+
+                kmer = fa[contig][pos+lslop : pos+rslop]
+
+                if is_rev:
+                    kmer = kmer.reverse.complement.seq.upper()
+                else:
+                    kmer = kmer.seq.upper()
 
                 if not 'N' in kmer:
                     context_idx = self.coords['context'].index(kmer)
@@ -212,7 +321,7 @@ class FragmentMotif(ModeConfig):
                     n_failure+=1
         
         logger.info(f'Processed {n_success} records successfully, {n_failure} failed')
-
+        
         return xr.DataArray(
             obs_matrix,
             dims = ('context', 'locus'),
@@ -221,15 +330,18 @@ class FragmentMotif(ModeConfig):
 
     def _get_context_frequencies( 
         self,
-        lslop : int, 
-        rslop : int,
+        fwd_slop,
+        rev_slop,
         kmer_width : int =4,
         *,
         regions_file,
-        fasta_file
+        fasta_file,
     ):
-        def _get_window_seq(fasta_object, chrom, start, end):
-            return fasta_object[chrom][max(start-lslop,0) : end+rslop].seq.upper()
+        def _get_window_seq(chrom, start, end):
+            return (
+                fasta_object[chrom][max(start+fwd_slop[0],0) : end+fwd_slop[1]].seq.upper(),
+                fasta_object[chrom][max(start+rev_slop[0],0) : end+rev_slop[1]].reverse.complement.seq.upper(),
+            )
 
         def _rolling(seq, w = 4):
                 for i in range(len(seq) - w + 1):
@@ -237,36 +349,41 @@ class FragmentMotif(ModeConfig):
 
         def _reduce_count(counts, seq):
             if not 'N' in counts:
-                counts[seq]+=1
+                counts[seq]+=0.5
             else:
-                counts['N']+=1
+                counts['N']+=0.5
             return counts
 
-        def _count_trinucs(bed12_region, fasta_object):
-            
-            segments = map(lambda x : _get_window_seq(fasta_object, *x), bed12_region.segments())
+        def _count_trinucs(bed12_region):
+            segments = chain.from_iterable(starmap(_get_window_seq, bed12_region.segments()))
             trinucs = chain.from_iterable(map(partial(_rolling, w=kmer_width), segments))
             counts = reduce(_reduce_count, trinucs, Counter())
 
             N_counts = counts.pop('N', 0)
             pseudocount = N_counts/len(self.coords['context'])
 
-            return [counts[context]+pseudocount for context in self.coords['context']]
-        
-        with Fasta(fasta_file) as fasta_object:
-            trinuc_matrix = [
-                _count_trinucs(w, fasta_object)/(len(w) + rslop + lslop - kmer_width + 1)*len(w) 
-                for w in tqdm(
-                    stream_bed12(regions_file), 
-                    nrows=100, 
-                    desc = 'Aggregating k-mer content'
-                )
+            context_counts = [
+                counts[context]+pseudocount
+                for context in self.coords['context']
             ]
 
-        # LxDxC => DxCxL
-        trinuc_matrix = np.array(trinuc_matrix)\
-            .astype(np.float32).T
-        # DON'T (!) add a pseudocount
+            return context_counts
+        
+        
+        n_loci = sum(1 for _ in stream_bed12(regions_file))
+        
+        trinuc_matrix = np.zeros(
+            (self.sizes['context'], n_loci),
+            dtype = np.float32,
+        )
+
+        with Fasta(fasta_file) as fasta_object:
+            for i, region in tqdm(
+                enumerate(stream_bed12(regions_file)), 
+                nrows=100, 
+                desc = 'Aggregating k-mer content'
+            ):
+                trinuc_matrix[...,i] = np.array(_count_trinucs(region), dtype=np.float32)
 
         return xr.DataArray(
             trinuc_matrix,
@@ -276,9 +393,12 @@ class FragmentMotif(ModeConfig):
 
 class InFragmentMotif(FragmentMotif):
 
+    MODE_ID='FRAGMENT_MOTIF_IN5P'
+
     def get_context_frequencies(self,*, regions_file, fasta_file):
         return self._get_context_frequencies(
-            -3, 3, 
+            (0,3),
+            (-3,0),
             regions_file=regions_file, 
             fasta_file=fasta_file
         )
@@ -291,11 +411,44 @@ class InFragmentMotif(FragmentMotif):
         dim_sizes,
         regions_file,
         fasta_file,
+        **kw,
     ):
         return self._ingest_observations(
             bam_file,
             weight_tags,
             in_motifs = True,
+            dim_sizes = dim_sizes,
+            regions_file = regions_file,
+            fasta_file = fasta_file,
+        )
+    
+
+class OutFragmentMotif(FragmentMotif):
+
+    MODE_ID='FRAGMENT_MOTIF_OUT5P'
+
+    def get_context_frequencies(self,*, regions_file, fasta_file):
+        return self._get_context_frequencies(
+            (-4,-1),
+            (1,4),
+            regions_file=regions_file, 
+            fasta_file=fasta_file
+        )
+    
+    def ingest_observations(
+        self,
+        bam_file,
+        weight_tags,
+        *,
+        dim_sizes,
+        regions_file,
+        fasta_file,
+        **kw,
+    ):
+        return self._ingest_observations(
+            bam_file,
+            weight_tags,
+            in_motifs = False,
             dim_sizes = dim_sizes,
             regions_file = regions_file,
             fasta_file = fasta_file,

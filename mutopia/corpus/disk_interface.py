@@ -64,6 +64,21 @@ def read_dims(dataset):
             for dim in dset.dimensions.keys()
         }
 
+@retry_until_write
+def write_context_freqs(
+    dataset,
+    context_freqs,
+):
+    
+    context_freqs.name = 'context_frequencies'
+
+    context_freqs.to_netcdf(
+        dataset,
+        group='regions',
+        mode='a',
+        **WRITE_KW,
+    )
+
 ##
 # feature write, remove, and list
 ##
@@ -195,7 +210,7 @@ def _backend_load_sample(filename, sample_name):
     
     with xr.open_dataset(filename, group=sample_name, engine='netcdf4') as sample:
         sample = sample.load()
-        if sample.attrs['format'] == 'COO':
+        if 'format' in sample.attrs and sample.attrs['format'] == 'COO':
             return sample.coo_to_sparse().ascoo()
         else:
             return sample.to_dataarray().squeeze()

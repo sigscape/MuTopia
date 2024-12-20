@@ -83,6 +83,43 @@ class ModeConfig(ABC):
 
 
     @classmethod
+    def _parse_signatures(
+        cls,
+        signature,
+        select = [],
+        sig_names = None,
+        normalize = False,
+    ):
+        '''
+        Parse a signature tensor into a list of signatures.
+        '''
+    
+        has_extra_dims = len(signature.dims) > 1
+
+        if len(select) > 0 and not has_extra_dims:
+            raise ValueError('`select` is only valid if the signature has one extra dimension to choose from.')
+
+        if len(select) > 0:            
+            lead_dim = signature.dims[0]
+
+            if sig_names and not len(select) == len(sig_names):
+                raise ValueError('If both `sig_names` and `select` are specified, they must have the same length.')
+            
+            pl_signatures = list(signature.loc[{lead_dim : list(select)}].data)
+            sig_names = sig_names or select
+
+        elif not has_extra_dims:
+            pl_signatures = [signature.data.ravel()]
+        else:
+            raise ValueError('If the signature has extra dimensions, `select` must be specified.')
+        
+        if normalize:
+            pl_signatures = [s/s.sum() for s in pl_signatures]
+
+        return pl_signatures, sig_names
+
+
+    @classmethod
     @abstractmethod
     def plot(cls,
         signatures,

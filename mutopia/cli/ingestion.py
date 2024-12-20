@@ -1,10 +1,13 @@
 import click
 from typing import *
 from functools import partial
+import os
 import numpy as np
 import mutopia.ingestion as ingest
 from mutopia.corpus import GTensor, write_dataset
 import netCDF4 as nc
+from shutil import copyfile
+
 import mutopia.corpus.disk_interface as disk
 from ..modalities import Modality
 from ..genome_utils.bed12_utils import stream_bed12
@@ -156,7 +159,7 @@ def create(
         context_frequencies=context_freqs,
     )
 
-    gtensor.attrs['regions_file'] = regions_file
+    gtensor.attrs['regions_file'] = os.path.basename(regions_file)
     gtensor.attrs['genome_file'] = genome_file
     gtensor.attrs['fasta_file'] = fasta_file
     gtensor.attrs['blacklist_file'] = blacklist_file
@@ -169,9 +172,49 @@ def create(
     
     write_dataset(gtensor, output)
 
+
 @ingestion.command("convert")
-def convert():
-    pass
+@click.argument(
+    'input',
+    type=click.Path(exists=True),
+)
+@click.argument(
+    'output',
+    type=click.Path(writable=True),
+)
+@click.option(
+    '-dtype',
+    '--dtype',
+    type=click.Choice([x.value for x in Modality]),
+    required=True,
+    help='Modality to convert the corpus to',
+)
+def convert(
+    *,
+    input,
+    dtype : str,
+    output : str,
+):
+    
+    logger.info('Copying corpus ...')
+    input_regions_file = disk.read_regions_file(input)
+    copyfile(input, output)
+    
+    modality = Modality(dtype).get_config()
+    attrs = disk.read_attrs(output)
+    output_regions_file = output + '.regions.bed'
+    copyfile(input_regions_file, output_regions_file)
+
+    context_freqs = modality.get_context_frequencies(
+        regions_file=output_regions_file,
+        fasta_file=attrs['fasta_file'],
+    )
+
+    disk.write_context_freqs(
+        output,
+        context_freqs,
+    )
+
 
 @ingestion.command("set-attr")
 @click.argument(
@@ -568,32 +611,6 @@ def samplecmds():
     help='ID to assign the sample',
 )
 @click.option(
-    '-m',
-    '--mutation-rate-file',
-    type=str,
-    required=True,
-    help='File containing mutation rates',
-)
-@click.option(
-    '-chr',
-    '--chr-prefix',
-    type=str,
-    default='',
-    help='Prefix to add to chromosome names',
-)
-@click.option(
-    '--pass-only/--no-pass-only',
-    type=bool,
-    default=True,
-    help='Whether to only ingest passing mutations',
-)
-@click.option(
-    '-w',
-    '--weight-col',
-    type=str,
-    help='Column to use for mutation weights',
-)
-@click.option(
     '-sw',
     '--sample-weight',
     type=click.FloatRange(0., 1000000, min_open=False),
@@ -601,11 +618,44 @@ def samplecmds():
     help='Weight to assign to the sample',
 )
 @click.option(
+    '-m',
+    '--mutation-rate-file',
+    type=str,
+    help='VCFS ONLY: File containing mutation rates',
+)
+@click.option(
+    '-chr',
+    '--chr-prefix',
+    type=str,
+    default='',
+    help='VCFS ONLY: Prefix to add to chromosome names',
+)
+@click.option(
+    '--pass-only/--no-pass-only',
+    type=bool,
+    default=True,
+    help='VCFS ONLY: Whether to only ingest passing mutations',
+)
+@click.option(
+    '-w',
+    '--weight-col',
+    type=str,
+    help='VCFS ONLY: Column to use for mutation weights',
+)
+@click.option(
     '-name',
     '--sample-name',
     type=str,
     default=None,
-    help='Name of sample in multi-sample VCF.',
+    help='VCFS ONLY: Name of sample in multi-sample VCF.',
+)
+@click.option(
+    '-tags',
+    '--weight-tags',
+    type=str,
+    multiple=True,
+    default=[],
+    help='BAM only: Tags to use for weighting reads, multiple may be provided.',
 )
 def ingest_sample(
     dataset : str,
@@ -616,6 +666,7 @@ def ingest_sample(
     weight_col : Union[None, str] = None,
     mutation_rate_file : Union[None, str] = None,
     sample_weight : Union[None, float] = 1.,
+    weight_tags : List[str] = [],
     *,
     sample_id : str,
 ):
@@ -633,6 +684,7 @@ def ingest_sample(
         mutation_rate_file=mutation_rate_file,
         sample_weight=sample_weight,
         sample_name=sample_name,
+        weight_tags=weight_tags,
         dim_sizes=disk.read_dims(dataset),
     )
 

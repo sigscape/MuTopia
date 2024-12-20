@@ -1,6 +1,7 @@
 from xarray import DataArray
 import numpy as np
 from functools import partial, reduce
+import sparse
 from ..model_components.base import _svi_update_fn, PrimitiveModel
 from ._dirichlet_update import update_alpha
 from ..corpus_state import CorpusState as CS
@@ -53,6 +54,32 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
             weights=weights,
         )
     
+
+    def _unconvert_sample(self, sample, sample_dict, data):
+
+        dims = tuple(sample.dims)
+        indices = np.array([sample_dict[k] for k in dims])
+        shape = tuple(sample.sizes[k] for k in dims)
+
+        sp_matrix = sparse.GCXS(
+            sparse.COO(
+                indices,
+                data,
+                shape=shape,
+            ),
+            compressed_axes=(dims.index('locus'),),
+        )
+
+        return DataArray(
+            sp_matrix,
+            dims=dims,
+            attrs={
+                k : v
+                for k,v in sample.attrs.items() 
+                if not k in ('shape', 'format')
+            },
+        )
+
 
     def _get_log_context_effect(
         self,
@@ -264,16 +291,19 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
         )
     
 
-    def _sample_deviance(
+    def _apply_per_sample(
         self,
+        fn,
+        *,
         corpus,
         sample,
         model_state,
-        *,
         gamma,
-        context_sum
+        **kw,
     ):
+
         sample_dict = self._convert_sample(sample)
+        
         conditional_likelihood = \
             self._conditional_observation_likelihood(
                 corpus, 
@@ -283,7 +313,6 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
             )
         
         weights = sample_dict['weights']
-        contributions = np.ascontiguousarray(gamma/np.sum(gamma))
 
         # the context frequencies are missing dimensions that the observations have ...
         log_context_effect = self._get_log_context_effect(
@@ -291,12 +320,40 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
             **sample_dict
         )
 
+        return fn(
+            corpus,
+            sample,
+            model_state,
+            gamma=gamma,
+            conditional_likelihood=conditional_likelihood,
+            weights=weights,
+            log_context_effect=log_context_effect,
+            sample_dict=sample_dict,
+            **kw,
+        )
+
+
+    def _sample_deviance(
+        self,
+        corpus,
+        sample,
+        model_state,
+        *,
+        gamma,
+        conditional_likelihood,
+        weights,
+        log_context_effect,
+        context_sum,
+        **kw,
+    ):
+        
+        contributions = np.ascontiguousarray(gamma/np.sum(gamma))        
+
         # 1. figure out the missing dimensions
         missing_dims = dims_except_for(sample.dims, *corpus.regions.context_frequencies.dims)
         # 2. figure out the number of possible types of observations missing
         n_types = prod(corpus.sizes[dim] for dim in missing_dims)
         # 3. penalize the log context effect for the missing dimensions
-        #log_context_effect -= np.log(n_types)
         
         # saturated
         y_sum = np.sum(weights)
@@ -310,8 +367,7 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
             d_sat - d_fit,
             d_sat - d_null,
         )
-
-
+    
     def get_deviance_fns(
         self,
         corpuses,
@@ -320,15 +376,6 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
         *,
         parallel_context,
     ):
-        '''
-        -> List[F() -> Tuple[float, float]]
-        '''
-        samples = [
-            (corpus, sample_name)
-            for corpus in corpuses
-            for sample_name in CS.list_samples(corpus)
-        ]
-
         context_sums = {
             CS.get_name(corpus) : np.sum(
                 corpus.regions.context_frequencies.data,
@@ -338,17 +385,69 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
 
         deviance_fns = (
             partial(
+                self._apply_per_sample,
                 self._sample_deviance,
-                sample=CS.fetch_sample(corpus, sample_name),
                 corpus=corpus,
                 model_state=model_state,
+                sample=CS.fetch_sample(corpus, sample_name),
                 gamma=exposures_fn(corpus, sample_name),
                 context_sum=context_sums[CS.get_name(corpus)],
             )
-            for (corpus, sample_name) in samples
+            for corpus in corpuses
+            for sample_name in CS.list_samples(corpus)
         )
 
         return deviance_fns
+    
+
+    def _deviance_residuals(
+        self,
+        corpus,
+        sample,
+        model_state,
+        *,
+        gamma,
+        conditional_likelihood,
+        weights,
+        log_context_effect,
+        sample_dict,
+    ):
+        
+        contributions = np.ascontiguousarray(gamma/np.sum(gamma))        
+        y_sum = np.sum(weights)
+        
+        log_y = np.log(weights)
+        log_pi_hat = ( np.log(conditional_likelihood.T.dot(contributions)) + np.log(y_sum) )
+        pi_hat = np.exp(log_pi_hat)
+
+        resid = np.sqrt( 2*(weights*(log_y - log_pi_hat) - weights + pi_hat) ) * np.sign(weights - pi_hat)
+
+        return self._unconvert_sample(sample, sample_dict, resid)
+
+
+    def get_residual_fns(
+        self,
+        corpuses,
+        model_state,
+        exposures_fn=CS.fetch_topic_compositions,
+        *,
+        parallel_context,
+    ):
+        residuals_fns = (
+            partial(
+                self._apply_per_sample,
+                self._deviance_residuals,
+                corpus=corpus,
+                model_state=model_state,
+                sample=CS.fetch_sample(corpus, sample_name),
+                gamma=exposures_fn(corpus, sample_name),
+            )
+            for corpus in corpuses
+            for sample_name in CS.list_samples(corpus)
+        )
+
+        return residuals_fns    
+    
 
     ## 
     # M-step functionality to satisfy the PrimModel interface
