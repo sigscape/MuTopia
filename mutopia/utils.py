@@ -298,6 +298,11 @@ class CorpusInterface(ABC):
 
     @property
     @abstractmethod
+    def sample(self):
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
     def sizes(self):
         raise NotImplementedError
 
@@ -341,17 +346,22 @@ class LazySampleSlicer(CorpusInterface):
     to the original data matrix, foregoing the copying step.
     '''
 
-    def __init__(self, corpus, **slices):
+    def __init__(self, corpus,*, sample, **slices):
         # first, make a copy of the corpus
         sliced = corpus.copy()
         # get a copy of the X layer
-        self._apply_slices=slices
+        self._apply_slices={d : s for d,s in slices.items() if not s is None}
+        self._samples = sample
         
         self.X = sliced.X
         self.corpus = sliced\
             .drop_nodes(('obsm', 'varm', 'features'))\
             .drop_vars('X', errors='ignore')\
             .isel(**self._apply_slices)
+        
+    @property
+    def sample(self):
+        return self._samples
     
     @property
     def sizes(self):
@@ -380,8 +390,8 @@ class LazySampleSlicer(CorpusInterface):
     def fetch_sample(self, sample_name):
         if not sample_name is None:
             return self.X\
-                        .sel(sample=sample_name)\
-                        .isel(**self._apply_slices)
+                    .sel(sample=sample_name)\
+                    .isel(**{d:s for d,s in self._apply_slices.items() if not d == 'sample'})
         else:
             return self.X.isel(**self._apply_slices)
 

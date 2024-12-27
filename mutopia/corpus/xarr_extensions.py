@@ -39,8 +39,10 @@ class OnDiskCoo(BaseAccessor):
                 indices,
                 data,
                 shape=shape,
+                fill_value=0.,
             ),
             compressed_axes=(compress,),
+            fill_value=0.,
         )
 
         return xr.DataArray(

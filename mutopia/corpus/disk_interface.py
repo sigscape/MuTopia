@@ -79,6 +79,22 @@ def write_context_freqs(
         **WRITE_KW,
     )
 
+
+@retry_until_write
+def write_locus_offsets(
+    dataset,
+    locus_offsets,
+):
+    
+    locus_offsets.name = 'exposures'
+
+    locus_offsets.to_netcdf(
+        dataset,
+        group='regions',
+        mode='a',
+        **WRITE_KW,
+    )
+
 ##
 # feature write, remove, and list
 ##

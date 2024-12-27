@@ -266,7 +266,8 @@ def SBSModel(
     begin_prior_updates = 20,
     stop_condition=50,
     num_epochs = 2000,
-    locus_subsample = None,
+    locus_subsample=None,
+    batch_subsample=None,
     threads = 1,
     kappa = 0.5,
     tau = 1.,
@@ -275,7 +276,7 @@ def SBSModel(
     sparse=True,
     verbose=0,
     max_iter=25,
-    init_variance=(0.05, 0.05, 0.05)
+    init_variance=(0.1, 0.1, 0.05)
 ):
     
     random_state = np.random.RandomState(seed)
@@ -369,6 +370,7 @@ def SBSModel(
             stop_condition=stop_condition,
             num_epochs=num_epochs,
             locus_subsample=locus_subsample,
+            batch_subsample=batch_subsample,
             threads=threads,
             kappa=kappa,
             tau=tau,

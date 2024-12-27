@@ -151,8 +151,8 @@ def get_corpus_design(corpuses, encoder : dict, n_repeats = lambda x : 1):
 def _svi_update_fn(old_value, new_value, learning_rate):
     
     if np.isnan(new_value).any():
-        print('NaN value encountered in update! - if this happens repeatedly later in training, '
-              'consider increasing `conditioning_alpha`.', 
+        print('\n\rNaN value encountered in update! - if this happens repeatedly later in training, '
+              'consider increasing `conditioning_alpha`, `locus_subsample`, or `batch_subsample`', 
               file=sys.stderr)
         return old_value
     
