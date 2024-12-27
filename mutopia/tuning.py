@@ -41,7 +41,7 @@ def create_study(
     storage=None,
     save_model=False,
     output_dir=None,
-    extensive=False,
+    extensive=0,
     *,
     min_components, 
     max_components,

@@ -396,11 +396,12 @@ def study():
     help="Use sparse matrices in the updates.",
 )
 @click.option(
-    '--extensive/--no-extensive',
-    type=bool,
-    default=False,
-    is_flag=True,
-    help="Use extensive mode",
+    '-e',
+    '--extensive',
+    count=True,
+    type=int,
+    default=0,
+    help='How extensively to tune the hyperparameters of the model, use -e, -ee, -eee, etc. for more tuning.'
 )
 def create_study(
     study_name: str,
@@ -412,7 +413,7 @@ def create_study(
     seed: int = 0,
     save_model: bool = False,
     output_dir: str = '.',
-    extensive: bool = False,
+    extensive: int = 0,
     init_components: Union[List[str], None] = None,
     **model_kw,
 ):
