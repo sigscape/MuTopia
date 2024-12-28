@@ -3,6 +3,8 @@ from .corpus_state import CorpusState as CS
 from .eval import *
 from ..utils import *
 from tqdm import trange
+import pandas as pd
+
 
 def VI_step(
     model_state,
@@ -79,7 +81,8 @@ def SVI_step(
     parallel_context,
     batch_generator,
     learning_rate,
-    subsample_rate,
+    locus_subsample,
+    batch_subsample,
 ):
 
     '''
@@ -91,18 +94,17 @@ def SVI_step(
         corpuses=slices,
         parallel_context=parallel_context,
     )
-    svi_kw = dict(
-        learning_rate=learning_rate,
-        subsample_rate=subsample_rate,
-    )
 
     '''
-    Get the offsets from the sliced data,
-    but don't update the normalizers!
+    Get the offsets from the sliced data.
     '''
     offsets = model_state.get_exp_offsets_dict(
         **args,
-        norm_update_fn=partial(model_state._update_normalizer, **svi_kw),
+        norm_update_fn=partial(
+            model_state._update_normalizer, 
+            learning_rate=learning_rate,
+            subsample_rate=locus_subsample
+        ),
     )
 
     '''
@@ -116,7 +118,12 @@ def SVI_step(
     '''
     Okay, now we can calculate the sufficient statistics.
     '''
-    sstats, elbo = model_state.Estep(**args, **svi_kw)
+    sstats, elbo = model_state.Estep(
+        **args, 
+        learning_rate=learning_rate,
+        locus_subsample=locus_subsample or 1.,
+        batch_subsample=batch_subsample or 1.,
+    )
 
     '''
     Calculate the bounds here because the normalizers and 
@@ -134,8 +141,8 @@ def SVI_step(
         offsets=offsets,
         sstats=sstats,
         update_prior=update_prior,
+        learning_rate=learning_rate,
         **args,
-        **svi_kw,
     )
 
     '''
@@ -160,23 +167,30 @@ def learning_rate_schedule(tau, kappa, epoch):
     return (tau + epoch)**(-kappa)
 
 
-def locus_slice_generator(
+def slice_generator(
         random_state,
         *corpuses,
-        subsample_rate=0.25,
+        locus_subsample=0.25,
+        batch_subsample=None,
     ):
 
-    def get_random_loci(corpus):
-        n_loci = corpus.dims['locus']
+    def _downselect(corpus, dim, rate):
+        n_loci = corpus.dims[dim]
         sel_loci = random_state.choice(
             n_loci,
-            int(subsample_rate*n_loci),
+            int(rate*n_loci),
             replace=False
         )
         return sel_loci
     
     return tuple(
-        LazySampleSlicer(corpus, locus=get_random_loci(corpus))
+        LazySampleSlicer(
+            corpus, 
+            sample=pd.Index(CS.list_samples(corpus))[_downselect(corpus, 'sample', batch_subsample)] \
+                if not batch_subsample is None else pd.Index(CS.list_samples(corpus)),
+            locus=_downselect(corpus, 'locus', locus_subsample) \
+                if not locus_subsample is None else None,
+        )
         for corpus in corpuses
     )
 
@@ -193,11 +207,12 @@ def fit_model(
     random_state,
     # optimization settings
     empirical_bayes = True,
-    begin_prior_updates = 10,
+    begin_prior_updates = 20,
     stop_condition=50,
     # optimization settings
     num_epochs = 2000,
     locus_subsample = None,
+    batch_subsample = None,
     threads = 1,
     kappa = 0.5,
     tau = 1.,
@@ -253,19 +268,21 @@ def fit_model(
         )
 
     else:
-        logger.info(f'Using stochastic VI with a sampling rate of {locus_subsample:2f}.')
-        subsampler = partial(
-            locus_slice_generator, 
-            random_state, 
-            subsample_rate=locus_subsample
+
+        subsample_rates = dict(
+            locus_subsample=locus_subsample,
+            batch_subsample=batch_subsample,
         )
+
+        logger.info(f'Using stochastic VI with a sampling rate of {locus_subsample:2f}.')
+        subsampler = partial(slice_generator, random_state, **subsample_rates)
 
         step_fn = partial(
             SVI_step, 
             model_state=model_state,
             corpuses=train_corpuses,
             batch_generator=subsampler,
-            subsample_rate=locus_subsample,
+            **subsample_rates,
         )
 
     logger.info(f'Training model with {threads} threads.')

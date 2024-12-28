@@ -42,6 +42,7 @@ class LDAUpdateDense(PrimitiveModel, LocalUpdate):
         conditional_likelihood, 
         weights,
         gamma,
+        batch_subsample=1.,
         *,
         dims,
         ):
@@ -58,7 +59,7 @@ class LDAUpdateDense(PrimitiveModel, LocalUpdate):
 
         suffstats = {
             'weighted_posterior' : DataArray(
-                weighted_posterior, 
+                weighted_posterior/batch_subsample, 
                 dims=('component', *dims),
             ),
             'gamma' : gamma, 
@@ -88,7 +89,8 @@ class LDAUpdateDense(PrimitiveModel, LocalUpdate):
         self,
         gamma,
         learning_rate=1.,
-        subsample_rate=1.,
+        locus_subsample=1.,
+        batch_subsample=1.,
         *,
         corpus,
         sample,
@@ -105,7 +107,7 @@ class LDAUpdateDense(PrimitiveModel, LocalUpdate):
         '''
         
         # 1. get the information we need from the sample
-        weights = self._convert_sample(sample)/subsample_rate
+        weights = self._convert_sample(sample)/locus_subsample
         alpha = np.ascontiguousarray(self.alpha[CS.get_name(corpus)])
         
         args = (
@@ -125,6 +127,7 @@ class LDAUpdateDense(PrimitiveModel, LocalUpdate):
             self._calc_sstats,
             *args,
             dims=dims,
+            batch_subsample=batch_subsample,
         )
 
         svi_update = partial(
@@ -143,7 +146,8 @@ class LDAUpdateDense(PrimitiveModel, LocalUpdate):
         corpuses,
         model_state,
         learning_rate=1.,
-        subsample_rate=1.,
+        locus_subsample=1.,
+        batch_subsample=1.,
         *,
         parallel_context,
     ):
@@ -181,7 +185,8 @@ class LDAUpdateDense(PrimitiveModel, LocalUpdate):
                 sample=CS.fetch_sample(corpus, sample_name),
                 corpus=corpus,
                 learning_rate=learning_rate,
-                subsample_rate=subsample_rate,
+                locus_subsample=locus_subsample,
+                batch_subsample=batch_subsample,
                 conditional_likelihood=likelihood_tensors[CS.get_name(corpus)],
                 dims=sample_dims,
             )

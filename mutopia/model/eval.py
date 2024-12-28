@@ -131,14 +131,12 @@ def residuals(
 
 
 
-def _slow_deviance(
+def squared_residuals(
     model_state,
     corpuses,
     exposures_fn = CS.fetch_topic_compositions,
     *,
     parallel_context,
-    ignore_dims=[],
-    save_dims=None,
 ):
     '''
     This function computes the deviance of the model on the corpuses.
@@ -150,17 +148,65 @@ def _slow_deviance(
     specialized `deviance` function.
     '''
 
-    xr_xlogy_sparse_dense = lambda a,b : xr.apply_ufunc(
-                            lambda x,y : x * np.nan_to_num(np.log(y), neginf=-1e30),
-                            a,b,
-                        )
+    _update_normalizers(
+        model_state, 
+        corpuses, 
+        parallel_context=parallel_context
+    )
 
-    xr_xlogy_sparse_sparse = lambda a,b : xr.apply_ufunc(
-                                lambda x,y : x * np.log(y),
-                                a,b,
-                            )
+    # () -> F(corpus) -> F(exposures) -> y_hat
+    get_log_mutation_rate_fn = lambda corpus : partial(
+            model_state._log_marginalize_mutrate,
+            model_state._get_log_mutation_rate_tensor(
+                corpus, 
+                parallel_context=parallel_context,
+                with_context=True,
+            )
+        )
     
-    def _sample_deviance(obs, marginal_mutrate):
+    xlogy_sp_dense = lambda a,b : xr.apply_ufunc(
+                        lambda x,y : x * np.nan_to_num(np.log(y), neginf=-1e30),
+                        a,b,
+                    )
+
+    xlogy = \
+        lambda a,b : xr.apply_ufunc(
+            lambda x,y : x * np.log(y),
+            a,b,
+        )
+    
+
+    def _sample_squared_residuals(obs, log_marginal_mutrate_fn, exposures):
+
+        log_mutrate = log_marginal_mutrate_fn(exposures)
+        
+        ysum = obs.data.sum()
+        y_hat = np.exp(log_mutrate + np.log(ysum))
+
+        return 2*(
+            xlogy(obs, obs) \
+            - xlogy_sp_dense(obs, y_hat) \
+            - obs + y_hat
+        )
+    
+
+    def _corpus_squared_residuals(corpus):
+        
+        log_marginal_mutrate_fn = get_log_mutation_rate_fn(corpus)
+        
+        return _reduce_sum(parallel_context(
+            delayed(_sample_squared_residuals)(
+                CS.fetch_sample(corpus, sample_name),
+                log_marginal_mutrate_fn,
+                exposures_fn(corpus, sample_name)
+            )
+            for sample_name in CS.list_samples(corpus)
+        ))
+    
+    return _reduce_sum(map(_corpus_squared_residuals, corpuses))
+    
+    
+    '''def _sample_deviance(obs, marginal_mutrate):
         
         sum_dims = dims_except_for(obs.dims, *save_dims) \
                     if not save_dims is None else None
@@ -175,64 +221,24 @@ def _slow_deviance(
                     - ysum * np.log(marginal_mutrate.data.sum())
 
         print(ylogy, ylogmu)
-        return (ylogy - ylogmu)
-    
-    
-    def _corpus_fit_deviance(corpus):
+        return (ylogy - ylogmu)'''
+        
 
-        '''
-        set up the marginal mutation rate tensor from the model
-        '''
-        marg_fn = partial(
-            model_state._marginalize_mutrate,
-            model_state._get_log_mutation_rate_tensor(
-                corpus, 
-                parallel_context=parallel_context
-            )
+    '''fit_deviance = lambda obs, gamma : _sample_deviance(
+                        obs.sum(dim=ignore_dims), 
+                        match_dims(obs, marg_fn(gamma)).sum(dim=ignore_dims)
+                    )
+    
+    return _reduce_sum(parallel_context(
+        delayed(fit_deviance)(
+            CS.fetch_sample(corpus, sample_name),
+            exposures_fn(corpus, sample_name)
         )
-
-        fit_deviance = lambda obs, gamma : _sample_deviance(
-                            obs.sum(dim=ignore_dims), 
-                            match_dims(obs, marg_fn(gamma)).sum(dim=ignore_dims)
-                        )
-        
-        return _reduce_sum(parallel_context(
-            delayed(fit_deviance)(
-                CS.fetch_sample(corpus, sample_name),
-                exposures_fn(corpus, sample_name)
-            )
-            for sample_name in CS.list_samples(corpus)
-        ))
-    
-    
-    def _corpus_null_deviance(corpus):
-
-        '''
-        set up the background mutation rate tensor
-        '''
-        example_sample = CS.fetch_sample(corpus, CS.list_samples(corpus)[0])
-
-        background_rate = match_dims(
-                            example_sample, 
-                            corpus.regions.exposures \
-                                * corpus.regions.context_frequencies
-                        ).sum(dim=ignore_dims)
-        
-        null_deviance = lambda obs : _sample_deviance(
-                            obs.sum(dim=ignore_dims),
-                            background_rate
-                        )
-        
-        return _reduce_sum(parallel_context(
-            delayed(null_deviance)(CS.fetch_sample(corpus, sample_name))
-            for sample_name in CS.list_samples(corpus)
-        ))
-
+        for sample_name in CS.list_samples(corpus)
+    ))
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
 
         D_fit = _reduce_sum(map(_corpus_fit_deviance, corpuses))
-        D_null = _reduce_sum(map(_corpus_null_deviance, corpuses))
-
-    return 10*(1 - D_fit/D_null)
+    '''

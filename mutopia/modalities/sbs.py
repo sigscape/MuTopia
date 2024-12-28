@@ -266,7 +266,8 @@ def SBSModel(
     begin_prior_updates = 20,
     stop_condition=50,
     num_epochs = 2000,
-    locus_subsample = None,
+    locus_subsample=None,
+    batch_subsample=None,
     threads = 1,
     kappa = 0.5,
     tau = 1.,
@@ -275,7 +276,7 @@ def SBSModel(
     sparse=True,
     verbose=0,
     max_iter=25,
-    init_variance=(0.05, 0.05, 0.05)
+    init_variance=(0.1, 0.1, 0.05)
 ):
     
     random_state = np.random.RandomState(seed)
@@ -369,6 +370,7 @@ def SBSModel(
             stop_condition=stop_condition,
             num_epochs=num_epochs,
             locus_subsample=locus_subsample,
+            batch_subsample=batch_subsample,
             threads=threads,
             kappa=kappa,
             tau=tau,
@@ -387,27 +389,37 @@ def SBSModel(
     )
 
 
-def _sample_params(study, trial, extensive=False):
+def _sample_params(study, trial, extensive=0):
 
     params = {
-        'l2_regularization' : trial.suggest_float('l2_regularization', 1e-5, 100., log=True),
-        'max_features' : trial.suggest_categorical('max_features', [0.25, 0.33, 0.5]),
+        'l2_regularization' : trial.suggest_float('l2_regularization', 1e-5, 1000., log=True),
+        'max_features' : trial.suggest_categorical('max_features', [0.25, 0.33, 0.5, 0.75, 1.]),
     }
 
-    if extensive:
+    if extensive>0:
+        params.update({
+            'context_reg' : trial.suggest_float('context_reg', 1e-5, 5e-3, log=True),
+            'mutation_reg' : trial.suggest_float('mutation_reg', 1e-5, 5e-2, log=True),
+        })
+
+    if extensive>1:
         params.update({
             'init_variance' : (
                 trial.suggest_float('init_variance_mutation', 0.01, 0.1),
                 trial.suggest_float('init_variance_context', 0.01, 0.1),
                 trial.suggest_float('init_variance_theta', 0.01, 0.1),
             ),
-            'context_reg' : trial.suggest_float('context_reg', 1e-5, 5e-3, log=True),
-            'mutation_reg' : trial.suggest_float('mutation_reg', 1e-5, 5e-2, log=True),
             'context_encoder' : trial.suggest_categorical('context_encoder', ['diagonal', 'kmer']),
             'kmer_reg' : trial.suggest_float('kmer_reg', 1e-4, 5e-2, log=True),
             'conditioning_alpha' : trial.suggest_float('conditioning_alpha', 1e-10, 1e-7, log=True),
             'tree_learning_rate' : trial.suggest_float('tree_learning_rate', 0.05, 0.2),
             'convolution_width' : trial.suggest_int('convolution_width', 0, 3),
+        })
+
+    if extensive>2:
+        params.update({
+            'batch_subsample' : trial.suggest_categorical('batch_subsample', [None, 0.0625, 0.125, 0.25, 0.5]),
+            'locus_subsample' : trial.suggest_categorical('locus_subsample', [None, 0.0625, 0.125, 0.25, 0.5]),
         })
     
     return params

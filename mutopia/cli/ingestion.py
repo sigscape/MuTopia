@@ -20,11 +20,45 @@ from ..utils import FeatureType, logger
 # within the regions.
 ## 
 
+def _read_continuous_file(
+    dataset,
+    ingest_file,
+    normalization : FeatureType,
+    column=4,
+):
+
+    file_type = ingest.FileType.from_extension(ingest_file)
+    
+    if not file_type in (ingest.FileType.BEDGRAPH, ingest.FileType.BIGWIG, ingest.FileType.BED):
+        raise ValueError(f'File type {file_type} not supported for continuous feature ingestion.')
+    
+    if not FeatureType(normalization) in file_type.allowed_normalizations:
+        raise ValueError(f'Normalization {normalization} not supported for file type {file_type}')
+
+    corpus_attrs = disk.read_attrs(dataset)
+
+    feature_vals = file_type.get_ingestion_fn(
+        is_distance_feature=False,
+        is_discrete_feature=False,
+    )(
+        ingest_file,
+        disk.read_regions_file(dataset),
+        genome_file=corpus_attrs['genome_file'],
+        column=column,
+    )
+
+    return feature_vals
+
+
 @click.group("G-tensor commands")
 def ingestion():
     pass
 
-@ingestion.command("linearize-beds")
+@ingestion.group("utils")
+def utils():
+    pass
+
+@utils.command("linearize-beds")
 @click.argument(
     'bed_files',
     type=click.Path(exists=True),
@@ -236,7 +270,64 @@ def set_attrs(
     with nc.Dataset(dataset, 'a') as dset:
         for k,v in attrs:
             setattr(dset, k, v)
+
+
+@ingestion.group("offsets")
+def offsets():
+    pass
+@offsets.group("locus")
+def offsets_locus():
+    pass
+
+@offsets_locus.command("add")
+@click.argument(
+    'dataset',
+    type=click.Path(exists=True),
+)
+@click.argument(
+    'offsets_file',
+    type=click.Path(exists=True),
+)
+@click.option(
+    '-col',
+    '--column',
+    type=click.IntRange(4,1000),
+    default=4,
+    help='Column in the bedfile to use for the class',
+)
+def add_locus_offsets(
+    dataset,
+    offsets_file,
+    column=4,
+):
+    exp_offsets = _read_continuous_file(
+        dataset,
+        offsets_file,
+        normalization='log1p_cpm',
+        column=column,
+    ).astype(np.float32)
+
+    disk.write_locus_offsets(
+        dataset,
+        exp_offsets,
+    )
+
+@offsets_locus.command("rm")
+@click.argument(
+    'dataset',
+    type=click.Path(exists=True),
+)
+def rm_locus_offsets(
+    dataset,
+):
     
+    exp_exposures = np.ones(disk.read_dims(dataset)['locus'], dtype=np.float32)
+
+    disk.write_locus_offsets(
+        dataset,
+        exp_exposures,
+    )
+
 
 @ingestion.group("feature")
 def featurecmds():
@@ -294,30 +385,12 @@ def continuous_feature(
     feature_name : str,
 ):
     
-    def read_file(ingest_file):
-
-        file_type = ingest.FileType.from_extension(ingest_file)
-        
-        if not file_type in (ingest.FileType.BEDGRAPH, ingest.FileType.BIGWIG, ingest.FileType.BED):
-            raise ValueError(f'File type {file_type} not supported for continuous feature ingestion.')
-        
-        if not FeatureType(normalization) in file_type.allowed_normalizations:
-            raise ValueError(f'Normalization {normalization} not supported for file type {file_type}')
-
-        corpus_attrs = disk.read_attrs(dataset)
-
-        feature_vals = file_type.get_ingestion_fn(
-            is_distance_feature=False,
-            is_discrete_feature=False,
-        )(
-            ingest_file,
-            disk.read_regions_file(dataset),
-            genome_file=corpus_attrs['genome_file'],
-            column=column,
-            #extend=corpus_attrs['region_size'],
-        )
-
-        return feature_vals
+    read_file = partial(
+        _read_continuous_file,
+        dataset,
+        normalization=normalization,
+        column=column,
+    )
     
     vals = np.mean([read_file(f) for f in ingest_file], axis=0)
 
