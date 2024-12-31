@@ -136,7 +136,22 @@ class FragmentMotif(ModeConfig):
             comps.append(
                 [database[component][context_mut] for context_mut in cls().coords['context']]
             )
-        return np.expand_dims(np.array(comps), axis=-1)
+        
+        return xr.DataArray(
+            np.array(comps, dtype=float),
+            dims = ('component', 'context'),
+        )
+
+    @classmethod
+    def _flatten_observations(cls, signature):
+        
+        cls.validate_signatures(
+            signature,
+            required_dims=('context',),
+        )
+        signature = signature.transpose(...,'context')
+        
+        return signature
 
 
     @classmethod
@@ -149,10 +164,8 @@ class FragmentMotif(ModeConfig):
         title=None,
         **kwargs,
     ):
-        cls.validate_signatures(
-            signature,
-            required_dims=('context',),
-        )
+        signature = cls._flatten_observations(signature)
+
         pl_signatures, sig_names = cls._parse_signatures(
             signature,
             select=select,
@@ -464,12 +477,15 @@ def _make_feature_name(subsequence_code):
 def MotifModel(
     train_corpuses,
     test_corpuses,
-    n_components=15,
+    num_components=15,
     init_components=None,
     seed=0,
     # context model
     context_reg=0.0001,
-    conditioning_alpha=5e-5,
+    kmer_reg=0.005,
+    conditioning_alpha=1e-9,
+    context_encoder='diagonal',
+    # mutation model
     # locals model
     pi_prior=1.,
     # locus model
@@ -482,23 +498,24 @@ def MotifModel(
     max_features = 0.5,
     n_iter_no_change=1,
     use_groups=True,
-    smoothing_size=1000,
-    add_corpus_intercepts=True,
-    context_encoder='diagonal',
-    kmer_reg=0.001,
+    add_corpus_intercepts=False,
+    convolution_width=1,
     l2_regularization=1,
     # optimization settings
     empirical_bayes = True,
-    begin_prior_updates = 10,
+    begin_prior_updates = 20,
     stop_condition=50,
     num_epochs = 2000,
-    locus_subsample = None,
+    locus_subsample=None,
+    batch_subsample=None,
     threads = 1,
     kappa = 0.5,
-    tau = 1.,
+    tau = 0,
     callback=None,
-    eval_every=10,
+    eval_every=1,
     verbose=0,
+    max_iter=25,
+    init_variance=(0.1, 0.05),
 ):
     random_state = np.random.RandomState(seed)
 
@@ -508,7 +525,8 @@ def MotifModel(
         else LinearThetaModel)\
         (
             train_corpuses,
-            n_components=n_components,
+            init_variance=init_variance[1],
+            n_components=num_components,
             tree_learning_rate=tree_learning_rate,
             max_depth=max_depth,
             max_trees_per_iter=max_trees_per_iter,
@@ -518,8 +536,8 @@ def MotifModel(
             n_iter_no_change=n_iter_no_change,
             use_groups=use_groups,
             random_state=random_state,
-            smoothing_size=smoothing_size,
-            #add_corpus_intercepts=add_corpus_intercepts,
+            add_corpus_intercepts=add_corpus_intercepts,
+            convolution_width=convolution_width,
             l2_regularization=l2_regularization,
         )
     
@@ -536,19 +554,21 @@ def MotifModel(
 
     context_model = UnstrandedContextModel(
         train_corpuses,
-        n_components=n_components,
+        kmer_encoder,
+        n_components=num_components,
         random_state=random_state,
-        kmer_encoder=kmer_encoder,
-        kmer_reg=kmer_reg,
+        init_variance=init_variance[0],
         tol=5e-4,
         reg=context_reg,
+        kmer_reg=kmer_reg,
         conditioning_alpha=conditioning_alpha,
         init_components=init_components,
+        max_iter=max_iter,
     )
 
-    locals_model = LDAUpdateSparse(
+    locals_model = LDAUpdateDense(
         train_corpuses,
-        n_components=n_components,
+        n_components=num_components,
         random_state=random_state,
         prior_alpha=pi_prior,
     )
@@ -571,6 +591,7 @@ def MotifModel(
             stop_condition=stop_condition,
             num_epochs=num_epochs,
             locus_subsample=locus_subsample,
+            batch_subsample=batch_subsample,
             threads=threads,
             kappa=kappa,
             tau=tau,
@@ -589,27 +610,37 @@ def MotifModel(
     )
 
 
-def _sample_params(study, trial, extensive=False):
+def _sample_params(study, trial, extensive=0):
 
     params = {
-        'l2_regularization' : trial.suggest_float('l2_regularization', 1e-5, 100., log=True),
-        'max_features' : trial.suggest_categorical('max_features', [0.25, 0.33, 0.5]),
+        'l2_regularization' : trial.suggest_float('l2_regularization', 1e-5, 1000., log=True),
+        'max_features' : trial.suggest_categorical('max_features', [0.25, 0.33, 0.5, 0.75, 1.]),
     }
 
-    if params:
+    if extensive>0:
+        params.update({
+            'context_reg' : trial.suggest_float('context_reg', 1e-5, 5e-3, log=True),
+            'mutation_reg' : trial.suggest_float('mutation_reg', 1e-5, 5e-2, log=True),
+        })
+
+    if extensive>1:
         params.update({
             'init_variance' : (
                 trial.suggest_float('init_variance_mutation', 0.01, 0.1),
                 trial.suggest_float('init_variance_context', 0.01, 0.1),
                 trial.suggest_float('init_variance_theta', 0.01, 0.1),
             ),
-            'context_reg' : trial.suggest_float('context_reg', 1e-5, 5e-3, log=True),
-            'mutation_reg' : trial.suggest_float('mutation_reg', 1e-5, 5e-2, log=True),
+            'context_encoder' : trial.suggest_categorical('context_encoder', ['diagonal', 'kmer']),
             'kmer_reg' : trial.suggest_float('kmer_reg', 1e-4, 5e-2, log=True),
             'conditioning_alpha' : trial.suggest_float('conditioning_alpha', 1e-10, 1e-7, log=True),
-            'begin_prior_updates' : trial.suggest_int('begin_prior_updates', 5, 50),
             'tree_learning_rate' : trial.suggest_float('tree_learning_rate', 0.05, 0.2),
             'convolution_width' : trial.suggest_int('convolution_width', 0, 3),
+        })
+
+    if extensive>2:
+        params.update({
+            'batch_subsample' : trial.suggest_categorical('batch_subsample', [None, 0.0625, 0.125, 0.25, 0.5]),
+            'locus_subsample' : trial.suggest_categorical('locus_subsample', [None, 0.0625, 0.125, 0.25, 0.5]),
         })
     
     return params

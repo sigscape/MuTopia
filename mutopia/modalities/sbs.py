@@ -81,7 +81,10 @@ class SBSMode(ModeConfig):
                     .reshape( (cls.dim_context(), cls.dim_mutation()) )
             )
 
-        return np.array(comps)
+        return xr.DataArray(
+            np.array(comps),
+            dims=('component', 'context', 'mutation'),
+        )
     
 
     @classmethod
@@ -257,9 +260,8 @@ def SBSModel(
     max_features = 0.5,
     n_iter_no_change=1,
     use_groups=True,
-    smoothing_size=1000,
     add_corpus_intercepts=False,
-    convolution_width=1,
+    convolution_width=2,
     l2_regularization=1,
     # optimization settings
     empirical_bayes = True,
@@ -270,7 +272,7 @@ def SBSModel(
     batch_subsample=None,
     threads = 1,
     kappa = 0.5,
-    tau = 1.,
+    tau = 0,
     callback=None,
     eval_every=1,
     sparse=True,
@@ -337,7 +339,6 @@ def SBSModel(
             n_iter_no_change=n_iter_no_change,
             use_groups=use_groups,
             random_state=random_state,
-            smoothing_size=smoothing_size,
             add_corpus_intercepts=add_corpus_intercepts,
             convolution_width=convolution_width,
             l2_regularization=l2_regularization,
@@ -394,6 +395,8 @@ def _sample_params(study, trial, extensive=0):
     params = {
         'l2_regularization' : trial.suggest_float('l2_regularization', 1e-5, 1000., log=True),
         'max_features' : trial.suggest_categorical('max_features', [0.25, 0.33, 0.5, 0.75, 1.]),
+        'tree_learning_rate' : trial.suggest_float('tree_learning_rate', 0.025, 0.2),
+        'init_variance' : (0.1, 0.1, trial.suggest_float('init_variance_theta', 0.01, 0.1)),
     }
 
     if extensive>0:
@@ -412,7 +415,6 @@ def _sample_params(study, trial, extensive=0):
             'context_encoder' : trial.suggest_categorical('context_encoder', ['diagonal', 'kmer']),
             'kmer_reg' : trial.suggest_float('kmer_reg', 1e-4, 5e-2, log=True),
             'conditioning_alpha' : trial.suggest_float('conditioning_alpha', 1e-10, 1e-7, log=True),
-            'tree_learning_rate' : trial.suggest_float('tree_learning_rate', 0.05, 0.2),
             'convolution_width' : trial.suggest_int('convolution_width', 0, 3),
         })
 

@@ -92,6 +92,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
 
         intercept_groups = [True]*self.consequence_dim \
                 + [False]*self.transformer.n_states_
+        
         ridge_solver = partial(
             interative_partial_ls_solver,
             group_mask = np.array(intercept_groups),
@@ -114,12 +115,6 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
             tol=tol,
             max_iter=max_iter,
         )
-
-        '''if not init_components is None:
-            self.init_from_signatures(
-                corpuses[0].modality().load_components(*init_components)
-            )'''
-
 
     @property
     def requires_normalization(self):

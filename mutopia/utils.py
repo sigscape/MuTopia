@@ -70,7 +70,7 @@ class FeatureType(Enum):
 
 
 def str_wrapped_list(x, n=4):
-    x = list(x)
+    x = list(map(str, x))
     return "\n\t" + ",\n\t".join([', '.join(x[i:i+n]) for i in range(0, len(x), n)])
 
 
