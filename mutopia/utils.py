@@ -430,13 +430,7 @@ def borrow_kwargs(*borrow_sigs):
     return decorator
 
 
-def stream_subprocess_output(process):
-    
-    while True:
-        line = process.stdout.readline().strip()
-        if not line:
-            break
-        yield line
+def close_process(process):
 
     process.stdout.close()
     process.wait()
@@ -445,5 +439,14 @@ def stream_subprocess_output(process):
         raise subprocess.CalledProcessError(
             process.returncode, 
             process.args,
-            process.stderr.read().decode('utf-8')
         )
+
+def stream_subprocess_output(process):
+    
+    while True:
+        line = process.stdout.readline().strip()
+        if not line:
+            break
+        yield line
+
+    close_process(process)

@@ -723,6 +723,18 @@ def samplecmds():
     help='VCFS ONLY: Name of sample in multi-sample VCF.',
 )
 @click.option(
+    '--cluster/--no-cluster',
+    type=bool,
+    default=True,
+    help='VCFS ONLY: Whether to cluster the mutations in the sample, requires a mutation rate file.',
+)
+@click.option(
+    '--skip-sort/--no-skip-sort',
+    type=bool,
+    default=False,
+    help='Whether to skip sorting the VCF file. This will fail if the VCF is not in lexigraphical sorted order (chr1, chr10, ...).',
+)
+@click.option(
     '-tags',
     '--weight-tags',
     type=str,
@@ -740,6 +752,8 @@ def ingest_sample(
     mutation_rate_file : Union[None, str] = None,
     sample_weight : Union[None, float] = 1.,
     weight_tags : List[str] = [],
+    skip_sort : bool = False,
+    cluster : bool = True,
     *,
     sample_id : str,
 ):
@@ -758,6 +772,8 @@ def ingest_sample(
         sample_weight=sample_weight,
         sample_name=sample_name,
         weight_tags=weight_tags,
+        skip_sort=skip_sort,
+        cluster=cluster,
         dim_sizes=disk.read_dims(dataset),
     )
 

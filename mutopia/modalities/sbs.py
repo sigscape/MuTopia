@@ -207,6 +207,8 @@ class SBSMode(ModeConfig):
         mutation_rate_file=None,
         sample_weight=None,
         sample_name=None,
+        skip_sort=False,
+        cluster=True,
         *,
         dim_sizes,
         regions_file,
@@ -224,6 +226,8 @@ class SBSMode(ModeConfig):
             sample_weight=sample_weight,
             sample_name=sample_name,
             pass_only=pass_only,
+            skip_sort=skip_sort,
+            cluster=cluster,
         )
         
         return self._arr_to_xr(dim_sizes, coords, data)

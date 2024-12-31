@@ -5,14 +5,49 @@ import tempfile
 import os
 import tqdm
 import pandas as pd
-import logging
 from scipy.stats import expon
 import numpy as np
+from contextlib import contextmanager
 import sys
-from ..utils import logger
+from ..utils import logger, close_process
 
 
-def get_passed_SNVs(
+@contextmanager
+def make_genome_file(vcf_file, chr_prefix='', require_length=False):
+
+    if not any(os.path.exists(vcf_file + ext) for ext in ['.tbi','.csi']):
+        subprocess.check_call(['bcftools','index', vcf_file])
+
+    contigs = subprocess.check_output(
+        ['bcftools', 'index','--all','--stats', vcf_file],
+        universal_newlines=True,
+        stderr=sys.stderr,
+    )
+
+    with tempfile.NamedTemporaryFile(delete=False) as f:
+        for line in contigs.split('\n'):
+            chrom, length, *_ = line.split('\t')
+
+            if length=='.':
+                if require_length:
+                    raise ValueError(f'Chromosome {chrom} does not have a length in the VCF file. Convert to BCF format.')
+                length = int(1e9)
+
+            try:
+                length = int(length)
+            except ValueError:
+                raise ValueError(f'Chromosome {chrom} has a non-integer length ({length}) in the VCF file.')
+            
+            print(chr_prefix + chrom, length, sep='\t', file=f)
+
+    try:
+        yield f.name
+    finally:
+        os.remove(f.name)
+
+
+@contextmanager
+def stream_passed_SNVs(
     vcf_file, 
     query_string, 
     output=subprocess.PIPE,
@@ -20,6 +55,7 @@ def get_passed_SNVs(
     pass_only=True,
     sample=None,
     chr_prefix='',
+    sorted=True,
 ):
     
     filter_basecmd = [
@@ -47,26 +83,31 @@ def get_passed_SNVs(
     query_process = subprocess.Popen(
         ['bcftools','query','-f', chr_prefix + query_string],
         stdin = filter_process.stdout,
-        stdout = subprocess.PIPE,
-        stderr = sys.stderr,
+        stdout = subprocess.PIPE if sorted else output,
         universal_newlines=True,
         bufsize=10000,
     )
 
-    # ahh so annoying - it would be nice to delegate sorting to the user
-    # but it can be difficult to make sure the VCFs are in lexigraphical order.
-    # Instead, I'll bite the bullet and sort here.
-    sort_process = subprocess.Popen(
-        ['sort','-k1,1','-k2,2n'],
-        stdin=query_process.stdout,
-        stdout=output,
-        stderr = sys.stderr,
-        universal_newlines=True,
-        bufsize=10000,
-    )
+    if sorted:
+        # ahh so annoying - it would be nice to delegate sorting to the user
+        # but it can be difficult to make sure the VCFs are in lexigraphical order.
+        # Instead, I'll bite the bullet and sort here.
+        sort_process = subprocess.Popen(
+            ['sort','-k1,1','-k2,2n'],
+            stdin=query_process.stdout,
+            stdout=output,
+            stderr=sys.stderr,
+            universal_newlines=True,
+            bufsize=10000,
+        )
 
-    return sort_process
-
+    out_process = sort_process if sorted else query_process
+        
+    try:
+        yield out_process
+    finally:
+        close_process(out_process)
+    
 
 def transfer_annotations_to_vcf(
         annotations_df,*,
@@ -113,11 +154,12 @@ def transfer_annotations_to_vcf(
             annotations_df.to_csv(dataframe.name, index = None, sep = '\t', header = None)
 
         try:    
-            subprocess.check_output(['bgzip','-f',dataframe.name])
+            subprocess.check_output(['bgzip','-f', dataframe.name])
             subprocess.check_output(['tabix','-s1','-b2','-e2', '-f', dataframe.name + '.gz'])
 
             subprocess.check_call(
-                ['bcftools','annotate',
+                [
+                'bcftools','annotate',
                 '-a',  dataframe.name + '.gz',
                 '-h', header.name,
                 '-c', transfer_columns,
@@ -130,31 +172,6 @@ def transfer_annotations_to_vcf(
         finally:
             os.remove(dataframe.name + '.gz')
             os.remove(dataframe.name + '.gz.tbi')
-
-
-'''def unstack_bed12_file(
-    regions_file, 
-    output,
-):
-
-    regions = read_windows(regions_file)
-
-    segments = []
-    for region in regions:
-        
-        total_region_length = sum([end-start for (_, start, end) in region.segments()])
-        
-        for chr, start, end in region.segments():
-            segments.append((chr, start, end, region.score/total_region_length*(end-start)))
-    
-    segments = sorted(segments, key=lambda x: (x[0], x[1]))
-
-    for chrom, start, end, score in segments:
-        print(
-            chrom, start, end, score, 
-            sep='\t', 
-            file=output
-        )'''
 
 
 def get_marginal_mutation_rate(
@@ -182,8 +199,16 @@ def get_marginal_mutation_rate(
 
         with tempfile.TemporaryDirectory() as tempdir:
             for vcf_file in tqdm.tqdm(vcf_files, desc='Filtering VCFs', ncols = 100):
+                
                 with open(os.path.join(tempdir, os.path.basename(vcf_file)), 'w') as f:
-                        get_passed_SNVs(vcf_file, query_str, pass_only=pass_only, output=f).communicate()
+                        
+                        with stream_passed_SNVs(
+                            vcf_file, 
+                            query_str, 
+                            pass_only=pass_only, 
+                            output=f
+                        ) as st:
+                            st.communicate()
 
             processed_vcfs = [os.path.join(tempdir, v) for v in os.listdir(tempdir)]
 
@@ -191,7 +216,7 @@ def get_marginal_mutation_rate(
             with open(coverage_file.name, 'w') as f:
                 subprocess.check_call(
                     ['bedtools','coverage',
-                    '-a',regions_file.name,
+                    '-a', regions_file.name,
                     '-b', *processed_vcfs,
                     '-sorted',
                     '-split',
@@ -231,48 +256,50 @@ def _get_local_mutation_rate(
     '''
 
     #1. get SNP positions that passed QC
-    query_process = query_fn('%CHROM\t%POS0\t%POS0\n')
+    with query_fn('%CHROM\t%POS0\t%POS0\n', sorted=True) as query_process, \
+        tempfile.NamedTemporaryFile() as temp_file:
 
-    #2. define a window around each SNV
-    slop_process = subprocess.Popen(
-        ['awk','-v','OFS=\t', 
-        f'{{start=($2-{smoothing_distance} > 0) ? $2-{smoothing_distance} : 0 ; print $1,start,$2+{smoothing_distance}, $1,$2,$3}}'],
-        stdin = query_process.stdout,
-        stdout = subprocess.PIPE,
-    )
+        #2. define a window around each SNV
+        slop_process = subprocess.Popen(
+            ['awk','-v','OFS=\t', 
+            f'{{start=($2-{smoothing_distance} > 0) ? $2-{smoothing_distance} : 0 ; print $1,start,$2+{smoothing_distance}, $1,$2,$3}}'],
+            stdin = query_process.stdout,
+            stdout = subprocess.PIPE,
+        )
 
-    #3. intersect the window with the mutation rate bedgraph
-    intersect_process = subprocess.Popen(
-        ['bedtools','intersect',
-         '-a','-', 
-         '-b', mutation_rate_bedgraph,
-         '-sorted',
-         '-wa','-wb',
-        ],
-        stdin = slop_process.stdout,
-        stdout = subprocess.PIPE,
-        universal_newlines=True,
-        bufsize=10000,
-    )
+        #3. intersect the window with the mutation rate bedgraph
+        intersect_process = subprocess.Popen(
+            [
+            'bedtools','intersect',
+            '-a','-', 
+            '-b', mutation_rate_bedgraph,
+            '-sorted',
+            '-wa',
+            '-wb',
+            ],
+            stdin = slop_process.stdout,
+            stdout = subprocess.PIPE,
+            universal_newlines=True,
+            bufsize=10000,
+        )
 
-    #4. get the mutation location (col 1-3), 
-    #   the local relative mutation rate (col 4), 
-    #   and the size of the local interval (col 5)
-    awk_process = subprocess.Popen(
-        ['awk','-v','OFS=\t','{print $4,$5,$6,$10,$9-$8}'],
-        stdin = intersect_process.stdout,
-        stdout = subprocess.PIPE,
-        universal_newlines=True,
-    )
-
-    with tempfile.NamedTemporaryFile() as temp_file:
+        #4. get the mutation location (col 1-3), 
+        #   the local relative mutation rate (col 4), 
+        #   and the size of the local interval (col 5)
+        awk_process = subprocess.Popen(
+            ['awk','-v','OFS=\t','{print $4,$5,$6,$10,$9-$8}'],
+            stdin = intersect_process.stdout,
+            stdout = subprocess.PIPE,
+            universal_newlines=True,
+        )
 
         #5. For each unique mutation location, 
         #   sum the local mutation rate and the size of the intersection interval
         #   Save this to a temporary file
         with open(temp_file.name, 'w') as f:
             subprocess.check_call(
-                ['bedtools','groupby',
+                [
+                'bedtools','groupby',
                 '-g','1,2,3','-c','4,5','-o','sum,sum',
                 ],
                 stdin = awk_process.stdout,
@@ -291,13 +318,13 @@ def _get_local_mutation_rate(
         #6. Divide the sum of the local mutation rate by the sum of the size of the intersection interval
         #   to get the average local mutation rate, them multiply by the total number of mutations
         #   in the sample to get the poisson process parameter
-        awk_process = subprocess.check_call(
+        write_process = subprocess.check_call(
             ['awk','-v','OFS=\t', f'{{print $1,$2,$3,$4/$5*{total_mutations}}}', temp_file.name],
             stdout = output,
             universal_newlines=True,
         )
 
-        return awk_process
+    return write_process
 
 
 
@@ -307,19 +334,17 @@ def _get_rainfall_statistic(
     output, 
     smoothing_distance=15000,                       
 ):
-
-
-    with tempfile.NamedTemporaryFile() as snp_file:
+    with tempfile.NamedTemporaryFile('w') as snp_file:
         
         #1. get local mutation rate parameter about each mutation,
         #   This parameter gives the average number of mutations in a window of size `smoothing_distance`
-        with open(snp_file.name, 'w') as f:
-            _get_local_mutation_rate(
-                mutation_rate_bedgraph, 
-                query_fn, 
-                f, 
-                smoothing_distance=smoothing_distance,
-            )
+        _get_local_mutation_rate(
+            mutation_rate_bedgraph, 
+            query_fn, 
+            snp_file, 
+            smoothing_distance=smoothing_distance,
+        )
+        snp_file.flush()
 
         #2. Compute the distance to the nearest mutation for each mutation
         closest_process = subprocess.Popen(
@@ -345,6 +370,7 @@ def _get_rainfall_statistic(
             stdout = output,
             universal_newlines=True,
         )
+
 
 
 def _cluster_mutations(
@@ -428,8 +454,8 @@ def cluster_vcf(
     '''
     A "cluster" of mutations should be 
     1. Contiguously statistically-significantly close to each other.
-    2. Of the same type (e.g. C>A)
-    3. Of the same allele frequency
+    2. Of the same type (e.g. C>A) - nope
+    3. Of the same allele frequency - nope
     '''
 
     #num_samples = int( subprocess.check_output(f'bcftools query -l {vcf_file} | wc -l | cut -f1', shell=True)\
@@ -439,40 +465,41 @@ def cluster_vcf(
     #    assert not sample is None, 'The VCF file contains multiple samples. Please specify a sample to analyze.'
 
 
-    with tempfile.NamedTemporaryFile() as rainfall_file, \
-        tempfile.NamedTemporaryFile() as df:
+    with tempfile.NamedTemporaryFile('w') as rainfall_file, \
+        tempfile.NamedTemporaryFile('w') as df:
         
         # 2. Calculate rainfall statistics
         #    from the VCF file
-        with open(rainfall_file.name, 'w') as f:
-            _get_rainfall_statistic(
-                mutation_rate_bedgraph, 
-                query_fn, 
-                f, 
-                smoothing_distance=smoothing_distance,
-            )
+        _get_rainfall_statistic(
+            mutation_rate_bedgraph, 
+            query_fn, 
+            rainfall_file, 
+            smoothing_distance=smoothing_distance,
+        )
+        rainfall_file.flush()
 
         # 2. get the mutation type and allele frequency
         #    from the VCF file
-        query_process = query_fn('%CHROM\t%POS0\t%POS0\t%REF>%ALT\n')
+        with query_fn('%CHROM\t%POS0\t%POS0\t%REF>%ALT\n') as query_process:
         
-        # 3. intersect the rainfall statistics with the mutation type and allele frequency
-        #    The output columns will be 1) chr 2) start 3) end 4) local mutation rate 5) rainfall distance
-        #                               6) chr 7) start 8) end 9) mutation type 10) read depth 11) variant read depth
-        with open(df.name, 'w') as f:
+            # 3. intersect the rainfall statistics with the mutation type and allele frequency
+            #    The output columns will be 1) chr 2) start 3) end 4) local mutation rate 5) rainfall distance
+            #                               6) chr 7) start 8) end 9) mutation type 10) read depth 11) variant read depth
             subprocess.check_call(
                 [
                 'bedtools','intersect',
                 '-a', rainfall_file.name,
                 '-b', '-',
                 '-sorted',
-                '-wa','-wb',
+                '-wa',
+                '-wb',
                 ], 
                 stdin = query_process.stdout,
-                stdout = f,
+                stdout = df,
                 universal_newlines=True,
                 bufsize=10000,
             )
+            df.flush()
 
         mutations_df = pd.read_csv(df.name, sep='\t', header=None)\
                 .iloc[:, [0,1,3,4,8]]
