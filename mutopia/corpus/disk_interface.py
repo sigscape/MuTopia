@@ -1,7 +1,7 @@
 import sparse
 import xarray as xr
 import datatree
-from numpy import nan, array, float32
+from numpy import nan, array, float16, float32
 from collections import defaultdict
 from functools import wraps
 import time
@@ -155,10 +155,11 @@ def list_features(dataset):
             for feature_name, feature in dset.groups['features'].variables.items()
             if not 'active' in feature.__dict__ or feature.__dict__['active']
         }
-    
 ##
 #
 ##
+
+
 
 ##
 # Sample write, remove, and list
@@ -174,11 +175,16 @@ def write_sample(
                 arr.to_dataset(name='data', promote_attrs=True)
     
     #dset.data.data = dset.data.data.astype(float32)
-        
+    maxval=dset.data.max().item() + 1.
+    prec=maxval/65535
+
+    dset.attrs['active'] = 1
+
     dset.to_netcdf(
         filename, 
         group=f'/raw/{sample_name}', 
         mode='a',
+        encoding={'data' : {'dtype' : 'uint16', 'scale_factor': prec, '_FillValue': 0}},
         **WRITE_KW,
     )
 
@@ -259,7 +265,10 @@ def write_dataset(dataset, filename):
 def _backend_load_sample(filename, sample_name):
     
     with xr.open_dataset(filename, group=sample_name, engine='netcdf4') as sample:
+        
         sample = sample.load()
+        sample['data'] = sample.data.astype(float16)
+
         if 'format' in sample.attrs and sample.attrs['format'] == 'COO':
             return sample.coo_to_sparse().ascoo()
         else:

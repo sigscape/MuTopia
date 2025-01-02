@@ -75,13 +75,10 @@ def parse_bamfile(
         raise ImportError('"pysam" is required for ingesting observations from BAM files')
     
     with pysam.AlignmentFile(bam_file, 'rb') as bam:
-
-        logger.info('Parsing BAM file ...')
         
         data = filter(
             lambda r : not r.is_unmapped and not r.is_secondary and not r.is_supplementary \
-                and not r.is_duplicate \
-                and r.is_paired and r.mapping_quality > 0,
+                and not r.is_duplicate and r.is_paired and r.mapping_quality > 0,
             bam
         )
 
@@ -201,6 +198,7 @@ class FragmentMotif(ModeConfig):
                     bam_file,
                     *weight_tags,
                 ],
+                stderr=sys.stderr,
                 stdout=subprocess.PIPE,
                 universal_newlines=True,
                 bufsize=10000,
@@ -219,6 +217,7 @@ class FragmentMotif(ModeConfig):
                 '-split',
                 '-g', bam_genome.name,
                 ],
+                stderr=sys.stderr,
                 stdin=parse_process.stdout,
                 stdout=subprocess.PIPE,
                 universal_newlines=True,
@@ -227,13 +226,19 @@ class FragmentMotif(ModeConfig):
             
             n_tags = len(weight_tags)
             n_success = 0; n_failure = 0
+            
+            context_idx_map = {c : j for j,c in enumerate(self.coords['context'])}
 
             obs_matrix = np.zeros(
                 (self.sizes['context'], dim_sizes['locus']),
                 dtype = np.float16,
             )
 
-            for line in stream_subprocess_output(intersect_process):
+            for line in tqdm(
+                stream_subprocess_output(intersect_process),
+                desc='Parsing bam records',
+                ncols=100,
+            ):
                 
                 fields = line.strip().split('\t')
                 
@@ -254,8 +259,6 @@ class FragmentMotif(ModeConfig):
                     n_failure+=1
                     logger.warning(f'Error while parsing record: {line}:\n\t' + str(err).strip())
                     continue
-                else:
-                    n_success+=1
                 
                 shift = int(is_rev)
                 rslop = 4 * (in_motifs ^ is_rev) + shift
@@ -292,14 +295,17 @@ class FragmentMotif(ModeConfig):
                 else:
                     kmer = kmer.seq.upper()
 
-                if not 'N' in kmer:
-                    context_idx = self.coords['context'].index(kmer)
+                if kmer in context_idx_map:
+                    context_idx = context_idx_map[kmer]
                     obs_matrix[context_idx, locus_idx] += weight
                     n_success+=1
                 else:
                     n_failure+=1
         
         logger.info(f'Processed {n_success} records successfully, {n_failure} failed')
+
+        if n_failure/(n_success + n_failure) > 0.05:
+            logger.warning('Quite a lot of fragments failed to be parsed ...')
         
         return xr.DataArray(
             obs_matrix,
@@ -359,7 +365,7 @@ class FragmentMotif(ModeConfig):
         with Fasta(fasta_file) as fasta_object:
             for i, region in tqdm(
                 enumerate(stream_bed12(regions_file)), 
-                nrows=100, 
+                ncols=100, 
                 desc = 'Aggregating k-mer content'
             ):
                 trinuc_matrix[...,i] = np.array(_count_trinucs(region), dtype=np.float32)

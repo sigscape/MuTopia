@@ -100,7 +100,7 @@ def load_study(study_name, storage = None, prune=True):
         'test_corpuses' : model_attrs.pop('test_corpuses'),
         'save_model' : model_attrs.pop('save_model'),
         'output_dir' : model_attrs.pop('output_dir'),
-        'extensive' : model_attrs.pop('extensive'),
+        'extensive' : model_attrs.pop('extensive', 0),
     }
 
     return (
