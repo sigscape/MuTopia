@@ -626,7 +626,7 @@ def list_features(
     rows = [
         [feature_name] + [str(attrs.get(header, "")) for header in headers[1:]]
         for feature_name, attrs in feature_info.items()
-        if bool(attrs['active'])
+        if not 'active' in attrs or bool(attrs['active'])
     ]
 
     col_widths = [max(len(str(item)) for item in col) for col in zip(*([headers] + rows))]
