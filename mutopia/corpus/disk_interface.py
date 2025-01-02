@@ -143,6 +143,7 @@ def rm_feature(
             pass
 
 
+@retry_until_write
 def list_features(dataset):
     
     with nc.Dataset(dataset, 'r') as dset:
@@ -152,7 +153,9 @@ def list_features(dataset):
         return {
             feature_name : feature.__dict__
             for feature_name, feature in dset.groups['features'].variables.items()
+            if not 'active' in feature.__dict__ or feature.__dict__['active']
         }
+    
 ##
 #
 ##
@@ -179,6 +182,37 @@ def write_sample(
         **WRITE_KW,
     )
 
+
+@retry_until_write
+def list_samples(dataset):
+
+    with nc.Dataset(dataset, 'r') as dset:
+        if not 'raw' in dset.groups:
+            raise ValueError('No `raw` group found in dataset - are you sure this is a G-Tensor?')
+        
+        return list(
+            sname 
+            for sname, sample in dset.groups['raw']['X'].groups.items() 
+            if not 'active' in sample.__dict__ or sample.__dict__['active']
+        )
+
+
+@retry_until_write
+def rm_sample(
+    dataset,
+    sample_name : str,
+):
+    
+    with nc.Dataset(dataset, 'a') as dset:
+        if not 'raw' in dset.groups:
+            raise ValueError('No `raw` group found in dataset - are you sure this is a G-Tensor?')
+        
+        raw = dset.groups['raw']
+        raw['X'][sample_name].active = 0
+
+##
+#
+##
 
 
 def write_dataset(dataset, filename):
