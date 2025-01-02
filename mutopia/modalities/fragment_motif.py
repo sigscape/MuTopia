@@ -15,18 +15,16 @@ from tqdm import tqdm
 from pyfaidx import Fasta
 import xarray as xr
 import tempfile
-from pyfaidx import Fasta
 import subprocess
 from ..utils import stream_subprocess_output, logger
 from ..genome_utils.fancy_iterators import streaming_local_sort
 from ..genome_utils.bed12_utils import stream_bed12
-from ..plot.signature_plot import _plot_linear_signature
 logger = logging.getLogger(' Mutopia-MotifModel ')
 
 CONTEXTS = sorted(
     map(lambda x : ''.join(x), product('ATCG','ATCG','ATCG', 'ATCG')), 
     key = lambda x : (x[0], x[1], x[2], x[3])
-    )
+)
 
 cmap = plt.colormaps['tab10']
 
@@ -92,8 +90,8 @@ def parse_bamfile(
         data = streaming_local_sort(
             data,
             key = lambda x : x[1],
-            has_lapsed= lambda curr, buffval : \
-                curr[0] != buffval[0] or curr[1] - buffval[1] > 1000,
+            has_lapsed = lambda curr, buffval : \
+                curr[0] != buffval[0] or curr[1] - buffval[1] > 10000,
         )
 
         for record in data:
@@ -102,6 +100,8 @@ def parse_bamfile(
 
 
 class FragmentMotif(ModeConfig):
+
+    PALETTE = COLOR_LIST
 
     @property
     def coords(self):
@@ -114,6 +114,10 @@ class FragmentMotif(ModeConfig):
     @property
     def sample_params(self):
         return _sample_params
+    
+    @property
+    def palette(self):
+        return COLOR_LIST
     
     @property
     def available_components(self):
@@ -140,44 +144,6 @@ class FragmentMotif(ModeConfig):
         return xr.DataArray(
             np.array(comps, dtype=float),
             dims = ('component', 'context'),
-        )
-
-    @classmethod
-    def _flatten_observations(cls, signature):
-        
-        cls.validate_signatures(
-            signature,
-            required_dims=('context',),
-        )
-        signature = signature.transpose(...,'context')
-        
-        return signature
-
-
-    @classmethod
-    def plot(cls,
-        signature,
-        *select,
-        palette = 'tab10',
-        sig_names = None,
-        normalize = False,
-        title=None,
-        **kwargs,
-    ):
-        signature = cls._flatten_observations(signature)
-
-        pl_signatures, sig_names = cls._parse_signatures(
-            signature,
-            select=select,
-            sig_names=sig_names,
-            normalize=normalize,
-        )
-        _plot_linear_signature(
-            CONTEXTS,
-            palette if len(pl_signatures) > 1 else COLOR_LIST,
-            *pl_signatures,
-            sig_names=sig_names,
-            **kwargs
         )
 
     

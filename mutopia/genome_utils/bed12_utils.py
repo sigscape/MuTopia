@@ -1,5 +1,4 @@
 from collections import defaultdict
-import subprocess
 from dataclasses import dataclass, field
 from ..utils import safe_read
 

@@ -65,6 +65,7 @@ class SBSMode(ModeConfig):
             
         return list(database.keys())
 
+
     @classmethod
     def load_components(cls, *init_components):
         
@@ -78,7 +79,7 @@ class SBSMode(ModeConfig):
                 raise ValueError(f"Component {component} not found in database")
             comps.append(
                 np.array([database[component][context_mut] for context_mut in MUTOPIA_ORDER])\
-                    .reshape( (cls.dim_context(), cls.dim_mutation()) )
+                    .reshape( (cls().sizes['context'], cls().sizes['mutation']) )
             )
 
         return xr.DataArray(
@@ -107,34 +108,6 @@ class SBSMode(ModeConfig):
             )
         
         return signature
-
-
-    @classmethod
-    def plot(cls,
-        signature,
-        *select,
-        palette = 'tab10',
-        sig_names = None,
-        normalize = False,
-        title=None,
-        **kwargs,
-    ):
-        
-        signature = cls._flatten_observations(signature)
-        pl_signatures, sig_names = cls._parse_signatures(
-            signature,
-            select=select,
-            sig_names=sig_names,
-            normalize=normalize,
-        )
-            
-        _plot_linear_signature(
-            COSMIC_SORT_ORDER,
-            palette if len(pl_signatures) > 1 else MUTATION_PALETTE,
-            *pl_signatures,
-            sig_names=sig_names,
-            **kwargs
-        )
     
     
     def get_context_frequencies(

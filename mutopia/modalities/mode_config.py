@@ -1,10 +1,12 @@
 import xarray as xr
 from abc import ABC, abstractmethod
 from sparse import SparseArray, COO
+from ..plot.signature_plot import _plot_linear_signature
 
 class ModeConfig(ABC):
 
     MODE_ID = None
+    PALETTE = None
 
     @property
     def sizes(self):
@@ -16,16 +18,6 @@ class ModeConfig(ABC):
     @property
     def dims(self):
         return tuple(self.coords.keys())
-    
-    def _arr_to_xr(self,dim_sizes, coords, data):
-        return xr.DataArray(
-            COO(
-                coords,
-                data,
-                shape = (*self.sizes.values(), dim_sizes['locus']),
-            ),
-            dims = (*self.sizes.keys(), 'locus'),
-        )
     
     @property
     @abstractmethod
@@ -60,6 +52,48 @@ class ModeConfig(ABC):
         n_jobs = 1,
     ):
         raise NotImplementedError
+    
+
+    @classmethod
+    @abstractmethod
+    def ingest_observations(
+        cls,
+        *,
+        input_file,
+        regions_file,
+        fasta_file,
+        **kwargs,
+    ) -> xr.DataArray:
+        '''
+        This should return an xr.DataArray of shape (n_configuration, n_context, n_mutation, n_locus),
+        which can be either dense or sparse.
+
+        It should have a "name" in the attributes.
+        '''
+        raise NotImplementedError
+    
+
+    def _arr_to_xr(self,dim_sizes, coords, data):
+        return xr.DataArray(
+            COO(
+                coords,
+                data,
+                shape = (*self.sizes.values(), dim_sizes['locus']),
+            ),
+            dims = (*self.sizes.keys(), 'locus'),
+        )
+    
+
+    @classmethod
+    def _flatten_observations(cls, signature):
+        
+        cls.validate_signatures(
+            signature,
+            required_dims=('context',),
+        )
+        signature = signature.transpose(...,'context')
+        
+        return signature
     
 
     @classmethod
@@ -117,34 +151,40 @@ class ModeConfig(ABC):
             pl_signatures = [s/s.sum() for s in pl_signatures]
 
         return pl_signatures, sig_names
-
+    
 
     @classmethod
-    @abstractmethod
     def plot(cls,
-        signatures,
+        signature,
+        *select,
+        palette = 'tab10',
+        sig_names = None,
+        normalize = False,
+        title=None,
         **kwargs,
     ):
-        raise NotImplementedError
         
+        signature = cls._flatten_observations(signature)
 
-    @classmethod
-    @abstractmethod
-    def ingest_observations(
-        cls,
-        *,
-        input_file,
-        regions_file,
-        fasta_file,
-        **kwargs,
-    ) -> xr.DataArray:
-        '''
-        This should return an xr.DataArray of shape (n_configuration, n_context, n_mutation, n_locus),
-        which can be either dense or sparse.
+        pl_signatures, sig_names = cls._parse_signatures(
+            signature,
+            select=select,
+            sig_names=sig_names,
+            normalize=normalize,
+        )
+        
+        ax = _plot_linear_signature(
+            signature.coords['observation'].values,
+            palette if len(pl_signatures) > 1 else cls.PALETTE,
+            *pl_signatures,
+            sig_names=sig_names,
+            **kwargs
+        )
 
-        It should have a "name" in the attributes.
-        '''
-        raise NotImplementedError
+        if title:
+            ax.set_title(title)
+            
+        return ax
     
 
     @classmethod

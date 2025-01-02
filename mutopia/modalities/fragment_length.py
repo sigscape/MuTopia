@@ -1,13 +1,18 @@
-from .mode_config import ModeConfig
-from itertools import product
-from ..model import *
 import numpy as np
+import xarray as xr
+import tempfile
+import subprocess
+from math import prod
 import os
 import json
 import logging
-import matplotlib.pyplot as plt
-from ..plot.signature_plot import _plot_linear_signature
-logger = logging.getLogger(' Mutopia-LengthModel ')
+from itertools import starmap
+import sys
+from .mode_config import ModeConfig
+from ..model import *
+from ..genome_utils.bed12_utils import stream_bed12
+from ..utils import stream_subprocess_output, logger
+from ..genome_utils.fancy_iterators import streaming_local_sort, streaming_groupby
 
 _bin_edges = [
     (70, 80),  (80, 90),  (90, 100), (100, 105), (105, 110),
@@ -19,11 +24,81 @@ _bin_edges = [
 ]
 LENGTH_BINS = [f'{l}-{r}' for l, r in _bin_edges]
 
-# Create mutation indices
+
+
+def bam_to_fragments(
+    bam_file,
+    *weight_tags,
+    output=sys.stdout,
+):
+    
+    def to_fragments(read1, read2): 
+
+        fwd, rev = (read1, read2) if read1.is_forward else (read2, read1)
+        start, end = fwd.reference_start, rev.reference_end
+
+        return (
+            read1.reference_name,
+            fwd.reference_start,
+            fwd.reference_start+1,
+            start,
+            end,
+            read1.query_name,
+            end-start,
+            *[read1.get_tag(tag) for tag in weight_tags],
+        )
+
+    try:
+        import pysam
+    except ImportError:
+        raise ImportError('"pysam" is required for ingesting observations from BAM files')
+    
+    with pysam.AlignmentFile(bam_file, 'rb') as bam:
+
+        logger.info('Parsing BAM file ...')
+        
+        data = filter(
+            lambda r : not r.is_unmapped and not r.is_secondary and not r.is_supplementary \
+                and not r.is_duplicate \
+                and r.is_paired and r.mapping_quality > 0,
+            bam
+        )
+
+        data = streaming_groupby(
+            data,
+            groupby_key=lambda r : r.query_name,
+            has_lapsed = lambda curr, group: \
+                len(group)==2 or \
+                curr.reference_start > (group[-1].reference_start + 10000) or \
+                curr.reference_name != group[-1].reference_name,
+        )
+
+        # get rid of the key
+        data = map(lambda x : x[1], data)
+
+        # filter out unpaired reads and discontinuous fragments
+        data = filter(lambda g : len(g) == 2, data)
+
+        # make into fragments
+        data = starmap(to_fragments, data)
+
+        # reorder the fragments
+        data = streaming_local_sort(
+            data,
+            key = lambda x : x[1],
+            has_lapsed = lambda curr, buffval : \
+                curr[0] != buffval[0] or curr[1] - buffval[1] > 10000,
+        )
+
+        for record in data:
+            print(*record, sep='\t', file=output)
+
+
 
 class FragmentLength(ModeConfig):
 
-    MODE_ID='fragment-length'
+    MODE_ID='FRAGMENT_LENGTH'
+    PALETTE='lightgrey'
 
     @property
     def coords(self):
@@ -45,6 +120,7 @@ class FragmentLength(ModeConfig):
             
         return list(database.keys())
 
+
     @classmethod
     def load_components(cls, *init_components):
         
@@ -59,38 +135,156 @@ class FragmentLength(ModeConfig):
             
             comps.append([database[component][l] for l in cls().coords['context']])
         
-        return np.expand_dims(np.array(comps), axis=-1)
+        return xr.DataArray(
+            np.array(comps, dtype=float),
+            dims = ('component', 'context'),
+        )
+    
 
-    @classmethod
-    def plot(
-        cls,
-        signature,
-        palette = 'lightgrey',
-        select = ['Baseline'],
-        **kwargs,
+    def ingest_observations(
+        self,
+        bam_file : str,
+        weight_tags : list,
+        *,
+        dim_sizes : dict,
+        regions_file : str,
+        **kw,
     ):
-        cls.validate_signatures(
-            signature,
-            required_dims=('context',),
-        )
-        signature = signature.transpose(...,'context',)
-        lead_dim = signature.dims[0]
+        try:
+            import pysam
+        except ImportError:
+            raise ImportError('"pysam" is required for ingesting observations from BAM files')
         
-        _plot_linear_signature(
-            LENGTH_BINS,
-            palette,
-            *list(map(
-                lambda s : s.ravel(),
-                signature.loc[{lead_dim : list(select)}].data
-            )),
-            **kwargs
+        with tempfile.NamedTemporaryFile('w') as bam_genome, \
+            tempfile.NamedTemporaryFile('w') as sorted_regions_file, \
+            pysam.AlignmentFile(bam_file, 'rb') as bam:
+
+            # 1. print out the chromosomes in the order defined by the BAM file
+            for contig in bam.header.references:
+                print(
+                    contig, 
+                    bam.header.get_reference_length(contig), 
+                    sep='\t', 
+                    file=bam_genome
+                )
+            bam_genome.flush()
+
+            # 2. re-sort the regions file to match the order of the BAM file
+            subprocess.check_call(
+                [
+                    'bedtools', 
+                    'sort', 
+                    '-i', regions_file,
+                    '-g', bam_genome.name,
+                ],
+                stdout=sorted_regions_file,
+                universal_newlines=True,
+                bufsize=10000,
+            )
+            sorted_regions_file.flush()
+
+            # 3. parse the BAM file - get the fragment ends,
+            #    filter and sort them, and get the final weight
+            parse_process = subprocess.Popen(
+                [
+                    'gtensor-fragments',
+                    'bam-to-fragments',
+                    bam_file,
+                    *weight_tags,
+                ],
+                stdout=subprocess.PIPE,
+                universal_newlines=True,
+                bufsize=10000,
+            )
+
+            # 4. intersect the sorted regions with the parsed fragments
+            intersect_process = subprocess.Popen(
+                [
+                'bedtools',
+                'intersect',
+                '-a', sorted_regions_file.name,
+                '-b', 'stdin', 
+                '-sorted',
+                '-wa',
+                '-wb',
+                '-split',
+                '-g', bam_genome.name,
+                ],
+                stdin=parse_process.stdout,
+                stdout=subprocess.PIPE,
+                universal_newlines=True,
+                bufsize=10000,
+            )
+            
+            n_tags = len(weight_tags)
+            n_success = 0; n_failure = 0
+
+            obs_matrix = np.zeros(
+                (self.sizes['context'], dim_sizes['locus']),
+                dtype = np.float16,
+            )
+
+            bins_flat = np.array([l for l, r in _bin_edges] + [_bin_edges[-1][-1]])
+
+            for line in stream_subprocess_output(intersect_process):
+                
+                fields = line.strip().split('\t')
+                
+                if len(fields) < 4 + n_tags:
+                    raise ValueError(f'Error while parsing record: {line}\nThe input regions file may be malformed')
+                
+                try:
+                    locus_idx = int(fields[3])
+                    contig = fields[0]
+                    tags = fields[-n_tags:]
+                    length = int(fields[-(n_tags + 1)])
+                    weight = prod(map(float, tags))
+
+                except ValueError as err:
+                    n_failure+=1
+                    logger.warning(f'Error while parsing record: {line}:\n\t' + str(err).strip())
+                    continue
+                else:
+                    n_success+=1
+                
+                try:
+                    bin_idx = np.digitize(length, bins_flat) - 1
+                    obs_matrix[bin_idx, locus_idx] += weight
+                    n_success+=1
+                except IndexError:
+                    n_failure+=1
+        
+        logger.info(f'Processed {n_success} records successfully, {n_failure} failed')
+
+        if n_success==0:
+            raise ValueError(
+                'No records were successfully processed.\n'
+                'Please check that:\n'
+                '* 1. The BAM file is valid, contains reads, and position-sorted\n'
+                '* 2. The BAM file contains paired-end reads, since mate information is needed to get the fragment length.\n'
+                '* 3. The fragment size is in the expected range (70-500bp).\n'
+            )
+        
+        return xr.DataArray(
+            obs_matrix,
+            dims = ('context', 'locus'),
         )
 
-    def ingest_observations(self, *args, **kw):
-        pass
 
-    def get_context_frequencies(self, *args,**kw):
-        pass
+    def get_context_frequencies(
+        self,
+        n_jobs = 1,
+        *,
+        regions_file,
+        fasta_file,
+    ):
+        region_lengths = list(len(r) for r in stream_bed12(regions_file))
+        region_lengths = np.array(region_lengths).astype(np.float32) 
+        
+        return xr.DataArray(
+            region_lengths,
+            dims = ('locus',),
+        )
 
 
 
@@ -154,17 +348,6 @@ def FragmentLengthModel(
             #add_corpus_intercepts=add_corpus_intercepts,
             l2_regularization=l2_regularization,
         )
-
-    '''fraglength_model = UnconditionalConsequenceModel(
-        'fragment-length',
-        train_corpuses,
-        n_components=n_components,
-        random_state=random_state,
-        tol=5e-4,
-        reg=reg,
-        conditioning_alpha=conditioning_alpha,
-        init_components=init_components,
-    )'''
 
     fraglength_model = UnstrandedContextModel(
         train_corpuses,
