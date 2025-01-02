@@ -249,6 +249,9 @@ def convert(
         context_freqs,
     )
 
+    with nc.Dataset(output, 'a') as dset:
+        setattr(dset, 'regions_file', output_regions_file)
+
 
 @ingestion.command("set-attr")
 @click.argument(
@@ -617,6 +620,7 @@ def list_features(
     dataset : str,
 ):
     feature_info = disk.list_features(dataset)
+    del feature_info['sample']
     
     if len(feature_info)==0:
         click.echo("No features found in the dataset.")
@@ -626,7 +630,6 @@ def list_features(
     rows = [
         [feature_name] + [str(attrs.get(header, "")) for header in headers[1:]]
         for feature_name, attrs in feature_info.items()
-        if not 'active' in attrs or bool(attrs['active'])
     ]
 
     col_widths = [max(len(str(item)) for item in col) for col in zip(*([headers] + rows))]
@@ -769,10 +772,40 @@ def ingest_sample(
 
 
 @samplecmds.command("rm")
-def rm_samples():
-    pass
+@click.argument(
+    'dataset',
+    type=click.Path(exists=True),
+)
+@click.argument(
+    'sample_names',
+    type=str,
+    nargs=-1,
+)
+def rm_samples(
+    dataset,
+    sample_names : List[str],
+):
+    
+    for sample_name in sample_names:
+        disk.rm_sample(
+            dataset,
+            sample_name,
+        )
+        click.echo(f'Removed sample: {sample_name}')
 
 
-@samplecmds.command("list")
-def list_samples():
-    pass
+
+@samplecmds.command("ls")
+@click.argument(
+    'dataset',
+    type=click.Path(exists=True),
+)
+def list_samples(dataset : str):
+    
+    samples = disk.list_samples(dataset)
+
+    if len(samples)==0:
+        click.echo("No samples found in the dataset.")
+        return
+    
+    print(*samples, sep='\n')
