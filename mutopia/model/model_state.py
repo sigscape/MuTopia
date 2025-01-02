@@ -271,11 +271,11 @@ class ModelState:
         )))
         
 
-    def format_signature(self, k):
+    def format_signature(self, k, normalization='global'):
         return np.exp(reduce(
             lambda x,y : x+y,
             (
-                model.format_signature(k)
+                model.format_signature(k, normalization=normalization)
                 for model in self.nonlocals.values()
             )
         ))

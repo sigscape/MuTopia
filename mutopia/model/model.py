@@ -84,13 +84,14 @@ class Model:
     def plot_signature(self, 
         component, 
         *select, 
+        normalization='global',
         **kwargs
     ):
         if len(select) == 0:
             select = ['Baseline']
 
         return self.modality_.plot(
-            self.model_state_.format_signature(component), 
+            self.model_state_.format_signature(component, normalization=normalization), 
             *select,
             **kwargs
         )
