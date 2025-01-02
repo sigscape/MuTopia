@@ -274,10 +274,15 @@ def load_dataset(filename):
             layers=[]
             sample_names=[]
         else:
+            
             layers = list(dset['raw'].groups.keys())
 
             try:
-                sample_names = list(dset['raw']['X'].groups.keys())
+                sample_names = list(
+                    sname 
+                    for sname, sample in dset.groups['raw']['X'].groups.items() 
+                    if not 'active' in sample.__dict__ or sample.__dict__['active']
+                )
             except KeyError:
                 warnings.warn('This dataset has no samples yet, it will not be compatible with many functions.')
                 sample_names = []
