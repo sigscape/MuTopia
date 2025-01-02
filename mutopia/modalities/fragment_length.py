@@ -8,6 +8,7 @@ import json
 import logging
 from itertools import starmap
 import sys
+from tqdm import tqdm
 from .mode_config import ModeConfig
 from ..model import *
 from ..genome_utils.bed12_utils import stream_bed12
@@ -226,7 +227,11 @@ class FragmentLength(ModeConfig):
 
             bins_flat = np.array([l for l, r in _bin_edges] + [_bin_edges[-1][-1]])
 
-            for line in stream_subprocess_output(intersect_process):
+            for line in tqdm(
+                stream_subprocess_output(intersect_process),
+                desc='Parsing fragments',
+                ncols=100,
+            ):
                 
                 fields = line.strip().split('\t')
                 

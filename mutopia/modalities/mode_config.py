@@ -91,7 +91,12 @@ class ModeConfig(ABC):
             signature,
             required_dims=('context',),
         )
-        signature = signature.transpose(...,'context')
+        
+        signature = signature.transpose(...,'context')\
+            .stack(observation=('context',))\
+            .assign_coords(
+                observation=signature.coords['context'].values
+            )
         
         return signature
     
@@ -183,7 +188,7 @@ class ModeConfig(ABC):
 
         if title:
             ax.set_title(title)
-            
+
         return ax
     
 

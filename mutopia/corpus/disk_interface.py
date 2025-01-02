@@ -176,7 +176,7 @@ def write_sample(
     
     #dset.data.data = dset.data.data.astype(float32)
     maxval=dset.data.max().item() + 1.
-    prec=maxval/65535
+    prec=float32(maxval/65535)
 
     dset.attrs['active'] = 1
 
@@ -184,7 +184,12 @@ def write_sample(
         filename, 
         group=f'/raw/{sample_name}', 
         mode='a',
-        encoding={'data' : {'dtype' : 'uint16', 'scale_factor': prec, '_FillValue': 0}},
+        encoding={'data' : {
+            'dtype' : 'uint16', 
+            'scale_factor': prec, 
+            '_FillValue': 0., 
+            'add_offset' : -prec}
+        },
         **WRITE_KW,
     )
 
@@ -267,7 +272,6 @@ def _backend_load_sample(filename, sample_name):
     with xr.open_dataset(filename, group=sample_name, engine='netcdf4') as sample:
         
         sample = sample.load()
-        sample['data'] = sample.data.astype(float16)
 
         if 'format' in sample.attrs and sample.attrs['format'] == 'COO':
             return sample.coo_to_sparse().ascoo()
