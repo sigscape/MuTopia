@@ -237,7 +237,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
                             .transpose('component', 'context').data
         
         context_effects/=context_effects.sum(axis=1, keepdims=True)
-        renormalized = 100*(context_effects + 1e-5)/self._context_distribution
+        renormalized = 100*(context_effects + 1e-5)#/self._context_distribution
 
         self._coefs[:k, :c] = np.log( renormalized )
         
@@ -391,7 +391,10 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         return self._calc_lambda(k, self.encoding_matrix_)
     
 
-    def format_signature(self, k):
+    def format_signature(self, k, normalization='global'):
+
+        if not normalization in ('global','weighted','none'):
+            raise ValueError('Normalization must be one of "global", "weighted", or "none"')
 
         encoding_matrix = DesignMatrixHelper\
             .compose_encoding_matrix(
@@ -401,9 +404,13 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
             )
         
         # C x S
-        signature = self._calc_lambda(k, encoding_matrix) \
-                        + np.log(self._comp_context_distribution[k, :])[:, None]
-                        #+ np.log(self._context_distribution)[:, None]
+        signature = self._calc_lambda(k, encoding_matrix)
+        
+        if normalization=='weighted':
+            signature += np.log(self._comp_context_distribution[k, :])[:, None]
+        
+        if normalization=='global':
+            signature += np.log(self._context_distribution)[:, None]
         
         return DataArray(
             signature,
@@ -416,7 +423,8 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
     
     
     def get_baseline_summary(self, k):
-        return self.format_signature(k).sel(mesoscale_state='Baseline')
+        return self.format_signature(k, normalization='none')\
+                    .sel(mesoscale_state='Baseline')
 
 
     def get_interaction_summary(self, k):

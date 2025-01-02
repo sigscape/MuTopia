@@ -167,10 +167,10 @@ def write_sample(
     *,
     sample_name,
 ):
-    dset = arr.sparse_to_coo() if isinstance(arr.data, sparse.SparseArray) \
-                else arr.to_dataset(name='data', promote_attrs=True)
+    dset = arr.sparse_to_coo() if isinstance(arr.data, sparse.SparseArray) else \
+                arr.to_dataset(name='data', promote_attrs=True)
     
-    dset.data.data = dset.data.data.astype(float32)
+    #dset.data.data = dset.data.data.astype(float32)
         
     dset.to_netcdf(
         filename, 

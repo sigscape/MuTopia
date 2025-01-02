@@ -58,7 +58,7 @@ class RateModel(PrimitiveModel, ABC):
         raise NotImplementedError    
 
     @abstractmethod
-    def format_signature(self, k):
+    def format_signature(self, k, normalization='global'):
         raise NotImplementedError
 
 

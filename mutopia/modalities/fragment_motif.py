@@ -264,7 +264,7 @@ class FragmentMotif(ModeConfig):
 
             obs_matrix = np.zeros(
                 (self.sizes['context'], dim_sizes['locus']),
-                dtype = np.float32,
+                dtype = np.float16,
             )
 
             for line in stream_subprocess_output(intersect_process):
