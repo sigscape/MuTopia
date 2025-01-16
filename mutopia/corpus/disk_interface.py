@@ -174,10 +174,13 @@ def write_sample(
     dset = arr.sparse_to_coo() if isinstance(arr.data, sparse.SparseArray) else \
                 arr.to_dataset(name='data', promote_attrs=True)
     
-    #dset.data.data = dset.data.data.astype(float32)
-    maxval=dset.data.max().item() + 1.
-    prec=float32(maxval/65535)
+    if len(dset.data) == 0:
+        maxval=1.
+    else:
+        maxval=dset.data.max().item() + 1.
 
+    prec=float32(maxval/65535)
+    
     dset.attrs['active'] = 1
 
     dset.to_netcdf(

@@ -8,7 +8,6 @@ from collections import Counter
 from tqdm import tqdm
 from pyfaidx import Fasta
 import xarray as xr
-from ..plot.signature_plot import _plot_linear_signature
 from ..model import *
 from ..utils import logger
 from ..genome_utils.bed12_utils import stream_bed12
@@ -46,7 +45,7 @@ class SBSMode(ModeConfig):
             'clustered' : ['no','yes'],
             'configuration' : CONFIGURATIONS,
             'context' : CONTEXTS,
-            'mutation' : MUTATIONS,
+            #'mutation' : MUTATIONS,
         }
     
     @property
@@ -87,24 +86,42 @@ class SBSMode(ModeConfig):
             dims=('component', 'context', 'mutation'),
         )
     
+    @classmethod
+    def unstack(cls, corpus):
+
+        from ..corpus import update_view
+
+        corpus = update_view(
+            corpus,
+            regions=corpus.regions.assign_coords({'mutation' : corpus.coords['mutation']}).to_dataset(),
+        )
+        corpus.regions.context_frequencies = corpus.regions.context_frequencies.expand_dims({'mutation' : 3})
+
+        stacked = corpus.drop_nodes(('features',))\
+                .stack(observation=('context','mutation'))
+
+        stacked = stacked.assign_coords(observation=\
+            stacked\
+                .indexes['observation']\
+                .map(lambda x : format_as_cosmic(*x))
+        )
+
+        stacked = stacked.rename({'observation' : 'context'})
+        corpus = update_view(
+            stacked,
+            features = corpus.features.to_dataset(),
+        )
+
+        return corpus
+    
 
     @classmethod
     def _flatten_observations(cls, signature):
         
-        cls.validate_signatures(
-            signature,
-            required_dims=('context', 'mutation'),
-        )
-        signature = signature.transpose(...,'context','mutation')
-
-        signature = signature.stack(observation=('context','mutation'))\
-            .isel(observation=MUTOPIA_TO_COSMIC_IDX)
-        
-        signature = signature.reset_index('observation')\
-            .assign_coords(observation=\
-                signature\
-                    .indexes['observation']\
-                    .map(lambda x : format_as_cosmic(*x))
+        signature = super()\
+            ._flatten_observations(signature)\
+            .isel(
+                observation=MUTOPIA_TO_COSMIC_IDX
             )
         
         return signature
@@ -216,11 +233,10 @@ def SBSModel(
     seed=0,
     # context model
     context_reg=0.0001,
+    context_conditioning=1e-5,
     kmer_reg=0.005,
     conditioning_alpha=1e-9,
     context_encoder='diagonal',
-    # mutation model
-    mutation_reg=0.0005,
     # locals model
     pi_prior=1.,
     # locus model
@@ -258,19 +274,6 @@ def SBSModel(
     
     logger.info('Initializing model parameters and transformations...')
     
-    mutation_model = StrandedConditionalConsequenceModel(
-        'mutation', # require the mutation dimension - this is the stranded conditional consequence
-        train_corpuses,
-        n_components=num_components,
-        init_variance=init_variance[0],
-        random_state=random_state,
-        tol=5e-4,
-        reg=mutation_reg,
-        conditioning_alpha=conditioning_alpha,
-        init_components=init_components,
-        max_iter=max_iter,
-    )
-
     if context_encoder == 'diagonal':
         kmer_encoder = DiagonalEncoder()
     elif context_encoder == 'kmer':
@@ -290,6 +293,7 @@ def SBSModel(
         init_variance=init_variance[1],
         tol=5e-4,
         reg=context_reg,
+        context_conditioning=context_conditioning,
         kmer_reg=kmer_reg,
         conditioning_alpha=conditioning_alpha,
         init_components=init_components,
@@ -328,7 +332,6 @@ def SBSModel(
     model_state = ModelState(
         train_corpuses,
         context_model=context_model,
-        mutation_model=mutation_model,
         theta_model=theta_model,
         locals_model=locals_model,
     )
@@ -367,7 +370,6 @@ def _sample_params(study, trial, extensive=0):
 
     params = {
         'l2_regularization' : trial.suggest_float('l2_regularization', 1e-5, 1000., log=True),
-        'max_features' : trial.suggest_categorical('max_features', [0.25, 0.33, 0.5, 0.75, 1.]),
         'tree_learning_rate' : trial.suggest_float('tree_learning_rate', 0.025, 0.2),
         'init_variance' : (0.1, 0.1, trial.suggest_float('init_variance_theta', 0.01, 0.1)),
     }
@@ -375,26 +377,31 @@ def _sample_params(study, trial, extensive=0):
     if extensive>0:
         params.update({
             'context_reg' : trial.suggest_float('context_reg', 1e-5, 5e-3, log=True),
-            'mutation_reg' : trial.suggest_float('mutation_reg', 1e-5, 5e-2, log=True),
+            'max_features' : trial.suggest_categorical('max_features', [0.25, 0.33, 0.5, 0.75, 1.]),
         })
 
     if extensive>1:
+        params['init_variance'] = (
+            trial.suggest_float('init_variance_mutation', 0.01, 0.1),
+            trial.suggest_float('init_variance_context', 0.01, 0.1),
+            params['init_variance'][2],
+        )
+
         params.update({
-            'init_variance' : (
-                trial.suggest_float('init_variance_mutation', 0.01, 0.1),
-                trial.suggest_float('init_variance_context', 0.01, 0.1),
-                trial.suggest_float('init_variance_theta', 0.01, 0.1),
-            ),
+            'context_conditioning' : trial.suggest_float('context_conditioning', 1e-9, 1e-2, log=True),
             'context_encoder' : trial.suggest_categorical('context_encoder', ['diagonal', 'kmer']),
             'kmer_reg' : trial.suggest_float('kmer_reg', 1e-4, 5e-2, log=True),
-            'conditioning_alpha' : trial.suggest_float('conditioning_alpha', 1e-10, 1e-7, log=True),
-            'convolution_width' : trial.suggest_int('convolution_width', 0, 3),
         })
 
     if extensive>2:
         params.update({
             'batch_subsample' : trial.suggest_categorical('batch_subsample', [None, 0.0625, 0.125, 0.25, 0.5]),
             'locus_subsample' : trial.suggest_categorical('locus_subsample', [None, 0.0625, 0.125, 0.25, 0.5]),
+        })
+
+    if extensive>3:
+        params.update({
+            'conditioning_alpha' : trial.suggest_float('conditioning_alpha', 1e-10, 1e-7, log=True),
         })
     
     return params

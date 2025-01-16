@@ -65,6 +65,7 @@ def bam_to_fragments(
             bam
         )
 
+        # groupby read name
         data = streaming_groupby(
             data,
             groupby_key=lambda r : r.query_name,

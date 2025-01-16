@@ -4,7 +4,7 @@ import xarray as xr
 from ..utils import ParContext, using_exposures_from, \
     check_corpus, check_dims
 from .model_components import *
-from .eval import deviance_locus
+from .eval import deviance_locus, pearson_residuals
 from .latent_var_models import *
 from ..plot.coef_matrix_plot import _plot_interaction_matrix
 from ..corpus import *
@@ -119,7 +119,7 @@ class Model:
         return _plot_interaction_matrix(
             interactions,
             baseline,
-            shared_effects.iloc[:,0],
+            shared_effects, #.iloc[:,0],
             palette=palette,
             **kw
         )
@@ -267,7 +267,7 @@ class Model:
         X = locus_model._fetch_feature_matrix(corpus)
 
         background_idx = np.random.RandomState(0).choice(
-                            len(X), size = 1000, replace = False
+                            len(X), size = min(1000, len(X)), replace = False
                         )
         
         def _component_shap(k):
@@ -322,10 +322,26 @@ class Model:
     def annot_residuals(
         self,
         corpus,
+        exposures=None,
         threads=1,
-        keepdims=('locus',),
     ):
         self._check_corpus(corpus)
+
+        if not CS.has_corpusstate(corpus):
+            corpus = self._setup_corpus(corpus)
         
+        with ParContext(threads) as par:
+            residuals = pearson_residuals(
+                self.model_state_,
+                (corpus,),
+                exposures_fn=using_exposures_from(corpus) if exposures is None else exposures,
+                parallel_context=par,
+            )
+        
+        corpus.varm['pearson_residuals'] = residuals
         logger.info('Added key to varm: "residuals"')
-        pass
+
+        return corpus
+
+
+        

@@ -251,6 +251,7 @@ def convert(
 
     with nc.Dataset(output, 'a') as dset:
         setattr(dset, 'regions_file', output_regions_file)
+        dset.setncattr('dtype', dtype)
 
 
 @ingestion.command("set-attr")
@@ -274,6 +275,25 @@ def set_attrs(
         for k,v in attrs:
             setattr(dset, k, v)
 
+
+@ingestion.command("info")
+@click.argument(
+    'dataset',
+    type=click.Path(exists=True),
+)
+def info(dataset):
+    attrs = disk.read_attrs(dataset)
+    
+    n_features = len(disk.list_features(dataset))
+    n_samples = len(disk.list_samples(dataset))
+
+    click.echo(f'Num features: {n_features}')
+    click.echo(f'Num samples: {n_samples}')
+    click.echo('Dataset attributes:')
+
+    for k,v in attrs.items():
+        click.echo(f'\t{k}: {v}')
+    
 
 @ingestion.group("offsets")
 def offsets():

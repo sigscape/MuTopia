@@ -1,6 +1,10 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
 from ..utils import safe_read
+from itertools import starmap, chain
+from numpy import array
+from .fancy_iterators import streaming_local_sort, sorted_iterator
+
 
 @dataclass
 class BED12Record:
@@ -105,34 +109,36 @@ def check_regions_file(regions_file):
     assert all([encountered_idx[i] for i in range(largest_bin + 1)]), \
         f'Expected regions file to have a contiguous set of indices from 0 to {largest_bin}.\n'
     
-    #try:
-    #    subprocess.check_output(['sort', '-k','1,1', '-k','2,2n', '-c', regions_file])
-    #except subprocess.CalledProcessError:
-    #    raise ValueError(
-    #        f'Expected regions file to be sorted by chromosome and start position.\n'
-    #        f'Use \'sort -k1,1 -k2,2n -o <filename> <filename>\' to sort the file.\n'
-    #    )
 
+def unstack_regions(
+    region_names,
+    regions_file,
+    values,
+):
+    
+    assert len(region_names) == len(values), \
+        'Expected region_names and values to have the same length.'
+    
+    region_lookup = set(list(map(str, region_names)))
 
-'''def read_exposure_file(exposure_file, windows):
-        
-    exposures = []
-    with open(exposure_file, 'r') as f:
-        for lineno, txt in enumerate(f):
-            if not txt[0] == '#':
-                try:
-                    exposures.append( float(txt.strip()) )
-                except ValueError as err:
-                    raise ValueError('Record {} on line {} could not be converted to float dtype.'.format(
-                        txt, lineno,
-                    )) from err
+    data = stream_bed12(regions_file)
+    data = zip(filter(lambda x : str(x.name) in region_lookup, data), values)
+    data = starmap(lambda region, vals : [(segment, vals) for segment in region.segments()],  data)
+    data = chain.from_iterable(data)
 
-    assert len(exposures) == len(windows), 'The number of exposures provided in {} does not match the number of specified windows.\n'\
-            'Each window must have correlates provided.'
+    data = streaming_local_sort(
+        data,
+        key = lambda x : (x[0][0], x[0][1]),
+        has_lapsed= lambda curr, buffval : curr[0][0] != buffval[0][0] or curr[0][1] - buffval[0][1] > 100000,
+    )
 
-    assert all([e >= 0. for e in exposures]), 'Exposures must be non-negative.'
+    data = sorted_iterator(
+        data,
+        key=lambda x : (x[0][0], x[0][1]),
+    )
 
-    return np.array(exposures)[np.newaxis, :]'''
+    data = map(lambda x : (x[0][1], x[0][2], x[1]), data)
 
+    data = list(map(array, (zip(*data))))
 
-
+    return data

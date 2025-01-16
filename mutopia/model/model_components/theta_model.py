@@ -252,7 +252,7 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         return sstats
     
 
-    def format_signature(self, k):
+    def format_signature(self, k, normalization='none'):
         return 0.
 
 

@@ -318,7 +318,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
         return np.log(rho)
 
 
-    def format_signature(self, k):
+    def format_signature(self, k, normalization='none'):
 
         encoding_matrix = DesignMatrixHelper\
             .compose_encoding_matrix(

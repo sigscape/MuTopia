@@ -32,6 +32,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         conditioning_alpha : float = 1e-9,
         dtype = float,
         init_components = None,
+        context_conditioning = 1e-5,
         *,
         n_components : int,
         random_state,
@@ -85,7 +86,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
 
             eln_solver = partial(
                 get_eln_solver,
-                **get_reg_params(reg, 1e-5),
+                **get_reg_params(reg, context_conditioning),
                 tol=tol,
                 random_state=random_state,
                 max_iter=100,
@@ -116,12 +117,12 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
 
             strand_solver = partial(
                 eln,
-                **get_reg_params(reg, 1e-5),
+                **get_reg_params(reg, context_conditioning),
             ) # f(X) -> f(z, w, beta) -> beta
 
             context_solver = partial(
                 eln,
-                **get_reg_params(kmer_reg, 1e-5),
+                **get_reg_params(kmer_reg, context_conditioning),
             )
 
             split_solver = partial(
@@ -142,6 +143,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
             tol=tol,
             max_iter=max_iter,
         )
+
 
     @property
     def requires_normalization(self):
