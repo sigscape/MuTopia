@@ -8,6 +8,48 @@ from optuna.storages import JournalStorage
 from optuna.storages.journal import JournalFileBackend
 from .corpus import load_dataset
 
+def sample_params(study, trial, extensive=0):
+
+    params = {
+        'l2_regularization' : trial.suggest_float('l2_regularization', 1e-5, 1000., log=True),
+        'tree_learning_rate' : trial.suggest_float('tree_learning_rate', 0.025, 0.2),
+        'init_variance' : (0.1, 0.1, trial.suggest_float('init_variance_theta', 0.01, 0.1)),
+    }
+
+    if extensive>0:
+        params.update({
+            'context_reg' : trial.suggest_float('context_reg', 1e-5, 5e-2, log=True),
+            'max_features' : trial.suggest_categorical('max_features', [0.25, 0.33, 0.5, 0.75, 1.]),
+        })
+
+    if extensive>1:
+        params['init_variance'] = (
+            trial.suggest_float('init_variance_mutation', 0.01, 0.1),
+            trial.suggest_float('init_variance_context', 0.01, 0.1),
+            params['init_variance'][2],
+        )
+
+        params.update({
+            'context_conditioning' : trial.suggest_float('context_conditioning', 1e-9, 1e-2, log=True),
+            'context_encoder' : trial.suggest_categorical('context_encoder', ['diagonal', 'kmer']),
+            'kmer_reg' : trial.suggest_float('kmer_reg', 1e-4, 5e-2, log=True),
+        })
+
+    if extensive>2:
+        params.update({
+            'batch_subsample' : trial.suggest_categorical('batch_subsample', [None, 0.0625, 0.125, 0.25, 0.5]),
+            'locus_subsample' : trial.suggest_categorical('locus_subsample', [None, 0.0625, 0.125, 0.25, 0.5]),
+        })
+
+    if extensive>3:
+        params.update({
+            'conditioning_alpha' : trial.suggest_float('conditioning_alpha', 1e-10, 1e-7, log=True),
+        })
+    
+    return params
+
+
+
 def _get_nfs_storage(study_name):
     
     journal = os.path.join(

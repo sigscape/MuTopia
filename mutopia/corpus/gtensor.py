@@ -5,7 +5,6 @@ import warnings
 from typing import Union, List, Dict
 from numpy.typing import ArrayLike, NDArray
 from ..utils import FeatureType, check_structure
-from ..modalities import get_mode
 import logging
 logger = logging.getLogger(' MuTensor ')
 logger.setLevel(logging.INFO)
@@ -136,7 +135,7 @@ def add_sample(
         sample = sample.squeeze()
 
     required_dims = \
-        set( get_mode(corpus).dims )\
+        set( corpus.modality().dims )\
         .union({'locus'})
     
     if not set(sample.dims) == required_dims:

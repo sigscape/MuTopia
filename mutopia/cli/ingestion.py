@@ -4,7 +4,7 @@ from functools import partial
 import os
 import numpy as np
 import mutopia.ingestion as ingest
-from mutopia.corpus import GTensor, write_dataset
+from mutopia.corpus import GTensor, write_dataset, update_view
 import netCDF4 as nc
 from shutil import copyfile
 
@@ -223,35 +223,63 @@ def create(
     required=True,
     help='Modality to convert the corpus to',
 )
+@click.option(
+    '-fa',
+    '--fasta-file',
+    type=click.Path(exists=True),
+    required=True,
+    help='Fasta file to use for calculating context frequencies',
+)
 def convert(
     *,
     input,
     dtype : str,
     output : str,
+    fasta_file : str,
 ):
     
-    logger.info('Copying corpus ...')
-    input_regions_file = disk.read_regions_file(input)
-    copyfile(input, output)
-    
-    modality = Modality(dtype).get_config()
-    attrs = disk.read_attrs(output)
+    old_dataset = disk.load_dataset(input, with_samples=False)
+    attrs = old_dataset.attrs
+
+    input_regions_file = attrs['regions_file']
     output_regions_file = output + '.regions.bed'
     copyfile(input_regions_file, output_regions_file)
-
+    
+    modality = Modality(dtype).get_config()
+    
     context_freqs = modality.get_context_frequencies(
         regions_file=output_regions_file,
-        fasta_file=attrs['fasta_file'],
+        fasta_file=fasta_file,
     )
 
-    disk.write_context_freqs(
-        output,
-        context_freqs,
+    chrom, start, end = list(zip(*(
+        (s.chromosome, s.start, s.end)
+        for s in stream_bed12(output_regions_file)
+    )))
+
+    new_dataset = GTensor(
+        modality,
+        name=attrs['name'],
+        chrom=chrom,
+        start=start,
+        end=end,
+        context_frequencies=context_freqs,
+        exposures=old_dataset.regions.exposures.values,
+    )
+    
+    for k, v in attrs.items():
+        if not k in ('regions_file','dtype'):
+            new_dataset.attrs[k] = v
+    
+    new_dataset.attrs['regions_file'] = output_regions_file
+    
+    new_dataset = update_view(
+        new_dataset,
+        features = old_dataset['features'].to_dataset(),
     )
 
-    with nc.Dataset(output, 'a') as dset:
-        setattr(dset, 'regions_file', output_regions_file)
-        dset.setncattr('dtype', dtype)
+    write_dataset(new_dataset, output)
+
 
 
 @ingestion.command("set-attr")
@@ -285,7 +313,11 @@ def info(dataset):
     attrs = disk.read_attrs(dataset)
     
     n_features = len(disk.list_features(dataset))
-    n_samples = len(disk.list_samples(dataset))
+
+    try:
+        n_samples = len(disk.list_samples(dataset))
+    except ValueError:
+        n_samples = 0
 
     click.echo(f'Num features: {n_features}')
     click.echo(f'Num samples: {n_samples}')

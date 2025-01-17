@@ -9,6 +9,7 @@ from tqdm import tqdm
 from pyfaidx import Fasta
 import xarray as xr
 from ..model import *
+from ..tuning import sample_params
 from ..utils import logger
 from ..genome_utils.bed12_utils import stream_bed12
 from .mode_config import ModeConfig
@@ -54,7 +55,7 @@ class SBSMode(ModeConfig):
     
     @property
     def sample_params(self):
-        return _sample_params
+        return sample_params
     
     @property
     def available_components(self):
@@ -117,12 +118,9 @@ class SBSMode(ModeConfig):
 
     @classmethod
     def _flatten_observations(cls, signature):
-        
         signature = super()\
             ._flatten_observations(signature)\
-            .isel(
-                observation=MUTOPIA_TO_COSMIC_IDX
-            )
+            .isel(observation=MUTOPIA_TO_COSMIC_IDX)
         
         return signature
     
@@ -264,7 +262,6 @@ def SBSModel(
     tau = 0,
     callback=None,
     eval_every=1,
-    sparse=True,
     verbose=0,
     max_iter=25,
     init_variance=(0.1, 0.1, 0.05)
@@ -321,6 +318,10 @@ def SBSModel(
             l2_regularization=l2_regularization,
         )
 
+    sparse = train_corpuses[0].X.is_sparse()
+    if not all(corpus.X.is_sparse() == sparse for corpus in train_corpuses + test_corpuses):
+        raise ValueError('All corpuses must be either sparse or dense - mixtures are not allowed!')
+    
     locals_model = \
         (LDAUpdateSparse if sparse else LDAUpdateDense)(
             train_corpuses,
@@ -364,44 +365,3 @@ def SBSModel(
         train_scores,
         test_scores,
     )
-
-
-def _sample_params(study, trial, extensive=0):
-
-    params = {
-        'l2_regularization' : trial.suggest_float('l2_regularization', 1e-5, 1000., log=True),
-        'tree_learning_rate' : trial.suggest_float('tree_learning_rate', 0.025, 0.2),
-        'init_variance' : (0.1, 0.1, trial.suggest_float('init_variance_theta', 0.01, 0.1)),
-    }
-
-    if extensive>0:
-        params.update({
-            'context_reg' : trial.suggest_float('context_reg', 1e-5, 5e-3, log=True),
-            'max_features' : trial.suggest_categorical('max_features', [0.25, 0.33, 0.5, 0.75, 1.]),
-        })
-
-    if extensive>1:
-        params['init_variance'] = (
-            trial.suggest_float('init_variance_mutation', 0.01, 0.1),
-            trial.suggest_float('init_variance_context', 0.01, 0.1),
-            params['init_variance'][2],
-        )
-
-        params.update({
-            'context_conditioning' : trial.suggest_float('context_conditioning', 1e-9, 1e-2, log=True),
-            'context_encoder' : trial.suggest_categorical('context_encoder', ['diagonal', 'kmer']),
-            'kmer_reg' : trial.suggest_float('kmer_reg', 1e-4, 5e-2, log=True),
-        })
-
-    if extensive>2:
-        params.update({
-            'batch_subsample' : trial.suggest_categorical('batch_subsample', [None, 0.0625, 0.125, 0.25, 0.5]),
-            'locus_subsample' : trial.suggest_categorical('locus_subsample', [None, 0.0625, 0.125, 0.25, 0.5]),
-        })
-
-    if extensive>3:
-        params.update({
-            'conditioning_alpha' : trial.suggest_float('conditioning_alpha', 1e-10, 1e-7, log=True),
-        })
-    
-    return params

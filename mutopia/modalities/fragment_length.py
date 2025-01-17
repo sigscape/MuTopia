@@ -5,12 +5,12 @@ import subprocess
 from math import prod
 import os
 import json
-import logging
 from itertools import starmap
 import sys
 from tqdm import tqdm
 from .mode_config import ModeConfig
 from ..model import *
+from ..tuning import sample_params
 from ..genome_utils.bed12_utils import stream_bed12
 from ..utils import stream_subprocess_output, logger
 from ..genome_utils.fancy_iterators import streaming_local_sort, streaming_groupby
@@ -112,7 +112,7 @@ class FragmentLength(ModeConfig):
     
     @property
     def sample_params(self):
-        return _sample_params
+        return sample_params
     
     @property
     def available_components(self):
@@ -152,6 +152,7 @@ class FragmentLength(ModeConfig):
         regions_file : str,
         **kw,
     ):
+        print('here')
         try:
             import pysam
         except ImportError:
@@ -294,15 +295,24 @@ class FragmentLength(ModeConfig):
 
 
 
+def _make_feature_name(subsequence_code):
+    default = {0 : 'N', 1 : 'N', 2 : 'N', 3 : 'N'}
+    default.update(subsequence_code)
+    return ''.join([default[i] for i in range(4)])
+
+
 def FragmentLengthModel(
     train_corpuses,
     test_corpuses,
-    n_components=15,
+    num_components=15,
     init_components=None,
     seed=0,
     # context model
-    reg=0.0001,
-    conditioning_alpha=5e-5,
+    context_reg=0.0001,
+    kmer_reg=0.005,
+    conditioning_alpha=1e-9,
+    context_encoder='diagonal',
+    # mutation model
     # locals model
     pi_prior=1.,
     # locus model
@@ -315,22 +325,24 @@ def FragmentLengthModel(
     max_features = 0.5,
     n_iter_no_change=1,
     use_groups=True,
-    smoothing_size=1000,
-    add_corpus_intercepts=True,
+    add_corpus_intercepts=False,
+    convolution_width=1,
     l2_regularization=1,
     # optimization settings
     empirical_bayes = True,
-    begin_prior_updates = 10,
+    begin_prior_updates = 20,
     stop_condition=50,
     num_epochs = 2000,
-    locus_subsample = None,
+    locus_subsample=None,
+    batch_subsample=None,
     threads = 1,
     kappa = 0.5,
-    tau = 1.,
+    tau = 0,
     callback=None,
-    eval_every=10,
+    eval_every=1,
     verbose=0,
-    sparse=True
+    max_iter=25,
+    init_variance=(0.1, 0.05),
 ):
     random_state = np.random.RandomState(seed)
 
@@ -340,7 +352,8 @@ def FragmentLengthModel(
         else LinearThetaModel)\
         (
             train_corpuses,
-            n_components=n_components,
+            init_variance=init_variance[1],
+            n_components=num_components,
             tree_learning_rate=tree_learning_rate,
             max_depth=max_depth,
             max_trees_per_iter=max_trees_per_iter,
@@ -350,33 +363,46 @@ def FragmentLengthModel(
             n_iter_no_change=n_iter_no_change,
             use_groups=use_groups,
             random_state=random_state,
-            smoothing_size=smoothing_size,
-            #add_corpus_intercepts=add_corpus_intercepts,
+            add_corpus_intercepts=add_corpus_intercepts,
+            convolution_width=convolution_width,
             l2_regularization=l2_regularization,
         )
+    
+    if context_encoder == 'diagonal':
+        kmer_encoder = DiagonalEncoder()
+    elif context_encoder == 'kmer':
+        kmer_encoder = KmerEncoder(
+            ['ATCG','ATCG','ATCG', 'ATCG'],
+            kmer_extractor=tuple,
+            feature_name_fn=_make_feature_name,
+        )
+    else:
+        raise ValueError(f'Unknown context encoder: {context_encoder}')
 
-    fraglength_model = UnstrandedContextModel(
+    context_model = UnstrandedContextModel(
         train_corpuses,
-        n_components=n_components,
+        kmer_encoder,
+        n_components=num_components,
         random_state=random_state,
+        init_variance=init_variance[0],
         tol=5e-4,
-        reg=reg,
+        reg=context_reg,
+        kmer_reg=kmer_reg,
         conditioning_alpha=conditioning_alpha,
         init_components=init_components,
+        max_iter=max_iter,
     )
 
-
-    locals_model = \
-        (LDAUpdateSparse if sparse else LDAUpdateDense)(
-            train_corpuses,
-            n_components=n_components,
-            random_state=random_state,
-            prior_alpha=pi_prior,
-        )
+    locals_model = LDAUpdateDense(
+        train_corpuses,
+        n_components=num_components,
+        random_state=random_state,
+        prior_alpha=pi_prior,
+    )
 
     model_state = ModelState(
         train_corpuses,
-        fraglength_model=fraglength_model,
+        context_model=context_model,
         theta_model=theta_model,
         locals_model=locals_model,
     )
@@ -392,6 +418,7 @@ def FragmentLengthModel(
             stop_condition=stop_condition,
             num_epochs=num_epochs,
             locus_subsample=locus_subsample,
+            batch_subsample=batch_subsample,
             threads=threads,
             kappa=kappa,
             tau=tau,
@@ -408,14 +435,3 @@ def FragmentLengthModel(
         train_scores,
         test_scores,
     )
-
-
-def _sample_params(study, trial):
-    return {
-        'reg' : trial.suggest_float('context_reg', 1e-5, 5e-3, log=True),
-        'conditioning_alpha' : trial.suggest_float('conditioning_alpha', 1e-6, 1e-3, log=True),
-        'empirical_bayes' : trial.suggest_categorical('empirical_bayes', [True, False]),
-        'max_features' : trial.suggest_float('max_features', 0.1, 1.),
-        'locus_subsample' : trial.suggest_categorical('locus_subsample', [None, 0.125, 0.25, 0.5]),
-        'kappa' : trial.suggest_float('kappa', 0.5, 0.9),
-    }

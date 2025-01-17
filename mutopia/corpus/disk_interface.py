@@ -282,7 +282,7 @@ def _backend_load_sample(filename, sample_name):
             return sample.to_dataarray().squeeze()
 
 
-def load_dataset(filename):
+def load_dataset(filename, with_samples=True):
     
     ## 1. explore the structure using the netCDF interface
     with nc.Dataset(filename, 'r') as dset:
@@ -319,9 +319,18 @@ def load_dataset(filename):
             '/varm' : varm.load(),
         })
 
-    ## read the layers piecemeal 
-    samples=defaultdict(list)
-    with ParContext(5) as par:
+    for fname, feature in list(dataset.features.data_vars.items()):
+        if 'active' in feature.attrs and not bool(feature.attrs['active']):
+            update_view(
+                dataset,
+                features=dataset.features\
+                    .to_dataset().drop_vars(fname)
+            )
+    
+    if with_samples:
+        ## read the layers piecemeal 
+        samples=defaultdict(list)
+
         for layer in layers:
             for sample_name in tqdm.tqdm(sample_names, desc=f'Loading layer `{layer}`', ncols=100):
                 samples[layer].append(
@@ -330,26 +339,18 @@ def load_dataset(filename):
                         f'raw/{layer}/{sample_name}'
                     )
                 )
-            
-    samples = {
-        layer : xr.concat(v, dim='sample')
-        for layer,v in samples.items()
-    }
+                
+        samples = {
+            layer : xr.concat(v, dim='sample')
+            for layer,v in samples.items()
+        }
 
-    dataset = dataset.assign_coords({'sample': sample_names})
-    dataset.update(samples)
+        dataset = dataset.assign_coords({'sample': sample_names})
+        dataset.update(samples)
 
-    for layer in layers:
-        if isinstance(dataset[layer].data, sparse.SparseArray):
-            dataset[layer].ascsr('sample','locus')
-
-    for fname, feature in list(dataset.features.data_vars.items()):
-        if 'active' in feature.attrs and not bool(feature.attrs['active']):
-            update_view(
-                dataset,
-                features=dataset.features\
-                    .to_dataset().drop_vars(fname)
-            )
+        for layer in layers:
+            if isinstance(dataset[layer].data, sparse.SparseArray):
+                dataset[layer].ascsr('sample','locus')
 
     return dataset
     
