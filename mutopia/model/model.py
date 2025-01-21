@@ -54,7 +54,7 @@ class Model:
         self.component_names_ = names
 
 
-    def _setup_corpus(self, corpus):
+    def setup_corpus(self, corpus):
         args = (corpus, self.model_state_)
         
         CS.init_corpusstate(*args)
@@ -125,7 +125,7 @@ class Model:
         )
     
 
-    def annot_exposures(
+    def annot_contributions(
         self,
         corpus,
         threads=1,
@@ -137,10 +137,10 @@ class Model:
         self.model_state_.locals_model.difference_tol=1e-5
 
         if not CS.has_corpusstate(corpus):
-            corpus = self._setup_corpus(corpus)
+            corpus = self.setup_corpus(corpus)
 
         with ParContext(threads, verbose=verbose) as par:
-            exposures = self.model_state_.locals_model\
+            contributions = self.model_state_.locals_model\
                 .predict(
                     corpus,
                     self.model_state_,
@@ -150,9 +150,10 @@ class Model:
         corpus = corpus.assign_coords({
             'component' : self.component_names,
         })
-        corpus.obsm['exposures'] = exposures
-        logger.info('Added key to obsm: "exposures"')
+        corpus['contributions'] = contributions
+        logger.info('Added key to dataset: "contributions"')
         return corpus
+    
     
     
     def annot_component_distributions(
@@ -163,7 +164,7 @@ class Model:
         self._check_corpus(corpus)
 
         if not CS.has_corpusstate(corpus):
-            corpus = self._setup_corpus(corpus)
+            corpus = self.setup_corpus(corpus)
 
         with ParContext(threads) as par:
             lmrt = self.model_state_._get_log_mutation_rate_tensor(
@@ -189,14 +190,14 @@ class Model:
         self._check_corpus(corpus)
 
         if not CS.has_corpusstate(corpus):
-            corpus = self._setup_corpus(corpus)
+            corpus = self.setup_corpus(corpus)
 
         try:
             corpus.varm['component_distributions']
         except KeyError:
             corpus = self.annot_component_distributions(corpus, threads)
 
-        marginal_exposures = corpus.obsm['exposures'].sum('sample').data
+        marginal_exposures = corpus['contributions'].sum('sample').data
 
         corpus.varm['predicted_marginal'] = \
             self.model_state_._log_marginalize_mutrate(
@@ -208,46 +209,6 @@ class Model:
         return corpus
 
 
-    def annot_imputed(
-        self,
-        corpus,
-        exposures=None,
-        threads=1,
-    ):  
-        self._check_corpus(corpus)
-
-        if not CS.has_corpusstate(corpus):
-            corpus = self._setup_corpus(corpus)
-
-        try:
-            corpus.varm['component_distributions']
-        except KeyError:
-            corpus = self.annot_component_distributions(corpus, threads)
-
-        if exposures is None:
-            exposures = using_exposures_from(corpus)
-
-        log_component_mutrate = np.log(corpus.varm['component_distributions'])
-
-        imputed = xr.concat(
-            [
-                self.model_state_._marginalize_mutrate(
-                    log_component_mutrate,
-                    exposures(sample_name)
-                )
-                for sample_name in CS.list_samples(corpus)
-            ],
-            dim='sample',
-        ).transpose(
-            'sample', *self.modality_.dims, 'locus',
-        )
-
-        corpus['imputed'] = imputed
-        logger.info('Added key to layers: "imputed"')
-        return corpus
-
-
-
     def annot_SHAP_values(
         self,
         corpus,
@@ -256,7 +217,7 @@ class Model:
         self._check_corpus(corpus)
 
         if not CS.has_corpusstate(corpus):
-            corpus = self._setup_corpus(corpus)
+            corpus = self.setup_corpus(corpus)
 
         try:
             import shap
@@ -308,7 +269,7 @@ class Model:
         self._check_corpus(corpus)
 
         if not CS.has_corpusstate(corpus):
-            corpus = self._setup_corpus(corpus)
+            corpus = self.setup_corpus(corpus)
 
         with ParContext(1) as par:
             return deviance_locus(
@@ -328,7 +289,7 @@ class Model:
         self._check_corpus(corpus)
 
         if not CS.has_corpusstate(corpus):
-            corpus = self._setup_corpus(corpus)
+            corpus = self.setup_corpus(corpus)
         
         with ParContext(threads) as par:
             residuals = pearson_residuals(

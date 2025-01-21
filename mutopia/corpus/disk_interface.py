@@ -261,10 +261,10 @@ def write_dataset(dataset, filename):
                 },
                 **WRITE_KW
             )
-
-    X = dataset.to_dataset().X
-
-    for sample_name, sample in zip(X.coords['sample'].data, X):
+    
+    if 'X' in dataset.data_vars:
+        X = dataset.to_dataset().X
+        for sample_name, sample in zip(X.coords['sample'].data, X):
             write_sample(
                 filename,
                 sample,
@@ -303,7 +303,6 @@ def load_dataset(filename, with_samples=True):
     ## 2. open the bones 
     with xr.open_dataset(filename, engine='netcdf4') as root, \
         xr.open_dataset(filename, group='regions', engine='netcdf4') as regions, \
-        xr.open_dataset(filename, group='obsm', engine='netcdf4') as obsm, \
         xr.open_dataset(filename, group='features', engine='netcdf4') as features, \
         xr.open_dataset(filename, group='varm', engine='netcdf4') as varm:
 
@@ -311,7 +310,6 @@ def load_dataset(filename, with_samples=True):
         dataset = datatree.DataTree.from_dict({
             '/' : root.load(),
             '/regions' : regions.load(),
-            '/obsm' : obsm.load(),
             '/features' : features.load(),
             '/varm' : varm.load(),
         })
@@ -339,117 +337,3 @@ def load_dataset(filename, with_samples=True):
             dataset['X'].ascsr('sample','locus')
 
     return dataset
-    
-
-'''def from_lr_corpus(corpus):
-
-    locus_coords = ['{}:{}-{}'.format(r.chromosome, r.start, r.end) for r in corpus.regions]
-
-    shared_coords = {
-                "sample" : [sample.name for sample in corpus.samples],
-                "configuration": ["C/T","A/G"],
-                "context": corpus.observation_class.CONTEXTS,
-                "mutation" : ["N>A","N>G","N>T/C"],
-                "locus": locus_coords,
-            }
-    
-    chrom, start, end, length = list(zip(*[
-            (r.chromosome, r.start, r.end, len(r), ) for r in read_windows(corpus.regions_file)        
-    ]))
-
-    root = xr.Dataset(
-        coords=shared_coords,
-        attrs={
-            'name' : corpus.name,
-            'regions_file' : corpus.regions_file,
-            'dtype' : corpus.type,
-        }
-    )
-
-    regions = xr.Dataset(
-        {
-            'chrom' : xr.DataArray(np.array(chrom), dims=('locus')),
-            'start' : xr.DataArray(np.array(start), dims=('locus')),
-            'end' : xr.DataArray(np.array(end), dims=('locus')),
-            'length' : xr.DataArray(np.array(length), dims=('locus')),
-            "context_frequencies": xr.DataArray(
-                    data=corpus.context_frequencies,
-                    dims=("configuration", "context", "locus"),
-                ),
-            "exposures" : xr.DataArray(
-                data=np.squeeze(corpus.exposures),
-                dims=("locus",),
-            ),
-        },
-        #coords=shared_coords,
-    )
-
-    feature_arrays = xr.Dataset(
-        {
-            feature_name: xr.DataArray(
-                data=feature_data['values'],
-                dims=("locus",),
-                attrs={
-                    'type' : feature_data['type'],
-                    'group' : feature_data['group'],
-                }
-            )
-            for feature_name, feature_data in corpus.features.items()
-        },
-        #coords={'locus' : locus_coords},
-    )
-
-    sample_datasets = {}
-    for sample in corpus:
-        sample_datasets[sample.name] = xr.Dataset(
-            {
-                "indices" :  xr.DataArray(
-                        np.array([
-                            sample.cardinality, sample.context, sample.mutation, sample.locus
-                        ]),
-                        dims=("obs_indices", "n_observations"),
-                    ),
-                "data" : xr.DataArray(
-                        data=sample.weight,
-                        dims=("n_observations",),
-                )
-            },
-            coords={
-                "obs_indices" : ["configuration", "context", "mutation", "locus"],
-            },
-            attrs = {
-                "shape" : (
-                    corpus.shape['cardinalities_dim'],
-                    corpus.shape['context_dim'],
-                    corpus.shape['mutation_dim'],
-                    corpus.shape['locus_dim'],
-                ),
-                "name" : sample.name,
-            }
-        )\
-        .coo_to_sparse()
-
-
-    def pack_samples(sample_datasets):
-        sample_dims = list(next(iter(sample_datasets.values())).dims)
-        return xr.DataArray(
-            sparse.stack(list(
-                sample_datasets.values(),
-                axis=0,
-            )).change_compressed_axes(
-                (0, sample_dims.index('locus')+1),
-            ),
-            dims=('sample', *sample_dims),
-        )
-
-    return datatree.DataTree.from_dict({
-                '/' : root,
-                '/features' : feature_arrays,
-                '/regions' : regions,
-                '/layers' : xr.Dataset(
-                    {'X' : pack_samples(sample_datasets)},
-                ),
-                '/obsm' : xr.Dataset(),
-                '/varm' : xr.Dataset(),
-            },
-        )'''

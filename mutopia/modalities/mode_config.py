@@ -132,30 +132,32 @@ class ModeConfig(ABC):
         '''
         Parse a signature tensor into a list of signatures.
         '''
-    
+        if len(signature.dims) > 2:
+            raise ValueError('`signature` must have at most 2 dimensions.')
+        
         has_extra_dims = len(signature.dims) > 1
 
         if len(select) > 0 and not has_extra_dims:
             raise ValueError('`select` is only valid if the signature has one extra dimension to choose from.')
 
-        if len(select) > 0:            
+        if len(select) > 0:
             lead_dim = signature.dims[0]
-
             if sig_names and not len(select) == len(sig_names):
                 raise ValueError('If both `sig_names` and `select` are specified, they must have the same length.')
             
             pl_signatures = list(signature.loc[{lead_dim : list(select)}].data)
             sig_names = sig_names or select
+            return pl_signatures, sig_names, lead_dim
 
         elif not has_extra_dims:
             pl_signatures = [signature.data.ravel()]
-        else:
-            raise ValueError('If the signature has extra dimensions, `select` must be specified.')
+            return pl_signatures, ['Signature'], None
         
-        if normalize:
-            pl_signatures = [s/s.sum() for s in pl_signatures]
-
-        return pl_signatures, sig_names
+        else:
+            lead_dim = signature.dims[0]
+            pl_signatures = list(signature.data)
+            sig_names = signature.coords[lead_dim].values
+            return pl_signatures, sig_names, lead_dim
     
 
     @classmethod
@@ -171,19 +173,28 @@ class ModeConfig(ABC):
         
         signature = cls._flatten_observations(signature)
 
-        pl_signatures, sig_names = cls._parse_signatures(
+        pl_signatures, sig_names, legend_title = cls._parse_signatures(
             signature,
             select=select,
             sig_names=sig_names,
             normalize=normalize,
         )
+
+        if len(pl_signatures) > 100:
+            raise ValueError(
+                f"Cannot plot more than 100 signatures at once. "
+                f"Choose a subset of signatures to plot using the `select` argument."
+            )
+
+        if normalize:
+            pl_signatures = [s/s.sum() for s in pl_signatures]
         
         ax = _plot_linear_signature(
             signature.coords['observation'].values,
             palette if len(pl_signatures) > 1 else cls.PALETTE,
-            *pl_signatures,
-            sig_names=sig_names,
-            **kwargs
+            plot_kw=kwargs,
+            legend_title = legend_title,
+            **dict(zip(sig_names, pl_signatures)),
         )
 
         if title:

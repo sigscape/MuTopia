@@ -70,7 +70,6 @@ def GTensor(
                     dims=('locus',),
                 ),
             }),
-            '/obsm' : xr.Dataset(),
             '/features' : xr.Dataset(),
             '/varm' : xr.Dataset(),
         },
@@ -163,14 +162,6 @@ def add_sample(
     corpus = DataTree(
         data=root,
         children=corpus.children
-    )
-
-    # remove and reinit the obsm section
-    update_view(
-        corpus,
-        obsm = xr.Dataset(
-            coords=corpus.coords,
-        )
     )
 
     logger.info(f'Added sample to .X: "{name}"')

@@ -117,7 +117,6 @@ def check_structure(corpus):
             'exposures'
         ],
         'features' : [],
-        'obsm' : [],
         'varm' : [],
     }
 
@@ -278,12 +277,12 @@ def match_dims(X,**dim_sizes):
 
 def using_exposures_from(corpus):
     try:
-        corpus.obsm['exposures']
+        corpus['contributions']
     except KeyError:
-        raise KeyError('The corpus does not have exposures. Run `model.annot_exposures(corpus)` first.')
+        raise KeyError('The corpus does not have contributions. Run `model.annot_contributions(corpus)` first.')
 
     return lambda _, sample_name : \
-        corpus.obsm['exposures'].sel(sample=sample_name).data
+        corpus['contributions'].sel(sample=sample_name).data
 
 
 class CorpusInterface(ABC):
@@ -292,7 +291,7 @@ class CorpusInterface(ABC):
     instead of a G-Tensor corpus. If the object implements the 
     following interface (and the outputs are the expected type), it will work.
 
-    Note, we don't need to copy "features", "obsm", "varm" etc.
+    Note, we don't need to copy "features", "varm" etc.
     because those elements are not used in the EM step.
     '''
 
@@ -355,7 +354,7 @@ class LazySampleSlicer(CorpusInterface):
         
         self.X = sliced.X
         self.corpus = sliced\
-            .drop_nodes(('obsm', 'varm', 'features'))\
+            .drop_nodes(('varm', 'features'))\
             .drop_vars('X', errors='ignore')\
             .isel(**self._apply_slices)
         
