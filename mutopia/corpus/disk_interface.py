@@ -187,11 +187,13 @@ def write_sample(
         filename, 
         group=f'/raw/{sample_name}', 
         mode='a',
-        encoding={'data' : {
-            'dtype' : 'uint16', 
-            'scale_factor': prec, 
-            '_FillValue': 0., 
-            'add_offset' : -prec}
+        encoding={
+            'data' : {
+                'dtype' : 'uint16', 
+                'scale_factor': prec, 
+                '_FillValue': 0., 
+                'add_offset' : -prec
+            }
         },
         **WRITE_KW,
     )
@@ -268,7 +270,7 @@ def write_dataset(dataset, filename):
             write_sample(
                 filename,
                 sample,
-                sample_name=f'raw/{sample_name}',
+                sample_name=f'X/{sample_name}',
             )
 
 

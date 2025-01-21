@@ -9,8 +9,8 @@ def _plot_linear_signature(
     palette,
     ax=None,
     legend_title=None,
-    height = 1,
-    width = 4.25,
+    height = 1.25,
+    width = 5.25,
     plot_kw = {},
     **signatures,
 ):    
@@ -39,10 +39,17 @@ def _plot_linear_signature(
         )
 
     ax.set(
-            yticks = [0.25, 0.5, 0.75, 1.], 
-            xticks = [],
-            xlim = (-1, sig_dim*n_sigs + 1),
-            ylim = (0, 1.1)
+        yticks = [0.25, 0.5, 0.75, 1.], 
+        xlim = (-1, sig_dim*n_sigs + 1),
+        ylim = (0, 1.1)
+    )
+
+    ax.set_xticks(
+        ticks = np.arange(0, sig_dim*n_sigs, n_sigs) + 0.5*(n_sigs - 1),
+        labels = xlabels,
+        fontsize=4,
+        fontweight="light",
+        rotation=90,
         )
 
     ax.axhline(0, color = 'black', linewidth = 0.5)

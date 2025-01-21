@@ -99,11 +99,12 @@ class SBSMode(ModeConfig):
 
         stacked = corpus.drop_nodes(('features',))\
                 .stack(observation=('context','mutation'))
-
-        stacked = stacked.assign_coords(observation=\
-            stacked\
-                .indexes['observation']\
-                .map(lambda x : format_as_cosmic(*x))
+        
+        stacked = stacked.assign_coords(
+            observation=\
+                stacked\
+                    .indexes['observation']\
+                    .map(lambda x : format_as_cosmic(*x))
         )
 
         stacked = stacked.rename({'observation' : 'context'})

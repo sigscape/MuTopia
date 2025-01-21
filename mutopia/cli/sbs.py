@@ -1,6 +1,7 @@
 import click
 import mutopia as mu
 from mutopia.modalities._sbs_clustering import *
+from mutopia.corpus import disk_interface as disk
 from functools import partial
 
 SBS = mu.Modality.SBS.get_config()
@@ -82,4 +83,17 @@ def _cluster_vcfs(
         query_fn=partial(query_fn, vcf_file),
         vcf_file=vcf_file,
         chr_prefix=chr_prefix,
+    )
+
+
+@sbs.command("unstack")
+@click.argument("input")
+@click.argument("output")
+def unstack(
+    input,
+    output,
+):
+    disk.write_dataset(
+        SBS.unstack(disk.load_dataset(input)),
+        output,
     )
