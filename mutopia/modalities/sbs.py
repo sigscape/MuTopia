@@ -45,8 +45,7 @@ class SBSMode(ModeConfig):
         return {
             'clustered' : ['no','yes'],
             'configuration' : CONFIGURATIONS,
-            'context' : CONTEXTS,
-            #'mutation' : MUTATIONS,
+            'context' : MUTOPIA_ORDER,
         }
     
     @property
@@ -156,8 +155,8 @@ class SBSMode(ModeConfig):
             counts = reduce(_reduce_count, trinucs, Counter())
 
             N_counts = counts.pop('N', 0)
-            pseudocount = N_counts/(2*len(self.coords['context']))
-            contexts = self.coords['context']
+            pseudocount = N_counts/(2*len(CONTEXTS))
+            contexts = CONTEXTS
 
             return [
                 [counts[context]+pseudocount for context in contexts],
@@ -180,6 +179,10 @@ class SBSMode(ModeConfig):
             .astype(np.float32) 
         # DON'T (!) add a pseudocount
 
+        # 2xCxL => 2xCx3xL => 2x(C*3)xL
+        trinuc_matrix = np.expand_dims(trinuc_matrix, axis=2)
+        trinuc_matrix = np.repeat(trinuc_matrix, 3, axis=2).reshape((2, -1, trinuc_matrix.shape[-1]))
+
         return xr.DataArray(
             trinuc_matrix,
             dims = ('configuration', 'context', 'locus'),
@@ -195,14 +198,15 @@ class SBSMode(ModeConfig):
         mutation_rate_file=None,
         sample_weight=None,
         sample_name=None,
+        skip_sort=False,
+        cluster=True,
         *,
-        dim_sizes,
+        locus_dim,
         regions_file,
         fasta_file,
         **kw,
     ):
-        
-        coords, data = featurize_mutations(
+        return featurize_mutations(
             vcf_file,
             regions_file,
             fasta_file,
@@ -212,9 +216,10 @@ class SBSMode(ModeConfig):
             sample_weight=sample_weight,
             sample_name=sample_name,
             pass_only=pass_only,
+            skip_sort=skip_sort,
+            cluster=cluster,
+            locus_dim=locus_dim,
         )
-        
-        return self._arr_to_xr(dim_sizes, coords, data)
 
 
 def _make_feature_name(subsequence_code):

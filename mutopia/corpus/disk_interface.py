@@ -233,17 +233,21 @@ def write_dataset(dataset, filename):
 
     check_corpus(dataset, enforce_sample=False)
 
-    dataset.to_dataset()\
-        .drop_vars(dataset.data_vars)\
-        .to_netcdf(
-            filename, 
-            group='/', 
-            mode='w', 
-            **WRITE_KW
-        )
+    root = dataset.to_dataset()
+    
+    if 'X' in root.data_vars:
+        root = root.drop_vars('X')
+
+    root.to_netcdf(
+        filename, 
+        group='/', 
+        mode='w', 
+        **WRITE_KW
+    )
 
     for group in list(dataset.children.keys()):
         if group.startswith('/raw') or group == 'state':
+            # don't save model state associated with the data
             continue
         
         dataset[group].to_dataset()\
@@ -258,16 +262,15 @@ def write_dataset(dataset, filename):
                 **WRITE_KW
             )
 
-    for layer_name, layer in dataset.to_dataset().data_vars.items():
-        for sample_name, sample in zip(
-            layer.coords['sample'].data,
-            layer
-        ):
+    X = dataset.to_dataset().X
+
+    for sample_name, sample in zip(X.coords['sample'].data, X):
             write_sample(
                 filename,
                 sample,
-                sample_name=f'{layer_name}/{sample_name}',
+                sample_name=f'raw/{sample_name}',
             )
+
 
 
 def _backend_load_sample(filename, sample_name):
@@ -285,14 +288,9 @@ def _backend_load_sample(filename, sample_name):
 def load_dataset(filename, with_samples=True):
     
     ## 1. explore the structure using the netCDF interface
+    sample_names=None
     with nc.Dataset(filename, 'r') as dset:
-        if not 'raw' in dset.groups:
-            layers=[]
-            sample_names=[]
-        else:
-            
-            layers = list(dset['raw'].groups.keys())
-
+        if 'raw' in dset.groups:
             try:
                 sample_names = list(
                     sname 
@@ -301,7 +299,6 @@ def load_dataset(filename, with_samples=True):
                 )
             except KeyError:
                 warnings.warn('This dataset has no samples yet, it will not be compatible with many functions.')
-                sample_names = []
 
     ## 2. open the bones 
     with xr.open_dataset(filename, engine='netcdf4') as root, \
@@ -318,39 +315,28 @@ def load_dataset(filename, with_samples=True):
             '/features' : features.load(),
             '/varm' : varm.load(),
         })
-
-    for fname, feature in list(dataset.features.data_vars.items()):
-        if 'active' in feature.attrs and not bool(feature.attrs['active']):
-            update_view(
-                dataset,
-                features=dataset.features\
-                    .to_dataset().drop_vars(fname)
-            )
     
-    if with_samples:
-        ## read the layers piecemeal 
-        samples=defaultdict(list)
-
-        for layer in layers:
-            for sample_name in tqdm.tqdm(sample_names, desc=f'Loading layer `{layer}`', ncols=100):
-                samples[layer].append(
-                    _backend_load_sample(
-                        filename, 
-                        f'raw/{layer}/{sample_name}'
-                    )
+    if not sample_names is None:
+        samples = xr.concat(
+            [
+                _backend_load_sample(
+                    filename, 
+                    f'raw/X/{sample_name}'
                 )
-                
-        samples = {
-            layer : xr.concat(v, dim='sample')
-            for layer,v in samples.items()
-        }
+                for sample_name in tqdm.tqdm(
+                    sample_names,
+                    desc=f'Loading samples',
+                    ncols=100,
+                )
+            ],
+            dim='sample'
+        )
 
         dataset = dataset.assign_coords({'sample': sample_names})
-        dataset.update(samples)
+        dataset.update({'X' : samples})
 
-        for layer in layers:
-            if isinstance(dataset[layer].data, sparse.SparseArray):
-                dataset[layer].ascsr('sample','locus')
+        if isinstance(dataset['X'].data, sparse.SparseArray):
+            dataset['X'].ascsr('sample','locus')
 
     return dataset
     
