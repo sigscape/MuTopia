@@ -13,12 +13,6 @@ from ..modalities import Modality
 from ..genome_utils.bed12_utils import stream_bed12
 from ..utils import FeatureType, logger
 
-##
-# TODO:
-# The exposures should be added like a feature.
-# Provide a bed file bigwig file and use this to find the average or sum 
-# within the regions.
-## 
 
 def _read_continuous_file(
     dataset,
@@ -774,7 +768,7 @@ def ingest_sample(
         weight_tags=weight_tags,
         skip_sort=skip_sort,
         cluster=cluster,
-        dim_sizes=disk.read_dims(dataset),
+        locus_dim=disk.read_dims(dataset)['locus'],
     )
 
     disk.write_sample(

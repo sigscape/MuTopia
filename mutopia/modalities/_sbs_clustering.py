@@ -59,7 +59,8 @@ def stream_passed_SNVs(
 ):
     
     filter_basecmd = [
-        'bcftools','view',
+        'bcftools',
+        'view',
         '-v','snps'
     ]
 
@@ -182,7 +183,7 @@ def get_marginal_mutation_rate(
     pass_only=True,
 ):
     
-    query_str = f'{chr_prefix}%CHROM\t%POS0\t%POS0\n'
+    query_str = f'{chr_prefix}%CHROM\t%POS0\t%POS\n'
 
     with tempfile.NamedTemporaryFile() as coverage_file, \
         tempfile.NamedTemporaryFile() as regions_file:
@@ -249,20 +250,20 @@ def _get_local_mutation_rate(
     mutation_rate_bedgraph, 
     query_fn,
     output, 
-    smoothing_distance=15000,
+    smoothing_distance=25000,
 ):
     '''
     bedfile : a bed file of genomic regions, and the score column should be the *normalized* mutation rate
     '''
 
     #1. get SNP positions that passed QC
-    with query_fn('%CHROM\t%POS0\t%POS0\n', sorted=True) as query_process, \
+    with query_fn('%CHROM\t%POS0\t%POS\n', sorted=True) as query_process, \
         tempfile.NamedTemporaryFile() as temp_file:
 
         #2. define a window around each SNV
         slop_process = subprocess.Popen(
             ['awk','-v','OFS=\t', 
-            f'{{start=($2-{smoothing_distance} > 0) ? $2-{smoothing_distance} : 0 ; print $1,start,$2+{smoothing_distance}, $1,$2,$3}}'],
+            f'{{start=($2-{smoothing_distance} > 0) ? $2-{smoothing_distance} : 0 ; print $1,start,$2+{smoothing_distance},$1,$2,$3}}'],
             stdin = query_process.stdout,
             stdout = subprocess.PIPE,
         )
@@ -348,7 +349,8 @@ def _get_rainfall_statistic(
 
         #2. Compute the distance to the nearest mutation for each mutation
         closest_process = subprocess.Popen(
-            ['bedtools',
+            [
+             'bedtools',
              'closest',
              '-a', snp_file.name,
              '-b', snp_file.name,
@@ -375,9 +377,7 @@ def _get_rainfall_statistic(
 
 def _cluster_mutations(
     mutations_df, 
-    alpha = 0.005, 
-    AF_tol = 0.1,
-    use_mutation_type=True,
+    alpha = 0.005,
 ):
 
     def get_mutclusters(df):
@@ -387,43 +387,16 @@ def _cluster_mutations(
         # 1. we are on a new chromosome
         # 2. the distance to the previous mutation is greater than the critical distance
         # 4. the allele frequency is different - this means the mutations occured in different cells or at different times
-
-        '''def similar_VAF(rd1, vrd1, rd2, vrd2):
-            #return np.abs(vrd1/rd1 - vrd2/rd2) < AF_tol
-            return chi2_contingency([[rd1-vrd1, vrd1], [rd2-vrd2, vrd2]])[1] > 0.01
-        
-        vaf_is_similar = np.array([
-            similar_VAF(rd1, vrd1, rd2, vrd2)
-            for rd1, vrd1, rd2, vrd2 in zip(df.readDepth, df.variantReadDepth, df.readDepth.shift(1), df.variantReadDepth.shift(1))
-        ])'''
         ## TODO - clean up problem where a cluster is split by a variant with a different VAF? ##
+
         return (
             (df.CHROM.shift(1) != df.CHROM) | \
             (df.POS - df.POS.shift(1) > np.minimum(10000, df.criticalDistance.shift(1))) 
             #| ~vaf_is_similar \
         ).cumsum()
 
-
-    mutation_type_map = {
-        'G>A' : 'C>T',
-        'G>T' : 'C>A',
-        'G>C' : 'C>G',
-        'A>G' : 'T>C',
-        'A>T' : 'T>A',
-        'A>C' : 'T>G',
-    }
-
-    mutations_df['mutationType'] = mutations_df.mutationType.apply(lambda x : mutation_type_map.setdefault(x,x))
     mutations_df['criticalDistance'] = expon.ppf(alpha, scale=1/mutations_df.localMutationRate)
-
-    if use_mutation_type:
-        clusters = mutations_df.groupby('mutationType').apply(get_mutclusters, include_groups=False)
-        clusters = (clusters.index.get_level_values(0) + '_' + clusters.astype(str))\
-            .droplevel(0)\
-            .rename('cluster')
-    else:
-        clusters = get_mutclusters(mutations_df).rename('cluster')      
-
+    clusters = get_mutclusters(mutations_df).rename('cluster')      
     mutations_df = mutations_df.join(clusters, how = 'left')
     cluster_size = mutations_df.cluster.value_counts().rename('clusterSize')
     mutations_df['negLog10interMutationDistanceRatio'] = -np.log10(mutations_df.rainfallDistance/mutations_df.criticalDistance)
@@ -432,10 +405,10 @@ def _cluster_mutations(
         .set_index('cluster')\
         .join(cluster_size)
     
-    mutations_df.index.name = 'cluster'
+    mutations_df.index.name = 'clusterID'
 
     return mutations_df.reset_index()\
-        [['CHROM','POS','mutationType','negLog10interMutationDistanceRatio','clusterSize', 'cluster']]
+        [['CHROM','POS','negLog10interMutationDistanceRatio','clusterSize', 'clusterID']]
 
 
 
@@ -446,7 +419,7 @@ def cluster_vcf(
     vcf_file,
     output = sys.stdout,
     chr_prefix='',
-    smoothing_distance=15000,
+    smoothing_distance=25000,
     alpha = 0.005,
     AF_tol = 0.1,
     use_mutation_type=False,
@@ -465,8 +438,7 @@ def cluster_vcf(
     #    assert not sample is None, 'The VCF file contains multiple samples. Please specify a sample to analyze.'
 
 
-    with tempfile.NamedTemporaryFile('w') as rainfall_file, \
-        tempfile.NamedTemporaryFile('w') as df:
+    with tempfile.NamedTemporaryFile('w') as rainfall_file:
         
         # 2. Calculate rainfall statistics
         #    from the VCF file
@@ -477,35 +449,9 @@ def cluster_vcf(
             smoothing_distance=smoothing_distance,
         )
         rainfall_file.flush()
+        mutations_df = pd.read_csv(rainfall_file.name, sep='\t', header=None)
 
-        # 2. get the mutation type and allele frequency
-        #    from the VCF file
-        with query_fn('%CHROM\t%POS0\t%POS0\t%REF>%ALT\n') as query_process:
-        
-            # 3. intersect the rainfall statistics with the mutation type and allele frequency
-            #    The output columns will be 1) chr 2) start 3) end 4) local mutation rate 5) rainfall distance
-            #                               6) chr 7) start 8) end 9) mutation type 10) read depth 11) variant read depth
-            subprocess.check_call(
-                [
-                'bedtools','intersect',
-                '-a', rainfall_file.name,
-                '-b', '-',
-                '-sorted',
-                '-wa',
-                '-wb',
-                ], 
-                stdin = query_process.stdout,
-                stdout = df,
-                universal_newlines=True,
-                bufsize=10000,
-            )
-            df.flush()
-
-        mutations_df = pd.read_csv(df.name, sep='\t', header=None)\
-                .iloc[:, [0,1,3,4,8]]
-        
-
-    mutations_df.columns = ['CHROM','POS','localMutationRate','rainfallDistance','mutationType']
+    mutations_df.columns = ['CHROM','POS','POS1','localMutationRate','rainfallDistance']
 
     mutations_df = mutations_df[ mutations_df.localMutationRate != '.' ]
     mutations_df['localMutationRate'] = mutations_df.localMutationRate.astype(float)
@@ -514,19 +460,16 @@ def cluster_vcf(
 
     mutations_df = _cluster_mutations(
         mutations_df, 
-        alpha=alpha, 
-        AF_tol=AF_tol, 
-        use_mutation_type=use_mutation_type
+        alpha=alpha,
     )
         
     transfer_annotations_to_vcf(
         mutations_df,
         vcf_file=vcf_file,
         description = {
-            'mutationType' : 'The type of mutation (e.g. C>A)',
             'negLog10interMutationDistanceRatio' : 'The negative log10 of the ratio of the inter-mutation distance to the critical distance',
             'clusterSize' : 'The number of mutations in the cluster',
-            'cluster' : 'The mutation\'s cluster ID',
+            'clusterID' : 'The mutation\'s cluster ID',
         },
         output=output,
         chr_prefix=chr_prefix,

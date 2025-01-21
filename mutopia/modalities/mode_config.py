@@ -17,16 +17,6 @@ class ModeConfig(ABC):
     def dims(self):
         return tuple(self.coords.keys())
     
-    def _arr_to_xr(self,dim_sizes, coords, data):
-        return xr.DataArray(
-            COO(
-                coords,
-                data,
-                shape = (*self.sizes.values(), dim_sizes['locus']),
-            ),
-            dims = (*self.sizes.keys(), 'locus'),
-        )
-    
     @property
     @abstractmethod
     def coords(self) -> dict:

@@ -128,3 +128,7 @@ MUTOPIA_ORDER = [
     for mut in MUTATIONS
 ]
 
+MUTOPIA_IDX_MAP = {
+    (context, mut) : idx
+    for idx, (context, mut) in enumerate(product(CONTEXTS, MUTATIONS))
+}
