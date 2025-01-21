@@ -28,7 +28,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
         init_variance : float=0.1,
         tol = 5e-4,
         max_iter=100,
-        dtype=np.float32,
+        dtype = float,
         init_components = None,
         *,
         n_components,
@@ -44,7 +44,6 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
 
         self.context_dim = corpuses[0].dims['context']
         self.context_names = corpuses[0].coords['context'].values
-        self.dtype = dtype
 
         self.transformer = MesoscaleEncoder()\
             .fit(corpuses)
@@ -93,6 +92,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
 
         intercept_groups = [True]*self.consequence_dim \
                 + [False]*self.transformer.n_states_
+        
         ridge_solver = partial(
             interative_partial_ls_solver,
             group_mask = np.array(intercept_groups),
@@ -115,12 +115,6 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
             tol=tol,
             max_iter=max_iter,
         )
-
-        '''if not init_components is None:
-            self.init_from_signatures(
-                corpuses[0].modality().load_components(*init_components)
-            )'''
-
 
     @property
     def requires_normalization(self):
@@ -160,11 +154,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
                             [configuration, locus]
 
         # Use numpy advanced indexing to update mutation_sstats
-        np.add.at(
-            sstats, 
-            (slice(None), context, consequence, mesoscale_states), 
-            weighted_posterior.astype(self.dtype)
-        )
+        np.add.at(sstats, (slice(None), context, consequence, mesoscale_states), weighted_posterior)
 
         return sstats
     
@@ -180,8 +170,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
         weights = weighted_posterior\
             .sum(dim=dims_except_for(weighted_posterior.dims, *to_dim))\
             .transpose(*to_dim)\
-            .data\
-            .astype(self.dtype)
+            .data
 
         # 2 x L
         (plus_idx, minus_idx) = CS.fetch_val(corpus, 'mesoscale_idx').data
@@ -205,7 +194,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
                 :k,
                 :,
                 0:c*self.consequence_dim:c
-            ] = np.log( renormalized.astype(self.dtype) )
+            ] = np.log( renormalized )
     
 
     def _init_params(self, random_state, dtype, init_variance, *shape):
@@ -329,7 +318,7 @@ class StrandedConditionalConsequenceModel(RateModel, SparseDataBase, DenseDataBa
         return np.log(rho)
 
 
-    def format_signature(self, k):
+    def format_signature(self, k, normalization='none'):
 
         encoding_matrix = DesignMatrixHelper\
             .compose_encoding_matrix(

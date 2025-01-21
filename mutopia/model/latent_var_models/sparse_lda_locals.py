@@ -19,7 +19,7 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
             prior_alpha=1.0,
             estep_iterations=300,
             difference_tol=1e-4,
-            dtype=np.float32,
+            dtype=float,
             *,
             random_state,
         ):
@@ -150,6 +150,7 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
         conditional_likelihood, 
         weights,
         gamma,
+        batch_subsample=1.,
         *,
         sample_dict,
         ):
@@ -166,7 +167,7 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
 
         suffstats = {
                 **sample_dict,
-                'weighted_posterior' : weighted_posterior, 
+                'weighted_posterior' : weighted_posterior/batch_subsample, 
                 'gamma' : gamma, 
             }
 
@@ -194,7 +195,8 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
         self,
         gamma,
         learning_rate=1.,
-        subsample_rate=1.,
+        locus_subsample=1.,
+        batch_subsample=1.,
         *,
         corpus,
         sample,
@@ -211,7 +213,7 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
         
         # 1. get the information we need from the sample
         sample_dict = self._convert_sample(sample)
-        weights = sample_dict['weights']/subsample_rate
+        weights = sample_dict['weights']/locus_subsample
         alpha = np.ascontiguousarray(self.alpha[CS.get_name(corpus)])
 
         conditional_likelihood = \
@@ -238,6 +240,7 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
             self._calc_sstats,
             *args,
             sample_dict=sample_dict,
+            batch_subsample=batch_subsample,
         )
 
         svi_update = partial(
@@ -256,7 +259,8 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
         corpuses,
         model_state,
         learning_rate=1.,
-        subsample_rate=1.,
+        locus_subsample=1.,
+        batch_subsample=1.,
         *,
         parallel_context,
     ):
@@ -280,7 +284,8 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
                 corpus=corpus,
                 model_state=model_state,
                 learning_rate=learning_rate,
-                subsample_rate=subsample_rate,
+                locus_subsample=locus_subsample,
+                batch_subsample=batch_subsample,
             )
             for (corpus, sample_name) in samples
         )
@@ -457,7 +462,7 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
                             100., 
                             1./100., 
                             size=(self.n_components, n_samples)
-                        ).astype(self.dtype)
+                        )
     
 
     def prepare_corpusstate(self, corpus):

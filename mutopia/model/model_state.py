@@ -271,11 +271,11 @@ class ModelState:
         )))
         
 
-    def format_signature(self, k):
+    def format_signature(self, k, normalization='global'):
         return np.exp(reduce(
             lambda x,y : x+y,
             (
-                model.format_signature(k)
+                model.format_signature(k, normalization=normalization)
                 for model in self.nonlocals.values()
             )
         ))
@@ -299,7 +299,6 @@ class ModelState:
             *,
             parallel_context,
             learning_rate=1.,
-            subsample_rate=1.,
             update_prior=True,
             use_parallel=True,
         ):
@@ -329,7 +328,8 @@ class ModelState:
         self,
         corpuses,
         learning_rate = 1.,
-        subsample_rate = 1.,    
+        locus_subsample = 1.,
+        batch_subsample = 1.,
         *,
         parallel_context,
     ):
@@ -353,7 +353,8 @@ class ModelState:
             corpuses,
             self,
             learning_rate=learning_rate,
-            subsample_rate=subsample_rate,
+            locus_subsample=locus_subsample,
+            batch_subsample=batch_subsample,
             parallel_context=parallel_context,
         )
         

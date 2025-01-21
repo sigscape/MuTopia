@@ -3,6 +3,7 @@ from math import prod
 from .mode_config import ModeConfig
 from itertools import product, chain, starmap
 from ..model import *
+from ..tuning import sample_params
 import numpy as np
 import os
 import json
@@ -15,18 +16,16 @@ from tqdm import tqdm
 from pyfaidx import Fasta
 import xarray as xr
 import tempfile
-from pyfaidx import Fasta
 import subprocess
 from ..utils import stream_subprocess_output, logger
 from ..genome_utils.fancy_iterators import streaming_local_sort
 from ..genome_utils.bed12_utils import stream_bed12
-from ..plot.signature_plot import _plot_linear_signature
 logger = logging.getLogger(' Mutopia-MotifModel ')
 
 CONTEXTS = sorted(
     map(lambda x : ''.join(x), product('ATCG','ATCG','ATCG', 'ATCG')), 
     key = lambda x : (x[0], x[1], x[2], x[3])
-    )
+)
 
 cmap = plt.colormaps['tab10']
 
@@ -77,13 +76,10 @@ def parse_bamfile(
         raise ImportError('"pysam" is required for ingesting observations from BAM files')
     
     with pysam.AlignmentFile(bam_file, 'rb') as bam:
-
-        logger.info('Parsing BAM file ...')
         
         data = filter(
             lambda r : not r.is_unmapped and not r.is_secondary and not r.is_supplementary \
-                and not r.is_duplicate \
-                and r.is_paired and r.mapping_quality > 0,
+                and not r.is_duplicate and r.is_paired and r.mapping_quality > 0,
             bam
         )
 
@@ -92,16 +88,17 @@ def parse_bamfile(
         data = streaming_local_sort(
             data,
             key = lambda x : x[1],
-            has_lapsed= lambda curr, buffval : \
-                curr[0] != buffval[0] or curr[1] - buffval[1] > 1000,
+            has_lapsed = lambda curr, buffval : \
+                curr[0] != buffval[0] or curr[1] - buffval[1] > 10000,
         )
 
         for record in data:
             print(*record, sep='\t', file=output)
         
 
-
 class FragmentMotif(ModeConfig):
+
+    PALETTE = COLOR_LIST
 
     @property
     def coords(self):
@@ -113,7 +110,11 @@ class FragmentMotif(ModeConfig):
     
     @property
     def sample_params(self):
-        return _sample_params
+        return sample_params
+    
+    @property
+    def palette(self):
+        return COLOR_LIST
     
     @property
     def available_components(self):
@@ -136,35 +137,10 @@ class FragmentMotif(ModeConfig):
             comps.append(
                 [database[component][context_mut] for context_mut in cls().coords['context']]
             )
-        return np.expand_dims(np.array(comps), axis=-1)
-
-
-    @classmethod
-    def plot(cls,
-        signature,
-        *select,
-        palette = 'tab10',
-        sig_names = None,
-        normalize = False,
-        title=None,
-        **kwargs,
-    ):
-        cls.validate_signatures(
-            signature,
-            required_dims=('context',),
-        )
-        pl_signatures, sig_names = cls._parse_signatures(
-            signature,
-            select=select,
-            sig_names=sig_names,
-            normalize=normalize,
-        )
-        _plot_linear_signature(
-            CONTEXTS,
-            palette if len(pl_signatures) > 1 else COLOR_LIST,
-            *pl_signatures,
-            sig_names=sig_names,
-            **kwargs
+        
+        return xr.DataArray(
+            np.array(comps, dtype=float),
+            dims = ('component', 'context'),
         )
 
     
@@ -222,6 +198,7 @@ class FragmentMotif(ModeConfig):
                     bam_file,
                     *weight_tags,
                 ],
+                stderr=sys.stderr,
                 stdout=subprocess.PIPE,
                 universal_newlines=True,
                 bufsize=10000,
@@ -240,6 +217,7 @@ class FragmentMotif(ModeConfig):
                 '-split',
                 '-g', bam_genome.name,
                 ],
+                stderr=sys.stderr,
                 stdin=parse_process.stdout,
                 stdout=subprocess.PIPE,
                 universal_newlines=True,
@@ -248,13 +226,19 @@ class FragmentMotif(ModeConfig):
             
             n_tags = len(weight_tags)
             n_success = 0; n_failure = 0
+            
+            context_idx_map = {c : j for j,c in enumerate(self.coords['context'])}
 
             obs_matrix = np.zeros(
                 (self.sizes['context'], dim_sizes['locus']),
-                dtype = np.float32,
+                dtype = np.float16,
             )
 
-            for line in stream_subprocess_output(intersect_process):
+            for line in tqdm(
+                stream_subprocess_output(intersect_process),
+                desc='Parsing bam records',
+                ncols=100,
+            ):
                 
                 fields = line.strip().split('\t')
                 
@@ -275,8 +259,6 @@ class FragmentMotif(ModeConfig):
                     n_failure+=1
                     logger.warning(f'Error while parsing record: {line}:\n\t' + str(err).strip())
                     continue
-                else:
-                    n_success+=1
                 
                 shift = int(is_rev)
                 rslop = 4 * (in_motifs ^ is_rev) + shift
@@ -313,14 +295,17 @@ class FragmentMotif(ModeConfig):
                 else:
                     kmer = kmer.seq.upper()
 
-                if not 'N' in kmer:
-                    context_idx = self.coords['context'].index(kmer)
+                if kmer in context_idx_map:
+                    context_idx = context_idx_map[kmer]
                     obs_matrix[context_idx, locus_idx] += weight
                     n_success+=1
                 else:
                     n_failure+=1
         
         logger.info(f'Processed {n_success} records successfully, {n_failure} failed')
+
+        if n_failure/(n_success + n_failure) > 0.05:
+            logger.warning('Quite a lot of fragments failed to be parsed ...')
         
         return xr.DataArray(
             obs_matrix,
@@ -380,7 +365,7 @@ class FragmentMotif(ModeConfig):
         with Fasta(fasta_file) as fasta_object:
             for i, region in tqdm(
                 enumerate(stream_bed12(regions_file)), 
-                nrows=100, 
+                ncols=100, 
                 desc = 'Aggregating k-mer content'
             ):
                 trinuc_matrix[...,i] = np.array(_count_trinucs(region), dtype=np.float32)
@@ -461,15 +446,19 @@ def _make_feature_name(subsequence_code):
     default.update(subsequence_code)
     return ''.join([default[i] for i in range(4)])
 
+
 def MotifModel(
     train_corpuses,
     test_corpuses,
-    n_components=15,
+    num_components=15,
     init_components=None,
     seed=0,
     # context model
     context_reg=0.0001,
-    conditioning_alpha=5e-5,
+    kmer_reg=0.005,
+    conditioning_alpha=1e-9,
+    context_encoder='diagonal',
+    # mutation model
     # locals model
     pi_prior=1.,
     # locus model
@@ -482,23 +471,24 @@ def MotifModel(
     max_features = 0.5,
     n_iter_no_change=1,
     use_groups=True,
-    smoothing_size=1000,
-    add_corpus_intercepts=True,
-    context_encoder='diagonal',
-    kmer_reg=0.001,
+    add_corpus_intercepts=False,
+    convolution_width=1,
     l2_regularization=1,
     # optimization settings
     empirical_bayes = True,
-    begin_prior_updates = 10,
+    begin_prior_updates = 20,
     stop_condition=50,
     num_epochs = 2000,
-    locus_subsample = None,
+    locus_subsample=None,
+    batch_subsample=None,
     threads = 1,
     kappa = 0.5,
-    tau = 1.,
+    tau = 0,
     callback=None,
-    eval_every=10,
+    eval_every=1,
     verbose=0,
+    max_iter=25,
+    init_variance=(0.1, 0.05),
 ):
     random_state = np.random.RandomState(seed)
 
@@ -508,7 +498,8 @@ def MotifModel(
         else LinearThetaModel)\
         (
             train_corpuses,
-            n_components=n_components,
+            init_variance=init_variance[1],
+            n_components=num_components,
             tree_learning_rate=tree_learning_rate,
             max_depth=max_depth,
             max_trees_per_iter=max_trees_per_iter,
@@ -518,8 +509,8 @@ def MotifModel(
             n_iter_no_change=n_iter_no_change,
             use_groups=use_groups,
             random_state=random_state,
-            smoothing_size=smoothing_size,
-            #add_corpus_intercepts=add_corpus_intercepts,
+            add_corpus_intercepts=add_corpus_intercepts,
+            convolution_width=convolution_width,
             l2_regularization=l2_regularization,
         )
     
@@ -536,19 +527,21 @@ def MotifModel(
 
     context_model = UnstrandedContextModel(
         train_corpuses,
-        n_components=n_components,
+        kmer_encoder,
+        n_components=num_components,
         random_state=random_state,
-        kmer_encoder=kmer_encoder,
-        kmer_reg=kmer_reg,
+        init_variance=init_variance[0],
         tol=5e-4,
         reg=context_reg,
+        kmer_reg=kmer_reg,
         conditioning_alpha=conditioning_alpha,
         init_components=init_components,
+        max_iter=max_iter,
     )
 
-    locals_model = LDAUpdateSparse(
+    locals_model = LDAUpdateDense(
         train_corpuses,
-        n_components=n_components,
+        n_components=num_components,
         random_state=random_state,
         prior_alpha=pi_prior,
     )
@@ -571,6 +564,7 @@ def MotifModel(
             stop_condition=stop_condition,
             num_epochs=num_epochs,
             locus_subsample=locus_subsample,
+            batch_subsample=batch_subsample,
             threads=threads,
             kappa=kappa,
             tau=tau,
@@ -587,29 +581,3 @@ def MotifModel(
         train_scores,
         test_scores,
     )
-
-
-def _sample_params(study, trial, extensive=False):
-
-    params = {
-        'l2_regularization' : trial.suggest_float('l2_regularization', 1e-5, 100., log=True),
-        'max_features' : trial.suggest_categorical('max_features', [0.25, 0.33, 0.5]),
-    }
-
-    if params:
-        params.update({
-            'init_variance' : (
-                trial.suggest_float('init_variance_mutation', 0.01, 0.1),
-                trial.suggest_float('init_variance_context', 0.01, 0.1),
-                trial.suggest_float('init_variance_theta', 0.01, 0.1),
-            ),
-            'context_reg' : trial.suggest_float('context_reg', 1e-5, 5e-3, log=True),
-            'mutation_reg' : trial.suggest_float('mutation_reg', 1e-5, 5e-2, log=True),
-            'kmer_reg' : trial.suggest_float('kmer_reg', 1e-4, 5e-2, log=True),
-            'conditioning_alpha' : trial.suggest_float('conditioning_alpha', 1e-10, 1e-7, log=True),
-            'begin_prior_updates' : trial.suggest_int('begin_prior_updates', 5, 50),
-            'tree_learning_rate' : trial.suggest_float('tree_learning_rate', 0.05, 0.2),
-            'convolution_width' : trial.suggest_int('convolution_width', 0, 3),
-        })
-    
-    return params

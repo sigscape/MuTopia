@@ -70,7 +70,7 @@ class FeatureType(Enum):
 
 
 def str_wrapped_list(x, n=4):
-    x = list(x)
+    x = list(map(str, x))
     return "\n\t" + ",\n\t".join([', '.join(x[i:i+n]) for i in range(0, len(x), n)])
 
 
@@ -117,7 +117,6 @@ def check_structure(corpus):
             'exposures'
         ],
         'features' : [],
-        'obsm' : [],
         'varm' : [],
     }
 
@@ -278,12 +277,12 @@ def match_dims(X,**dim_sizes):
 
 def using_exposures_from(corpus):
     try:
-        corpus.obsm['exposures']
+        corpus['contributions']
     except KeyError:
-        raise KeyError('The corpus does not have exposures. Run `model.annot_exposures(corpus)` first.')
+        raise KeyError('The corpus does not have contributions. Run `model.annot_contributions(corpus)` first.')
 
     return lambda _, sample_name : \
-        corpus.obsm['exposures'].sel(sample=sample_name).data
+        corpus['contributions'].sel(sample=sample_name).data
 
 
 class CorpusInterface(ABC):
@@ -292,9 +291,14 @@ class CorpusInterface(ABC):
     instead of a G-Tensor corpus. If the object implements the 
     following interface (and the outputs are the expected type), it will work.
 
-    Note, we don't need to copy "features", "obsm", "varm" etc.
+    Note, we don't need to copy "features", "varm" etc.
     because those elements are not used in the EM step.
     '''
+
+    @property
+    @abstractmethod
+    def sample(self):
+        raise NotImplementedError
 
     @property
     @abstractmethod
@@ -341,17 +345,22 @@ class LazySampleSlicer(CorpusInterface):
     to the original data matrix, foregoing the copying step.
     '''
 
-    def __init__(self, corpus, **slices):
+    def __init__(self, corpus,*, sample, **slices):
         # first, make a copy of the corpus
         sliced = corpus.copy()
         # get a copy of the X layer
-        self._apply_slices=slices
+        self._apply_slices={d : s for d,s in slices.items() if not s is None}
+        self._samples = sample
         
         self.X = sliced.X
         self.corpus = sliced\
-            .drop_nodes(('obsm', 'varm', 'features'))\
+            .drop_nodes(('varm', 'features'))\
             .drop_vars('X', errors='ignore')\
             .isel(**self._apply_slices)
+        
+    @property
+    def sample(self):
+        return self._samples
     
     @property
     def sizes(self):
@@ -380,8 +389,8 @@ class LazySampleSlicer(CorpusInterface):
     def fetch_sample(self, sample_name):
         if not sample_name is None:
             return self.X\
-                        .sel(sample=sample_name)\
-                        .isel(**self._apply_slices)
+                    .sel(sample=sample_name)\
+                    .isel(**{d:s for d,s in self._apply_slices.items() if not d == 'sample'})
         else:
             return self.X.isel(**self._apply_slices)
 
@@ -420,13 +429,7 @@ def borrow_kwargs(*borrow_sigs):
     return decorator
 
 
-def stream_subprocess_output(process):
-    
-    while True:
-        line = process.stdout.readline().strip()
-        if not line:
-            break
-        yield line
+def close_process(process):
 
     process.stdout.close()
     process.wait()
@@ -435,5 +438,14 @@ def stream_subprocess_output(process):
         raise subprocess.CalledProcessError(
             process.returncode, 
             process.args,
-            process.stderr.read().decode('utf-8')
         )
+
+def stream_subprocess_output(process):
+    
+    while True:
+        line = process.stdout.readline().strip()
+        if not line:
+            break
+        yield line
+
+    close_process(process)

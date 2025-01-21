@@ -65,17 +65,16 @@ psi and gammaln functions from scipy.special, referencing the
 cython code underlying the scipy.special module.
 '''
 addr = get_cython_function_address("scipy.special.cython_special", "__pyx_fuse_1psi")
-#functype = ctypes.CFUNCTYPE(ctypes.c_double, ctypes.c_double)
-functype = ctypes.CFUNCTYPE(ctypes.c_float, ctypes.c_float)
+functype = ctypes.CFUNCTYPE(ctypes.c_double, ctypes.c_double)
 psi = functype(addr)
 
-@vectorize(['float32(float32)'])
+@vectorize(['double(double)'])
 def psivec(x):
     return psi(x)
 
 
 gammaln = functype(get_cython_function_address("scipy.special.cython_special", "gammaln"))
-@vectorize(['float32(float32)'])
+@vectorize(['double(double)'])
 def gammalnvec(x):
     return gammaln(x)
 
@@ -83,12 +82,12 @@ def gammalnvec(x):
 '''
 Helper functions for the dirichlet log likelihood and bound
 '''
-@njit('float32[:](float32[:])', nogil=True)
+@njit('double[:](double[:])', nogil=True)
 def log_dirichlet_expectation(alpha):
     return psivec(alpha) - psi(np.sum(alpha))
 
 
-@njit('float32(float32[:], float32[:])', nogil=True)
+@njit('double(double[:], double[:])', nogil=True)
 def dirichlet_bound(alpha, gamma):
 
     logE_gamma = log_dirichlet_expectation(gamma)
@@ -98,7 +97,7 @@ def dirichlet_bound(alpha, gamma):
 
 
 
-@njit('float32[::1](float32[::1], float32[:,::1], float32[::1], float32[::1])', nogil=True)
+@njit('double[::1](double[::1], double[:,::1], double[::1], double[::1])', nogil=True)
 def _update_step(
         alpha, 
         conditional_likelihood, 
@@ -116,7 +115,7 @@ def _update_step(
     X_div_X_tild = np.where(
         weights>0.,
         weights/(exp_Elog_gamma @ conditional_likelihood),
-        np.float32(0.),
+        0.
     )
     gamma_sstats = exp_Elog_gamma*(conditional_likelihood @ X_div_X_tild)
 
@@ -124,7 +123,7 @@ def _update_step(
 
 
 @flatten_tensor_for_update
-@njit('float32[::1](float32[::1], float32[:,::1], float32[::1], int64, double, float32[::1])', nogil=True)
+@njit('double[::1](double[::1], double[:,::1], double[::1], int64, double, double[::1])', nogil=True)
 def iterative_update(
     alpha, 
     conditional_likelihood, 
@@ -151,7 +150,7 @@ def iterative_update(
 
 @reshape_output
 @flatten_tensor_for_update
-@njit('float32[:,::1](float32[::1], float32[:,::1], float32[::1], float32[::1])', nogil=True)
+@njit('double[:,::1](double[::1], double[:,::1], double[::1], double[::1])', nogil=True)
 def calc_local_variables(
         alpha,
         conditional_likelihood,
@@ -169,7 +168,7 @@ def calc_local_variables(
 
 @flatten_tensor_for_update
 @flatten_last_arg
-@njit('float32(float32[::1], float32[:,::1], float32[::1], float32[::1], float32[:,::1])', nogil=True)
+@njit('double(double[::1], double[:,::1], double[::1], double[::1], double[:,::1])', nogil=True)
 def bound(
     alpha,
     conditional_likelihood,

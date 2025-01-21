@@ -4,7 +4,7 @@ from functools import partial
 import os
 import numpy as np
 import mutopia.ingestion as ingest
-from mutopia.corpus import GTensor, write_dataset
+from mutopia.corpus import GTensor, write_dataset, update_view
 import netCDF4 as nc
 from shutil import copyfile
 
@@ -13,18 +13,46 @@ from ..modalities import Modality
 from ..genome_utils.bed12_utils import stream_bed12
 from ..utils import FeatureType, logger
 
-##
-# TODO:
-# The exposures should be added like a feature.
-# Provide a bed file bigwig file and use this to find the average or sum 
-# within the regions.
-## 
+
+def _read_continuous_file(
+    dataset,
+    ingest_file,
+    normalization : FeatureType,
+    column=4,
+):
+
+    file_type = ingest.FileType.from_extension(ingest_file)
+    
+    if not file_type in (ingest.FileType.BEDGRAPH, ingest.FileType.BIGWIG, ingest.FileType.BED):
+        raise ValueError(f'File type {file_type} not supported for continuous feature ingestion.')
+    
+    if not FeatureType(normalization) in file_type.allowed_normalizations:
+        raise ValueError(f'Normalization {normalization} not supported for file type {file_type}')
+
+    corpus_attrs = disk.read_attrs(dataset)
+
+    feature_vals = file_type.get_ingestion_fn(
+        is_distance_feature=False,
+        is_discrete_feature=False,
+    )(
+        ingest_file,
+        disk.read_regions_file(dataset),
+        genome_file=corpus_attrs['genome_file'],
+        column=column,
+    )
+
+    return feature_vals
+
 
 @click.group("G-tensor commands")
 def ingestion():
     pass
 
-@ingestion.command("linearize-beds")
+@ingestion.group("utils")
+def utils():
+    pass
+
+@utils.command("linearize-beds")
 @click.argument(
     'bed_files',
     type=click.Path(exists=True),
@@ -189,31 +217,63 @@ def create(
     required=True,
     help='Modality to convert the corpus to',
 )
+@click.option(
+    '-fa',
+    '--fasta-file',
+    type=click.Path(exists=True),
+    required=True,
+    help='Fasta file to use for calculating context frequencies',
+)
 def convert(
     *,
     input,
     dtype : str,
     output : str,
+    fasta_file : str,
 ):
     
-    logger.info('Copying corpus ...')
-    input_regions_file = disk.read_regions_file(input)
-    copyfile(input, output)
-    
-    modality = Modality(dtype).get_config()
-    attrs = disk.read_attrs(output)
+    old_dataset = disk.load_dataset(input, with_samples=False)
+    attrs = old_dataset.attrs
+
+    input_regions_file = attrs['regions_file']
     output_regions_file = output + '.regions.bed'
     copyfile(input_regions_file, output_regions_file)
-
+    
+    modality = Modality(dtype).get_config()
+    
     context_freqs = modality.get_context_frequencies(
         regions_file=output_regions_file,
-        fasta_file=attrs['fasta_file'],
+        fasta_file=fasta_file,
     )
 
-    disk.write_context_freqs(
-        output,
-        context_freqs,
+    chrom, start, end = list(zip(*(
+        (s.chromosome, s.start, s.end)
+        for s in stream_bed12(output_regions_file)
+    )))
+
+    new_dataset = GTensor(
+        modality,
+        name=attrs['name'],
+        chrom=chrom,
+        start=start,
+        end=end,
+        context_frequencies=context_freqs,
+        exposures=old_dataset.regions.exposures.values,
     )
+    
+    for k, v in attrs.items():
+        if not k in ('regions_file','dtype'):
+            new_dataset.attrs[k] = v
+    
+    new_dataset.attrs['regions_file'] = output_regions_file
+    
+    new_dataset = update_view(
+        new_dataset,
+        features = old_dataset['features'].to_dataset(),
+    )
+
+    write_dataset(new_dataset, output)
+
 
 
 @ingestion.command("set-attr")
@@ -236,7 +296,87 @@ def set_attrs(
     with nc.Dataset(dataset, 'a') as dset:
         for k,v in attrs:
             setattr(dset, k, v)
+
+
+@ingestion.command("info")
+@click.argument(
+    'dataset',
+    type=click.Path(exists=True),
+)
+def info(dataset):
+    attrs = disk.read_attrs(dataset)
     
+    n_features = len(disk.list_features(dataset))
+
+    try:
+        n_samples = len(disk.list_samples(dataset))
+    except ValueError:
+        n_samples = 0
+
+    click.echo(f'Num features: {n_features}')
+    click.echo(f'Num samples: {n_samples}')
+    click.echo('Dataset attributes:')
+
+    for k,v in attrs.items():
+        click.echo(f'\t{k}: {v}')
+    
+
+@ingestion.group("offsets")
+def offsets():
+    pass
+@offsets.group("locus")
+def offsets_locus():
+    pass
+
+@offsets_locus.command("add")
+@click.argument(
+    'dataset',
+    type=click.Path(exists=True),
+)
+@click.argument(
+    'offsets_file',
+    type=click.Path(exists=True),
+)
+@click.option(
+    '-col',
+    '--column',
+    type=click.IntRange(4,1000),
+    default=4,
+    help='Column in the bedfile to use for the class',
+)
+def add_locus_offsets(
+    dataset,
+    offsets_file,
+    column=4,
+):
+    exp_offsets = _read_continuous_file(
+        dataset,
+        offsets_file,
+        normalization='log1p_cpm',
+        column=column,
+    ).astype(np.float32)
+
+    disk.write_locus_offsets(
+        dataset,
+        exp_offsets,
+    )
+
+@offsets_locus.command("rm")
+@click.argument(
+    'dataset',
+    type=click.Path(exists=True),
+)
+def rm_locus_offsets(
+    dataset,
+):
+    
+    exp_exposures = np.ones(disk.read_dims(dataset)['locus'], dtype=np.float32)
+
+    disk.write_locus_offsets(
+        dataset,
+        exp_exposures,
+    )
+
 
 @ingestion.group("feature")
 def featurecmds():
@@ -294,30 +434,12 @@ def continuous_feature(
     feature_name : str,
 ):
     
-    def read_file(ingest_file):
-
-        file_type = ingest.FileType.from_extension(ingest_file)
-        
-        if not file_type in (ingest.FileType.BEDGRAPH, ingest.FileType.BIGWIG, ingest.FileType.BED):
-            raise ValueError(f'File type {file_type} not supported for continuous feature ingestion.')
-        
-        if not FeatureType(normalization) in file_type.allowed_normalizations:
-            raise ValueError(f'Normalization {normalization} not supported for file type {file_type}')
-
-        corpus_attrs = disk.read_attrs(dataset)
-
-        feature_vals = file_type.get_ingestion_fn(
-            is_distance_feature=False,
-            is_discrete_feature=False,
-        )(
-            ingest_file,
-            disk.read_regions_file(dataset),
-            genome_file=corpus_attrs['genome_file'],
-            column=column,
-            #extend=corpus_attrs['region_size'],
-        )
-
-        return feature_vals
+    read_file = partial(
+        _read_continuous_file,
+        dataset,
+        normalization=normalization,
+        column=column,
+    )
     
     vals = np.mean([read_file(f) for f in ingest_file], axis=0)
 
@@ -544,6 +666,7 @@ def list_features(
     dataset : str,
 ):
     feature_info = disk.list_features(dataset)
+    del feature_info['sample']
     
     if len(feature_info)==0:
         click.echo("No features found in the dataset.")
@@ -553,7 +676,6 @@ def list_features(
     rows = [
         [feature_name] + [str(attrs.get(header, "")) for header in headers[1:]]
         for feature_name, attrs in feature_info.items()
-        if bool(attrs['active'])
     ]
 
     col_widths = [max(len(str(item)) for item in col) for col in zip(*([headers] + rows))]
@@ -650,6 +772,18 @@ def samplecmds():
     help='VCFS ONLY: Name of sample in multi-sample VCF.',
 )
 @click.option(
+    '--cluster/--no-cluster',
+    type=bool,
+    default=True,
+    help='VCFS ONLY: Whether to cluster the mutations in the sample, requires a mutation rate file.',
+)
+@click.option(
+    '--skip-sort/--no-skip-sort',
+    type=bool,
+    default=False,
+    help='Whether to skip sorting the VCF file. This will fail if the VCF is not in lexigraphical sorted order (chr1, chr10, ...).',
+)
+@click.option(
     '-tags',
     '--weight-tags',
     type=str,
@@ -667,6 +801,8 @@ def ingest_sample(
     mutation_rate_file : Union[None, str] = None,
     sample_weight : Union[None, float] = 1.,
     weight_tags : List[str] = [],
+    skip_sort : bool = False,
+    cluster : bool = True,
     *,
     sample_id : str,
 ):
@@ -685,7 +821,9 @@ def ingest_sample(
         sample_weight=sample_weight,
         sample_name=sample_name,
         weight_tags=weight_tags,
-        dim_sizes=disk.read_dims(dataset),
+        skip_sort=skip_sort,
+        cluster=cluster,
+        locus_dim=disk.read_dims(dataset)['locus'],
     )
 
     disk.write_sample(
@@ -696,10 +834,40 @@ def ingest_sample(
 
 
 @samplecmds.command("rm")
-def rm_samples():
-    pass
+@click.argument(
+    'dataset',
+    type=click.Path(exists=True),
+)
+@click.argument(
+    'sample_names',
+    type=str,
+    nargs=-1,
+)
+def rm_samples(
+    dataset,
+    sample_names : List[str],
+):
+    
+    for sample_name in sample_names:
+        disk.rm_sample(
+            dataset,
+            sample_name,
+        )
+        click.echo(f'Removed sample: {sample_name}')
 
 
-@samplecmds.command("list")
-def list_samples():
-    pass
+
+@samplecmds.command("ls")
+@click.argument(
+    'dataset',
+    type=click.Path(exists=True),
+)
+def list_samples(dataset : str):
+    
+    samples = disk.list_samples(dataset)
+
+    if len(samples)==0:
+        click.echo("No samples found in the dataset.")
+        return
+    
+    print(*samples, sep='\n')

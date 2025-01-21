@@ -1,8 +1,6 @@
 import sparse
 import xarray as xr
 import typing
-import datatree
-from ..modalities import get_mode
 
 class BaseAccessor:
     def __init__(self, xrds):
@@ -39,8 +37,10 @@ class OnDiskCoo(BaseAccessor):
                 indices,
                 data,
                 shape=shape,
+                fill_value=0.,
             ),
             compressed_axes=(compress,),
+            fill_value=0.,
         )
 
         return xr.DataArray(
@@ -126,8 +126,7 @@ class AsCSR(BaseAccessor):
         self._xrds.data = self._xrds.data.todense()
         return self._xrds
     
-
-@datatree.register_datatree_accessor("modality")
-class Mod(BaseAccessor):
+@xr.register_dataarray_accessor("is_sparse")
+class IsSparse(BaseAccessor):
     def __call__(self):
-        return get_mode(self._xrds)
+        return isinstance(self._xrds.data, sparse.SparseArray)

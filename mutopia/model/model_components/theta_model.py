@@ -191,26 +191,21 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
     def _make_model(self, **kw):
         raise NotImplementedError
     
-    
-    def get_exp_offset(self, offsets, corpus):
+    @staticmethod
+    def get_exp_offset(offsets, corpus):
         return np.exp(offsets)\
                 .sum(dim=dims_except_for(offsets.dims, 'locus'))\
-                .data\
-                .astype(self.dtype)
+                .data
 
 
     def _get_targets(self, k, sstats, exp_offsets, corpuses):
 
         corpus_names = [CS.get_name(corpus) for corpus in corpuses]
-        
-        target = np.concatenate([sstats[n][k] for n in corpus_names])\
-                    .astype(self.dtype, copy=False)
-        
+        target = np.concatenate([sstats[n][k] for n in corpus_names])
         eta = np.concatenate([exp_offsets[n][k] for n in corpus_names])
 
         current_prediction = np.concatenate([
-            CS.fetch_val(state, 'log_locus_distribution')[k].data 
-            for state in corpuses
+            CS.fetch_val(state, 'log_locus_distribution')[k].data for state in corpuses
         ])
 
         return (
@@ -229,8 +224,8 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
                             [:, locus]
     
 
+    @staticmethod
     def reduce_sparse_sstats(
-        self,
         sstats, 
         corpus,
         *,
@@ -238,7 +233,7 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         locus,
         **kw,
     ):
-        np.add.at(sstats, (slice(None), locus), weighted_posterior.astype(self.dtype))
+        np.add.at(sstats, (slice(None), locus), weighted_posterior)
 
         return sstats
     
@@ -250,15 +245,14 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         weights = weighted_posterior\
             .sum(dim=dims_except_for(weighted_posterior.dims, *to_dim))\
             .transpose(*to_dim)\
-            .data\
-            .astype(self.dtype)
+            .data
         
         sstats += weights
 
         return sstats
     
 
-    def format_signature(self, k):
+    def format_signature(self, k, normalization='none'):
         return 0.
 
 
@@ -434,9 +428,7 @@ class GBTThetaModel(ThetaModel):
 
         self.predict_from[k] = n_fit_trees
 
-        rate_model = rate_model.set_params(
-                        max_iter = n_fit_trees + self.max_trees_per_iter
-                    )
+        rate_model = rate_model.set_params(max_iter = n_fit_trees + self.max_trees_per_iter)
                 
         yield partial(
             rate_model.fit,

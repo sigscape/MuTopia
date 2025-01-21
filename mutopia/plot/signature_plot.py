@@ -7,49 +7,36 @@ import matplotlib.pyplot as plt
 def _plot_linear_signature(
     xlabels,
     palette,
-    signature, 
-    *compare_sigs,
-    sig_names=None,
-    ax=None, 
+    ax=None,
+    legend_title=None,
     height = 1,
     width = 4.25,
-    **kwargs,
-):
-    
-    sig_dim = len(signature)
-    
+    plot_kw = {},
+    **signatures,
+):    
     plot_kw = dict(
         width = 1,
         edgecolor = 'white',
         linewidth = 0.5,
         error_kw = {'alpha' : 0.5, 'linewidth' : 0.5},
-        **kwargs,
+        **plot_kw,
     )
 
-    extent=max(chain(signature, *compare_sigs))
-    n_sigs = len(compare_sigs) + 1
+    extent=max(chain(*signatures.values()))
+    n_sigs = len(signatures)
+    sig_dim = len(next(iter(signatures.values())))
 
     if ax is None:
         _, ax = plt.subplots(1,1,figsize=(width*n_sigs, height*n_sigs))
 
-    if n_sigs==1:
-        signature=np.array(signature)
-        signature=signature/extent
+    for i, (label, s) in enumerate(signatures.items()):
         ax.bar(
-            height = signature, 
-            x = range(len(xlabels)),
-            color = palette,
-            **plot_kw
+            height = np.array(s)/extent, 
+            x = range(i, n_sigs*len(xlabels), n_sigs),
+            color = plt.get_cmap(palette)(i) if isinstance(palette, str) else palette[i],
+            **plot_kw,
+            label=label,
         )
-    else:
-        for i, s in enumerate((signature, *compare_sigs)):
-            ax.bar(
-                height = np.array(s)/extent, 
-                x = range(i, n_sigs*len(xlabels), n_sigs),
-                color = plt.get_cmap(palette)(i) if isinstance(palette, str) else palette[i],
-                **plot_kw,
-                label = sig_names[i] if not sig_names is None else f'Signature {i+1}'
-            )
 
     ax.set(
             yticks = [0.25, 0.5, 0.75, 1.], 
@@ -60,7 +47,7 @@ def _plot_linear_signature(
 
     ax.axhline(0, color = 'black', linewidth = 0.5)
 
-    for s in ['left','right','top','bottom']:
+    for s in ['left','right','top',]:
         ax.spines[s].set_visible(False)
 
     ## add a whitegrid at the quarter, half, and top marks of the y-axis
@@ -70,8 +57,14 @@ def _plot_linear_signature(
     # keep the grid but remove the ytick markers
     ax.tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
 
-    if len(compare_sigs) > 0:
-        ax.legend(loc='lower center', fontsize=8, ncol=n_sigs,
-                    bbox_to_anchor=(0.5, -0.25), frameon=False)
+    if len(signatures) > 1:
+        ax.legend(
+            title=legend_title,
+            fontsize=8, 
+            ncol=n_sigs,
+            frameon=False,
+            loc="center left",
+            bbox_to_anchor=(1, 0, 0.5, 1),
+        )
         
     return ax

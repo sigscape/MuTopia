@@ -32,6 +32,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         conditioning_alpha : float = 1e-9,
         dtype = float,
         init_components = None,
+        context_conditioning = 1e-5,
         *,
         n_components : int,
         random_state,
@@ -78,9 +79,14 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
 
         if isinstance(self.context_transformer, DiagonalEncoder):
 
+            if not init_components is None:
+                self.init_from_signatures(
+                    corpuses[0].modality().load_components(*init_components)
+                )
+
             eln_solver = partial(
                 get_eln_solver,
-                **get_reg_params(reg, 1e-5),
+                **get_reg_params(reg, context_conditioning),
                 tol=tol,
                 random_state=random_state,
                 max_iter=100,
@@ -98,7 +104,10 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
                 reg_solver = eln_solver, # f(X) -> f(z, w, beta) -> beta
             )
         else:
-            #raise NotImplementedError('Only diagonal encoders are supported')
+            
+            if not init_components is None:
+                raise ValueError('Cannot initialize from signatures with non-diagonal context encoders')
+            
             eln = partial(
                 get_eln_solver,
                 tol=tol,
@@ -108,12 +117,12 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
 
             strand_solver = partial(
                 eln,
-                **get_reg_params(reg, 1e-5),
+                **get_reg_params(reg, context_conditioning),
             ) # f(X) -> f(z, w, beta) -> beta
 
             context_solver = partial(
                 eln,
-                **get_reg_params(kmer_reg, 1e-5),
+                **get_reg_params(kmer_reg, context_conditioning),
             )
 
             split_solver = partial(
@@ -135,20 +144,16 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
             max_iter=max_iter,
         )
 
-        '''
-        if not init_components is None:
-            self.init_from_signatures(
-                corpuses[0].modality().load_components(*init_components)
-            )
-        '''
 
     @property
     def requires_normalization(self):
         return True
+    
 
     @property
     def requires_dims(self):
         return ('configuration','context','locus')
+    
 
     def post_fit(self, corpuses):
 
@@ -197,11 +202,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
                             [configuration, locus]
 
         # Use numpy advanced indexing to update context_sstats
-        np.add.at(
-            sstats, 
-            (slice(None), context, mesoscale_states), 
-            weighted_posterior.astype(self.dtype)
-        )
+        np.add.at(sstats, (slice(None), context, mesoscale_states), weighted_posterior)
 
         return sstats
     ##
@@ -218,8 +219,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         weights = weighted_posterior\
             .sum(dim=dims_except_for(weighted_posterior.dims, *to_dim))\
             .transpose(*to_dim)\
-            .data\
-            .astype(self.dtype)
+            .data
 
         # 2 x L
         (plus_idx, minus_idx) = CS.fetch_val(corpus, 'mesoscale_idx').data
@@ -233,14 +233,15 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
     def init_from_signatures(self, signatures):
         
         k = signatures.shape[0]
-        c=self.transformer.n_encoded_features_
+        c=self.context_transformer.n_coefs
 
-        renormalized = 100*(signatures.sum(axis = -1) + 1e-5)/self._context_distribution
+        context_effects = signatures.sum(dim=dims_except_for(signatures.dims, 'context', 'component'))\
+                            .transpose('component', 'context').data
+        
+        context_effects/=context_effects.sum(axis=1, keepdims=True)
+        renormalized = 100*(context_effects + 1e-5)#/self._context_distribution
 
-        self._coefs[
-                :k,
-                0:c*self.context_dim:c
-            ] = np.log( renormalized.astype(self.dtype) )
+        self._coefs[:k, :c] = np.log( renormalized )
         
         return self
     
@@ -385,15 +386,17 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
 
     def _calc_lambda(self, k, design_matrix):
         return (self.coefs_[k] @ design_matrix.T)\
-                    .reshape((self.context_dim, -1))\
-                    .astype(self.dtype, copy=False)
+                    .reshape((self.context_dim, -1))
     
     
     def _format_component(self, k):        
         return self._calc_lambda(k, self.encoding_matrix_)
     
 
-    def format_signature(self, k):
+    def format_signature(self, k, normalization='global'):
+
+        if not normalization in ('global','weighted','none'):
+            raise ValueError('Normalization must be one of "global", "weighted", or "none"')
 
         encoding_matrix = DesignMatrixHelper\
             .compose_encoding_matrix(
@@ -403,9 +406,13 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
             )
         
         # C x S
-        signature = self._calc_lambda(k, encoding_matrix) \
-                        + np.log(self._comp_context_distribution[k, :])[:, None]
-                        #+ np.log(self._context_distribution)[:, None]
+        signature = self._calc_lambda(k, encoding_matrix)
+        
+        if normalization=='weighted':
+            signature += np.log(self._comp_context_distribution[k, :])[:, None]
+        
+        if normalization=='global':
+            signature += np.log(self._context_distribution)[:, None]
         
         return DataArray(
             signature,
@@ -418,7 +425,9 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
     
     
     def get_baseline_summary(self, k):
-        return self.format_signature(k).sel(mesoscale_state='Baseline')
+        return self.format_signature(k, normalization='none')\
+                    .sel(mesoscale_state='Baseline')
+
 
     def get_interaction_summary(self, k):
 

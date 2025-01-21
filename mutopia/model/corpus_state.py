@@ -51,7 +51,7 @@ class CorpusState:
         if cls.is_marginal_corpus(corpus):
             return [None]
         
-        return list(corpus.X.coords['sample'].values)
+        return list(corpus.sample.values)
 
     @classmethod
     def fetch_sample(cls, corpus, sample_name):

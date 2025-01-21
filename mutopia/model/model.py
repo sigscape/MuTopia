@@ -4,7 +4,7 @@ import xarray as xr
 from ..utils import ParContext, using_exposures_from, \
     check_corpus, check_dims
 from .model_components import *
-from .eval import deviance_locus
+from .eval import deviance_locus, pearson_residuals
 from .latent_var_models import *
 from ..plot.coef_matrix_plot import _plot_interaction_matrix
 from ..corpus import *
@@ -54,7 +54,7 @@ class Model:
         self.component_names_ = names
 
 
-    def _setup_corpus(self, corpus):
+    def setup_corpus(self, corpus):
         args = (corpus, self.model_state_)
         
         CS.init_corpusstate(*args)
@@ -84,13 +84,14 @@ class Model:
     def plot_signature(self, 
         component, 
         *select, 
+        normalization='global',
         **kwargs
     ):
         if len(select) == 0:
             select = ['Baseline']
 
         return self.modality_.plot(
-            self.model_state_.format_signature(component), 
+            self.model_state_.format_signature(component, normalization=normalization), 
             *select,
             **kwargs
         )
@@ -118,13 +119,13 @@ class Model:
         return _plot_interaction_matrix(
             interactions,
             baseline,
-            shared_effects.iloc[:,0],
+            shared_effects, #.iloc[:,0],
             palette=palette,
             **kw
         )
     
 
-    def annot_exposures(
+    def annot_contributions(
         self,
         corpus,
         threads=1,
@@ -136,10 +137,10 @@ class Model:
         self.model_state_.locals_model.difference_tol=1e-5
 
         if not CS.has_corpusstate(corpus):
-            corpus = self._setup_corpus(corpus)
+            corpus = self.setup_corpus(corpus)
 
         with ParContext(threads, verbose=verbose) as par:
-            exposures = self.model_state_.locals_model\
+            contributions = self.model_state_.locals_model\
                 .predict(
                     corpus,
                     self.model_state_,
@@ -149,9 +150,10 @@ class Model:
         corpus = corpus.assign_coords({
             'component' : self.component_names,
         })
-        corpus.obsm['exposures'] = exposures
-        logger.info('Added key to obsm: "exposures"')
+        corpus['contributions'] = contributions
+        logger.info('Added key to dataset: "contributions"')
         return corpus
+    
     
     
     def annot_component_distributions(
@@ -162,7 +164,7 @@ class Model:
         self._check_corpus(corpus)
 
         if not CS.has_corpusstate(corpus):
-            corpus = self._setup_corpus(corpus)
+            corpus = self.setup_corpus(corpus)
 
         with ParContext(threads) as par:
             lmrt = self.model_state_._get_log_mutation_rate_tensor(
@@ -188,14 +190,14 @@ class Model:
         self._check_corpus(corpus)
 
         if not CS.has_corpusstate(corpus):
-            corpus = self._setup_corpus(corpus)
+            corpus = self.setup_corpus(corpus)
 
         try:
             corpus.varm['component_distributions']
         except KeyError:
             corpus = self.annot_component_distributions(corpus, threads)
 
-        marginal_exposures = corpus.obsm['exposures'].sum('sample').data
+        marginal_exposures = corpus['contributions'].sum('sample').data
 
         corpus.varm['predicted_marginal'] = \
             self.model_state_._log_marginalize_mutrate(
@@ -207,46 +209,6 @@ class Model:
         return corpus
 
 
-    def annot_imputed(
-        self,
-        corpus,
-        exposures=None,
-        threads=1,
-    ):  
-        self._check_corpus(corpus)
-
-        if not CS.has_corpusstate(corpus):
-            corpus = self._setup_corpus(corpus)
-
-        try:
-            corpus.varm['component_distributions']
-        except KeyError:
-            corpus = self.annot_component_distributions(corpus, threads)
-
-        if exposures is None:
-            exposures = using_exposures_from(corpus)
-
-        log_component_mutrate = np.log(corpus.varm['component_distributions'])
-
-        imputed = xr.concat(
-            [
-                self.model_state_._marginalize_mutrate(
-                    log_component_mutrate,
-                    exposures(sample_name)
-                )
-                for sample_name in CS.list_samples(corpus)
-            ],
-            dim='sample',
-        ).transpose(
-            'sample', *self.modality_.dims, 'locus',
-        )
-
-        corpus['imputed'] = imputed
-        logger.info('Added key to layers: "imputed"')
-        return corpus
-
-
-
     def annot_SHAP_values(
         self,
         corpus,
@@ -255,7 +217,7 @@ class Model:
         self._check_corpus(corpus)
 
         if not CS.has_corpusstate(corpus):
-            corpus = self._setup_corpus(corpus)
+            corpus = self.setup_corpus(corpus)
 
         try:
             import shap
@@ -266,7 +228,7 @@ class Model:
         X = locus_model._fetch_feature_matrix(corpus)
 
         background_idx = np.random.RandomState(0).choice(
-                            len(X), size = 1000, replace = False
+                            len(X), size = min(1000, len(X)), replace = False
                         )
         
         def _component_shap(k):
@@ -307,7 +269,7 @@ class Model:
         self._check_corpus(corpus)
 
         if not CS.has_corpusstate(corpus):
-            corpus = self._setup_corpus(corpus)
+            corpus = self.setup_corpus(corpus)
 
         with ParContext(1) as par:
             return deviance_locus(
@@ -321,10 +283,26 @@ class Model:
     def annot_residuals(
         self,
         corpus,
+        exposures=None,
         threads=1,
-        keepdims=('locus',),
     ):
         self._check_corpus(corpus)
+
+        if not CS.has_corpusstate(corpus):
+            corpus = self.setup_corpus(corpus)
         
+        with ParContext(threads) as par:
+            residuals = pearson_residuals(
+                self.model_state_,
+                (corpus,),
+                exposures_fn=using_exposures_from(corpus) if exposures is None else exposures,
+                parallel_context=par,
+            )
+        
+        corpus.varm['pearson_residuals'] = residuals
         logger.info('Added key to varm: "residuals"')
-        pass
+
+        return corpus
+
+
+        
