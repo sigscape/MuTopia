@@ -2,7 +2,6 @@
 import xarray as xr
 from datatree import DataTree
 import numpy as np
-from ..utils import CorpusInterface
 from joblib import delayed
 
 class CorpusState:
@@ -48,21 +47,15 @@ class CorpusState:
     
     @classmethod
     def list_samples(cls, corpus):
-        if cls.is_marginal_corpus(corpus):
-            return [None]
-        
-        return list(corpus.sample.values)
+        #if cls.is_marginal_corpus(corpus):
+        #    return [None]
+        return list(corpus.sample)
 
     @classmethod
     def fetch_sample(cls, corpus, sample_name):
-        if issubclass(type(corpus), CorpusInterface):
-            return corpus.fetch_sample(sample_name)
-        
-        if cls.is_marginal_corpus(corpus) and sample_name is None:
+        if sample_name is None:
             return corpus.X
-
-        return corpus.X.sel(sample=sample_name)
-    
+        return corpus.fetch_sample(sample_name)
 
     @classmethod
     def sample_dims(cls, corpus):
@@ -121,7 +114,7 @@ class CorpusState:
                 }
             ),
             name='state',
-            parent=corpus
+            parent=corpus.corpus
         )
 
         return corpus
@@ -146,7 +139,6 @@ class CorpusState:
     def update(corpus, **items):
         corpus.state = corpus.state.assign(**items)
         return corpus
-
 
     @classmethod
     def update_topic_compositions(cls, corpus, sample_name, gamma):

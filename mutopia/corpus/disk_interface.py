@@ -274,35 +274,35 @@ def write_dataset(dataset, filename):
             )
 
 
-
-def _backend_load_sample(filename, sample_name):
+def _backend_load_sample(filename, sample_name, coo=False):
     
     with xr.open_dataset(filename, group=sample_name, engine='netcdf4') as sample:
-        
-        sample = sample.load()
-
         if 'format' in sample.attrs and sample.attrs['format'] == 'COO':
-            return sample.coo_to_sparse().ascoo()
+            s = sample.load().coo_to_sparse()
+            if coo:
+                return s.ascoo()
+            return s
         else:
             return sample.to_dataarray().squeeze()
 
 
+class NoSamplesError(ValueError):
+    pass
+
+def _list_sample_names(filename):
+    with nc.Dataset(filename, 'r') as dset:
+        if 'raw' in dset.groups and 'X' in dset.groups['raw'].groups:
+            return list(
+                sname 
+                for sname, sample in dset.groups['raw']['X'].groups.items() 
+                if not 'active' in sample.__dict__ or sample.__dict__['active']
+            )
+        else:
+            raise NoSamplesError('This dataset has no samples yet, it will not be compatible with many functions.')
+
+
 def load_dataset(filename, with_samples=True):
     
-    ## 1. explore the structure using the netCDF interface
-    sample_names=None
-    with nc.Dataset(filename, 'r') as dset:
-        if 'raw' in dset.groups:
-            try:
-                sample_names = list(
-                    sname 
-                    for sname, sample in dset.groups['raw']['X'].groups.items() 
-                    if not 'active' in sample.__dict__ or sample.__dict__['active']
-                )
-            except KeyError:
-                warnings.warn('This dataset has no samples yet, it will not be compatible with many functions.')
-
-    ## 2. open the bones 
     with xr.open_dataset(filename, engine='netcdf4') as root, \
         xr.open_dataset(filename, group='regions', engine='netcdf4') as regions, \
         xr.open_dataset(filename, group='features', engine='netcdf4') as features, \
@@ -315,13 +315,25 @@ def load_dataset(filename, with_samples=True):
             '/features' : features.load(),
             '/varm' : varm.load(),
         })
+
+    ## 1. explore the structure using the netCDF interface
+    has_samples=False
+    try:
+        sample_names = _list_sample_names(filename)
+        has_samples=True
+    except NoSamplesError:
+        pass
     
-    if not sample_names is None:
+    if has_samples:
+        dataset = dataset.assign_coords({'sample': sample_names})
+
+    if has_samples and with_samples:
         samples = xr.concat(
             [
                 _backend_load_sample(
                     filename, 
-                    f'raw/X/{sample_name}'
+                    f'raw/X/{sample_name}',
+                    coo=True,
                 )
                 for sample_name in tqdm.tqdm(
                     sample_names,
@@ -332,10 +344,10 @@ def load_dataset(filename, with_samples=True):
             dim='sample'
         )
 
-        dataset = dataset.assign_coords({'sample': sample_names})
         dataset.update({'X' : samples})
 
         if isinstance(dataset['X'].data, sparse.SparseArray):
             dataset['X'].ascsr('sample','locus')
 
+    dataset.attrs['filename'] = filename
     return dataset

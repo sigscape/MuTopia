@@ -33,7 +33,7 @@ class LDAUpdateDense(PrimitiveModel, LocalUpdate):
         }
     
     def _convert_sample(self, sample):
-        return np.ascontiguousarray(sample.data, dtype=self.dtype)
+        return np.ascontiguousarray(sample.load().data, dtype=self.dtype)
 
 
     @staticmethod

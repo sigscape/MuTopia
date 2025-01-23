@@ -1,6 +1,7 @@
 import sparse
 import xarray as xr
 import typing
+from datatree import register_datatree_accessor
 
 class BaseAccessor:
     def __init__(self, xrds):
@@ -130,3 +131,9 @@ class AsCSR(BaseAccessor):
 class IsSparse(BaseAccessor):
     def __call__(self):
         return isinstance(self._xrds.data, sparse.SparseArray)
+
+
+@register_datatree_accessor('fetch_sample')
+class FetchSample(BaseAccessor):
+    def __call__(self, sample_name):
+        return self._xrds['X'].sel(sample=sample_name)

@@ -2,6 +2,7 @@
 from .corpus_state import CorpusState as CS
 from .eval import *
 from ..utils import *
+from ..corpus.interfaces import *
 from tqdm import trange
 import pandas as pd
 
@@ -259,14 +260,13 @@ def fit_model(
 
     stop_fn = partial(_should_stop, stop_condition//eval_every)
 
-    if locus_subsample is None:
-        logger.info('Using batch variational inference.')
+    if locus_subsample is None and batch_subsample is None:
+        logger.warning('Using batch variational inference.')
         step_fn = partial(
             VI_step, 
             model_state=model_state,
             corpuses=train_corpuses,
         )
-
     else:
 
         subsample_rates = dict(
@@ -274,7 +274,7 @@ def fit_model(
             batch_subsample=batch_subsample,
         )
 
-        logger.info(f'Using stochastic VI with a sampling rate of {locus_subsample:2f}.')
+        logger.info(f'Using stochastic VI.')
         subsampler = partial(slice_generator, random_state, **subsample_rates)
 
         step_fn = partial(

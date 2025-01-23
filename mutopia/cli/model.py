@@ -1,11 +1,56 @@
+
+import mutopia as mu
+from mutopia.corpus.interfaces import *
+import mutopia.corpus.disk_interface as disk
 import click
 from typing import *
-import mutopia as mu
+import numpy as np
 import os
 
 @click.group("Model training")
 def model():
     pass
+
+@model.command("train-test-split")
+@click.argument("filename", type=click.Path(exists=True))
+@click.argument("test_contigs", nargs=-1, type=str)
+def train_test_split(
+    filename : str, 
+    test_contigs : list[str],
+):
+    outprefix = '.'.join(filename.split(".")[:-1])
+    dataset = disk.load_dataset(
+        filename,
+        with_samples=False
+    )
+
+    test_mask = np.isin(dataset.regions.chrom.values, test_contigs)
+
+    disk.write_dataset(
+        dataset.isel(locus=~test_mask),
+        outprefix + ".train.nc",
+    )
+
+    disk.write_dataset(
+        dataset.isel(locus=test_mask),
+        outprefix + ".test.nc",
+    )
+
+    loader = LazySampleLoader(CorpusInterface(dataset))
+
+    for sample_name in dataset.sample.values:
+        sample = loader.fetch_sample(sample_name)
+        disk.write_sample(
+            outprefix + ".train.nc",
+            sample.isel(locus=~test_mask),
+            sample_name=f'X/{sample_name}',
+        )
+        disk.write_sample(
+            outprefix + ".test.nc",
+            sample.isel(locus=test_mask),
+            sample_name=f'X/{sample_name}',
+        )
+
 
 @model.command("train")
 @click.argument("output", type=click.Path(exists=False))
@@ -51,15 +96,8 @@ def model():
     "-alpha",
     "--conditioning-alpha",
     type=click.FloatRange(0.0, 10.0),
-    default=1e-5,
+    default=1e-8,
     help="Stabilizing parameter - increase if you're getting NaNs",
-)
-@click.option(
-    "-mreg",
-    "--mutation-reg",
-    type=click.FloatRange(0.0, 10.0),
-    default=0.0005,
-    help="Regularization for mutation model",
 )
 @click.option(
     "-pi",
@@ -94,12 +132,6 @@ def model():
     default=False,
     is_flag=True,
     help="Use groups in locus model",
-)
-@click.option(
-    "--smoothing-size",
-    type=click.IntRange(1, 100000),
-    default=1000,
-    help="Smooth locus features using this window size (in bp).",
 )
 @click.option(
     "--add-corpus-intercepts",
@@ -203,8 +235,8 @@ def train(
             "At least one testing corpus is required",
         )
     
-    train_corpuses = tuple(map(mu.corpus.load_dataset, train_corpuses))
-    test_corpuses = tuple(map(mu.corpus.load_dataset, test_corpuses))
+    train_corpuses = tuple(map(lazy_load, train_corpuses))
+    test_corpuses = tuple(map(lazy_load, test_corpuses))
 
     model = mu.MutopiaModel(
         train_corpuses,

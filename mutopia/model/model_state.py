@@ -253,7 +253,7 @@ class ModelState:
         
         norm[k] = _svi_update_fn(
                 norm[k],
-                np.log(subsample_rate) + logsum_mutation_rate,
+                np.log(subsample_rate or 1.) + logsum_mutation_rate,
                 learning_rate
             )
         
@@ -370,6 +370,7 @@ class ModelState:
                     sample_name, 
                     gamma_new
                 )
+                print(sample_name)
                 
                 for model_name, model in self.models.items():
                     '''

@@ -117,7 +117,6 @@ def check_structure(corpus):
             'exposures'
         ],
         'features' : [],
-        'varm' : [],
     }
 
     if not 'name' in corpus.attrs:
@@ -135,7 +134,7 @@ def check_structure(corpus):
 
 def check_sample_data(corpus, dtype):
 
-    if not 'X' in corpus:
+    if not hasattr(corpus, 'X'):
         raise ValueError('The corpus is missing the data matrix `X`.')
 
     X = corpus.X.data
@@ -283,116 +282,6 @@ def using_exposures_from(corpus):
 
     return lambda _, sample_name : \
         corpus['contributions'].sel(sample=sample_name).data
-
-
-class CorpusInterface(ABC):
-    '''
-    Sometimes, we'd like to drop something else into the EM step
-    instead of a G-Tensor corpus. If the object implements the 
-    following interface (and the outputs are the expected type), it will work.
-
-    Note, we don't need to copy "features", "varm" etc.
-    because those elements are not used in the EM step.
-    '''
-
-    @property
-    @abstractmethod
-    def sample(self):
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def sizes(self):
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def dims(self):
-        raise NotImplementedError
-    
-    @property
-    @abstractmethod
-    def coords(self):
-        raise NotImplementedError
-    
-    @property
-    @abstractmethod
-    def regions(self):
-        raise NotImplementedError
-    
-    @property
-    @abstractmethod
-    def state(self):
-        raise NotImplementedError
-    
-    @property
-    @abstractmethod
-    def attrs(self):
-        raise NotImplementedError
-
-    
-class LazySampleSlicer(CorpusInterface):
-    '''
-    Making slices of the corpus is memory-intensive.
-    This problem is exacerbated when we want to slice by locus
-    *then* by sample, since we have to generate a locus subset
-    of the entire dataset and keep that in memory.
-
-    Instead, this interface class allows us to lazily slice the corpus.
-    First, we supply the corpus and the slices we want to apply.
-    
-    Later, we can fetch a sample by name and the slices will be applied
-    to the original data matrix, foregoing the copying step.
-    '''
-
-    def __init__(self, corpus,*, sample, **slices):
-        # first, make a copy of the corpus
-        sliced = corpus.copy()
-        # get a copy of the X layer
-        self._apply_slices={d : s for d,s in slices.items() if not s is None}
-        self._samples = sample
-        
-        self.X = sliced.X
-        self.corpus = sliced\
-            .drop_nodes(('varm', 'features'))\
-            .drop_vars('X', errors='ignore')\
-            .isel(**self._apply_slices)
-        
-    @property
-    def sample(self):
-        return self._samples
-    
-    @property
-    def sizes(self):
-        return self.corpus.sizes
-        
-    @property
-    def dims(self):
-        return self.corpus.dims
-    
-    @property
-    def coords(self):
-        return self.corpus.coords
-    
-    @property
-    def state(self):
-        return self.corpus.state
-    
-    @property
-    def regions(self):
-        return self.corpus.regions
-    
-    @property
-    def attrs(self):
-        return self.corpus.attrs
-    
-    def fetch_sample(self, sample_name):
-        if not sample_name is None:
-            return self.X\
-                    .sel(sample=sample_name)\
-                    .isel(**{d:s for d,s in self._apply_slices.items() if not d == 'sample'})
-        else:
-            return self.X.isel(**self._apply_slices)
 
 
 def borrow_kwargs(*borrow_sigs):

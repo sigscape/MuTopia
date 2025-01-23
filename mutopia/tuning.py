@@ -6,7 +6,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(' Mutopia-tuning ')
 from optuna.storages import JournalStorage
 from optuna.storages.journal import JournalFileBackend
-from .corpus import load_dataset
+from .corpus.interfaces import lazy_load
 
 def sample_params(study, trial, extensive=0):
 
@@ -235,8 +235,8 @@ def run_trial(
 
     study, study_attrs, model_kw = load_study(study_name, storage)
 
-    train_corpuses = tuple(map(load_dataset, study_attrs['train_corpuses']))
-    test_corpuses = tuple(map(load_dataset, study_attrs['test_corpuses']))
+    train_corpuses = tuple(map(lazy_load, study_attrs['train_corpuses']))
+    test_corpuses = tuple(map(lazy_load, study_attrs['test_corpuses']))
     
     example_corpus = train_corpuses[0]
 
