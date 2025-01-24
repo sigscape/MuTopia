@@ -3,6 +3,7 @@ import mutopia as mu
 from mutopia.corpus.interfaces import *
 import mutopia.corpus.disk_interface as disk
 import click
+from tabulate import tabulate
 from typing import *
 import numpy as np
 import os
@@ -292,7 +293,7 @@ def study():
     type=bool,
     default=False,
     is_flag=True,
-    help="Save the model under `<model_prefix>/<study_name>_<trial_number>.pkl`",
+    help="Save the model under `<output_dir>/<study_name>_<trial_number>.pkl`",
 )
 @click.option(
     "-outdir",
@@ -323,13 +324,6 @@ def study():
     type=click.FloatRange(0.0, 10.0),
     default=5e-5,
     help="Stabilizing parameter - increase if you're getting NaNs",
-)
-@click.option(
-    "-mreg",
-    "--mutation-reg",
-    type=click.FloatRange(0.0, 10.0),
-    default=0.0005,
-    help="Regularization for mutation model",
 )
 @click.option(
     "-pi",
@@ -508,3 +502,18 @@ def dashboard(
 ):
     mu.dashboard(study_name)
 
+
+@study.command("summary")
+@click.argument("study_name", type=str)
+def summary(
+    study_name: str,
+):
+    trials = mu.tuning.summary(study_name)
+    trials = trials.sort_values('value', ascending=False, na_position='last')  
+    print(
+        tabulate(
+            trials,
+            headers='keys',
+            tablefmt='pipe',
+        )
+    )

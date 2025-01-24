@@ -1,12 +1,10 @@
 import optuna
 import os
 from functools import partial
-import logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(' Mutopia-tuning ')
 from optuna.storages import JournalStorage
 from optuna.storages.journal import JournalFileBackend
 from .corpus.interfaces import lazy_load
+from .utils import logger
 
 def sample_params(study, trial, extensive=0):
 
@@ -75,6 +73,18 @@ def dashboard(study_name, storage=None):
 
     run_server(storage)
 
+
+def summary(study_name, storage=None):
+
+    if storage is None:
+        storage = _get_nfs_storage(study_name)
+
+    study = optuna.load_study(
+        study_name=study_name, 
+        storage=storage,
+    )
+
+    return study.trials_dataframe()
 
 def create_study(
     train_corpuses,
