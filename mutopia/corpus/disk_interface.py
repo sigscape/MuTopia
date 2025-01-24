@@ -274,16 +274,34 @@ def write_dataset(dataset, filename):
             )
 
 
-def _backend_load_sample(filename, sample_name, coo=False):
-    
+
+def _load_sparse_sample(filename, sample_name, coo=False):
     with xr.open_dataset(filename, group=sample_name, engine='netcdf4') as sample:
-        if 'format' in sample.attrs and sample.attrs['format'] == 'COO':
-            s = sample.load().coo_to_sparse()
-            if coo:
-                return s.ascoo()
-            return s
-        else:
-            return sample.to_dataarray().squeeze()
+        s = sample.load().coo_to_sparse()
+        if coo:
+            return s.ascoo()
+        return s
+
+
+def _load_dense_sample(filename, sample_name, **kwargs):
+    with xr.open_dataarray(
+        filename, 
+        group=sample_name,
+        engine='netcdf4'
+    ) as dset:
+        return dset.load()
+    
+
+def _backend_load_sample(filename, sample_name, coo=False):
+
+    with nc.Dataset(filename, 'r') as dset:
+        sample=dset[sample_name]
+        attrs=sample.ncattrs()
+        is_sparse = 'format' in attrs and getattr(sample, 'format') == 'COO'
+    
+    loader = _load_sparse_sample if is_sparse else _load_dense_sample
+
+    return loader(filename, sample_name, coo=coo)
 
 
 class NoSamplesError(ValueError):

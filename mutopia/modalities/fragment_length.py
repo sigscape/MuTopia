@@ -309,6 +309,7 @@ def FragmentLengthModel(
     seed=0,
     # context model
     context_reg=0.0001,
+    context_conditioning=1e-5,
     kmer_reg=0.005,
     conditioning_alpha=1e-9,
     context_encoder='diagonal',
@@ -342,7 +343,7 @@ def FragmentLengthModel(
     eval_every=1,
     verbose=0,
     max_iter=25,
-    init_variance=(0.1, 0.05),
+    init_variance=(0.1, 0.1),
 ):
     random_state = np.random.RandomState(seed)
 
@@ -391,6 +392,7 @@ def FragmentLengthModel(
         conditioning_alpha=conditioning_alpha,
         init_components=init_components,
         max_iter=max_iter,
+        context_conditioning=context_conditioning,
     )
 
     locals_model = LDAUpdateDense(

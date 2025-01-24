@@ -300,7 +300,7 @@ class ModelState:
             parallel_context,
             learning_rate=1.,
             update_prior=True,
-            use_parallel=True,
+            use_parallel=False,
         ):
 
         if update_prior:
@@ -370,7 +370,6 @@ class ModelState:
                     sample_name, 
                     gamma_new
                 )
-                print(sample_name)
                 
                 for model_name, model in self.models.items():
                     '''

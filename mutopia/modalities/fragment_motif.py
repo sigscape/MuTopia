@@ -457,6 +457,7 @@ def MotifModel(
     context_reg=0.0001,
     kmer_reg=0.005,
     conditioning_alpha=1e-9,
+    context_conditioning=1e-5,
     context_encoder='diagonal',
     # mutation model
     # locals model
@@ -537,6 +538,7 @@ def MotifModel(
         conditioning_alpha=conditioning_alpha,
         init_components=init_components,
         max_iter=max_iter,
+        context_conditioning=context_conditioning,
     )
 
     locals_model = LDAUpdateDense(

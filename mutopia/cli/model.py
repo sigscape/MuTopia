@@ -6,6 +6,7 @@ import click
 from typing import *
 import numpy as np
 import os
+from tqdm import tqdm
 
 @click.group("Model training")
 def model():
@@ -38,7 +39,11 @@ def train_test_split(
 
     loader = LazySampleLoader(CorpusInterface(dataset))
 
-    for sample_name in dataset.sample.values:
+    for sample_name in tqdm(
+        dataset.sample.values,
+        desc=f'Writing samples',
+        ncols=100,
+    ):
         sample = loader.fetch_sample(sample_name)
         disk.write_sample(
             outprefix + ".train.nc",
@@ -76,7 +81,7 @@ def train_test_split(
     type=click.IntRange(1, 1000),
     required=True,
 )
-@click.option("--seed", type=int, default=42, help="Random seed")
+@click.option("--seed", type=int, default=0, help="Random seed")
 @click.option(
     "-init",
     "--init-components",
@@ -175,8 +180,15 @@ def train_test_split(
     help="Number of epochs to train.",
 )
 @click.option(
-    "-sub",
+    "-lsub",
     "--locus-subsample",
+    type=click.FloatRange(0.0, 1.0),
+    default=None,
+    help="Subsample rate for locus model",
+)
+@click.option(
+    "-bsub",
+    "--batch-subsample",
     type=click.FloatRange(0.0, 1.0),
     default=None,
     help="Subsample rate for locus model",
@@ -204,15 +216,8 @@ def train_test_split(
     "-eval",
     "--eval-every",
     type=click.IntRange(1, 1000),
-    default=10,
+    default=1,
     help="Evaluate every N epochs",
-)
-@click.option(
-    "--sparse/--no-sparse",
-    type=bool,
-    default=True,
-    is_flag=True,
-    help="Use sparse matrices in the updates.",
 )
 @click.option('-v', '--verbose', count=True)
 def train(
@@ -238,7 +243,7 @@ def train(
     train_corpuses = tuple(map(lazy_load, train_corpuses))
     test_corpuses = tuple(map(lazy_load, test_corpuses))
 
-    model = mu.MutopiaModel(
+    model, *_ = mu.MutopiaModel(
         train_corpuses,
         test_corpuses,
         init_components=init_components if len(init_components) > 0 else None,
@@ -402,8 +407,15 @@ def study():
     help="Number of epochs to train.",
 )
 @click.option(
-    "-sub",
+    "-lsub",
     "--locus-subsample",
+    type=click.FloatRange(0.0, 1.0),
+    default=None,
+    help="Subsample rate for locus model",
+)
+@click.option(
+    "-bsub",
+    "--batch-subsample",
     type=click.FloatRange(0.0, 1.0),
     default=None,
     help="Subsample rate for locus model",
@@ -419,13 +431,6 @@ def study():
     type=click.IntRange(1, 1000),
     default=1,
     help='"Offset" parameter for stochastic variational inference',
-)
-@click.option(
-    "--sparse/--no-sparse",
-    type=bool,
-    default=True,
-    is_flag=True,
-    help="Use sparse matrices in the updates.",
 )
 @click.option(
     '-e',

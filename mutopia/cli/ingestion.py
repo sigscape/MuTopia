@@ -315,8 +315,12 @@ def info(dataset):
 
     click.echo(f'Num features: {n_features}')
     click.echo(f'Num samples: {n_samples}')
-    click.echo('Dataset attributes:')
 
+    click.echo('Dataset dims:')
+    for k,v in disk.read_dims(dataset).items():
+        click.echo(f'\t{k}: {v}')
+    
+    click.echo('Dataset attributes:')
     for k,v in attrs.items():
         click.echo(f'\t{k}: {v}')
     

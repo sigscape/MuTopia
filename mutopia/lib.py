@@ -1,14 +1,14 @@
-from .modalities import *
+from .modalities.sbs import SBSModel
 from .utils import borrow_kwargs
 from joblib import load as jl_load
 
-#@borrow_kwargs(SBSModel, MotifModel)
+@borrow_kwargs(SBSModel)
 def MutopiaModel(
     train_corpuses,
     test_corpuses,
     **kwargs,
 ):
-    return get_mode(train_corpuses[0])\
+    return train_corpuses[0].modality()\
         .make_model(
             train_corpuses=train_corpuses,
             test_corpuses=test_corpuses,

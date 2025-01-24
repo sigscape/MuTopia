@@ -2,7 +2,7 @@
 import numpy as np
 from itertools import chain
 import matplotlib.pyplot as plt
-
+from ..utils import borrow_kwargs
 
 def _plot_linear_signature(
     xlabels,
@@ -75,3 +75,10 @@ def _plot_linear_signature(
         )
         
     return ax
+
+@borrow_kwargs(_plot_linear_signature)
+def plot_signature(signature,**kw):
+    return signature.modality().plot(
+        signature,
+        **kw
+    )

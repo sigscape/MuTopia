@@ -163,13 +163,17 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
             .transpose('locus',...).data
 
         freqs = corpus.regions.context_frequencies
-        contexts = freqs\
-            .sum(dim=dims_except_for(freqs.dims, 'context', 'locus'))\
-            .transpose('context','locus').data
 
-        # CxL @ LxK => CxK => KxC
-        self._comp_context_distribution = (contexts @ np.exp(locus_effects)).T
-        self._comp_context_distribution /= self._comp_context_distribution.sum(axis=1, keepdims=True)
+        if 'context' in freqs.dims:
+            contexts = freqs\
+                .sum(dim=dims_except_for(freqs.dims, 'context', 'locus'))\
+                .transpose('context','locus').data
+
+            # CxL @ LxK => CxK => KxC
+            self._comp_context_distribution = (contexts @ np.exp(locus_effects)).T
+            self._comp_context_distribution /= self._comp_context_distribution.sum(axis=1, keepdims=True)
+        else:
+            self._comp_context_distribution = np.expand_dims(self.context_distribution_, axis=0)
 
     
     def prepare_to_save(self):
