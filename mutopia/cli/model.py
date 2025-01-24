@@ -509,7 +509,11 @@ def summary(
     study_name: str,
 ):
     trials = mu.tuning.summary(study_name)
-    trials = trials.sort_values('value', ascending=False, na_position='last')  
+    trials = trials.sort_values('value', ascending=False, na_position='last')
+    
+    sel_cols = ['number', 'value', 'state',] + [col for col in trials.columns if col.startswith('params_')]
+    trials = trials[sel_cols]
+
     print(
         tabulate(
             trials,
@@ -517,3 +521,4 @@ def summary(
             tablefmt='pipe',
         )
     )
+    
