@@ -509,11 +509,18 @@ def summary(
     study_name: str,
 ):
     trials = mu.tuning.summary(study_name)
-    trials = trials.sort_values('value', ascending=False, na_position='last')  
-    print(
-        tabulate(
-            trials,
-            headers='keys',
-            tablefmt='pipe',
-        )
-    )
+    trials = trials.sort_values('value', ascending=False, na_position='last')
+    sel_cols = ['number', 'value', 'state'] 
+    
+    if 'user_attrs_model_path' in trials.columns:
+        sel_cols+=['user_attrs_model_path']
+    sel_cols += [col for col in trials.columns if col.startswith('params_')]
+    
+    trials = trials[sel_cols]
+    trials.columns = [col.removeprefix('params_') for col in trials.columns]
+
+    print(tabulate(
+        trials,
+        headers='keys',
+        tablefmt="simple",
+    ))

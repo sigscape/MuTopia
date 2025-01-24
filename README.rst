@@ -1,3 +1,19 @@
+Installation
+===========
+
+Start by making a new conda environment:
+
+.. code-block:: bash
+
+    $ conda create --name my-mutopia -c conda-forge -y python=3.11
+    $ conda activate my-mutopia
+
+Next, install the package from github:
+
+.. code-block:: bash
+
+    $ pip install git+https://github.com/AllenWLynch/Mutopia.git
+
 
 Mutopia model training
 ==========================
@@ -107,4 +123,6 @@ To check how training is going, use:
 
     $ mutopia study summary tutorial.study.01
 
-which prints out a table of the trials, with the best performing trials at the top.
+which prints out a table of the trials, with the best performing trials at the top. You can use the column "user_attrs_model_path"
+to find the saved checkpoint for each trial. At this point, we can switch over to the python API!
+
