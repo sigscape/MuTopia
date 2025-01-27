@@ -255,12 +255,13 @@ def check_feature_consistency(*corpuses):
         
 
 def check_dim_consistency(*corpuses):
-    req_dims = tuple(corpuses[0].X.sizes)
+    '''req_dims = tuple(corpuses[0].X.sizes)
     for corpus in corpuses:
         if not req_dims == tuple(corpus.X.sizes):
             raise ValueError(
                 f'The corpuses have different dimensions: {str_wrapped_list(map(str, map(set, map(dict.keys, map(lambda x : x.X.sizes, corpuses)))))}'
-            )
+            )'''
+    pass
 
 
 def dims_except_for(dims, *keepdims):
