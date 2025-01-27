@@ -4,6 +4,8 @@ from .disk_interface import _backend_load_sample, load_dataset
 def lazy_load(corpus):
     return LazySampleLoader(CorpusInterface(load_dataset(corpus, with_samples=False)))
 
+def eager_load(corpus):
+    return CorpusInterface(load_dataset(corpus, with_samples=True))
 
 def _fetch_sample_from_disk(
     dataset,

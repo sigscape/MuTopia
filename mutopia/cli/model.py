@@ -507,7 +507,7 @@ def create_study(
     mu.create_study(
         list(map(os.path.abspath, train_corpuses)),
         list(map(os.path.abspath, test_corpuses)),
-        eval_every=1,
+        eval_every=5,
         min_components=min_components,
         max_components=max_components,
         study_name=study_name,

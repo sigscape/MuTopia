@@ -4,6 +4,7 @@ from glob import glob
 from functools import partial
 from optuna.storages import JournalStorage
 from optuna.storages.journal import JournalFileBackend
+from numpy import isfinite
 from .corpus.interfaces import lazy_load
 from .utils import logger
 
@@ -97,6 +98,7 @@ def summary(study_name, storage=None):
 
     return study.trials_dataframe()
 
+
 def create_study(
     train_corpuses,
     test_corpuses,
@@ -179,9 +181,11 @@ def _model_report_callback(
     train_scores, 
     test_scores
 ):
-    trial.report(test_scores[-1], len(train_scores))
-    if trial.should_prune():
-        raise optuna.TrialPruned()
+
+    if isfinite(test_scores[-1]):
+        trial.report(test_scores[-1], len(train_scores))
+        if trial.should_prune():
+            raise optuna.TrialPruned()
 
 
 def _get_save_model_fn(
@@ -261,11 +265,15 @@ def run_trial(
     
     example_corpus = train_corpuses[0]
 
+    if 'eval_every' in model_kw:
+        model_kw.pop('eval_every')
+
     model_fn = partial(
         example_corpus.modality().make_model,
         train_corpuses,
         test_corpuses,
         threads = threads,
+        eval_every=5,
         **model_kw,
     )
 
