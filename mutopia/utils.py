@@ -17,8 +17,8 @@ def safe_read(filename):
         else open(filename, 'r')
 
 logger = logging.getLogger(' Mutopia')
+logging.basicConfig(level = logging.INFO)
 logger.setLevel(logging.INFO)
-
 
 class FeatureType(Enum):
     LOG1P_CPM = 'log1p_cpm'

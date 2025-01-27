@@ -12,9 +12,8 @@ def get_eln_solver(
     random_state=None,
     tol=1e-4,
     max_iter=1000,
-    selection="random",
+    selection="cyclic", # use cyclic to make it deterministic
 ):
-    rng = check_random_state(random_state)
 
     X = check_array(
         X,
@@ -64,7 +63,7 @@ def get_eln_solver(
                 X_mean=X_sparse_scaling,
                 max_iter=max_iter,
                 tol=tol,
-                rng=rng,
+                rng=random_state,
                 random=random,
                 positive=False,
             )

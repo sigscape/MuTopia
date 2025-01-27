@@ -300,7 +300,7 @@ class ModelState:
             parallel_context,
             learning_rate=1.,
             update_prior=True,
-            use_parallel=False,
+            use_parallel=True,
         ):
 
         if update_prior:

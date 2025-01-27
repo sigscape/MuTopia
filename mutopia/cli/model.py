@@ -2,6 +2,7 @@
 import mutopia as mu
 from mutopia.corpus.interfaces import *
 import mutopia.corpus.disk_interface as disk
+from ..utils import logger
 import click
 from tabulate import tabulate
 from typing import *
@@ -95,21 +96,21 @@ def train_test_split(
     "-creg",
     "--context-reg",
     type=click.FloatRange(0.0, 10.0),
-    default=0.0001,
+    default=None,
     help="Regularization for context model",
 )
 @click.option(
     "-alpha",
     "--conditioning-alpha",
     type=click.FloatRange(0.0, 10.0),
-    default=1e-8,
+    default=None,
     help="Stabilizing parameter - increase if you're getting NaNs",
 )
 @click.option(
     "-pi",
     "--pi-prior",
     type=click.FloatRange(0.0, 1000.0),
-    default=1.0,
+    default=None,
     help="Prior for local model, if --empirical-bayes is passed, then this prior is updated using empirical bayes.",
 )
 @click.option(
@@ -123,14 +124,21 @@ def train_test_split(
     "-lr",
     "--tree-learning-rate",
     type=click.FloatRange(0.0, 100.0),
-    default=0.1,
+    default=None,
     help="Learning rate for tree models",
 )
 @click.option(
     "--max-features",
     type=click.FloatRange(0.0, 1.0),
-    default=0.5,
+    default=None,
     help="Maximum number of features to use per tree",
+)
+@click.option(
+    '--convolution-width',
+    '-cw',
+    type=click.IntRange(1, 5),
+    default=None,
+    help='Width of the convolutional kernel',
 )
 @click.option(
     "--use-groups/--no-use-groups",
@@ -150,7 +158,7 @@ def train_test_split(
     "-l2",
     "--l2-regularization",
     type=click.FloatRange(0.0, 1000.0),
-    default=1.0,
+    default=None,
     help="L2 regularization for locus model",
 )
 @click.option(
@@ -163,7 +171,7 @@ def train_test_split(
 @click.option(
     "--begin-prior-updates",
     type=click.IntRange(0, 100000),
-    default=10,
+    default=None,
     help="Number of epochs to wait before updating priors",
 )
 @click.option(
@@ -204,13 +212,13 @@ def train_test_split(
 @click.option(
     "--kappa",
     type=click.FloatRange(0.0, 1.0),
-    default=0.5,
+    default=None,
     help='"Forgetting" parameter for stochastic variational inference',
 )
 @click.option(
     "--tau",
     type=click.IntRange(1, 1000),
-    default=1,
+    default=None,
     help='"Offset" parameter for stochastic variational inference',
 )
 @click.option(
@@ -240,6 +248,14 @@ def train(
             "test-corpuses",
             "At least one testing corpus is required",
         )
+    
+    model_kw = {k: v for k, v in model_kw.items() if v is not None}
+    click.echo(f'Training model with parameters: ')
+    click.echo(tabulate(
+        model_kw.items(),
+        headers=['Parameter', 'Value'],
+        tablefmt='simple',
+    ))
     
     train_corpuses = tuple(map(lazy_load, train_corpuses))
     test_corpuses = tuple(map(lazy_load, test_corpuses))
@@ -315,14 +331,14 @@ def study():
     "-creg",
     "--context-reg",
     type=click.FloatRange(0.0, 10.0),
-    default=0.0001,
+    default=None,
     help="Regularization for context model",
 )
 @click.option(
     "-alpha",
     "--conditioning-alpha",
     type=click.FloatRange(0.0, 10.0),
-    default=5e-5,
+    default=None,
     help="Stabilizing parameter - increase if you're getting NaNs",
 )
 @click.option(
@@ -343,13 +359,20 @@ def study():
     "-lr",
     "--tree-learning-rate",
     type=click.FloatRange(0.0, 100.0),
-    default=0.1,
+    default=None,
     help="Learning rate for tree models",
+)
+@click.option(
+    '--convolution-width',
+    '-cw',
+    type=click.IntRange(1, 5),
+    default=None,
+    help='Width of the convolutional kernel',
 )
 @click.option(
     "--max-features",
     type=click.FloatRange(0.0, 1.0),
-    default=0.5,
+    default=None,
     help="Maximum number of features to use per tree",
 )
 @click.option(
@@ -370,7 +393,7 @@ def study():
     "-l2",
     "--l2-regularization",
     type=click.FloatRange(0.0, 1000.0),
-    default=1.0,
+    default=None,
     help="L2 regularization for locus model",
 )
 @click.option(
@@ -383,7 +406,7 @@ def study():
 @click.option(
     "--begin-prior-updates",
     type=click.IntRange(0, 100000),
-    default=10,
+    default=None,
     help="Number of epochs to wait before updating priors",
 )
 @click.option(
@@ -417,13 +440,13 @@ def study():
 @click.option(
     "--kappa",
     type=click.FloatRange(0.0, 1.0),
-    default=0.5,
+    default=None,
     help='"Forgetting" parameter for stochastic variational inference',
 )
 @click.option(
     "--tau",
     type=click.IntRange(1, 1000),
-    default=1,
+    default=None,
     help='"Offset" parameter for stochastic variational inference',
 )
 @click.option(
@@ -459,6 +482,14 @@ def create_study(
             "test-corpuses",
             "At least one testing corpus is required",
         )
+    
+    model_kw = {k: v for k, v in model_kw.items() if v is not None}
+    click.echo(f'Fixing parameters: ')
+    click.echo(tabulate(
+        model_kw.items(),
+        headers=['Parameter', 'Value'],
+        tablefmt='simple',
+    ))
 
     mu.create_study(
         list(map(os.path.abspath, train_corpuses)),
@@ -505,8 +536,16 @@ def dashboard(
 
 @study.command("summary")
 @click.argument("study_name", type=str)
+@click.option(
+    '--output',
+    '-o',
+    type=click.Path(writable=True),
+    default=None,
+    help='Output file to write summary to. If this is specified, the info is saved as a CSV instead of pretty-printed.'
+)
 def summary(
     study_name: str,
+    output=None,
 ):
     trials = mu.tuning.summary(study_name)
     trials = trials.sort_values('value', ascending=False, na_position='last')
@@ -519,8 +558,18 @@ def summary(
     trials = trials[sel_cols]
     trials.columns = [col.removeprefix('params_') for col in trials.columns]
 
-    print(tabulate(
-        trials,
-        headers='keys',
-        tablefmt="simple",
-    ))
+    if not output is None:
+        trials.to_csv(output, index=False)
+    else:
+        print(tabulate(
+            trials,
+            headers='keys',
+            tablefmt="simple",
+        ))
+
+
+@study.command("ls")
+def list_studies():
+    click.echo('Available studies:')
+    studies = mu.tuning.list_studies()
+    click.echo('\n'.join(studies))

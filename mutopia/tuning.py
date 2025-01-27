@@ -1,5 +1,6 @@
 import optuna
 import os
+from glob import glob
 from functools import partial
 from optuna.storages import JournalStorage
 from optuna.storages.journal import JournalFileBackend
@@ -11,7 +12,7 @@ def sample_params(study, trial, extensive=0):
     params = {
         'l2_regularization' : trial.suggest_float('l2_regularization', 1e-5, 1000., log=True),
         'tree_learning_rate' : trial.suggest_float('tree_learning_rate', 0.025, 0.2),
-        'init_variance' : (0.1, 0.1, trial.suggest_float('init_variance_theta', 0.01, 0.1)),
+        'init_variance_theta' : trial.suggest_float('init_variance_theta', 0.025, 0.1),
     }
 
     if extensive>0:
@@ -21,22 +22,18 @@ def sample_params(study, trial, extensive=0):
         })
 
     if extensive>1:
-        params['init_variance'] = (
-            trial.suggest_float('init_variance_mutation', 0.01, 0.1),
-            trial.suggest_float('init_variance_context', 0.01, 0.1),
-            params['init_variance'][2],
-        )
-
         params.update({
             'context_conditioning' : trial.suggest_float('context_conditioning', 1e-9, 1e-2, log=True),
-            'context_encoder' : trial.suggest_categorical('context_encoder', ['diagonal', 'kmer']),
-            'kmer_reg' : trial.suggest_float('kmer_reg', 1e-4, 5e-2, log=True),
+            'init_variance_context' : trial.suggest_float('init_variance_context', 0.025, 0.15),
         })
+
+        #'context_encoder' : trial.suggest_categorical('context_encoder', ['diagonal', 'kmer']),
+        #'kmer_reg' : trial.suggest_float('kmer_reg', 1e-4, 5e-2, log=True),
 
     if extensive>2:
         params.update({
-            'batch_subsample' : trial.suggest_categorical('batch_subsample', [None, 0.0625, 0.125, 0.25, 0.5]),
-            'locus_subsample' : trial.suggest_categorical('locus_subsample', [None, 0.0625, 0.125, 0.25, 0.5]),
+            'batch_subsample' : trial.suggest_categorical('batch_subsample', [None, 0.0625, 0.125, 0.25,]),
+            'locus_subsample' : trial.suggest_categorical('locus_subsample', [None, 0.0625, 0.125, 0.25,]),
         })
 
     if extensive>3:
@@ -47,16 +44,30 @@ def sample_params(study, trial, extensive=0):
     return params
 
 
-
 def _get_nfs_storage(study_name):
     
     journal = os.path.join(
-                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                    f'.journal.{study_name}.db'
-                )
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        f'.journal.{study_name}.db'
+    )
 
     storage = JournalStorage(JournalFileBackend(journal))
     return storage
+
+
+def list_studies():
+    
+    glob_script = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        '.journal.{study_name}.db'
+    )
+
+    journal_files=glob(glob_script.format(study_name='*'))
+    
+    return [
+        os.path.basename(journal).removeprefix('.journal.').removesuffix('.db') 
+        for journal in journal_files
+    ]
 
 
 def dashboard(study_name, storage=None):

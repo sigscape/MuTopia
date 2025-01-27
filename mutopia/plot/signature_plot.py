@@ -27,13 +27,13 @@ def _plot_linear_signature(
     sig_dim = len(next(iter(signatures.values())))
 
     if ax is None:
-        _, ax = plt.subplots(1,1,figsize=(width*n_sigs, height*n_sigs))
+        _, ax = plt.subplots(1,1,figsize=(width*n_sigs, height))
 
     for i, (label, s) in enumerate(signatures.items()):
         ax.bar(
             height = np.array(s)/extent, 
             x = range(i, n_sigs*len(xlabels), n_sigs),
-            color = plt.get_cmap(palette)(i) if isinstance(palette, str) else palette[i],
+            color = plt.get_cmap(palette)(i) if isinstance(palette, str) else palette,
             **plot_kw,
             label=label,
         )
@@ -66,9 +66,9 @@ def _plot_linear_signature(
 
     if len(signatures) > 1:
         ax.legend(
-            title=legend_title,
+            title=legend_title.replace('_', ' ').title() if legend_title else None,
             fontsize=8, 
-            ncol=n_sigs,
+            ncol=1,
             frameon=False,
             loc="center left",
             bbox_to_anchor=(1, 0, 0.5, 1),

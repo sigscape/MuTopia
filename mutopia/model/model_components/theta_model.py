@@ -93,9 +93,9 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         Laplace projection of the feature matrix.
         '''
         self.init_projection_ = random_state.normal(
-                0., init_variance,
-                (self.n_components, self.n_features_ - self.n_categorical_features_),
-            ).astype(self.dtype)
+            0., init_variance,
+            (self.n_components, self.n_features_ - self.n_categorical_features_),
+        ).astype(self.dtype)
 
 
     @property
@@ -219,7 +219,7 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
     
 
     @staticmethod
-    def predict_sparse(corpus, locus, **idx_dict):
+    def predict_sparse(corpus,*, locus, **idx_dict):
         return CS.fetch_val(corpus, 'log_locus_distribution').data\
                             [:, locus]
     
@@ -396,7 +396,7 @@ class GBTThetaModel(ThetaModel):
                     interaction_cst = interaction_groups if use_groups else None,
                     verbose=False,
                     learning_rate=tree_learning_rate,
-                    random_state=random_state, 
+                    random_state=1776, 
                     **tree_kw
                 )
         

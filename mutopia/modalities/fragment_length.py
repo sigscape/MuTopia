@@ -310,40 +310,40 @@ def FragmentLengthModel(
     # context model
     context_reg=0.0001,
     context_conditioning=1e-5,
-    kmer_reg=0.005,
     conditioning_alpha=1e-9,
+    kmer_reg=0.005,
     context_encoder='diagonal',
-    # mutation model
     # locals model
     pi_prior=1.,
     # locus model
     locus_model_type='gbt',
-    tree_learning_rate=0.1, 
-    max_depth = 5,
-    max_trees_per_iter = 25,
-    max_leaf_nodes = 31,
-    min_samples_leaf = 30,
-    max_features = 0.5,
+    tree_learning_rate=0.15, 
+    max_depth=5,
+    max_trees_per_iter=25,
+    max_leaf_nodes=31,
+    min_samples_leaf=30,
+    max_features=0.5,
     n_iter_no_change=1,
     use_groups=True,
     add_corpus_intercepts=False,
-    convolution_width=1,
+    convolution_width=2,
     l2_regularization=1,
     # optimization settings
-    empirical_bayes = True,
-    begin_prior_updates = 20,
+    empirical_bayes=True,
+    begin_prior_updates=15,
     stop_condition=50,
     num_epochs = 2000,
     locus_subsample=None,
     batch_subsample=None,
-    threads = 1,
-    kappa = 0.5,
-    tau = 0,
+    threads=1,
+    kappa=0.5,
+    tau=1,
     callback=None,
     eval_every=1,
     verbose=0,
     max_iter=25,
-    init_variance=(0.1, 0.1),
+    init_variance_theta=0.05,
+    init_variance_context=0.1,
 ):
     random_state = np.random.RandomState(seed)
 
@@ -353,7 +353,7 @@ def FragmentLengthModel(
         else LinearThetaModel)\
         (
             train_corpuses,
-            init_variance=init_variance[1],
+            init_variance=init_variance_theta,
             n_components=num_components,
             tree_learning_rate=tree_learning_rate,
             max_depth=max_depth,
@@ -368,27 +368,15 @@ def FragmentLengthModel(
             convolution_width=convolution_width,
             l2_regularization=l2_regularization,
         )
-    
-    if context_encoder == 'diagonal':
-        kmer_encoder = DiagonalEncoder()
-    elif context_encoder == 'kmer':
-        kmer_encoder = KmerEncoder(
-            ['ATCG','ATCG','ATCG', 'ATCG'],
-            kmer_extractor=tuple,
-            feature_name_fn=_make_feature_name,
-        )
-    else:
-        raise ValueError(f'Unknown context encoder: {context_encoder}')
 
     context_model = UnstrandedContextModel(
         train_corpuses,
-        kmer_encoder,
+        DiagonalEncoder(),
         n_components=num_components,
         random_state=random_state,
-        init_variance=init_variance[0],
+        init_variance=init_variance_context,
         tol=5e-4,
         reg=context_reg,
-        kmer_reg=kmer_reg,
         conditioning_alpha=conditioning_alpha,
         init_components=init_components,
         max_iter=max_iter,
@@ -414,7 +402,7 @@ def FragmentLengthModel(
             train_corpuses,
             test_corpuses,
             model_state,
-            random_state,
+            np.random.RandomState(seed),
             empirical_bayes=empirical_bayes,
             begin_prior_updates=begin_prior_updates,
             stop_condition=stop_condition,

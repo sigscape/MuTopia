@@ -1,6 +1,7 @@
 from .corpus_state import CorpusState as CS
 import numpy as np
 import xarray as xr
+import matplotlib.pyplot as plt
 from ..utils import ParContext, using_exposures_from, \
     check_corpus, check_dims
 from .model_components import *
@@ -10,6 +11,7 @@ from ..plot.coef_matrix_plot import _plot_interaction_matrix
 from ..corpus import *
 from functools import partial  
 from joblib import dump
+from collections import defaultdict
 import typing
 
 import logging
@@ -95,11 +97,69 @@ class Model:
             *select,
             **kwargs
         )
+    
+
+    def signature_report(
+        self, 
+        component, 
+        normalization='global',
+        width=5.25,
+        height=2.,
+        show=True,
+    ):
+
+        signatures = self.model_state_.format_signature(component, normalization=normalization)
+        state_groups = defaultdict(list)
+        for state in signatures.mesoscale_state.values:
+            state_groups[state.split(':')[0]].append(state)
+
+        max_n_states = max(map(len, state_groups.values()))
+        n_sigs = len(state_groups)
+        fig = plt.figure(figsize=(
+            max(width*max_n_states, 10),
+            height*n_sigs + 3
+        ))
+
+        gs = fig.add_gridspec(
+            2, 1,
+            height_ratios=[height*n_sigs, 3],
+            hspace=0.1,
+        )
+
+        gs0 = gs[0].subgridspec(
+            n_sigs + 1, max_n_states, 
+            hspace=0.75, 
+            wspace=0.5,
+            width_ratios=[3] + [1]*(max_n_states-1),
+        )
+
+        for i, states in enumerate(state_groups.values()):
+            ax = fig.add_subplot(gs0[i, :len(states)])
+            self.plot_signature(
+                component,
+                *states,
+                ax=ax,
+            )
+
+        self.plot_interaction_matrix(
+            component,
+            gridspec=gs[1],
+        )
+
+        fig.suptitle(
+            f'Signature {component} report', 
+            fontsize=12,
+            y=0.95
+        )
+
+        if show:
+            plt.show()
 
 
     def plot_interaction_matrix(self, 
             component,
-            palette='vlag',
+            palette='coolwarm',
+            gridspec=None,
             **kw,
         ):
 
@@ -121,6 +181,7 @@ class Model:
             baseline,
             shared_effects, #.iloc[:,0],
             palette=palette,
+            gridspec=gridspec,
             **kw
         )
     

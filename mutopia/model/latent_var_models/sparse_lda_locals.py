@@ -139,7 +139,7 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
             logp_X - logp_X.max()
 
         return np.ascontiguousarray(
-            np.nan_to_num(np.exp(logp_X), nan=0)\
+            np.nan_to_num(np.exp(logp_X), nan=0.)\
                 .astype(self.dtype, copy=False)
         )
     

@@ -8,19 +8,24 @@ def _plot_interaction_matrix(
         baseline_matrix : pd.Series,
         shared_effects : pd.Series,
         palette='vlag',
+        gridspec=None,
     ):
 
-    fig = plt.figure(figsize=(10, 3))
-    gs = gridspec.GridSpec(
-                2,3,
-                width_ratios=[0.22,7, 0.1], 
-                height_ratios=[1,1.8],
-                wspace=0.05,
-                hspace=0.1,
-            )
+    gs_kw = dict(
+        width_ratios=[0.22,7, 0.1], 
+        height_ratios=[1,1.8],
+        wspace=0.05,
+        hspace=0.1,
+    )
+
+    if gridspec is None:
+        fig = plt.figure(figsize=(10, 3))
+        gs = gridspec.GridSpec(2,3, **gs_kw)
+    else:
+        fig = plt.gcf()
+        gs = gridspec.subgridspec(2,3, **gs_kw)
 
     base_ax = fig.add_subplot(gs[0,1])
-
     baseline = baseline_matrix
     baseline_x = np.arange(len(baseline))
 

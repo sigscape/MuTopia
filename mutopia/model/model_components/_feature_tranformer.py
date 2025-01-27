@@ -80,7 +80,7 @@ def get_shared_features(*corpus_states):
 
     return list(zip(*sorted(
         shared_features, 
-        key = lambda x : not FeatureType(x[1]) == FeatureType.CATEGORICAL
+        key = lambda x : (not FeatureType(x[1]) == FeatureType.CATEGORICAL, x[0]) # sort by type then name
     )))
 
 
@@ -278,7 +278,7 @@ def get_normalizing_transformer(
             ('log1p_cpm', log1p_cpm(), type_dict[FeatureType.LOG1P_CPM]),
             ('power', log1p_cpm(), type_dict[FeatureType.POWER]),
             ('minmax', MinMaxScaler(), type_dict[FeatureType.MINMAX]),
-            ('quantile', QuantileTransformer(output_distribution='uniform'), type_dict[FeatureType.QUANTILE]),
+            ('quantile', QuantileTransformer(output_distribution='uniform', random_state=42), type_dict[FeatureType.QUANTILE]),
             ('standardize', StandardScaler(), type_dict[FeatureType.STANDARDIZE]),
             ('robust', RobustScaler(), type_dict[FeatureType.ROBUST]),
         ],

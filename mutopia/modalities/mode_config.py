@@ -92,12 +92,8 @@ class ModeConfig(ABC):
             required_dims=('context',),
         )
         
-        signature = signature.transpose(...,'context')\
-            .stack(observation=('context',))\
-            .assign_coords(
-                observation=signature.coords['context'].values
-            )
-        
+        signature = signature.transpose(...,'context')
+
         return signature
     
 
@@ -168,6 +164,9 @@ class ModeConfig(ABC):
         sig_names = None,
         normalize = False,
         title=None,
+        width=5.25,
+        height=1.25,
+        ax=None,
         **kwargs,
     ):
         
@@ -190,10 +189,13 @@ class ModeConfig(ABC):
             pl_signatures = [s/s.sum() for s in pl_signatures]
         
         ax = _plot_linear_signature(
-            signature.coords['observation'].values,
+            signature.coords['context'].values,
             palette if len(pl_signatures) > 1 else cls.PALETTE,
             plot_kw=kwargs,
             legend_title = legend_title,
+            height = height,
+            width = width,
+            ax = ax,
             **dict(zip(sig_names, pl_signatures)),
         )
 
@@ -217,5 +219,3 @@ class ModeConfig(ABC):
         
         if not observations.dims == ('configuration', 'context', 'mutation', 'locus'):
             raise ValueError("Expected dimensions ('configuration', 'context', 'mutation', 'locus')")
-
-    

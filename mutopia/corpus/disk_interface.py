@@ -310,11 +310,11 @@ class NoSamplesError(ValueError):
 def _list_sample_names(filename):
     with nc.Dataset(filename, 'r') as dset:
         if 'raw' in dset.groups and 'X' in dset.groups['raw'].groups:
-            return list(
+            return list(sorted(
                 sname 
                 for sname, sample in dset.groups['raw']['X'].groups.items() 
                 if not 'active' in sample.__dict__ or sample.__dict__['active']
-            )
+            ))
         else:
             raise NoSamplesError('This dataset has no samples yet, it will not be compatible with many functions.')
 

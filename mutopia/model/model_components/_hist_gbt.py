@@ -179,8 +179,13 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
         # When warm starting, we want to reuse the same seed that was used
         # the first time fit was called (e.g. for subsampling or for the
         # train/val split).
-        if not (self.warm_start and self._is_fitted()):
+        # When warm starting, we want to reuse the same seed that was used
+        # the first time fit was called (e.g. train/val split).
+        # For feature subsampling, we want to continue with the rng we started with.
+        if not self.warm_start or not self._is_fitted():
             self._random_seed = rng.randint(np.iinfo(np.uint32).max, dtype="u8")
+            feature_subsample_seed = rng.randint(np.iinfo(np.uint32).max, dtype="u8")
+            self._feature_subsample_rng = np.random.default_rng(feature_subsample_seed)
 
         #self._validate_parameters()
         monotonic_cst = _check_monotonic_cst(self, self.monotonic_cst)
@@ -439,6 +444,7 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
                     l2_regularization=self.l2_regularization,
                     shrinkage=self.learning_rate,
                     feature_fraction_per_split=self.max_features,
+                    rng=self._feature_subsample_rng,
                     n_threads=n_threads,
                 )
 

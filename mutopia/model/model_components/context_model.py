@@ -105,6 +105,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
             )
         else:
             
+            raise ValueError('Only diagonal context encoders are supported')
             if not init_components is None:
                 raise ValueError('Cannot initialize from signatures with non-diagonal context encoders')
             

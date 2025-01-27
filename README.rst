@@ -124,5 +124,31 @@ To check how training is going, use:
     $ mutopia study summary tutorial.study.01
 
 which prints out a table of the trials, with the best performing trials at the top. You can use the column "user_attrs_model_path"
-to find the saved checkpoint for each trial. At this point, we can switch over to the python API!
+to find the saved checkpoint for each trial. As a final aside, you can run `mutopia study ls` to list all of your ongoing studies 
+in case you've forgotten the name!
 
+Let's assume that tuning is completed, and through `mutopia study summary` you found a model that showed good performance. To 
+inspect the extracted signatures, we have to switch over to the python API.
+
+
+Mutopia model analysis
+==========================
+
+First, let's load the model and the data:
+
+.. code-block:: python
+
+    import mutopia as mu
+
+    model = mu.load_model("path/to/model.pth")
+    data = mu.load_data("gtensor.test.nc") # the training data may be quite large, it's often easier to work with the test data
+
+Next, let's plot some signatures. There are commands which allow for more granular control, but it's easier to print a "report" 
+with everything at once:
+
+.. code-block:: python
+
+    k=0
+    model.signature_report(k)
+
+The signatures are indexed by their component numbers for now.
