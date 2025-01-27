@@ -109,9 +109,15 @@ class Model:
     ):
 
         signatures = self.model_state_.format_signature(component, normalization=normalization)
+        n_rows = len(signatures.mesoscale_state)
+
         state_groups = defaultdict(list)
         for state in signatures.mesoscale_state.values:
             state_groups[state.split(':')[0]].append(state)
+
+        for k, v in state_groups.items():
+            if not k=='Baseline' and len(v)==1:
+                state_groups[k].append('Baseline')
 
         max_n_states = max(map(len, state_groups.values()))
         n_sigs = len(state_groups)
@@ -122,7 +128,7 @@ class Model:
 
         gs = fig.add_gridspec(
             2, 1,
-            height_ratios=[height*n_sigs, 3],
+            height_ratios=[height*n_sigs, 1+0.35*n_rows],
             hspace=0.1,
         )
 

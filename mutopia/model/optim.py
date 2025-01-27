@@ -99,7 +99,7 @@ def SVI_step(
     '''
     Get the offsets from the sliced data.
     '''
-    offsets = model_state.get_exp_offsets_dict(
+    offsets = timer_wrapper(model_state.get_exp_offsets_dict)(
         **args,
         norm_update_fn=partial(
             model_state._update_normalizer, 
@@ -119,7 +119,7 @@ def SVI_step(
     '''
     Okay, now we can calculate the sufficient statistics.
     '''
-    sstats, elbo = model_state.Estep(
+    sstats, elbo = timer_wrapper(model_state.Estep)(
         **args, 
         learning_rate=learning_rate,
         locus_subsample=locus_subsample or 1.,
@@ -130,7 +130,7 @@ def SVI_step(
     Calculate the bounds here because the normalizers and 
     locals have been updated for some set of model parameters.
     '''
-    test_score = test_score_fn(
+    test_score = timer_wrapper(test_score_fn, 'test_score')(
         model_state, 
         parallel_context=parallel_context
     )
@@ -138,7 +138,7 @@ def SVI_step(
     '''
     Update global model parameters
     '''
-    model_state.Mstep(
+    timer_wrapper(model_state.Mstep)(
         offsets=offsets,
         sstats=sstats,
         update_prior=update_prior,
@@ -154,7 +154,7 @@ def SVI_step(
     the normalizers on the subset data during the offset calculation.
     '''
     for corpus in corpuses:
-        CS.update_corpusstate(
+        timer_wrapper(CS.update_corpusstate)(
             corpus, 
             model_state, 
             from_scratch=False,
@@ -309,7 +309,7 @@ def fit_model(
                                 or epoch == num_epochs
                                 )
 
-                train_score, test_score = step_fn(
+                train_score, test_score = timer_wrapper(step_fn, 'train_step')(
                     parallel_context=par,
                     update_prior = \
                         epoch >= begin_prior_updates \

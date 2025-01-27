@@ -7,20 +7,23 @@ def _plot_interaction_matrix(
         interaction_matrix : pd.DataFrame,
         baseline_matrix : pd.Series,
         shared_effects : pd.Series,
-        palette='vlag',
+        palette='coolwarm',
         gridspec=None,
     ):
 
+    n_rows, _ = interaction_matrix.shape
+    plot_height = 1 + 0.35 * n_rows
+
     gs_kw = dict(
         width_ratios=[0.22,7, 0.1], 
-        height_ratios=[1,1.8],
+        height_ratios=[1, plot_height-1],
         wspace=0.05,
         hspace=0.1,
     )
 
     if gridspec is None:
-        fig = plt.figure(figsize=(10, 3))
-        gs = gridspec.GridSpec(2,3, **gs_kw)
+        fig = plt.figure(figsize=(10, plot_height))
+        gs = plt.GridSpec(2,3, **gs_kw)
     else:
         fig = plt.gcf()
         gs = gridspec.subgridspec(2,3, **gs_kw)
@@ -43,7 +46,7 @@ def _plot_interaction_matrix(
         xlim = (-0.5, len(baseline)-0.5),
         xticks=[],
     )
-    base_ax.set_ylabel('Base\nmutation rate', rotation=0, labelpad=0.1, fontsize=9, ha='right', va='center')
+    base_ax.set_ylabel('Base\nmutation rate', rotation=0, labelpad=0.1, fontsize=8, ha='right', va='center')
 
 
     interaction_ax = fig.add_subplot(gs[1,1])
@@ -68,7 +71,7 @@ def _plot_interaction_matrix(
     interaction_ax.set_xticks(baseline_x - 0.5)
     interaction_ax.set_xticklabels(baseline.index, rotation=90, fontsize=5)
     interaction_ax.set(yticks=[])
-    interaction_ax.set_xlabel('Nucleotide context', fontsize=9)
+    interaction_ax.set_xlabel('Nucleotide context', fontsize=8)
     for spine in interaction_ax.spines.values():
         spine.set_visible(False)
 
@@ -89,16 +92,16 @@ def _plot_interaction_matrix(
     for spine in common_ax.spines.values():
         spine.set_visible(False)
     common_ax.set_yticks(np.arange(interaction_matrix.shape[0]))
-    common_ax.set_yticklabels(interaction_matrix.index, fontsize=9)
+    common_ax.set_yticklabels(interaction_matrix.index, fontsize=8)
     common_ax.set(xticks=[0.5])
-    common_ax.set_ylabel('Features', fontsize=9)
-    common_ax.set_xticklabels(['Shared\neffect'], rotation=90, fontsize=9)
+    common_ax.set_ylabel('Features', fontsize=8)
+    common_ax.set_xticklabels(['Shared\neffect'], rotation=90, fontsize=8)
 
     cbar_ax = fig.add_subplot(gs[1, 2])
     cbar = fig.colorbar(interaction_ax.collections[0], 
                         cax=cbar_ax, orientation='vertical',
                         )
-    cbar.set_label('Interaction effect', rotation=90, labelpad=5, fontsize=9)
-    cbar.ax.set_yticklabels(cbar.ax.get_yticklabels(), fontsize=9)
+    cbar.set_label('Interaction effect', rotation=90, labelpad=5, fontsize=8)
+    cbar.ax.set_yticklabels(cbar.ax.get_yticklabels(), fontsize=8)
 
     return gs

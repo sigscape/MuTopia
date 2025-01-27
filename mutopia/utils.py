@@ -2,7 +2,6 @@ import sparse
 import numpy as np
 from joblib import Parallel
 from contextlib import contextmanager
-from abc import ABC, abstractmethod
 from enum import Enum
 import inspect
 from functools import wraps
@@ -10,15 +9,30 @@ from collections import defaultdict
 import logging
 import subprocess
 from gzip import open as gzopen
+import time
 
 @contextmanager
 def safe_read(filename):
     yield gzopen(filename, 'rt') if filename.endswith('.gz') \
         else open(filename, 'r')
 
+
 logger = logging.getLogger(' Mutopia')
 logging.basicConfig(level = logging.INFO)
 logger.setLevel(logging.INFO)
+
+
+def timer_wrapper(func, name=None):
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        logger.debug(f'{name or func.__name__} took {time.time() - start:.2f} seconds.')
+        return result
+
+    return wrapper
+
 
 class FeatureType(Enum):
     LOG1P_CPM = 'log1p_cpm'
@@ -255,12 +269,7 @@ def check_feature_consistency(*corpuses):
         
 
 def check_dim_consistency(*corpuses):
-    req_dims = tuple(corpuses[0].X.sizes)
-    for corpus in corpuses:
-        if not req_dims == tuple(corpus.X.sizes):
-            raise ValueError(
-                f'The corpuses have different dimensions: {str_wrapped_list(map(str, map(set, map(dict.keys, map(lambda x : x.X.sizes, corpuses)))))}'
-            )
+    pass
 
 
 def dims_except_for(dims, *keepdims):

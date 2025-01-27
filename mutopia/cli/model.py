@@ -228,13 +228,20 @@ def train_test_split(
     default=1,
     help="Evaluate every N epochs",
 )
-@click.option('-v', '--verbose', count=True)
+@click.option(
+    "--time-profile/--no-time-profile",
+    type=bool,
+    default=False,
+    is_flag=True,
+    help="Profile the training time",
+)
 def train(
     output,
     *,
     train_corpuses: List[str],
     test_corpuses: List[str],
     init_components : Union[None, List[str]],
+    time_profile: bool = False,
     **model_kw,
 ):  
     if not len(train_corpuses) > 0:
@@ -260,6 +267,11 @@ def train(
     train_corpuses = tuple(map(lazy_load, train_corpuses))
     test_corpuses = tuple(map(lazy_load, test_corpuses))
 
+    if time_profile:
+        model_kw['eval_every'] = 1
+        model_kw['num_epochs'] = 1
+        logger.setLevel('DEBUG')
+
     model, *_ = mu.MutopiaModel(
         train_corpuses,
         test_corpuses,
@@ -267,7 +279,8 @@ def train(
         **model_kw,
     )
 
-    model.save(output)
+    if not time_profile:
+        model.save(output)
 
 
 @model.group("study")
