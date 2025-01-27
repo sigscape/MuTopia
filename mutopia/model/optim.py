@@ -220,8 +220,9 @@ def fit_model(
     callback=None,
     eval_every=10,
     verbose=0,
+    time_limit=None,
 ):
-
+    start_time = time.time()
     ##
     # If the data is sparse, we should make sure it's in the right format.
     # GCSX with locus and sample dimensions compressed.
@@ -241,7 +242,6 @@ def fit_model(
     logger.info('Preprocessing testing corpuses...')
     for test_corpus in test_corpuses:
         CS.init_corpusstate(test_corpus, model_state)
-
 
     test_score_fn = partial(
         deviance_locus,
@@ -274,7 +274,7 @@ def fit_model(
             batch_subsample=batch_subsample,
         )
 
-        logger.info(f'Using stochastic VI.')
+        logger.info(f'Using SVI.')
         subsampler = partial(slice_generator, random_state, **subsample_rates)
 
         step_fn = partial(
@@ -288,6 +288,9 @@ def fit_model(
     logger.info(f'Training model with {threads} threads.')
     logger.info('The first few epochs take longer as things get warmed up -\n\texpect the time per epoch to decrease about 4-fold.')
     logger.info(f'Model will stop training if no improvement in the last {stop_condition} epochs.')
+    if not time_limit is None:
+        logger.info(f'Training will stop after {time_limit} minutes.')
+
     train_scores = []
     test_scores = []
 
@@ -303,11 +306,11 @@ def fit_model(
             for epoch in progress_bar:
 
                 evaluate_test = not eval_every is None and \
-                                (
-                                (epoch % eval_every == 0) \
-                                or epoch == 1 \
-                                or epoch == num_epochs
-                                )
+                    (
+                        (epoch % eval_every == 0) \
+                        or epoch == 1 \
+                        or epoch == num_epochs
+                    )
 
                 train_score, test_score = timer_wrapper(step_fn, 'train_step')(
                     parallel_context=par,
@@ -353,6 +356,10 @@ def fit_model(
 
                 if stop_fn(test_scores):
                     logger.info('Early stopping criterion met. The model has converged.')
+                    break
+
+                if not time_limit is None and (time.time() - start_time)/60 > time_limit:
+                    logger.info('Time limit reached. Stopping training.')
                     break
         
         except (KeyboardInterrupt, SystemError, SystemExit):

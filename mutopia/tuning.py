@@ -5,7 +5,7 @@ from functools import partial
 from optuna.storages import JournalStorage
 from optuna.storages.journal import JournalFileBackend
 from numpy import isfinite
-from .corpus.interfaces import lazy_load
+from .corpus.interfaces import lazy_load, eager_load
 from .utils import logger
 
 def sample_params(study, trial, extensive=0):
@@ -253,15 +253,16 @@ def _sample_params(study, extra_param_fn, trial):
 
 def run_trial(
     storage = None,
-    threads = 1,
+    lazy = False,
     *,
     study_name,
+    **kwargs,
 ):
 
     study, study_attrs, model_kw = load_study(study_name, storage)
-
-    train_corpuses = tuple(map(lazy_load, study_attrs['train_corpuses']))
-    test_corpuses = tuple(map(lazy_load, study_attrs['test_corpuses']))
+    model_kw.update(kwargs)
+    train_corpuses = tuple(map(lazy_load if lazy else eager_load, study_attrs['train_corpuses']))
+    test_corpuses = tuple(map(eager_load, study_attrs['test_corpuses']))
     
     example_corpus = train_corpuses[0]
 
@@ -272,7 +273,6 @@ def run_trial(
         example_corpus.modality().make_model,
         train_corpuses,
         test_corpuses,
-        threads = threads,
         eval_every=5,
         **model_kw,
     )

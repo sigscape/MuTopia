@@ -225,7 +225,7 @@ def train_test_split(
     "-eval",
     "--eval-every",
     type=click.IntRange(1, 1000),
-    default=1,
+    default=5,
     help="Evaluate every N epochs",
 )
 @click.option(
@@ -235,6 +235,20 @@ def train_test_split(
     is_flag=True,
     help="Profile the training time",
 )
+@click.option(
+    "--lazy/--eager",
+    type=bool,
+    default=False,
+    is_flag=True,
+    help="Lazy load the underlying data to reduce memory requirements.\n",
+)
+@click.option(
+    "--time-limit",
+    '-t',
+    type=int,
+    default=None,
+    help="Time limit for training, in seconds",
+)
 def train(
     output,
     *,
@@ -242,6 +256,7 @@ def train(
     test_corpuses: List[str],
     init_components : Union[None, List[str]],
     time_profile: bool = False,
+    lazy: bool = False,
     **model_kw,
 ):  
     if not len(train_corpuses) > 0:
@@ -264,9 +279,9 @@ def train(
         tablefmt='simple',
     ))
     
-    train_corpuses = tuple(map(lazy_load, train_corpuses))
-    test_corpuses = tuple(map(lazy_load, test_corpuses))
-
+    train_corpuses = tuple(map(lazy_load if lazy else eager_load, train_corpuses))
+    test_corpuses = tuple(map(eager_load, test_corpuses))
+    
     if time_profile:
         model_kw['eval_every'] = 1
         model_kw['num_epochs'] = 1
@@ -529,13 +544,31 @@ def create_study(
     default=1,
     help="Number of threads to use",
 )
+@click.option(
+    "--lazy/--eager",
+    type=bool,
+    default=False,
+    is_flag=True,
+    help="Lazy load the underlying data to reduce memory requirements.\n",
+)
+@click.option(
+    "--time-limit",
+    '-t',
+    type=int,
+    default=None,
+    help="Time limit for training, in minutes",
+)
 def run_trial(
     study_name: str,
     threads : int = 1,
+    time_limit: Union[None, int] = None,
+    lazy: bool = False,
 ):
     mu.run_trial(
         study_name=study_name,
         threads=threads,
+        lazy=lazy,
+        time_limit=time_limit,
     )
 
 

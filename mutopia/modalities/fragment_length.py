@@ -310,8 +310,8 @@ def FragmentLengthModel(
     # context model
     context_reg=0.0001,
     context_conditioning=1e-5,
-    conditioning_alpha=1e-9,
     kmer_reg=0.005,
+    conditioning_alpha=1e-9,
     context_encoder='diagonal',
     # locals model
     pi_prior=1.,
@@ -328,22 +328,11 @@ def FragmentLengthModel(
     add_corpus_intercepts=False,
     convolution_width=2,
     l2_regularization=1,
-    # optimization settings
-    empirical_bayes=True,
-    begin_prior_updates=15,
-    stop_condition=50,
-    num_epochs = 2000,
-    locus_subsample=None,
-    batch_subsample=None,
-    threads=1,
-    kappa=0.5,
-    tau=1,
-    callback=None,
-    eval_every=1,
-    verbose=0,
     max_iter=25,
     init_variance_theta=0.05,
     init_variance_context=0.1,
+    # optimization settings
+    **optimization_settings,
 ):
     random_state = np.random.RandomState(seed)
 
@@ -403,18 +392,7 @@ def FragmentLengthModel(
             test_corpuses,
             model_state,
             np.random.RandomState(seed),
-            empirical_bayes=empirical_bayes,
-            begin_prior_updates=begin_prior_updates,
-            stop_condition=stop_condition,
-            num_epochs=num_epochs,
-            locus_subsample=locus_subsample,
-            batch_subsample=batch_subsample,
-            threads=threads,
-            kappa=kappa,
-            tau=tau,
-            callback=callback,
-            eval_every=eval_every,
-            verbose=verbose,
+            **optimization_settings,
         )
 
     return (
