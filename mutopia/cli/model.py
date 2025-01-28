@@ -614,6 +614,50 @@ def summary(
         ))
 
 
+@study.command("retrain")
+@click.argument("study_name", type=str)
+@click.argument("trial_number", type=int)
+@click.argument("output", type=click.Path(writable=True))
+@click.option(
+    "-@",
+    "--threads",
+    type=click.IntRange(1, 1000),
+    default=1,
+    help="Number of threads to use",
+)
+@click.option(
+    "--lazy/--eager",
+    type=bool,
+    default=False,
+    is_flag=True,
+    help="Lazy load the underlying data to reduce memory requirements.\n",
+)
+@click.option(
+    "--time-limit",
+    '-t',
+    type=int,
+    default=None,
+    help="Time limit for training, in minutes",
+)
+def retrain(
+    output : str,
+    study_name: str,
+    trial_number: int,
+    threads : int = 1,
+    time_limit: Union[None, int] = None,
+    lazy: bool = False,
+    
+):
+    mu.tuning.retrain(
+        lazy=lazy,
+        study_name=study_name,
+        trial_number=trial_number,
+        threads=threads,
+        time_limit=time_limit,
+        save_name=output,
+    )
+
+
 @study.command("ls")
 def list_studies():
     click.echo('Available studies:')

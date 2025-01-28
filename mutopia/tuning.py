@@ -315,16 +315,22 @@ def retrain(
 ):
 
     study, study_attrs, model_kw = load_study(study_name, storage)
-    train_corpuses = tuple(map(lazy_load if lazy else eager_load, study_attrs['train_corpuses']))
-    test_corpuses = tuple(map(eager_load, study_attrs['test_corpuses']))
-
-    example_corpus = train_corpuses[0]
-
     model_kw.update(kwargs)
     model_kw.update(study.trials[trial_number].params)
 
     if 'eval_every' in model_kw:
         model_kw.pop('eval_every')
+
+    logger.info(
+        f"Retraining trial {trial_number} with params:\n\t" \
+        + "\n\t".join(
+            [f"{key}: {value}" for key, value in model_kw.items()]
+        )
+    )
+
+    train_corpuses = tuple(map(lazy_load if lazy else eager_load, study_attrs['train_corpuses']))
+    test_corpuses = tuple(map(eager_load, study_attrs['test_corpuses']))
+    example_corpus = train_corpuses[0]
 
     model, *_ = example_corpus.modality().make_model(
         train_corpuses,
@@ -335,3 +341,4 @@ def retrain(
     )
 
     model.save(save_name)
+
