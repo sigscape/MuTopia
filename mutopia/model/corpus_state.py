@@ -3,6 +3,7 @@ import xarray as xr
 from datatree import DataTree
 import numpy as np
 from joblib import delayed
+from ..corpus.interfaces import CorpusInterface
 
 class CorpusState:
 
@@ -42,14 +43,14 @@ class CorpusState:
     
     @classmethod
     def is_marginal_corpus(cls, corpus):
-        return not 'sample' in corpus.coords or len(corpus.coords['sample']) == 0 \
-            or not 'sample' in corpus.X.dims
+        return len(cls.list_samples(corpus)) <= 1
     
     @classmethod
     def list_samples(cls, corpus):
-        #if cls.is_marginal_corpus(corpus):
-        #    return [None]
-        return list(corpus.sample)
+        if issubclass(type(corpus), CorpusInterface):
+            return list(corpus.sample)
+        else:
+            return list(corpus.sample.values)
 
     @classmethod
     def fetch_sample(cls, corpus, sample_name):
@@ -87,6 +88,7 @@ class CorpusState:
             ):
 
         sample_names = cls.list_samples(corpus)
+
         n_components = model_state.n_components
             
         state_elements = {
@@ -114,7 +116,7 @@ class CorpusState:
                 }
             ),
             name='state',
-            parent=corpus.corpus
+            parent=corpus.corpus if issubclass(type(corpus), CorpusInterface) else corpus,
         )
 
         return corpus

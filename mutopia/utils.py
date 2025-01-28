@@ -293,6 +293,10 @@ def using_exposures_from(corpus):
         corpus['contributions'].sel(sample=sample_name).data
 
 
+def using_priors_from(model_state):
+    return lambda corpus, _ : model_state.alpha[corpus.attrs['name']]
+
+
 def borrow_kwargs(*borrow_sigs):
     
     def decorator(func):
@@ -312,7 +316,13 @@ def borrow_kwargs(*borrow_sigs):
                 if not param.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
                     continue
                 combined_params[name] = param
-            
+        
+        # Sort the parameters so that the order is valid
+        sorted_params = sorted(
+            combined_params.values(), 
+            key=lambda p: (p.kind, p.default is not inspect.Parameter.empty)
+        )
+        combined_params = {param.name: param for param in sorted_params}
         # Create a new signature with combined parameters
         merged_signature = inspect.Signature(parameters=combined_params.values())
 

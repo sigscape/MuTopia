@@ -3,8 +3,8 @@ import xarray as xr
 import numpy as np
 import warnings
 from typing import Union, List, Dict
-from numpy.typing import ArrayLike, NDArray
-from ..utils import FeatureType, check_structure
+from numpy.typing import NDArray
+from ..utils import FeatureType, check_structure, dims_except_for
 import logging
 logger = logging.getLogger(' MuTensor ')
 logger.setLevel(logging.INFO)
@@ -188,20 +188,12 @@ def annot_empirical_marginal(
 ):
     check_structure(corpus)
     
-    #with warnings.simplefilter("ignore"):
-    log_em = (
-        np.log( corpus.X.sum('sample') )\
-            - np.log( corpus.regions.context_frequencies )
-    )
+    X_emp = corpus.X.sum(dim=dims_except_for(corpus.X.dims, 'locus'))
+    X_emp = (X_emp.asdense() if X_emp.is_sparse() else X_emp)/corpus.regions.length
     
-    log_em.data = log_em.data.astype(np.float32)
-    empirical_marginal = np.exp(log_em - log_em.max()).fillna(0.)
-    del log_em
-    
-    corpus.varm['empirical_marginal'] = empirical_marginal
-    logger.info('Added key to varm: "empirical_marginal"')
+    logger.info('Added key to varm: "empirical_locus_marginal"')
+    corpus.varm['empirical_locus_marginal'] = X_emp
     return corpus
-
 
 
 def split_by_chrom(

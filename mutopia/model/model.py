@@ -2,8 +2,7 @@ from .corpus_state import CorpusState as CS
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
-from ..utils import ParContext, using_exposures_from, \
-    check_corpus, check_dims
+from ..utils import *
 from .model_components import *
 from .eval import deviance_locus, pearson_residuals
 from .latent_var_models import *
@@ -49,6 +48,7 @@ class Model:
         check_corpus(corpus)
         check_dims(corpus, self.model_state_)
         
+
     def set_component_names(self, names : typing.List[str]):
         if not len(names) == self.n_components:
             raise ValueError('The number of names must match the number of components')
@@ -59,6 +59,8 @@ class Model:
     def setup_corpus(self, corpus):
         args = (corpus, self.model_state_)
         
+        logger.info('Setting up dataset state ...')
+
         CS.init_corpusstate(*args)
         
         with ParContext(1) as par:
@@ -72,6 +74,8 @@ class Model:
             corpus, 
             self.model_state_.get_normalizers(corpus)
         )
+
+        logger.info('Done ...')
         return corpus
         
 
@@ -201,7 +205,7 @@ class Model:
         self._check_corpus(corpus)
 
         self.model_state_.locals_model.estep_iterations=10000
-        self.model_state_.locals_model.difference_tol=1e-5
+        self.model_state_.locals_model.difference_tol=1e-4
 
         if not CS.has_corpusstate(corpus):
             corpus = self.setup_corpus(corpus)
@@ -264,15 +268,28 @@ class Model:
         except KeyError:
             corpus = self.annot_component_distributions(corpus, threads)
 
-        marginal_exposures = corpus['contributions'].sum('sample').data
+        if exposures is None:
+            try:
+                corpus['contributions']
+            except KeyError:
+                corpus = self.annot_contributions(corpus, threads)
+            marginal_exposures = corpus['contributions'].sum(dim='sample').data
+        else:
+            marginal_exposures = np.sum([exposures(corpus, sample_name) for sample_name in corpus.sample.values])
 
-        corpus.varm['predicted_marginal'] = \
+        marginal = \
             self.model_state_._log_marginalize_mutrate(
                 np.log(corpus.varm['component_distributions']),
                 marginal_exposures
             )
         
+        corpus.varm['predicted_marginal'] = marginal
+        corpus.varm['predicted_locus_marginal'] = (np.exp(marginal) * corpus.regions.context_frequencies)\
+            .sum(dim=dims_except_for(marginal.dims, 'locus'))/corpus.regions.length
+        
         logger.info('Added key to varm: "predicted_marginal"')
+        logger.info('Added key to varm: "predicted_locus_marginal"')
+        
         return corpus
 
 

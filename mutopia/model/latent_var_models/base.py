@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from joblib import delayed
 from xarray import DataArray
-
+from tqdm import tqdm
 from numba import njit, vectorize
 import numpy as np
 from numba.extending import get_cython_function_address
@@ -196,19 +196,23 @@ class LocalUpdate(ABC):
         *, 
         parallel_context
     ):
-        _, update_fns = self.get_update_fns(
+        samples, update_fns = self.get_update_fns(
             (corpus,),
             model_state,
             parallel_context=parallel_context,
         )
             
-        gammas = map(
-            lambda x : x[1],
-            parallel_context(delayed(update_fn)() for update_fn in update_fns)
-        )
+        gammas = []
+        for s in tqdm(
+            parallel_context(delayed(update_fn)() for update_fn in update_fns),
+            total=len(samples),
+            ncols=100,
+            desc='Estimating contributions',
+        ):
+            gammas.append(s[1])
         
         return DataArray(
-            np.array(list(gammas)),
+            np.array(gammas),
             dims=('sample', 'component'),
         )
 
