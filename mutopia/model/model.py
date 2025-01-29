@@ -165,6 +165,8 @@ class Model:
         if show:
             plt.show()
 
+        return fig
+
 
     def plot_interaction_matrix(self, 
             component,
@@ -248,7 +250,12 @@ class Model:
         corpus.varm['component_distributions'] =\
              np.exp(lmrt - lmrt.max(skipna=True)).fillna(0.)
         
+        corpus.varm['component_locus_distributions'] =\
+            (corpus.varm.component_distributions * corpus.regions.context_frequencies)\
+            .sum(dim=dims_except_for(corpus.varm.component_distributions.dims, 'locus', 'component'))/corpus.regions.length
+        
         logger.info('Added key to varm: "component_distributions"')
+        logger.info('Added key to varm: "component_locus_distributions"')
         return corpus
         
 
@@ -349,13 +356,14 @@ class Model:
         self,
         corpus,
         exposures=None,
+        threads=1,
     ):
         self._check_corpus(corpus)
 
         if not CS.has_corpusstate(corpus):
             corpus = self.setup_corpus(corpus)
 
-        with ParContext(1) as par:
+        with ParContext(threads) as par:
             return deviance_locus(
                 self.model_state_,
                 (corpus,),
@@ -387,6 +395,3 @@ class Model:
         logger.info('Added key to varm: "residuals"')
 
         return corpus
-
-
-        

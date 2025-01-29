@@ -457,7 +457,7 @@ def MotifModel(
     context_reg=0.0001,
     context_conditioning=1e-5,
     kmer_reg=0.005,
-    conditioning_alpha=1e-9,
+    conditioning_alpha=1e-8,
     context_encoder='diagonal',
     # locals model
     pi_prior=1.,

@@ -16,7 +16,6 @@ from .mode_config import ModeConfig
 from ._sbs_nucdata import *
 from ._sbs_ingestion import featurize_mutations, _revcomp
 
-
 _transition_palette = {
     ('C','A') : (0.33, 0.75, 0.98),
     ('C','G') : (0.0, 0.0, 0.0),
@@ -221,7 +220,7 @@ class SBSMode(ModeConfig):
             cluster=cluster,
             locus_dim=locus_dim,
         )
-
+    
 
 def _make_feature_name(subsequence_code):
     default = {0 : 'N', 1 : 'N', 2 : 'N'}
@@ -239,7 +238,7 @@ def SBSModel(
     context_reg=0.0001,
     context_conditioning=1e-5,
     kmer_reg=0.005,
-    conditioning_alpha=1e-9,
+    conditioning_alpha=1e-8,
     context_encoder='diagonal',
     # locals model
     pi_prior=1.,

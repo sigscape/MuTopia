@@ -222,6 +222,13 @@ def train_test_split(
     help='"Offset" parameter for stochastic variational inference',
 )
 @click.option(
+    '--init-variance-theta',
+    '-ivt',
+    type=click.FloatRange(0.0, 1000.0),
+    default=None,
+    help='Initial variance for theta',
+)
+@click.option(
     "-eval",
     "--eval-every",
     type=click.IntRange(1, 1000),
@@ -663,3 +670,23 @@ def list_studies():
     click.echo('Available studies:')
     studies = mu.tuning.list_studies()
     click.echo('\n'.join(studies))
+
+
+@model.command("report")
+@click.argument("model_path", type=click.Path(exists=True))
+@click.argument("output", type=click.Path(writable=True))
+def report(
+    model_path: str,
+    output: str,
+):  
+    import matplotlib.backends.backend_pdf
+    matplotlib.rcParams['figure.max_open_warning']=100
+
+    model = mu.load_model(model_path)
+    
+    pdf = matplotlib.backends.backend_pdf.PdfPages(output)
+    for i in range(model.n_components):
+        fig = model.signature_report(i, show=False)
+        pdf.savefig(fig, dpi=300, bbox_inches='tight')
+
+    pdf.close()

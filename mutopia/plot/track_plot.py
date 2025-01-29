@@ -75,7 +75,7 @@ def _set_axlabel(ax, label):
 def _clean_ax(ax, axlabel=None):
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
+    #ax.spines['bottom'].set_visible(False)
     ax.set(xticks=[])
     if not axlabel is None:
         _set_axlabel(ax, axlabel)

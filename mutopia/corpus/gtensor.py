@@ -181,27 +181,3 @@ def update_view(
         )
 
     return tree
-
-
-def annot_empirical_marginal(
-    corpus,
-):
-    check_structure(corpus)
-    
-    X_emp = corpus.X.sum(dim=('sample',))
-    X_emp = (X_emp.asdense() if X_emp.is_sparse() else X_emp)
-    
-    logger.info('Added key to varm: "empirical_marginal"')
-    corpus.varm['empirical_marginal'] = X_emp/corpus.regions.context_frequencies
-
-    logger.info('Added key to varm: "empirical_locus_marginal"')
-    corpus.varm['empirical_locus_marginal'] = X_emp.sum(dim=dims_except_for(X_emp.dims, 'locus'))/corpus.regions.length
-
-    return corpus
-
-
-def split_by_chrom(
-    corpus,
-    test_chroms = ('chr1',),
-):
-    pass

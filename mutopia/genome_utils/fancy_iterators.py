@@ -21,20 +21,10 @@ class RegionOverlapComparitor:
     When wrapped, a region is equal to another region if the two regions overlap.
     '''
 
-    def __init__(self, wraps):
-        self._wraps = wraps
-
-    @property
-    def chrom(self):
-        return self._wraps.chrom
-    
-    @property
-    def start(self):
-        return self._wraps.start
-    
-    @property
-    def end(self):
-        return self._wraps.end
+    def __init__(self, chrom, start, end, *args):
+        self.chrom = chrom
+        self.start = start
+        self.end = end
     
     def __gt__(self, other):
         return self.chrom > other.chrom or \

@@ -1,5 +1,6 @@
 import mutopia.corpus as gt
 import mutopia.plot as pl
+import mutopia.tools as tl
 from .tuning import create_study, load_study, run_trial, dashboard, sample_params
 from .lib import MutopiaModel, load_model
 from .modalities import get_mode, Modality

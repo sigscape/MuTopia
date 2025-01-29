@@ -102,6 +102,6 @@ def _plot_interaction_matrix(
                         cax=cbar_ax, orientation='vertical',
                         )
     cbar.set_label('Interaction effect', rotation=90, labelpad=5, fontsize=8)
-    cbar.ax.set_yticklabels(cbar.ax.get_yticklabels(), fontsize=8)
+    cbar.ax.tick_params(labelsize=8)
 
     return gs
