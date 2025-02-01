@@ -147,6 +147,11 @@ class ModelState:
                 log_mutrate_tensor,
                 input_core_dims=[[], ['component']],
             )
+        
+    
+    def _log_component_posterior(self, log_mutrate_tensor, exposures):
+        log_X_tild = self._log_marginalize_mutrate(log_mutrate_tensor, exposures)
+        return log_mutrate_tensor - log_X_tild
     
 
     def get_sstats_dict(self, corpuses):

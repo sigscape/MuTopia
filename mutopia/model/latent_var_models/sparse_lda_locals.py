@@ -2,38 +2,18 @@ from xarray import DataArray
 import numpy as np
 from functools import partial, reduce
 import sparse
-from ..model_components.base import _svi_update_fn, PrimitiveModel
-from ._dirichlet_update import update_alpha
+from ..model_components.base import _svi_update_fn
 from ..corpus_state import CorpusState as CS
 from ...utils import dims_except_for
+from ...corpus.interfaces import *
 from math import prod
 from .base import *
 import warnings
 
 
-class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
+class LDAUpdateSparse(LocalUpdate):
 
-    def __init__(self,
-            corpuses,
-            n_components,
-            prior_alpha=1.0,
-            estep_iterations=300,
-            difference_tol=1e-4,
-            dtype=float,
-            *,
-            random_state,
-        ):
-        self.estep_iterations = estep_iterations
-        self.difference_tol = difference_tol
-        self.random_state = random_state
-        self.n_components = n_components
-        self.dtype = dtype
 
-        self.alpha = {
-            CS.get_name(corpus) : np.ones(n_components, dtype=dtype)*prior_alpha
-            for corpus in corpuses
-        }
-    
     ##
     # E-step functionality to satisfy the LocalUpdate interface
     ##
@@ -247,8 +227,8 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
             self._apply_update,
             np.ascontiguousarray(gamma),
             update_fn=map_update,
+            suffstat_fn=suffstat_fn,
             learning_rate=learning_rate,
-            suffstat_fn=suffstat_fn
         )
 
         return svi_update
@@ -261,6 +241,7 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
         learning_rate=1.,
         locus_subsample=1.,
         batch_subsample=1.,
+        exposures_fn=CS.fetch_topic_compositions,
         *,
         parallel_context,
     ):
@@ -279,7 +260,7 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
 
         updates = (
             self._get_update_fn(
-                CS.fetch_topic_compositions(corpus, sample_name),
+                exposures_fn(corpus, sample_name),
                 sample=CS.fetch_sample(corpus, sample_name),
                 corpus=corpus,
                 model_state=model_state,
@@ -293,6 +274,34 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
         return (
             samples,
             updates
+        )
+    
+
+    def posterior_assign_sample(
+        self,
+        sample,
+        corpus,
+        model_state,
+    ):
+        self.estep_iterations=10000
+        self.difference_tol=5e-5
+
+        subsample_rate = corpus.regions.context_frequencies.sum().item()/model_state.get_genome_size(corpus)
+
+        with ParContext(1) as par:
+            _, update_fns = self.get_update_fns(
+                (SampleCorpusFusion(CorpusInterface(corpus), sample),),
+                model_state,
+                parallel_context=par,
+                exposures_fn=random_locals(np.random.RandomState(1776), self.n_components),
+                locus_subsample=subsample_rate,
+            )
+
+        suffstats = next(update_fns)()[0]
+
+        return (
+            suffstats['weighted_posterior']/suffstats['weights']*subsample_rate, 
+            suffstats['gamma']
         )
     
 
@@ -452,42 +461,7 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
         )
 
         return residuals_fns    
-    
 
-    ## 
-    # M-step functionality to satisfy the PrimModel interface
-    ##
-    def init_locals(self, n_samples):
-        return self.random_state.gamma(
-                            100., 
-                            1./100., 
-                            size=(self.n_components, n_samples)
-                        )
-    
-
-    def prepare_corpusstate(self, corpus):
-        return dict(
-            topic_compositions = DataArray(
-                self.init_locals( len(CS.list_samples(corpus)) ),
-                dims=('component','sample')
-            )
-        )
-
-    def spawn_sstats(self, corpus):
-        return []
-    
-
-    @staticmethod
-    def reduce_sparse_sstats(
-        sstats, 
-        corpus,
-        *,
-        gamma,
-        **kw,
-    ):
-        sstats.append(gamma)
-        return sstats
-    
 
     @staticmethod
     def reduce_model_sstats(
@@ -501,17 +475,3 @@ class LDAUpdateSparse(PrimitiveModel, LocalUpdate):
                 corpus,
                 **sample_sstats
             )
-
-
-    def partial_fit(
-        self, sstats, learning_rate
-    ):
-        
-        for corpus_name, gammas in sstats.items():
-            alpha0 = self.alpha[corpus_name]
-            self.alpha[corpus_name] = _svi_update_fn(
-                alpha0,
-                update_alpha(alpha0, np.array(gammas)),
-                learning_rate
-            )
-    

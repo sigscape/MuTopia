@@ -2,10 +2,13 @@ from .modalities._sbs_nucdata import CONTEXTS
 from .genome_utils.fancy_iterators import RegionOverlapComparitor
 from .genome_utils.bed12_utils import unstack_regions
 from .model.corpus_state import CorpusState as CS
+from .model.model_components.base import idx_array_to_design
+from .model.latent_var_models.base import mixture_update_step
 from .utils import dims_except_for, check_structure, logger
 import os
 from pyfaidx import Fasta
 import numpy as np
+from functools import partial
 
 COMPLEMENT = {'A' : 'T','T' : 'A','G' : 'C','C' : 'G'}
 def _revcomp(seq):
@@ -118,7 +121,99 @@ def annot_empirical_marginal(
 
 
 def estimate_model_mixture(
-    corpus, *models,
-):
-    pass
+    sample, 
+    *model_pairs,
+    tau=None,
+    seed=None,
+    max_iter=1000,
+    tol=5e-5,
+):    
+    
+    def get_state(model):
+        return model.model_state_
+    
+    seed = seed or 42
+    random_state = np.random.RandomState(seed)
+    
+    if tau is None:
+        tau = np.ones(len(model_pairs), order='C')
+    elif not len(tau) == len(model_pairs):
+        raise ValueError('Length of tau must match the number of models')
+    
+    # (D*K,)
+    alphas = np.concatenate([
+        get_state(model).alpha[CS.get_name(corpus)]
+        for model, corpus in model_pairs
+    ], order='C')
 
+    # extract sample dictionary using the first model
+    sample_dict = model_pairs[0][0].locals_model._convert_sample(sample)
+
+    # (D*K, I)
+    likelihoods = []
+    for model, corpus in model_pairs:
+        
+        state = get_state(model)
+        locals_model = state.locals_model
+        locals_model.random_state = random_state
+
+        model.setup_corpus(corpus)
+
+        likelihoods.append(
+            locals_model._conditional_observation_likelihood(
+                corpus,
+                state,
+                **sample_dict,
+                logsafe=False,
+            )
+        )
+
+    likelihoods = np.vstack(likelihoods, order='C')
+
+    # (D, D*K)
+    fraction_map = idx_array_to_design(
+        [[j]*state.n_components for j, (state, _) in enumerate(model_pairs)],
+        len(model_pairs),
+    ).todense().T
+
+    weights = np.ascontiguousarray(sample_dict['weights'])
+
+    kw=dict(
+        alpha=alphas,
+        tau=tau,
+        conditional_likelihood=likelihoods,
+        weights=weights,
+        fraction_map=fraction_map,
+    )
+
+    update_step = partial(mixture_update_step, **kw)
+
+    ##
+    # Init the parameters
+    ##
+    delta = random_state.gamma(100., 1./100., size=(len(model_pairs),)) # D
+    
+    gamma = np.concatenate([
+        get_state(model).locals_model.init_locals(1)
+        for model, _ in model_pairs
+    ], order='C') # (D*K,)
+
+    ##
+    # Run the update steps
+    ##
+    scores=[]
+    for i in range(max_iter):
+       
+        gamma, delta, elbo = update_step(gamma, delta)
+        scores.append(elbo)
+        
+        logger.info(f'Iteration {i+1} - ELBO: {elbo:.3f}')
+
+        if i > 0 and np.abs(scores[-1] - scores[-2]) < tol:
+            break
+
+    return gamma, delta, scores
+
+
+def simulate_from_model(model, corpus, seed=None):
+    pass

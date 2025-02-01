@@ -1,4 +1,5 @@
 import os
+from numpy import array
 from .disk_interface import _backend_load_sample, load_dataset
 
 def lazy_load(corpus):
@@ -41,6 +42,10 @@ class CorpusInterface:
 
     def modality(self):
         return self.corpus.modality()
+    
+    @property
+    def varm(self):
+        return self.corpus.varm
 
     @property
     def corpus(self):
@@ -148,3 +153,22 @@ class LazySampleSlicer(CorpusInterface):
                     .isel(**{d:s for d,s in self._apply_slices.items() if not d == 'sample'})
         else:
             return self.X.isel(**self._apply_slices)
+        
+
+class SampleCorpusFusion(CorpusInterface):
+
+    def __init__(self, corpus, sample):
+        self._corpus = corpus.corpus
+        self._sample = sample
+
+    @property
+    def sample(self):
+        return array(['0'])
+    
+    @property
+    def X(self):
+        return self._sample
+    
+    def fetch_sample(self, sample_name):
+        return self._sample
+        

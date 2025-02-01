@@ -124,13 +124,13 @@ def idx_array_to_design(idx_array, n_cols):
     n_idx = len(idx_array)
 
     return GCXS(
-                COO(
-                    (np.arange(n_idx).astype(int), idx_array.astype(int)),
-                    np.ones(n_idx),
-                    shape=(n_idx, n_cols)
-                ),
-                compressed_axes=(0,),
-            )
+        COO(
+            (np.arange(n_idx).astype(int), idx_array.astype(int)),
+            np.ones(n_idx),
+            shape=(n_idx, n_cols)
+        ),
+        compressed_axes=(0,),
+    )
 
 
 def get_corpus_intercepts(corpuses, encoder : dict, n_repeats = lambda x : 1):

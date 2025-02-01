@@ -2,6 +2,8 @@
 import mutopia as mu
 from mutopia.corpus.interfaces import *
 import mutopia.corpus.disk_interface as disk
+import xarray as xr
+import netCDF4 as nc
 from ..utils import logger
 import click
 from tabulate import tabulate
@@ -38,6 +40,14 @@ def train_test_split(
         dataset.isel(locus=test_mask),
         outprefix + ".test.nc",
     )
+
+    # unset the regions file so that you can't run ingestion operations on the split datasets
+    with nc.Dataset(outprefix + ".train.nc", 'a') as dset:
+        setattr(outprefix + ".train.nc", "regions_file", None)
+
+    with nc.Dataset(outprefix + ".test.nc", 'a') as dset:
+        setattr(outprefix + ".test.nc", "regions_file", None)
+    
 
     loader = LazySampleLoader(CorpusInterface(dataset))
 
@@ -690,3 +700,41 @@ def report(
         pdf.savefig(fig, dpi=300, bbox_inches='tight')
 
     pdf.close()
+
+
+@model.command("predict")
+@click.argument("model_path", type=click.Path(exists=True))
+@click.argument("corpus_path", type=click.Path(exists=True))
+@click.option(
+    "-@",
+    "--threads",
+    type=click.IntRange(1, 1000),
+    default=1,
+    help="Number of threads to use",
+)
+def predict(
+    model_path: str,
+    corpus_path: str,
+    threads: int = 1,
+):
+    
+    model = mu.load_model(model_path)
+    dataset = lazy_load(corpus_path)
+
+    logger.info('Setting up corpus ...')
+    dataset = model.setup_corpus(dataset)
+
+    logger.info('Annotating contributions ...')
+    dataset = model.annot_contributions(dataset, threads=threads)
+    dataset.contributions.name = 'contributions'
+    
+    dataset.contributions.to_netcdf(
+        corpus_path,
+        mode='a',
+        **disk.WRITE_KW,
+    )
+
+    disk._write_model_state(
+        dataset,
+        corpus_path,
+    )

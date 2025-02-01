@@ -9,28 +9,7 @@ from ._dirichlet_update import update_alpha
 from .base import *
 
 
-class LDAUpdateDense(PrimitiveModel, LocalUpdate):
-
-    def __init__(self,
-            corpuses,
-            n_components,
-            prior_alpha=1.0,
-            estep_iterations=300,
-            difference_tol=1e-4,
-            dtype=float,
-            *,
-            random_state,
-        ):
-        self.estep_iterations = estep_iterations
-        self.difference_tol = difference_tol
-        self.random_state = random_state
-        self.n_components = n_components
-        self.dtype = dtype
-
-        self.alpha = {
-            CS.get_name(corpus) : np.ones(n_components, dtype=dtype)*prior_alpha
-            for corpus in corpuses
-        }
+class LDAUpdateDense(LocalUpdate):
     
     def _convert_sample(self, sample):
         return np.ascontiguousarray(sample.load().data, dtype=self.dtype)
@@ -148,6 +127,7 @@ class LDAUpdateDense(PrimitiveModel, LocalUpdate):
         learning_rate=1.,
         locus_subsample=1.,
         batch_subsample=1.,
+        exposures_fn=CS.fetch_topic_compositions,
         *,
         parallel_context,
     ):
@@ -181,7 +161,7 @@ class LDAUpdateDense(PrimitiveModel, LocalUpdate):
 
         updates = (
             self._get_update_fn(
-                CS.fetch_topic_compositions(corpus, sample_name),
+                exposures_fn(corpus, sample_name),
                 sample=CS.fetch_sample(corpus, sample_name),
                 corpus=corpus,
                 learning_rate=learning_rate,
@@ -302,42 +282,6 @@ class LDAUpdateDense(PrimitiveModel, LocalUpdate):
         )
 
         return deviance_fns
-
-
-
-    ## 
-    # M-step functionality to satisfy the PrimModel interface
-    ##
-    def init_locals(self, n_samples):
-        return self.random_state.gamma(
-                            100., 
-                            1./100., 
-                            size=(self.n_components, n_samples)
-                        )
-    
-
-    def prepare_corpusstate(self, corpus):
-        return dict(
-            topic_compositions = DataArray(
-                self.init_locals( len(CS.list_samples(corpus)) ),
-                dims=('component', 'sample')
-            )
-        )
-
-    def spawn_sstats(self, corpus):
-        return []
-    
-
-    @staticmethod
-    def reduce_dense_sstats(
-        sstats, 
-        corpus,
-        *,
-        gamma,
-        **kw,
-    ):
-        sstats.append(gamma)
-        return sstats
     
 
     @staticmethod
@@ -352,15 +296,3 @@ class LDAUpdateDense(PrimitiveModel, LocalUpdate):
             corpus,
             **sample_sstats
         )
-
-
-    def partial_fit(
-        self, sstats, learning_rate
-    ):
-        for corpus_name, gammas in sstats.items():
-            alpha0 = self.alpha[corpus_name]
-            self.alpha[corpus_name] = _svi_update_fn(
-                alpha0,
-                update_alpha(alpha0, np.array(gammas)),
-                learning_rate
-            )

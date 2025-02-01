@@ -4,9 +4,7 @@ from dataclasses import dataclass
 import tempfile
 from functools import partial
 from pyfaidx import Fasta
-from sparse import COO
 import numpy as np
-import xarray as xr
 from ._sbs_nucdata import *
 from ._sbs_clustering import *
 from ..utils import logger, stream_subprocess_output
@@ -123,7 +121,7 @@ def _process_query_line(line, fasta_object):
     adjusted_weight = query.WEIGHT if (query.CLUSTER_SIZE <= 3) else (query.WEIGHT/query.CLUSTER_SIZE)
 
     return (
-        (query.CHROM, query.POS),
+        (query.CHROM, query.POS0),
         (int(query.CLUSTER_SIZE > 3), configuration_idx, context_idx, locus_idx),
         adjusted_weight
     )
@@ -141,8 +139,6 @@ def featurize_mutations(
     pass_only=True,
     cluster=True,
     skip_sort=False,
-    *,
-    locus_dim,
 ):
     
     if weight_col is None and sample_name is None:
@@ -215,15 +211,17 @@ def featurize_mutations(
 
             coords=[]
             weights=[]
+            mut_ids=[]
             n_ingested=0
             n_weird=0
 
             for line in stream_subprocess_output(intersect_process):
                 
                 try:
-                    _, coo, weight = _process_query_line(line, fa)
+                    mut_id, coo, weight = _process_query_line(line, fa)
                     coords.append(coo)
                     weights.append(weight)
+                    mut_ids.append(mut_id)
                     n_ingested+=1
 
                 except (WeirdMutationError, BadWeightError) as err:
@@ -231,7 +229,7 @@ def featurize_mutations(
                     n_weird+=1
                     continue
 
-                if n_ingested % 1000 == 0:
+                if n_ingested % 5000 == 0:
                     logger.info(f'Ingested {n_ingested} mutations ...')
 
     if len(weights) == 0:
@@ -253,11 +251,4 @@ def featurize_mutations(
 
     logger.info(f'Successfully ingested {n_ingested} mutations, {n_weird} mutations could not be parsed.')
 
-    return xr.DataArray(
-        COO(
-            coords,
-            weights,
-            shape = (2, 2, len(MUTOPIA_ORDER), locus_dim),
-        ),
-        dims = ('clustered','configuration','context','locus'),
-    )
+    return mut_ids, coords, weights

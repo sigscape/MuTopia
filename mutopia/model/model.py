@@ -8,14 +8,16 @@ from .eval import deviance_locus, pearson_residuals
 from .latent_var_models import *
 from ..plot.coef_matrix_plot import _plot_interaction_matrix
 from ..corpus import *
+from ..corpus.interfaces import CorpusInterface
 from functools import partial  
 from joblib import dump
 from collections import defaultdict
 import typing
 
-import logging
-logger = logging.getLogger(' Mutopia-Model ')
-logger.setLevel('INFO')
+def _unwrap(corpus):
+    if issubclass(type(corpus), CorpusInterface):
+        return corpus.corpus
+    return corpus
    
 '''
 The Model class is a wrapper around a trained model state object, 
@@ -43,10 +45,12 @@ class Model:
             self.component_names_
         except AttributeError:
             return ['component_{}'.format(i) for i in range(1, self.n_components+1)]
-        
-    def _check_corpus(self, corpus):
-        check_corpus(corpus)
-        check_dims(corpus, self.model_state_)
+    
+
+    def _check_corpus(self, corpus, enforce_sample=True):
+        check_corpus(corpus, enforce_sample=enforce_sample)
+        if enforce_sample:
+            check_dims(corpus, self.model_state_)
         
 
     def set_component_names(self, names : typing.List[str]):
@@ -206,9 +210,6 @@ class Model:
     ):
         self._check_corpus(corpus)
 
-        self.model_state_.locals_model.estep_iterations=10000
-        self.model_state_.locals_model.difference_tol=1e-4
-
         if not CS.has_corpusstate(corpus):
             corpus = self.setup_corpus(corpus)
 
@@ -219,11 +220,13 @@ class Model:
                     self.model_state_,
                     parallel_context=par
                 )
-
-        corpus = corpus.assign_coords({
+        
+        
+        corpus = _unwrap(corpus).assign_coords({
             'component' : self.component_names,
         })
         corpus['contributions'] = contributions
+
         logger.info('Added key to dataset: "contributions"')
         return corpus
     
@@ -234,7 +237,7 @@ class Model:
         corpus,
         threads=1,
     ):
-        self._check_corpus(corpus)
+        self._check_corpus(corpus, enforce_sample=False)
 
         if not CS.has_corpusstate(corpus):
             corpus = self.setup_corpus(corpus)
@@ -246,7 +249,7 @@ class Model:
                 with_context=False,
             )
 
-        corpus = corpus.assign_coords({'component' : self.component_names})
+        corpus = _unwrap(corpus).assign_coords({'component' : self.component_names})
         corpus.varm['component_distributions'] =\
              np.exp(lmrt - lmrt.max(skipna=True)).fillna(0.)
         
@@ -265,10 +268,12 @@ class Model:
         exposures=None,
         threads=1,
     ):
-        self._check_corpus(corpus)
+        self._check_corpus(corpus, enforce_sample=False)
 
         if not CS.has_corpusstate(corpus):
             corpus = self.setup_corpus(corpus)
+
+        corpus = _unwrap(corpus)
 
         try:
             corpus.varm['component_distributions']
@@ -305,7 +310,7 @@ class Model:
         corpus,
         threads=1,
     ):
-        self._check_corpus(corpus)
+        self._check_corpus(corpus, enforce_sample=False)
 
         if not CS.has_corpusstate(corpus):
             corpus = self.setup_corpus(corpus)
@@ -319,26 +324,28 @@ class Model:
         X = locus_model._fetch_feature_matrix(corpus)
 
         background_idx = np.random.RandomState(0).choice(
-                            len(X), size = min(1000, len(X)), replace = False
-                        )
+            len(X), size = min(1000, len(X)), replace = False
+        )
         
         def _component_shap(k):
             
             logger.info(f'Calculating SHAP values for {self.component_names[k]} ...')
 
             return shap.TreeExplainer(
-                    locus_model.rate_models[k],
-                    X[background_idx],
-                ).shap_values(
-                    X,
-                    check_additivity=False,
-                    approximate=False,
-                )
+                locus_model.rate_models[k],
+                X[background_idx],
+            ).shap_values(
+                X,
+                check_additivity=False,
+                approximate=False,
+            )
         
         shap_matrix = np.array([
             np.squeeze(_component_shap(k))
             for k in range(self.n_components)
         ])
+
+        corpus = _unwrap(corpus)
         
         features = corpus.state.coords['feature'].data
 

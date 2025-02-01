@@ -7,6 +7,11 @@ import numpy as np
 from numba.extending import get_cython_function_address
 import ctypes
 from functools import wraps
+from ...corpus.interfaces import *
+from ...utils import ParContext
+from ._dirichlet_update import update_alpha
+from ..corpus_state import CorpusState as CS
+from ..model_components.base import _svi_update_fn, PrimitiveModel
 
 '''
 Numba only works with 2D arrays, not arbitrary tensors. Luckily,
@@ -186,8 +191,77 @@ def bound(
     return np.sum(weighted_posterior * np.nan_to_num(flattened_logweight, nan=0.)) + entropy_sstats
 
 
+@njit(nogil=True)
+def mixture_update_step(
+    alpha, # D*K
+    tau, # D
+    conditional_likelihood,  # *(D*K)xI
+    weights, # I
+    fraction_map, # DxD*K,
+    gamma, # D*K
+    delta, # D
+):
 
-class LocalUpdate(ABC):
+    exp_Elog_gamma = np.exp(log_dirichlet_expectation(gamma)) # D*K
+    exp_Elog_delta = np.exp(log_dirichlet_expectation(delta)) # D
+    
+    # (D @ D*K) => D*K) * D*K => D*K
+    exp_Elog_prior = (exp_Elog_delta @ fraction_map) * exp_Elog_gamma
+
+    X_div_X_tild = np.where(
+        weights>0.,
+        weights/(exp_Elog_prior @ conditional_likelihood),
+        0.
+    ) # (I,)
+    
+    # (D*KxI @ I => D*K) * D*K => D*K
+    sstats = (conditional_likelihood @ X_div_X_tild)*exp_Elog_prior
+
+    weighted_phi = np.outer(exp_Elog_prior, X_div_X_tild)*conditional_likelihood
+    phi = weighted_phi/weights[None,:]
+    entropy_sstats = -np.sum(weighted_phi * np.where(phi > 0, np.log(phi), 0.))
+
+    flattened_logweight = np.log(exp_Elog_prior) + np.log(conditional_likelihood)
+    elbo = np.sum(weighted_phi * np.nan_to_num(flattened_logweight, nan=0.)) + entropy_sstats
+
+    return (
+        alpha + sstats, 
+        tau + sstats @ fraction_map.T,
+        elbo,
+    )
+
+
+def random_locals(random_state, n_components):
+    def init_locals(corpus, sample_name):
+        return random_state.gamma(100., 1./100., size=(n_components,))
+    
+    return init_locals
+
+
+
+class LocalUpdate(PrimitiveModel):
+
+    def __init__(self,
+            corpuses,
+            n_components,
+            prior_alpha=1.0,
+            estep_iterations=300,
+            difference_tol=1e-4,
+            dtype=float,
+            *,
+            random_state,
+        ):
+        self.estep_iterations = estep_iterations
+        self.difference_tol = difference_tol
+        self.random_state = random_state
+        self.n_components = n_components
+        self.dtype = dtype
+
+        self.alpha = {
+            CS.get_name(corpus) : np.ones(n_components, dtype=dtype)*prior_alpha
+            for corpus in corpuses
+        }
+
 
     def predict(
         self, 
@@ -196,10 +270,17 @@ class LocalUpdate(ABC):
         *, 
         parallel_context
     ):
+        self.estep_iterations=10000
+        self.difference_tol=5e-5
+
+        subsample_rate = corpus.regions.context_frequencies.sum().item()/model_state.get_genome_size(corpus)
+
         samples, update_fns = self.get_update_fns(
             (corpus,),
             model_state,
             parallel_context=parallel_context,
+            exposures_fn=random_locals(np.random.RandomState(1776), self.n_components),
+            locus_subsample=subsample_rate,
         )
             
         gammas = []
@@ -215,6 +296,23 @@ class LocalUpdate(ABC):
             np.array(gammas),
             dims=('sample', 'component'),
         )
+    
+
+    def predict_sample(
+        self,
+        sample,
+        corpus,
+        model_state,
+    ):
+        self.estep_iterations=10000
+        self.difference_tol=5e-5
+
+        with ParContext(1) as par:
+            return self.predict(
+                SampleCorpusFusion(CorpusInterface(corpus), sample),
+                model_state,
+                parallel_context=par,
+            ).ravel()
 
 
     @abstractmethod
@@ -224,6 +322,7 @@ class LocalUpdate(ABC):
         model_state,
         learning_rate=1.,
         subsample_rate=1.,
+        exposures_fn=CS.fetch_topic_compositions,
         *,
         parallel_context
     ):
@@ -250,3 +349,51 @@ class LocalUpdate(ABC):
         **sample_sstats,
     ):
         raise NotImplementedError
+    
+
+    ## 
+    # M-step functionality to satisfy the PrimModel interface
+    ##
+    def init_locals(self, n_samples):
+        return self.random_state.gamma(
+            100., 
+            1./100., 
+            size=(self.n_components, n_samples)
+        )
+    
+
+    def prepare_corpusstate(self, corpus):
+        return dict(
+            topic_compositions = DataArray(
+                self.init_locals( len(CS.list_samples(corpus)) ),
+                dims=('component','sample')
+            )
+        )
+
+
+    def spawn_sstats(self, corpus):
+        return []
+    
+
+    @staticmethod
+    def reduce_sparse_sstats(
+        sstats, 
+        corpus,
+        *,
+        gamma,
+        **kw,
+    ):
+        sstats.append(gamma)
+        return sstats
+    
+
+    def partial_fit(
+        self, sstats, learning_rate
+    ):
+        for corpus_name, gammas in sstats.items():
+            alpha0 = self.alpha[corpus_name]
+            self.alpha[corpus_name] = _svi_update_fn(
+                alpha0,
+                update_alpha(alpha0, np.array(gammas)),
+                learning_rate
+            )

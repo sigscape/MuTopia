@@ -36,7 +36,7 @@ def _read_continuous_file(
         is_discrete_feature=False,
     )(
         ingest_file,
-        disk.read_regions_file(dataset),
+        disk.fetch_regions_path(dataset),
         genome_file=corpus_attrs['genome_file'],
         column=column,
     )
@@ -528,11 +528,9 @@ def add_discrete_feature(
     if not ingest.FileType.from_extension(ingest_file) == ingest.FileType.BED:
         raise ValueError('Discrete features must be ingested from Bed files.')
     
-    corpus_attrs = disk.read_attrs(dataset)
-
     feature_vals, classes = ingest.make_discrete_features(
         ingest_file,
-        disk.read_regions_file(dataset),
+        disk.fetch_regions_path(dataset),
         column=column,
         null=null,
         class_priority=classes if len(classes) > 0 else None,
@@ -584,7 +582,7 @@ def add_distance_feature(
     (progress_between, distance_between) = \
         ingest.make_distance_features(
             ingest_file,
-            disk.read_regions_file(dataset),
+            disk.fetch_regions_path(dataset),
         )
     
     write_fn = partial(
@@ -648,7 +646,7 @@ def add_strand_feature(
     
     feature_vals = ingest.make_strand_features(
         ingest_file,
-        disk.read_regions_file(dataset),
+        disk.fetch_regions_path(dataset),
         column=column,
     )
 
@@ -795,6 +793,13 @@ def samplecmds():
     default=[],
     help='BAM only: Tags to use for weighting reads, multiple may be provided.',
 )
+@click.option(
+    '-fa',
+    '--fasta',
+    type=click.Path(exists=True),
+    default=None,
+    help='Fasta file to use for calculating context frequencies',
+)
 def ingest_sample(
     dataset : str,
     sample_file : str,
@@ -807,6 +812,7 @@ def ingest_sample(
     weight_tags : List[str] = [],
     skip_sort : bool = False,
     cluster : bool = True,
+    fasta : Union[None, str] = None,
     *,
     sample_id : str,
 ):
@@ -814,10 +820,15 @@ def ingest_sample(
     attrs = disk.read_attrs(dataset)
     modality = Modality(attrs['dtype'].upper()).get_config()
 
+    fasta = fasta or attrs['fasta_file']
+    if not os.path.exists(fasta):
+        raise click.FileError(f'No such file exists: {fasta}, provide a valid fasta file using the `--fasta/-fa` argument.')
+    
     sample_arr = modality.ingest_observations(
         sample_file,
-        regions_file=disk.read_regions_file(dataset),
-        fasta_file=attrs['fasta_file'],
+        regions_file=disk.fetch_regions_path(dataset),
+        locus_dim=disk.read_dims(dataset)['locus'],
+        fasta_file=fasta,
         chr_prefix=chr_prefix,
         pass_only=pass_only,
         weight_col=weight_col,
@@ -827,7 +838,6 @@ def ingest_sample(
         weight_tags=weight_tags,
         skip_sort=skip_sort,
         cluster=cluster,
-        locus_dim=disk.read_dims(dataset)['locus'],
     )
 
     disk.write_sample(

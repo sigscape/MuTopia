@@ -2,15 +2,12 @@ import sparse
 import xarray as xr
 import datatree
 from numpy import nan, array, float16, float32
-from collections import defaultdict
 from functools import wraps
 import time
 import netCDF4 as nc
-import warnings
 import tqdm
 import os
-from joblib import delayed
-from ..utils import check_corpus, FeatureType, logger, ParContext
+from ..utils import check_corpus, FeatureType, logger
 from .gtensor import update_view
 
 WRITE_KW = dict(
@@ -18,9 +15,21 @@ WRITE_KW = dict(
     engine='netcdf4', 
 )
 
-def read_regions_file(dataset):
+def fetch_regions_path(dataset):
     regions_file = read_attrs(dataset)['regions_file']
-    return os.path.join(os.path.dirname(dataset), regions_file)
+
+    if regions_file is None:
+        raise ValueError('No regions file found in dataset attributes. This probably means you are attempting an ingestion operation on a subset corpus view, which is not allowed.')
+    
+    regions_path = os.path.join(os.path.dirname(dataset), regions_file)
+
+    if not os.path.exists(regions_path):
+        raise FileNotFoundError(
+            f'No such file exists: {regions_path}, maybe it was deleted? You can set a new regions_file with the command:\n\t'
+            f'gtensor set-attr {dataset.attrs["filename"]} -set regions_file <path/to/file>'
+        )
+
+    return regions_file
 
 
 def retry_until_write(func, n_tries=1000, sleep=1):
@@ -230,6 +239,16 @@ def rm_sample(
 #
 ##
 
+def _write_model_state(dataset, filename):
+    dataset.state.to_dataset().drop_vars(
+        [name for name, d in dataset.state.data_vars.items() if d.is_sparse()]
+    ).to_netcdf(
+        filename,
+        group='/state', 
+        mode='a', 
+        **WRITE_KW
+    )
+
 
 def write_dataset(dataset, filename):
 
@@ -263,6 +282,9 @@ def write_dataset(dataset, filename):
                 },
                 **WRITE_KW
             )
+    
+    if 'state' in dataset.children:
+        _write_model_state(dataset, filename)
     
     if 'X' in dataset.data_vars:
         X = dataset.to_dataset().X
@@ -333,6 +355,17 @@ def load_dataset(filename, with_samples=True):
             '/features' : features.load(),
             '/varm' : varm.load(),
         })
+
+    with nc.Dataset(filename, 'r') as dset:
+        has_state = 'state' in dset.groups
+
+    if has_state:
+        logger.info('Loading model state with data.')
+        with xr.open_dataset(filename, group='state', engine='netcdf4') as state:
+            dataset = update_view(
+                dataset,
+                state=state.load(),
+            )
 
     ## 1. explore the structure using the netCDF interface
     has_samples=False
