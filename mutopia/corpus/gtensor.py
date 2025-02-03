@@ -4,10 +4,7 @@ import numpy as np
 import warnings
 from typing import Union, List, Dict
 from numpy.typing import NDArray
-from ..utils import FeatureType, check_structure, dims_except_for
-import logging
-logger = logging.getLogger(' MuTensor ')
-logger.setLevel(logging.INFO)
+from ..utils import FeatureType, check_structure, logger
 
 
 def GTensor(

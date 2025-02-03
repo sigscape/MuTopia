@@ -81,8 +81,10 @@ def deepscan_neutral_matagenesis(
     )
 
     nloci, ncomp, *_ = region_mutation_rate.shape
-    region_mutation_rate = region_mutation_rate.reshape(nloci, ncomp, 32, -3).sum(
-        axis=-1
+    region_mutation_rate = (
+        region_mutation_rate
+        .reshape(nloci, ncomp, 32, 3)
+        .sum(axis=-1)
     )
 
     # 3. Extract the mutation rates per sample
@@ -95,7 +97,7 @@ def deepscan_neutral_matagenesis(
         for _start, _end, _mutrates in zip(start, end, region_mutation_rate):
 
             seq = fa[chrom][(_start - 1) : (_end + 2)].seq.upper()
-            nucleotides.extend(seq)
+            nucleotides.extend(seq[1:-2])
 
             for pos_m1 in range(len(seq) - 3 + 1):
 

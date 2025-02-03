@@ -80,12 +80,12 @@ class SBSMode(ModeConfig):
             comps.append(
                 np.array(
                     [database[component][context_mut] for context_mut in MUTOPIA_ORDER]
-                ).reshape((cls().sizes["context"], cls().sizes["mutation"]))
+                )
             )
 
         return xr.DataArray(
             np.array(comps),
-            dims=("component", "context", "mutation"),
+            dims=("component", "context",),
         )
 
     @classmethod
