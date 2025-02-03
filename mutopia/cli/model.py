@@ -16,7 +16,7 @@ from tqdm import tqdm
 def model():
     pass
 
-@model.command("train-test-split")
+@model.command("split")
 @click.argument("filename", type=click.Path(exists=True))
 @click.argument("test_contigs", nargs=-1, type=str)
 def train_test_split(
