@@ -23,7 +23,7 @@ Split the data into train and test sets, listing the contigs you would like to l
 
 .. code-block:: bash
     
-    $ mutopia train-test-split gtensor.nc chr2
+    $ mutopia split gtensor.nc chr2
 
 
 This will create two new files, `gtensor.train.nc` and `gtensor.test.nc`. Let's first make sure we can run a model on the data:
@@ -134,6 +134,44 @@ inspect the extracted signatures, we have to switch over to the python API.
 Mutopia model analysis
 ==========================
 
+Once you have a model you're happy with, you can use it to annotate a G-tensor. First, make a copy of your data, then run 
+the `mutopia predict` command:
+
+.. code-block:: bash
+
+    $ cp gtensor.nc gtensor.annotated.nc
+    $ mutopia predict path/to/model.pth gtensor.annotated.nc -@ 5
+
+This will pre-load the data with information about the discovered components, like the contribution of each component to each sample. You can also
+generate a report which shows the spectrum of each component:
+
+.. code-block:: bash
+
+    $ mutopia report path/to/model.pth report.pdf
+
+Finally, you can use the model to annotate observations from new samples (this only works for SBS data for now). Run the `gtensor-sbs annotate` command,
+and provide paths to a trained model, an annotated G-tensor, and a VCF file:
+
+.. code-block:: bash
+
+    $ gtensor-sbs annotate \
+        path/to/model.pth \
+        gtensor.annotated.nc \
+        path/to/sample.bcf \
+        --pass-only \
+        -m mutation_rate.bedgraph.gz \
+        | bcftools view -Oz > annotated.vcf.gz
+
+Note that by omitting `--weight-col`, you are weighting each observation equally when solving for the sample-level contributions (which is 
+usually the desired behavior). The "mutation_rate.bedgraph.gz" file is used for clustering. If clustering is not desired, pass the `--no-cluster` flag.
+
+This command adds the INFO columns "logp_{component}" to the VCF file, which contains the posterior log-probability that the component generated the observation. 
+
+Mutopia API usage
+==========================
+
+Expansion coming soon!
+
 First, let's load the model and the data:
 
 .. code-block:: python
@@ -143,12 +181,4 @@ First, let's load the model and the data:
     model = mu.load_model("path/to/model.pth")
     data = mu.load_data("gtensor.test.nc") # the training data may be quite large, it's often easier to work with the test data
 
-Next, let's plot some signatures. There are commands which allow for more granular control, but it's easier to print a "report" 
-with everything at once:
 
-.. code-block:: python
-
-    k=0
-    model.signature_report(k)
-
-The signatures are indexed by their component numbers for now.
