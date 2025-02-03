@@ -186,6 +186,9 @@ def annotate(
     fasta = fasta or attrs['fasta_file']
     if not os.path.exists(fasta):
         raise click.FileError(f'No such file exists: {fasta}, provide a valid fasta file using the `--fasta/-fa` argument.')
+    
+    if not mu.model.CS.has_corpusstate(corpus):
+        raise ValueError(f'The provided G-Tensor is not annotated. Please run `mutopia predict <model> {corpus.attrs["filename"]}` with a trained model to annotate the corpus.')
         
     SBS.annotate_mutations(
         model,

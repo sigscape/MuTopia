@@ -257,10 +257,10 @@ class ModelState:
         norm = self._normalizers[CS.get_name(corpus)]
         
         norm[k] = _svi_update_fn(
-                norm[k],
-                np.log(subsample_rate or 1.) + logsum_mutation_rate,
-                learning_rate
-            )
+            norm[k],
+            np.log(subsample_rate or 1.) + logsum_mutation_rate,
+            learning_rate
+        )
         
     
     def _calc_normalizers(self, 

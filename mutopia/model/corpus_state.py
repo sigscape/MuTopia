@@ -47,10 +47,7 @@ class CorpusState:
     
     @classmethod
     def list_samples(cls, corpus):
-        if issubclass(type(corpus), CorpusInterface):
-            return list(corpus.sample)
-        else:
-            return list(corpus.sample.values)
+        return list(corpus.list_samples())
 
     @classmethod
     def fetch_sample(cls, corpus, sample_name):
@@ -88,7 +85,6 @@ class CorpusState:
             ):
 
         sample_names = cls.list_samples(corpus)
-
         n_components = model_state.n_components
             
         state_elements = {
@@ -103,6 +99,14 @@ class CorpusState:
                 model.prepare_corpusstate(corpus)
             )
 
+
+        # a smidge of interface chicanery here
+        # The "corpus" passed to this function may be a nested series of interfaces, or it could be a plain G-Tensor.
+        # Since we want to be able to modify the wrapped corpus, we add one more layer of indirection,
+        # then modify the corpus in place.
+        corpus = CorpusInterface(corpus)
+        corpus.corpus = corpus.drop_dims('component', errors='ignore')
+
         DataTree(
             data=xr.Dataset(
                 state_elements,
@@ -116,11 +120,12 @@ class CorpusState:
                 }
             ),
             name='state',
-            parent=corpus.corpus if issubclass(type(corpus), CorpusInterface) else corpus,
+            parent=corpus.corpus,
         )
 
         return corpus
     
+
     @staticmethod
     def genome_size(corpus):
         return corpus.state.attrs['genome_size']

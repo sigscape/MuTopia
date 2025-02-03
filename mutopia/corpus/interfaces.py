@@ -3,10 +3,11 @@ from numpy import array
 from .disk_interface import _backend_load_sample, load_dataset
 
 def lazy_load(corpus):
-    return LazySampleLoader(CorpusInterface(load_dataset(corpus, with_samples=False)))
+    return LazySampleLoader(CorpusInterface(load_dataset(corpus, with_samples=False, with_state=False)))
 
 def eager_load(corpus):
-    return CorpusInterface(load_dataset(corpus, with_samples=True))
+    return CorpusInterface(load_dataset(corpus, with_samples=True, with_state=False))
+
 
 def _fetch_sample_from_disk(
     dataset,
@@ -39,72 +40,38 @@ class CorpusInterface:
     ):
         # first, make a copy of the corpus
         self._corpus = corpus
-
-    def modality(self):
-        return self.corpus.modality()
     
-    @property
-    def varm(self):
-        return self.corpus.varm
-
+    def __getattr__(self, attr):
+        return getattr(self._corpus, attr)
+    
     @property
     def corpus(self):
+        if issubclass(type(self._corpus), CorpusInterface):
+            return self._corpus.corpus
         return self._corpus
     
-    @property
-    def features(self):
-        return self.corpus.features
-
-    @property
-    def sample(self):
-        return self.corpus.sample.values
-    
-    @property
-    def sizes(self):
-        return self.corpus.sizes
+    @corpus.setter
+    def corpus(self, value):
+        if issubclass(type(self._corpus), CorpusInterface):
+            self._corpus.corpus = value
+        else:
+            self._corpus = value
         
-    @property
-    def dims(self):
-        return self.corpus.dims
-    
-    @property
-    def coords(self):
-        return self.corpus.coords
-    
-    @property
-    def state(self):
-        return self.corpus.state
-    
-    @property
-    def regions(self):
-        return self.corpus.regions
-    
-    @property
-    def attrs(self):
-        return self.corpus.attrs
-    
-    @property
-    def X(self):
-        return self.corpus.X
-    
-    def fetch_sample(self, sample_name):
-        return self.corpus.fetch_sample(sample_name)
-    
 
 class LazySampleLoader(CorpusInterface):
 
     def __init__(self,
         corpus : CorpusInterface,
     ):
-        self._corpus = corpus.corpus
+        self._corpus = corpus
 
     @property
     def X(self):
-        return self.fetch_sample(self.corpus.sample.values[0])
+        return self.fetch_sample(self.list_samples()[0])
 
     def fetch_sample(self, sample_name):
         return _fetch_sample_from_disk(
-            self.corpus, 
+            self._corpus, 
             sample_name,
         )
 
@@ -125,17 +92,19 @@ class LazySampleSlicer(CorpusInterface):
 
     def __init__(self, corpus,*, sample, **slices):
         # first, make a copy of the corpus
-        sliced = corpus.corpus.copy()
-        # get a copy of the X layer
+
+        self._base_corpus=corpus
+
         self._apply_slices={d : s for d,s in slices.items() if not s is None}
         self._samples = sample
+        
+        sliced = corpus.copy()
+        # get a copy of the X layer
 
         if hasattr(sliced, 'X'):
             sliced = sliced.drop_vars('X', errors='ignore')
         sliced = sliced.drop_nodes(('features',))
 
-        self._base_corpus=corpus
-        
         self._corpus = sliced\
             .isel(**self._apply_slices)
         
@@ -158,7 +127,7 @@ class LazySampleSlicer(CorpusInterface):
 class SampleCorpusFusion(CorpusInterface):
 
     def __init__(self, corpus, sample):
-        self._corpus = corpus.corpus
+        self._corpus = corpus
         self._sample = sample
 
     @property

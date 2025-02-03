@@ -236,12 +236,10 @@ def fit_model(
     check_dim_consistency(*train_corpuses, *test_corpuses)
 
     logger.info('Preprocessing training corpuses...')
-    for corpus in train_corpuses:   
-        CS.init_corpusstate(corpus, model_state)
+    train_corpuses = [CS.init_corpusstate(corpus, model_state) for corpus in train_corpuses]
 
     logger.info('Preprocessing testing corpuses...')
-    for test_corpus in test_corpuses:
-        CS.init_corpusstate(test_corpus, model_state)
+    test_corpuses = [CS.init_corpusstate(corpus, model_state) for corpus in test_corpuses]
 
     test_score_fn = partial(
         deviance_locus,

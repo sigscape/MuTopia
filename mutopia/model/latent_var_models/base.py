@@ -191,18 +191,20 @@ def bound(
     return np.sum(weighted_posterior * np.nan_to_num(flattened_logweight, nan=0.)) + entropy_sstats
 
 
+@flatten_tensor_for_update
 @njit(nogil=True)
 def mixture_update_step(
+    gamma, # D*K
+    delta, # D
     alpha, # D*K
     tau, # D
     conditional_likelihood,  # *(D*K)xI
     weights, # I
     fraction_map, # DxD*K,
-    gamma, # D*K
-    delta, # D
 ):
 
-    exp_Elog_gamma = np.exp(log_dirichlet_expectation(gamma)) # D*K
+    Elog_gamma = log_dirichlet_expectation(gamma)
+    exp_Elog_gamma = np.exp(Elog_gamma) # D*K
     exp_Elog_delta = np.exp(log_dirichlet_expectation(delta)) # D
     
     # (D @ D*K) => D*K) * D*K => D*K
@@ -221,8 +223,16 @@ def mixture_update_step(
     phi = weighted_phi/weights[None,:]
     entropy_sstats = -np.sum(weighted_phi * np.where(phi > 0, np.log(phi), 0.))
 
-    flattened_logweight = np.log(exp_Elog_prior) + np.log(conditional_likelihood)
-    elbo = np.sum(weighted_phi * np.nan_to_num(flattened_logweight, nan=0.)) + entropy_sstats
+    prior_elbo = dirichlet_bound(tau, delta)
+    
+    M = fraction_map.T
+    prior_elbo += np.sum(
+        gammalnvec(alpha @ M) - gammalnvec(gamma @ M) + \
+            (gammalnvec(gamma) - gammalnvec(alpha) + (alpha - gamma) * Elog_gamma) @ M
+    )
+
+    flattened_logweight = np.log(exp_Elog_prior)[:,None] + np.log(conditional_likelihood)
+    elbo = np.sum(weighted_phi * np.nan_to_num(flattened_logweight, nan=0.)) + entropy_sstats + prior_elbo
 
     return (
         alpha + sstats, 

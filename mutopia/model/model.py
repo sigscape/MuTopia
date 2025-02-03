@@ -13,11 +13,6 @@ from functools import partial
 from joblib import dump
 from collections import defaultdict
 import typing
-
-def _unwrap(corpus):
-    if issubclass(type(corpus), CorpusInterface):
-        return corpus.corpus
-    return corpus
    
 '''
 The Model class is a wrapper around a trained model state object, 
@@ -61,15 +56,14 @@ class Model:
 
 
     def setup_corpus(self, corpus):
-        args = (corpus, self.model_state_)
         
         logger.info('Setting up dataset state ...')
 
-        CS.init_corpusstate(*args)
+        corpus = CS.init_corpusstate(corpus, self.model_state_)
         
         with ParContext(1) as par:
             CS.update_corpusstate(
-                *args, 
+                corpus, self.model_state_, 
                 from_scratch=True,
                 parallel_context=par,
             )
@@ -222,7 +216,7 @@ class Model:
                 )
         
         
-        corpus = _unwrap(corpus).assign_coords({
+        corpus = corpus.assign_coords({
             'component' : self.component_names,
         })
         corpus['contributions'] = contributions
@@ -249,7 +243,7 @@ class Model:
                 with_context=False,
             )
 
-        corpus = _unwrap(corpus).assign_coords({'component' : self.component_names})
+        corpus = corpus.assign_coords({'component' : self.component_names})
         corpus.varm['component_distributions'] =\
              np.exp(lmrt - lmrt.max(skipna=True)).fillna(0.)
         
@@ -272,8 +266,6 @@ class Model:
 
         if not CS.has_corpusstate(corpus):
             corpus = self.setup_corpus(corpus)
-
-        corpus = _unwrap(corpus)
 
         try:
             corpus.varm['component_distributions']
@@ -345,8 +337,6 @@ class Model:
             for k in range(self.n_components)
         ])
 
-        corpus = _unwrap(corpus)
-        
         features = corpus.state.coords['feature'].data
 
         corpus = corpus.assign_coords({'transformed_features' : features})

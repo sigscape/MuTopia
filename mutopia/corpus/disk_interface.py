@@ -341,7 +341,7 @@ def _list_sample_names(filename):
             raise NoSamplesError('This dataset has no samples yet, it will not be compatible with many functions.')
 
 
-def load_dataset(filename, with_samples=True):
+def load_dataset(filename, with_samples=True, with_state=True):
     
     with xr.open_dataset(filename, engine='netcdf4') as root, \
         xr.open_dataset(filename, group='regions', engine='netcdf4') as regions, \
@@ -359,7 +359,7 @@ def load_dataset(filename, with_samples=True):
     with nc.Dataset(filename, 'r') as dset:
         has_state = 'state' in dset.groups
 
-    if has_state:
+    if with_state and has_state:
         logger.info('Loading model state with data.')
         with xr.open_dataset(filename, group='state', engine='netcdf4') as state:
             dataset = update_view(

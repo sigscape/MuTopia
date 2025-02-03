@@ -278,6 +278,9 @@ class SBSMode(ModeConfig):
                 coords, weights, 
                 shape=(2, 2, len(MUTOPIA_ORDER), locus_dim),
                 has_duplicates=False,
+                sorted=True,
+                prune=False,
+                cache=False,
             ),
             dims=("clustered", "configuration", "context", "locus"),
         )
@@ -298,14 +301,14 @@ class SBSMode(ModeConfig):
                 pd.DataFrame(
                     gamma_hat/gamma_hat.sum(), 
                     index=model.component_names, 
-                    columns=['Fraction of mutations'],
+                    columns=['Fraction of\nmutations'],
                 ).sort_values(
-                    'Fraction of mutations', 
+                    'Fraction of\nmutations', 
                     ascending=False
                 ),
                 headers='keys',
-                tablefmt='pretty',
-                floatfmt=".3f"
+                tablefmt='simple',
+                floatfmt=(".3f", ".3f")
             ), 
             file=sys.stderr
         )
@@ -329,7 +332,6 @@ class SBSMode(ModeConfig):
             description={},
             output=output,
         )
-
 
 
 def _make_feature_name(subsequence_code):
