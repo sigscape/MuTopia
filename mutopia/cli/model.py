@@ -536,7 +536,7 @@ def create_study(
         tablefmt='simple',
     ))
 
-    mu.create_study(
+    mu.tune.create_study(
         list(map(os.path.abspath, train_corpuses)),
         list(map(os.path.abspath, test_corpuses)),
         eval_every=5,
@@ -581,7 +581,7 @@ def run_trial(
     time_limit: Union[None, int] = None,
     lazy: bool = False,
 ):
-    mu.run_trial(
+    mu.tune.run_trial(
         study_name=study_name,
         threads=threads,
         lazy=lazy,
@@ -594,7 +594,7 @@ def run_trial(
 def dashboard(
     study_name: str,
 ):
-    mu.dashboard(study_name)
+    mu.tune.dashboard(study_name)
 
 
 @study.command("summary")
@@ -610,7 +610,7 @@ def summary(
     study_name: str,
     output=None,
 ):
-    trials = mu.tuning.summary(study_name)
+    trials = mu.tune.summary(study_name)
     trials = trials.sort_values('value', ascending=False, na_position='last')
     sel_cols = ['number', 'value', 'state'] 
     
@@ -665,7 +665,7 @@ def retrain(
     lazy: bool = False,
     
 ):
-    mu.tuning.retrain(
+    mu.tune.retrain(
         lazy=lazy,
         study_name=study_name,
         trial_number=trial_number,
@@ -678,7 +678,7 @@ def retrain(
 @study.command("ls")
 def list_studies():
     click.echo('Available studies:')
-    studies = mu.tuning.list_studies()
+    studies = mu.tune.list_studies()
     click.echo('\n'.join(studies))
 
 

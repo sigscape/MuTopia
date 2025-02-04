@@ -397,6 +397,17 @@ class LocalUpdate(PrimitiveModel):
         return sstats
     
 
+    @staticmethod
+    def reduce_dense_sstats(
+        sstats, 
+        corpus,
+        *,
+        gamma,
+        **kw,
+    ):
+        sstats.append(gamma)
+        return sstats
+
     def partial_fit(
         self, sstats, learning_rate
     ):
