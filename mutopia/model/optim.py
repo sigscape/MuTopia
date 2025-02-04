@@ -369,8 +369,13 @@ def fit_model(
 
     if num_epochs > 0:
         logger.info('Finalizing models ...')
+
         for model in model_state.nonlocals.values():
             model.post_fit(train_corpuses)
+
+        if not empirical_bayes:
+            logger.info('Updating priors ...')
+            model_state.optim_prior(train_corpuses)
 
     return (
         model_state,

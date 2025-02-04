@@ -2,9 +2,9 @@
 import mutopia as mu
 from mutopia.corpus.interfaces import *
 import mutopia.corpus.disk_interface as disk
-import xarray as xr
 import netCDF4 as nc
 from ..utils import logger
+
 import click
 from tabulate import tabulate
 from typing import *
@@ -703,8 +703,8 @@ def report(
 
 
 @model.command("predict")
-@click.argument("model_path", type=click.Path(exists=True))
-@click.argument("corpus_path", type=click.Path(exists=True))
+@click.argument("model", type=click.Path(exists=True))
+@click.argument("dataset", type=click.Path(exists=True))
 @click.option(
     "-@",
     "--threads",
@@ -713,13 +713,14 @@ def report(
     help="Number of threads to use",
 )
 def predict(
-    model_path: str,
-    corpus_path: str,
+    model: str,
+    dataset: str,
     threads: int = 1,
 ):
     
-    model = mu.load_model(model_path)
-    dataset = lazy_load(corpus_path)
+    model = mu.load_model(model)
+    corpus_path = dataset
+    dataset = lazy_load(dataset)
 
     logger.info('Setting up corpus ...')
     dataset = model.setup_corpus(dataset)
@@ -737,4 +738,43 @@ def predict(
     disk._write_model_state(
         dataset,
         corpus_path,
+    )
+
+
+@model.group("tools")
+def tools():
+    pass
+
+@tools.command("simulate")
+@click.argument("model", type=click.Path(exists=True))
+@click.argument("dataset", type=click.Path(exists=True))
+@click.argument("output", type=click.Path(writable=True))
+@click.option(
+    "--seed",
+    type=int,
+    default=42,
+)
+def simulate_from_model(
+    model : str,
+    dataset : str,
+    output : str,
+    seed : int = 0,
+):
+    
+    dataset = disk.load_dataset(
+        dataset,
+        with_samples=False,
+    )
+
+    model = mu.load_model(model)
+
+    resampled = mu.tl.simulate_from_model(
+        model,
+        dataset,
+        seed=seed,
+    )
+
+    disk.write_dataset(
+        resampled,
+        output,
     )

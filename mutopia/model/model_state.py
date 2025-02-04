@@ -295,18 +295,31 @@ class ModelState:
                 if hasattr(model, 'get_interaction_summary')
             )
         )
+    
+
+    def optim_prior(self, corpuses):
+
+        sstats = {
+            CS.get_name(corpus) : [
+                CS.fetch_topic_compositions(corpus, sname)
+                for sname in CS.list_samples(corpus)
+            ]
+            for corpus in corpuses
+        }
+
+        self.locals_model.partial_fit(sstats, learning_rate=1.)
         
 
     def Mstep(self,
-            corpuses,
-            sstats,
-            offsets,
-            *,
-            parallel_context,
-            learning_rate=1.,
-            update_prior=True,
-            use_parallel=True,
-        ):
+        corpuses,
+        sstats,
+        offsets,
+        *,
+        parallel_context,
+        learning_rate=1.,
+        update_prior=True,
+        use_parallel=True,
+    ):
 
         if update_prior:
             self.locals_model.partial_fit(sstats['locals_sstats'], learning_rate=learning_rate)
