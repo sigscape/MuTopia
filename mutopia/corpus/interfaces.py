@@ -112,8 +112,7 @@ class LazySampleSlicer(CorpusInterface):
     def X(self):
         return self._base_corpus.X
     
-    @property
-    def sample(self):
+    def list_samples(self):
         return self._samples
     
     def fetch_sample(self, sample_name):
@@ -130,9 +129,8 @@ class SampleCorpusFusion(CorpusInterface):
         self._corpus = corpus
         self._sample = sample
 
-    @property
-    def sample(self):
-        return array(['0'])
+    def list_samples(self):
+        return ['0']
     
     @property
     def X(self):
@@ -141,3 +139,28 @@ class SampleCorpusFusion(CorpusInterface):
     def fetch_sample(self, sample_name):
         return self._sample
         
+
+class BootstrapCorpus(CorpusInterface):
+
+    def __init__(self, corpus, random_state):
+        self._corpus = corpus
+
+        self._sample = random_state.choice(
+            corpus.list_samples(),
+            size=len(corpus.list_samples()),
+            replace=True,
+        )
+
+    def list_samples(self):
+        return self._sample
+
+
+class DifferentSamples(CorpusInterface):
+
+    def __init__(self, corpus, samples):
+        self._corpus = corpus
+        self._samples = samples
+
+    def list_samples(self):
+        return self._samples
+    

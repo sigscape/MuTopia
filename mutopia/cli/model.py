@@ -1,6 +1,7 @@
 
 import mutopia as mu
 from mutopia.corpus.interfaces import *
+from mutopia.model.corpus_state import CorpusState as CS
 import mutopia.corpus.disk_interface as disk
 import netCDF4 as nc
 from ..utils import logger
@@ -11,6 +12,25 @@ from typing import *
 import numpy as np
 import os
 from tqdm import tqdm
+
+
+def _setup_bootstrap(train_corpuses, test_corpuses, seed):
+    
+    logger.warning('Bootstrapping training and testing corpuses ...')
+    test_corpus_map = {CS.get_name(corpus) : corpus for corpus in test_corpuses}
+
+    train_corpuses = tuple([
+        BootstrapCorpus(corpus, np.random.RandomState(seed)) 
+        for corpus in train_corpuses
+    ])
+
+    test_corpuses = tuple([
+        DifferentSamples(test_corpus_map[CS.get_name(corpus)], corpus.list_samples())
+        for corpus in train_corpuses
+    ])
+
+    return train_corpuses, test_corpuses
+
 
 @click.group("Model training")
 def model():
@@ -266,6 +286,13 @@ def train_test_split(
     default=None,
     help="Time limit for training, in seconds",
 )
+@click.option(
+    "--bootstrap",
+    '-b',
+    type=click.IntRange(0, np.iinfo(np.int32).max),
+    default=None,
+    help="Bootstrap the training and testing corpuses",
+)
 def train(
     output,
     *,
@@ -274,6 +301,7 @@ def train(
     init_components : Union[None, List[str]],
     time_profile: bool = False,
     lazy: bool = False,
+    bootstrap : Union[int, None] = None,
     **model_kw,
 ):  
     if not len(train_corpuses) > 0:
@@ -298,6 +326,9 @@ def train(
     
     train_corpuses = tuple(map(lazy_load if lazy else eager_load, train_corpuses))
     test_corpuses = tuple(map(eager_load, test_corpuses))
+
+    if bootstrap:
+        train_corpuses, test_corpuses = _setup_bootstrap(train_corpuses, test_corpuses, seed=bootstrap)
     
     if time_profile:
         model_kw['eval_every'] = 1
@@ -656,12 +687,19 @@ def summary(
     default=None,
     help="Time limit for training, in minutes",
 )
+@click.option(
+    "--seed",
+    type=click.IntRange(0, 100000),
+    default=None,
+    help="Use a different random seed",
+)
 def retrain(
     output : str,
     study_name: str,
     trial_number: int,
     threads : int = 1,
     time_limit: Union[None, int] = None,
+    seed: Union[None, int] = None,
     lazy: bool = False,
     
 ):
@@ -669,6 +707,7 @@ def retrain(
         lazy=lazy,
         study_name=study_name,
         trial_number=trial_number,
+        seed=seed,
         threads=threads,
         time_limit=time_limit,
         save_name=output,

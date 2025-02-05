@@ -307,6 +307,7 @@ def run_trial(
 def retrain(
     storage = None,
     lazy = False,
+    seed = None,
     *,
     study_name,
     trial_number,
@@ -336,7 +337,7 @@ def retrain(
         train_corpuses,
         test_corpuses,
         eval_every=5,
-        seed=trial_number,
+        seed=seed or trial_number,
         **model_kw,
     )
 

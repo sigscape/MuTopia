@@ -155,9 +155,15 @@ class CorpusState:
 
     @classmethod
     def fetch_topic_compositions(cls, corpus, sample_name):
-        return cls.fetch_val(corpus, 'topic_compositions')\
+        gamma = cls.fetch_val(corpus, 'topic_compositions')\
                     .sel(sample=sample_name)\
+                    .transpose('component',...)\
                     .data
+        
+        if len(gamma.shape) > 1:
+            gamma = gamma[:,0]
+
+        return gamma
     
     
     @classmethod

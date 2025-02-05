@@ -103,7 +103,8 @@ class Segment:
     end : int
     parent_region : Region
     feature_combination : typing.Any
-
+    active_features: typing.Any
+    
     def __len__(self):
         return self.end - self.start
     
@@ -223,7 +224,8 @@ def _endpoints_to_segments(endpoints, has_base_regions=True): # change default m
                         prev_pos, 
                         pos, 
                         base_region,
-                        feature_combination_ids[feature_combination]
+                        feature_combination_ids[feature_combination],
+                        feature_combination,
                     )
 
         if is_start:
@@ -287,8 +289,10 @@ def linearize_beds(
                     segment.start + i*cut_size,
                     min(segment.end, segment.start + (i+1)*cut_size),
                     segment.parent_region,
-                    segment.feature_combination
+                    segment.feature_combination,
+                    segment.active_features
                 )
+
     # 1. get the endpoints from the bedfiles
     data = _get_endpoints(*bedfiles)
     
@@ -298,7 +302,14 @@ def linearize_beds(
     data = chain.from_iterable(map(chop_if_too_large, data))
 
     for segment in data:
-        print(segment.chrom, segment.start, segment.end, sep='\t', file=output)
+        print(
+            segment.chrom, 
+            segment.start, 
+            segment.end, 
+            '|'.join(f'{track_id}:{feature}' for track_id, feature in segment.active_features),
+            sep='\t', 
+            file=output
+        )
 
 
 def make_regions(
