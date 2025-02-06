@@ -152,6 +152,7 @@ class Model:
         self.plot_interaction_matrix(
             component,
             gridspec=gs[1],
+            normalization=normalization,
         )
 
         fig.suptitle(
@@ -170,6 +171,7 @@ class Model:
             component,
             palette='coolwarm',
             gridspec=None,
+            normalization='global',
             **kw,
         ):
 
@@ -181,7 +183,7 @@ class Model:
         interactions = flatten(interactions.drop_sel(context='Shared effect')).to_pandas()
         
         baseline = flatten(
-            self.model_state_.format_signature(component).sel(
+            self.model_state_.format_signature(component, normalization=normalization).sel(
                 mesoscale_state='Baseline',
             )
         ).to_pandas()

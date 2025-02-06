@@ -100,7 +100,7 @@ def bam_to_fragments(
 class FragmentLength(ModeConfig):
 
     MODE_ID='FRAGMENT_LENGTH'
-    PALETTE='lightgrey'
+    PALETTE=(0.8, 0.8, 0.8)
 
     @property
     def coords(self):
@@ -152,7 +152,6 @@ class FragmentLength(ModeConfig):
         regions_file : str,
         **kw,
     ):
-        print('here')
         try:
             import pysam
         except ImportError:
