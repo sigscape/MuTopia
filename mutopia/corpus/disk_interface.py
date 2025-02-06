@@ -16,20 +16,21 @@ WRITE_KW = dict(
 )
 
 def fetch_regions_path(dataset):
+    
     regions_file = read_attrs(dataset)['regions_file']
 
     if regions_file is None:
         raise ValueError('No regions file found in dataset attributes. This probably means you are attempting an ingestion operation on a subset corpus view, which is not allowed.')
-    
+        
     regions_path = os.path.join(os.path.dirname(dataset), regions_file)
 
     if not os.path.exists(regions_path):
         raise FileNotFoundError(
             f'No such file exists: {regions_path}, maybe it was deleted? You can set a new regions_file with the command:\n\t'
-            f'gtensor set-attr {dataset.attrs["filename"]} -set regions_file <path/to/file>'
+            f'gtensor set-attr {dataset} -set regions_file <path/to/file>'
         )
 
-    return regions_file
+    return regions_path
 
 
 def retry_until_write(func, n_tries=1000, sleep=1):

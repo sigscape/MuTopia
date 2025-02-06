@@ -152,7 +152,6 @@ class FragmentLength(ModeConfig):
         regions_file : str,
         **kw,
     ):
-        print('here')
         try:
             import pysam
         except ImportError:
