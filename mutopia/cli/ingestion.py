@@ -823,7 +823,7 @@ def ingest_sample(
     fasta = fasta or attrs['fasta_file']
     if not os.path.exists(fasta):
         raise click.FileError(f'No such file exists: {fasta}, provide a valid fasta file using the `--fasta/-fa` argument.')
-    
+
     sample_arr = modality.ingest_observations(
         sample_file,
         regions_file=disk.fetch_regions_path(dataset),
