@@ -150,7 +150,7 @@ class FragmentMotif(ModeConfig):
         weight_tags,
         in_motifs = True,
         *,
-        dim_sizes,
+        locus_dim,
         regions_file,
         fasta_file,
     ):
@@ -230,7 +230,7 @@ class FragmentMotif(ModeConfig):
             context_idx_map = {c : j for j,c in enumerate(self.coords['context'])}
 
             obs_matrix = np.zeros(
-                (self.sizes['context'], dim_sizes['locus']),
+                (self.sizes['context'], locus_dim),
                 dtype = np.float16,
             )
 
@@ -393,7 +393,7 @@ class InFragmentMotif(FragmentMotif):
         bam_file,
         weight_tags,
         *,
-        dim_sizes,
+        locus_dim,
         regions_file,
         fasta_file,
         **kw,
@@ -402,7 +402,7 @@ class InFragmentMotif(FragmentMotif):
             bam_file,
             weight_tags,
             in_motifs = True,
-            dim_sizes = dim_sizes,
+            locus_dim = locus_dim,
             regions_file = regions_file,
             fasta_file = fasta_file,
         )
@@ -425,7 +425,7 @@ class OutFragmentMotif(FragmentMotif):
         bam_file,
         weight_tags,
         *,
-        dim_sizes,
+        locus_dim,
         regions_file,
         fasta_file,
         **kw,
@@ -434,7 +434,7 @@ class OutFragmentMotif(FragmentMotif):
             bam_file,
             weight_tags,
             in_motifs = False,
-            dim_sizes = dim_sizes,
+            locus_dim = locus_dim,
             regions_file = regions_file,
             fasta_file = fasta_file,
         )

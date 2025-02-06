@@ -148,7 +148,7 @@ class FragmentLength(ModeConfig):
         bam_file : str,
         weight_tags : list,
         *,
-        dim_sizes : dict,
+        locus_dim : dict,
         regions_file : str,
         **kw,
     ):
@@ -223,7 +223,7 @@ class FragmentLength(ModeConfig):
             n_success = 0; n_failure = 0
 
             obs_matrix = np.zeros(
-                (self.sizes['context'], dim_sizes['locus']),
+                (self.sizes['context'], locus_dim),
                 dtype = np.float16,
             )
 
