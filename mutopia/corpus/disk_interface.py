@@ -349,11 +349,16 @@ def load_dataset(filename, with_samples=True, with_state=True):
         xr.open_dataset(filename, group='features', engine='netcdf4') as features, \
         xr.open_dataset(filename, group='varm', engine='netcdf4') as varm:
 
+        features = features.load()
+        for fname, feature in features.data_vars.items():
+            if not bool(feature.attrs['active']):
+                features = features.drop_vars(fname)
+
         ## 2. load the bones using xarray dataset calls
         dataset = datatree.DataTree.from_dict({
             '/' : root.load(),
             '/regions' : regions.load(),
-            '/features' : features.load(),
+            '/features' : features,
             '/varm' : varm.load(),
         })
 
