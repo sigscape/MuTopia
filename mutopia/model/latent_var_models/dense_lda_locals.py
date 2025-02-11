@@ -120,6 +120,35 @@ class LDAUpdateDense(LocalUpdate):
         return svi_update
     
 
+    def _conditional_observation_likelihood(
+        self,
+        corpus,
+        model_state,
+        logsafe=True,
+        *,
+        parallel_context,
+    ):
+        
+        obs_dims = CS.observation_dims(corpus)
+        sample_dims = (*obs_dims, 'locus')
+
+        logsafe_transform = lambda x : np.nan_to_num(np.exp(x - np.nanmax(x)), nan=0., neginf=0.)
+        exp_transform = lambda x : np.nan_to_num(np.exp(x), nan=0., neginf=0.)
+
+        lcol = model_state\
+            ._get_log_mutation_rate_tensor(
+                corpus, 
+                parallel_context=parallel_context,
+                with_context=False,
+            )\
+            .transpose('component', *sample_dims)\
+            .data
+        
+        return np.ascontiguousarray(
+            (logsafe_transform if logsafe else exp_transform)(lcol) 
+        )
+    
+
     def get_update_fns(
         self,
         corpuses,
@@ -138,23 +167,14 @@ class LDAUpdateDense(LocalUpdate):
             for sample_name in CS.list_samples(corpus)
         ]
 
-        obs_dims = CS.observation_dims(corpuses[0])
-        sample_dims = (*obs_dims, 'locus')
-
-        logsafe_transform = lambda x : np.ascontiguousarray(
-            np.nan_to_num(np.exp(x - np.nanmax(x)), nan=0., neginf=0.)
-        )
-        
         likelihood_tensors = {
-            CS.get_name(corpus) : logsafe_transform(
-                model_state\
-                ._get_log_mutation_rate_tensor(
-                    corpus, 
+            CS.get_name(corpus) : (
+                self._conditional_observation_likelihood(
+                    corpus,
+                    model_state,
                     parallel_context=parallel_context,
-                    with_context=False,
-                )\
-                .transpose('component', *sample_dims)\
-                .data
+                    logsafe=True,
+                )
             )
             for corpus in corpuses
         }
@@ -168,7 +188,7 @@ class LDAUpdateDense(LocalUpdate):
                 locus_subsample=locus_subsample,
                 batch_subsample=batch_subsample,
                 conditional_likelihood=likelihood_tensors[CS.get_name(corpus)],
-                dims=sample_dims,
+                dims=(*CS.observation_dims(corpus), 'locus'),
             )
             for (corpus, sample_name) in samples
         )

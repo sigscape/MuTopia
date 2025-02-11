@@ -281,7 +281,10 @@ class Model:
                 corpus = self.annot_contributions(corpus, threads)
             marginal_exposures = corpus['contributions'].sum(dim='sample').data
         else:
-            marginal_exposures = np.sum([exposures(corpus, sample_name) for sample_name in CS.list_samples(corpus)])
+            marginal_exposures = np.sum(
+                [exposures(corpus, sample_name) for sample_name in CS.list_samples(corpus)],
+                axis=0,
+            )
             
         marginal = \
             self.model_state_._log_marginalize_mutrate(

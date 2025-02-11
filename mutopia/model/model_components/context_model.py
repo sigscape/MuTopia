@@ -42,6 +42,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         self.n_components = n_components
         self.context_dim = corpuses[0].dims['context']
         self.context_names = list(corpuses[0].coords['context'].data)
+        self.dtype = dtype
 
         corpus=corpuses[0] # just grab the first one to use for initialization
         self._context_distribution = \
@@ -58,11 +59,11 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
                 self.context_transformer.encoding_matrix,
                 self.transformer.encoding_matrix,
                 shared_effects=True
-            )
+            ).astype(dtype)
 
         X = DesignMatrixHelper.one_pad_right(
             self.encoding_matrix_.copy()
-        )
+        ).astype(dtype)
 
         self._coefs = self._init_params(
             random_state, 
@@ -209,7 +210,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         # Use numpy advanced indexing to update context_sstats
         np.add.at(sstats, (slice(None), context, mesoscale_states), weighted_posterior)
 
-        return sstats
+        return sstats.astype(self.dtype)
     ##
     # End of SparseDataBase interface
     ##
@@ -232,7 +233,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         np.add.at(sstats, (slice(None), slice(None), plus_idx), weights[:,0])
         np.add.at(sstats, (slice(None), slice(None), minus_idx), weights[:,1])
 
-        return sstats
+        return sstats.astype(self.dtype)
 
 
     def init_from_signatures(self, signatures):

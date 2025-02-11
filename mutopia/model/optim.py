@@ -208,7 +208,7 @@ def fit_model(
     random_state,
     # optimization settings
     empirical_bayes = True,
-    begin_prior_updates = 20,
+    begin_prior_updates = 50,
     stop_condition=50,
     # optimization settings
     num_epochs = 2000,
@@ -291,6 +291,7 @@ def fit_model(
 
     train_scores = []
     test_scores = []
+    prior_has_been_updated = False
 
     with ParContext(threads, verbose) as par:
         try:
@@ -303,19 +304,28 @@ def fit_model(
             
             for epoch in progress_bar:
 
-                evaluate_test = not eval_every is None and \
+                evaluate_test = (
+                    not eval_every is None and 
                     (
                         (epoch % eval_every == 0) \
                         or epoch == 1 \
                         or epoch == num_epochs
                     )
+                )
+                
+                update_prior = (
+                    epoch >= begin_prior_updates
+                    and empirical_bayes
+                    and not any(CS.is_marginal_corpus(corpus) for corpus in train_corpuses)
+                )
+
+                if update_prior and not prior_has_been_updated:
+                    logger.info('Beginning to update priors.')
+                    prior_has_been_updated = True
 
                 train_score, test_score = timer_wrapper(step_fn, 'train_step')(
                     parallel_context=par,
-                    update_prior = \
-                        epoch >= begin_prior_updates \
-                        and empirical_bayes \
-                        and not any(CS.is_marginal_corpus(corpus) for corpus in train_corpuses),
+                    update_prior = update_prior,
                     learning_rate = lr_schedule(epoch),
                     test_score_fn=test_score_fn if evaluate_test else dummy_score_fn,
                 )

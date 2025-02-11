@@ -348,9 +348,9 @@ def SBSModel(
     seed=0,
     # context model
     context_reg=0.0001,
-    context_conditioning=1e-5,
+    context_conditioning=1e-9,
     kmer_reg=0.005,
-    conditioning_alpha=1e-8,
+    conditioning_alpha=1e-9,
     context_encoder="diagonal",
     # locals model
     pi_prior=1.0,

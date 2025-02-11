@@ -17,11 +17,12 @@ class LDAUpdateSparse(LocalUpdate):
     ##
     # E-step functionality to satisfy the LocalUpdate interface
     ##
-    def _convert_sample(self, sample):
+    @classmethod
+    def _convert_sample(cls, sample, dtype=float):
 
         sample = sample.sparse_to_coo()
         weights = np.ascontiguousarray(
-            sample.data.data.astype(self.dtype, copy=False)
+            sample.data.data.astype(dtype, copy=False)
         )
 
         idx_dict = dict(zip(
@@ -35,7 +36,8 @@ class LDAUpdateSparse(LocalUpdate):
         )
     
 
-    def _unconvert_sample(self, sample, sample_dict, data):
+    @classmethod
+    def _unconvert_sample(cls, sample, sample_dict, data):
 
         dims = tuple(sample.dims)
         indices = np.array([sample_dict[k] for k in dims])
@@ -60,7 +62,7 @@ class LDAUpdateSparse(LocalUpdate):
             },
         )
 
-
+    @classmethod
     def _get_log_context_effect(
         self,
         corpus,
@@ -81,8 +83,9 @@ class LDAUpdateSparse(LocalUpdate):
                 + np.log(corpus.regions.exposures.data[locus])
 
 
+    @classmethod
     def _conditional_observation_likelihood(
-        self,
+        cls,
         corpus,
         model_state,
         logsafe=True,
@@ -97,7 +100,7 @@ class LDAUpdateSparse(LocalUpdate):
         ##
         logp_normalizer = CS.fetch_normalizers(corpus)[:,None]
 
-        offset = self._get_log_context_effect(
+        offset = cls._get_log_context_effect(
             corpus,
             **idx_dict
         )
@@ -119,8 +122,7 @@ class LDAUpdateSparse(LocalUpdate):
             logp_X - logp_X.max()
 
         return np.ascontiguousarray(
-            np.nan_to_num(np.exp(logp_X), nan=0.)\
-                .astype(self.dtype, copy=False)
+            np.nan_to_num(np.exp(logp_X), nan=0.)
         )
     
 
@@ -192,7 +194,7 @@ class LDAUpdateSparse(LocalUpdate):
         '''
         
         # 1. get the information we need from the sample
-        sample_dict = self._convert_sample(sample)
+        sample_dict = self._convert_sample(sample, dtype=self.dtype)
         weights = sample_dict['weights']/locus_subsample
         alpha = np.ascontiguousarray(self.alpha[CS.get_name(corpus)])
 
@@ -201,7 +203,7 @@ class LDAUpdateSparse(LocalUpdate):
                 corpus, 
                 model_state,
                 **sample_dict
-            )
+            ).astype(self.dtype, copy=False)
         
         args = (
             alpha, 
@@ -316,7 +318,7 @@ class LDAUpdateSparse(LocalUpdate):
         **kw,
     ):
 
-        sample_dict = self._convert_sample(sample)
+        sample_dict = self._convert_sample(sample, dtype=self.dtype)
         
         conditional_likelihood = \
             self._conditional_observation_likelihood(
@@ -324,7 +326,7 @@ class LDAUpdateSparse(LocalUpdate):
                 model_state,
                 logsafe=False, # we want the actual likelihood, don't remove the max for numerical stability
                 **sample_dict
-            )
+            ).astype(self.dtype, copy=False)
         
         weights = sample_dict['weights']
 

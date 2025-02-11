@@ -1,5 +1,5 @@
 import os
-from numpy import array
+from functools import lru_cache
 from .disk_interface import _backend_load_sample, load_dataset
 
 def lazy_load(corpus):
@@ -64,10 +64,11 @@ class LazySampleLoader(CorpusInterface):
         corpus : CorpusInterface,
     ):
         self._corpus = corpus
+        self._X = self.fetch_sample(self.list_samples()[0])
 
     @property
     def X(self):
-        return self.fetch_sample(self.list_samples()[0])
+        return self._X
 
     def fetch_sample(self, sample_name):
         return _fetch_sample_from_disk(

@@ -14,6 +14,7 @@ def sample_params(study, trial, extensive=0):
         'l2_regularization' : trial.suggest_float('l2_regularization', 1e-5, 1000., log=True),
         'tree_learning_rate' : trial.suggest_float('tree_learning_rate', 0.025, 0.2),
         'init_variance_theta' : trial.suggest_float('init_variance_theta', 0.025, 0.1),
+        'empirical_bayes' : trial.suggest_categorical('empirical_bayes', [True, False]),
     }
 
     if extensive>0:
