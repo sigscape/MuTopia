@@ -193,16 +193,15 @@ def get_marginal_mutation_rate(
                 [
                     'bedtools','makewindows',
                     '-g', genome_file,
-                    '-w', '5000',
+                    '-w', '50000',
                 ], 
                 stdout=f
             )
 
         with tempfile.TemporaryDirectory() as tempdir:
-            for vcf_file in tqdm.tqdm(vcf_files, desc='Filtering VCFs', ncols = 100):
-                
+            
+            for vcf_file in tqdm.tqdm(vcf_files, desc='Filtering VCFs', ncols = 100):    
                 with open(os.path.join(tempdir, os.path.basename(vcf_file)), 'w') as f:
-                        
                         with stream_passed_SNVs(
                             vcf_file, 
                             query_str, 

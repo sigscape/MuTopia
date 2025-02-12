@@ -659,6 +659,62 @@ def add_strand_feature(
     )
 
 
+@add_feature.command("vector")
+@click.argument(
+    'dataset',
+    type=click.Path(exists=True),
+)
+@click.argument(
+    'ingest_file',
+    type=click.Path(exists=True),
+)
+@click.option(
+    '-name',
+    '--feature-name',
+    type=str,
+    required=True,
+    help='Name to assign the feature',
+)
+@click.option(
+    '-g',
+    '--group',
+    default='all',
+    type=str,
+    help='Group to assign the feature to',
+)
+@click.option(
+    '-norm',
+    '--normalization',
+    type=click.Choice([x.value for x in FeatureType]),
+    default='log1p_cpm',
+    help='Normalization to apply to the feature',
+)
+def add_vector(
+    ingest_file : str,
+    group : str = 'all',
+    normalization : str = 'log1p_cpm',
+    *,
+    dataset : str,
+    feature_name : str,
+):
+    
+    with open(ingest_file) as f:
+        feature_vals = np.array([float(x.strip()) for x in f])
+
+    dims = disk.read_dims(dataset)
+    if not len(feature_vals) == dims['locus']:
+        raise ValueError(f'Feature vector length ({len(feature_vals)}) does not match the number of loci in the dataset ({dims["locus"]}).')
+
+    disk.write_feature(
+        dataset,
+        feature_vals,
+        group=group,
+        name=feature_name,
+        normalization=FeatureType(normalization),
+    )
+    
+
+
 @featurecmds.command("ls")
 @click.argument(
     'dataset',

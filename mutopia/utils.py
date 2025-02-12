@@ -339,7 +339,8 @@ def borrow_kwargs(*borrow_sigs):
 
 def close_process(process):
 
-    process.stdout.close()
+    if not process.stdout is None:
+        process.stdout.close()
     process.wait()
 
     if process.returncode:
