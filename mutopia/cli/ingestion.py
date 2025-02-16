@@ -295,7 +295,10 @@ def set_attrs(
 ):
     with nc.Dataset(dataset, 'a') as dset:
         for k,v in attrs:
-            setattr(dset, k, v)
+            try:
+                setattr(dset, k, v)
+            except AttributeError:
+                dset.setncattr(k, v)
 
 
 @ingestion.command("info")
