@@ -267,35 +267,35 @@ def write_dataset(dataset, filename):
         **WRITE_KW
     )
 
-    for group in list(dataset.children.keys()):
-        if group.startswith('/raw') or group == 'state':
+    for group_name in list(dataset.children.keys()):
+        if group_name.startswith('/raw') or group_name == 'state':
             # don't save model state associated with the data
             continue
         
-        dataset[group].to_dataset()\
+        group = getattr(dataset, group_name)
+        group.to_dataset()\
             .to_netcdf(
                 filename, 
-                group='/' + group, 
+                group='/' + group_name, 
                 mode='a', 
                 encoding={
                     k : {'dtype' : v.dtype}
-                    for k, v in dataset[group].data_vars.items()
+                    for k, v in group.data_vars.items()
                 },
                 **WRITE_KW
             )
     
     if 'state' in dataset.children:
         _write_model_state(dataset, filename)
-    
-    if 'X' in dataset.data_vars:
-        X = dataset.to_dataset().X
-        for sample_name, sample in zip(X.coords['sample'].data, X):
+
+
+    if len(dataset.list_samples()) > 0:
+        for sample_name in dataset.list_samples():
             write_sample(
                 filename,
-                sample,
+                dataset.fetch_sample(sample_name),
                 sample_name=f'X/{sample_name}',
             )
-
 
 
 def _load_sparse_sample(filename, sample_name, coo=False):

@@ -292,6 +292,7 @@ def simulate_from_model(
     model, 
     corpus, 
     seed=None,
+    exposures=None,
 ):
      
     model_state = _get_state(model)
@@ -334,7 +335,7 @@ def simulate_from_model(
             dims=log_marginal_mutrate.dims,
         )
     
-    contributions = _fetch_contributions(corpus)
+    contributions = _fetch_contributions(corpus, exposures=exposures)
 
     if not CS.has_corpusstate(corpus):
         raise ValueError(

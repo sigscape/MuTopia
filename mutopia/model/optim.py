@@ -171,29 +171,45 @@ def learning_rate_schedule(tau, kappa, epoch):
 def slice_generator(
         random_state,
         *corpuses,
-        locus_subsample=0.25,
+        locus_subsample=None,
         batch_subsample=None,
     ):
 
-    def _downselect(corpus, dim, rate):
-        n_loci = corpus.dims[dim]
-        sel_loci = random_state.choice(
-            n_loci,
-            int(rate*n_loci),
-            replace=False
-        )
-        return sel_loci
+    def _subset_corpus(corpus):
+
+        if not batch_subsample is None:
+
+            sample_names = CS.list_samples(corpus)
+
+            new_samples = list(
+                random_state.choice(
+                    sample_names,
+                    int(len(sample_names)*batch_subsample),
+                    replace=False,
+                )
+            )
+
+            corpus = DifferentSamples(
+                corpus, 
+                new_samples,
+            )
+
+
+        if not locus_subsample is None:
+
+            corpus = LazySlicer(
+                corpus,
+                keep_features=False,
+                locus = random_state.choice(
+                    corpus.dims['locus'],
+                    int(locus_subsample*corpus.dims['locus']),
+                    replace=False
+                )
+            )
+
+        return corpus
     
-    return tuple(
-        LazySampleSlicer(
-            corpus, 
-            sample=pd.Index(CS.list_samples(corpus))[_downselect(corpus, 'sample', batch_subsample)] \
-                if not batch_subsample is None else pd.Index(CS.list_samples(corpus)),
-            locus=_downselect(corpus, 'locus', locus_subsample) \
-                if not locus_subsample is None else None,
-        )
-        for corpus in corpuses
-    )
+    return tuple(_subset_corpus(corpus) for corpus in corpuses)
 
 
 def _should_stop(stop_condition, scores):

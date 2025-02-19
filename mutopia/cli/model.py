@@ -177,7 +177,7 @@ def train_test_split(
 @click.option(
     '--convolution-width',
     '-cw',
-    type=click.IntRange(1, 5),
+    type=click.IntRange(0, 5),
     default=None,
     help='Width of the convolutional kernel',
 )
@@ -328,12 +328,18 @@ def train(
         )
     
     model_kw = {k: v for k, v in model_kw.items() if v is not None}
-    click.echo(f'Training model with parameters: ')
-    click.echo(tabulate(
-        model_kw.items(),
-        headers=['Parameter', 'Value'],
-        tablefmt='simple',
-    ))
+    click.echo(
+        f'Training model with parameters: ', 
+        file=click.get_text_stream('stderr')
+    )
+    click.echo(
+        tabulate(
+            model_kw.items(),
+            headers=['Parameter', 'Value'],
+            tablefmt='simple',
+        ),
+        file=click.get_text_stream('stderr')
+    )
     
     train_corpuses = tuple(map(lazy_load if lazy else eager_load, train_corpuses))
     test_corpuses = tuple(map(eager_load, test_corpuses))
@@ -346,12 +352,14 @@ def train(
         model_kw['num_epochs'] = 1
         logger.setLevel('DEBUG')
 
-    model, *_ = mu.MutopiaModel(
+    model, _, test_scores = mu.MutopiaModel(
         train_corpuses,
         test_corpuses,
         init_components=init_components if len(init_components) > 0 else None,
         **model_kw,
     )
+
+    click.echo('Best test score:\t{:.5f}'.format(max(test_scores)))
 
     if not time_profile:
         model.save(output)
@@ -452,7 +460,7 @@ def study():
 @click.option(
     '--convolution-width',
     '-cw',
-    type=click.IntRange(1, 5),
+    type=click.IntRange(0, 5),
     default=None,
     help='Width of the convolutional kernel',
 )
