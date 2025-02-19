@@ -77,7 +77,7 @@ class LazySampleLoader(CorpusInterface):
         )
 
     
-class LazySampleSlicer(CorpusInterface):
+class LazySlicer(CorpusInterface):
     '''
     Making slices of the corpus is memory-intensive.
     This problem is exacerbated when we want to slice by locus
@@ -91,20 +91,19 @@ class LazySampleSlicer(CorpusInterface):
     to the original data matrix, foregoing the copying step.
     '''
 
-    def __init__(self, corpus,*, sample, **slices):
+    def __init__(self, corpus, keep_features=True, **slices):
         # first, make a copy of the corpus
 
         self._base_corpus=corpus
-
         self._apply_slices={d : s for d,s in slices.items() if not s is None}
-        self._samples = sample
         
         sliced = corpus.copy()
-        # get a copy of the X layer
 
         if hasattr(sliced, 'X'):
             sliced = sliced.drop_vars('X', errors='ignore')
-        sliced = sliced.drop_nodes(('features',))
+
+        if not keep_features:
+            sliced = sliced.drop_nodes(('features',))
 
         self._corpus = sliced\
             .isel(**self._apply_slices)
@@ -114,12 +113,12 @@ class LazySampleSlicer(CorpusInterface):
         return self._base_corpus.X
     
     def list_samples(self):
-        return self._samples
+        return self._base_corpus.list_samples()
     
     def fetch_sample(self, sample_name):
         if not sample_name is None:
             return self._base_corpus.fetch_sample(sample_name)\
-                    .isel(**{d:s for d,s in self._apply_slices.items() if not d == 'sample'})
+                    .isel(**{d:s for d,s in self._apply_slices.items()})
         else:
             return self.X.isel(**self._apply_slices)
         

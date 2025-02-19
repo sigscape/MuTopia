@@ -239,6 +239,10 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
     def init_from_signatures(self, signatures):
         
         k = signatures.shape[0]
+
+        if k>self.n_components:
+            raise ValueError('You are trying to initialize with too many signatures! Increase `num_components/k`, then try again.')
+
         c=self.context_transformer.n_coefs
 
         context_effects = signatures.sum(dim=dims_except_for(signatures.dims, 'context', 'component'))\

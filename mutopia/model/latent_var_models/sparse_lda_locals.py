@@ -148,10 +148,10 @@ class LDAUpdateSparse(LocalUpdate):
         elbo = bound(*args, weighted_posterior)        
 
         suffstats = {
-                **sample_dict,
-                'weighted_posterior' : weighted_posterior/batch_subsample, 
-                'gamma' : gamma, 
-            }
+            **sample_dict,
+            'weighted_posterior' : weighted_posterior/batch_subsample, 
+            'gamma' : gamma, 
+        }
 
         return (suffstats, gamma, elbo)
     
