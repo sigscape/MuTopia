@@ -342,7 +342,7 @@ def train(
     )
     
     train_corpuses = tuple(map(lazy_load if lazy else eager_load, train_corpuses))
-    test_corpuses = tuple(map(eager_load, test_corpuses))
+    test_corpuses = tuple(map(lazy_load if lazy else eager_load, test_corpuses))
 
     if bootstrap:
         train_corpuses, test_corpuses = _setup_bootstrap(train_corpuses, test_corpuses, seed=bootstrap)
