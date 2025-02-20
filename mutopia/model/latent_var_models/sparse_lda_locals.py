@@ -370,7 +370,7 @@ class LDAUpdateSparse(LocalUpdate):
         # 2. figure out the number of possible types of observations missing
         n_types = prod(corpus.sizes[dim] for dim in missing_dims)
         # 3. penalize the log context effect for the missing dimensions
-        
+
         # saturated
         y_sum = np.sum(weights)
         d_sat = weights @ np.log(weights) - y_sum * np.log(y_sum)

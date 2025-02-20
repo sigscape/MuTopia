@@ -263,7 +263,7 @@ def run_trial(
     study, study_attrs, model_kw = load_study(study_name, storage)
     model_kw.update(kwargs)
     train_corpuses = tuple(map(lazy_load if lazy else eager_load, study_attrs['train_corpuses']))
-    test_corpuses = tuple(map(eager_load, study_attrs['test_corpuses']))
+    test_corpuses = tuple(map(lazy_load if lazy else eager_load, study_attrs['test_corpuses']))
     
     example_corpus = train_corpuses[0]
 
@@ -331,7 +331,7 @@ def retrain(
     )
 
     train_corpuses = tuple(map(lazy_load if lazy else eager_load, study_attrs['train_corpuses']))
-    test_corpuses = tuple(map(eager_load, study_attrs['test_corpuses']))
+    test_corpuses = tuple(map(lazy_load if lazy else eager_load, study_attrs['test_corpuses']))
     example_corpus = train_corpuses[0]
 
     model, *_ = example_corpus.modality().make_model(
