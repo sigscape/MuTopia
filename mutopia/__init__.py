@@ -8,4 +8,6 @@ from .utils import FeatureType
 import mutopia.model as model
 from mutopia.utils import using_exposures_from
 
+SBS=Modality.SBS.get_config()
+
 __version__ = '1.0.0a0'

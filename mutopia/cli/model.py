@@ -36,69 +36,6 @@ def _setup_bootstrap(train_corpuses, test_corpuses, seed):
 def model():
     pass
 
-@model.command("split")
-@click.argument("filename", type=click.Path(exists=True))
-@click.argument("test_contigs", nargs=-1, type=str)
-@click.option(
-    "-min",
-    "--min-region-size",
-    type=click.IntRange(1, 100000000),
-    default=5,
-)
-def train_test_split(
-    filename : str, 
-    test_contigs : list[str],
-    min_region_size=5,
-):
-    outprefix = '.'.join(filename.split(".")[:-1])
-    dataset = disk.load_dataset(
-        filename,
-        with_samples=False
-    )
-
-    test_mask = np.isin(dataset.regions.chrom.values, test_contigs)
-    include_region = dataset.regions.length.values >= min_region_size
-
-    train_mask = ~test_mask & include_region
-    test_mask = test_mask & include_region
-
-    disk.write_dataset(
-        dataset.isel(locus=train_mask),
-        outprefix + ".train.nc",
-    )
-
-    disk.write_dataset(
-        dataset.isel(locus=test_mask),
-        outprefix + ".test.nc",
-    )
-
-    # unset the regions file so that you can't run ingestion operations on the split datasets
-    with nc.Dataset(outprefix + ".train.nc", 'a') as dset:
-        setattr(dset, "regions_file", "none")
-
-    with nc.Dataset(outprefix + ".test.nc", 'a') as dset:
-        setattr(dset, "regions_file", "none")
-    
-
-    loader = LazySampleLoader(CorpusInterface(dataset))
-
-    for sample_name in tqdm(
-        dataset.sample.values,
-        desc=f'Writing samples',
-        ncols=100,
-    ):
-        sample = loader.fetch_sample(sample_name)
-        disk.write_sample(
-            outprefix + ".train.nc",
-            sample.isel(locus=train_mask),
-            sample_name=f'X/{sample_name}',
-        )
-        disk.write_sample(
-            outprefix + ".test.nc",
-            sample.isel(locus=test_mask),
-            sample_name=f'X/{sample_name}',
-        )
-
 
 @model.command("train")
 @click.argument("output", type=click.Path(exists=False))

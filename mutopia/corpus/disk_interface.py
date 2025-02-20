@@ -251,7 +251,7 @@ def _write_model_state(dataset, filename):
     )
 
 
-def write_dataset(dataset, filename):
+def write_dataset(dataset, filename, bar=False):
 
     check_corpus(dataset, enforce_sample=False)
 
@@ -290,7 +290,10 @@ def write_dataset(dataset, filename):
 
 
     if len(dataset.list_samples()) > 0:
-        for sample_name in dataset.list_samples():
+        for sample_name in (
+            dataset.list_samples() if not bar else
+            tqdm.tqdm(dataset.list_samples(), desc='Writing samples', ncols=100)
+        ):
             write_sample(
                 filename,
                 dataset.fetch_sample(sample_name),
