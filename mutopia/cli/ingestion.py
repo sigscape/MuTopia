@@ -73,7 +73,7 @@ def linearize_beds(
 
 @ingestion.command("split")
 @click.argument("filename", type=click.Path(exists=True))
-@click.argument("test_contigs", nargs=-1, type=str)
+@click.argument("test_contigs", nargs=-1, type=str, required=True)
 @click.option(
     "-min",
     "--min-region-size",
@@ -85,6 +85,10 @@ def train_test_split(
     test_contigs : list[str],
     min_region_size=5,
 ):
+    
+    if not len(test_contigs) > 0:
+        raise click.BadParameter('Must provide at least one contig to use for testing.')
+    
     outprefix = '.'.join(filename.split(".")[:-1])
     
     dataset = disk.load_dataset(filename, with_samples=False)
@@ -95,6 +99,12 @@ def train_test_split(
 
     train_mask = ~test_mask & include_region
     test_mask = test_mask & include_region
+
+    if not np.any(test_mask) or not np.any(train_mask):
+        raise ValueError(
+            "Was not able to produce a valid test or training partition given these parameters.\n"
+            "Either check to make sure the corpus contains the contigs you provided, or try using a smaller min-region-size."
+        )
 
     train = LazySlicer(LazySampleLoader(dataset), locus=train_mask)
     test = LazySlicer(LazySampleLoader(dataset), locus=test_mask)
