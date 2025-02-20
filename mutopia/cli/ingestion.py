@@ -7,7 +7,10 @@ import mutopia.ingestion as ingest
 from mutopia.corpus import GTensor, write_dataset, update_view
 import netCDF4 as nc
 from shutil import copyfile
+from itertools import starmap
 
+from ..corpus.interfaces import *
+from ..genome_utils.fancy_iterators import RegionOverlapComparitor
 import mutopia.corpus.disk_interface as disk
 from ..modalities import Modality
 from ..genome_utils.bed12_utils import stream_bed12
@@ -66,6 +69,73 @@ def linearize_beds(
         *bed_files,
         max_region_size=max_region_size,
     )
+
+
+@ingestion.command("split")
+@click.argument("filename", type=click.Path(exists=True))
+@click.argument("test_contigs", nargs=-1, type=str)
+@click.option(
+    "-min",
+    "--min-region-size",
+    type=click.IntRange(1, 100000000),
+    default=5,
+)
+def train_test_split(
+    filename : str, 
+    test_contigs : list[str],
+    min_region_size=5,
+):
+    outprefix = '.'.join(filename.split(".")[:-1])
+    
+    dataset = disk.load_dataset(filename, with_samples=False)
+    dataset.attrs['regions_file']='none'
+
+    test_mask = np.isin(dataset.regions.chrom.values, test_contigs)
+    include_region = dataset.regions.length.values >= min_region_size
+
+    train_mask = ~test_mask & include_region
+    test_mask = test_mask & include_region
+
+    train = LazySlicer(LazySampleLoader(dataset), locus=train_mask)
+    test = LazySlicer(LazySampleLoader(dataset), locus=test_mask)
+
+    disk.write_dataset(train, outprefix + ".train.nc", bar=True)
+    disk.write_dataset(test, outprefix + ".test.nc", bar=True)
+
+
+@ingestion.command("slice")
+@click.argument("dataset", type=click.Path(exists=True))
+@click.argument("output", type=click.Path(writable=True))
+@click.option(
+    "-r",
+    "--query-region",
+    required=True,
+    multiple=True,
+    type=(str, int, int),
+)
+def slice_loci(
+    *,
+    output,
+    dataset,
+    query_region : list[tuple[str, int, int]],
+):
+    
+    dataset = LazySampleLoader(disk.load_dataset(dataset, with_samples=False))
+    dataset.attrs['regions_file']='none'
+
+    regions = dataset.regions
+    region = starmap(RegionOverlapComparitor, zip(regions.chrom, regions.start, regions.end))
+    query = list(starmap(RegionOverlapComparitor, query_region))
+
+    regions_mask = np.array([any(r == q for q in query) for r in region])
+
+    if not np.any(regions_mask):
+        raise ValueError("No regions match query")
+    
+    logger.info(f"Found {np.sum(regions_mask)}/{len(regions_mask)} regions matching query.")
+    
+    dataset = LazySlicer(dataset, locus=regions_mask)
+    disk.write_dataset(dataset, output, bar=True)
 
 
 @ingestion.command("create")
