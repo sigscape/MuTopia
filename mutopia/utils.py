@@ -1,5 +1,6 @@
 import sparse
 import numpy as np
+from pandas import DataFrame
 from joblib import Parallel
 from contextlib import contextmanager
 from enum import Enum
@@ -10,6 +11,7 @@ import logging
 import subprocess
 from gzip import open as gzopen
 import time
+
 
 @contextmanager
 def safe_read(filename):
@@ -285,16 +287,68 @@ def match_dims(X,**dim_sizes):
 
 def using_exposures_from(corpus):
     try:
-        corpus['contributions']
-    except KeyError:
-        raise KeyError('The corpus does not have contributions. Run `model.annot_contributions(corpus)` first.')
+        corpus.contributions
+    except AttributeError:
+        raise AttributeError('The corpus does not have contributions. Run `model.annot_contributions(corpus)` first.')
 
     return lambda _, sample_name : \
-        corpus['contributions'].sel(sample=sample_name).data
+        corpus.contributions.sel(sample=sample_name).data
 
 
 def using_priors_from(model_state):
     return lambda corpus, _ : model_state.alpha[corpus.attrs['name']]
+
+
+def get_explanation(corpus, component):
+
+    try:
+        import shap
+    except ImportError:
+        raise ImportError('SHAP is required to calculate SHAP values')
+
+    shap_df = (
+        DataFrame(
+            corpus.varm['SHAP_values'][component].data,
+            columns=corpus.transformed_features.values,
+        )
+        .melt(
+            ignore_index=False, 
+            var_name='feature', 
+            value_name='value'
+        )
+        .reset_index()\
+        .rename(columns={'index':'locus'})
+    )
+    
+    # handle this case to remove the convolution
+    if all(shap_df.feature.str.contains(':')):
+        shap_df[['feature', 'convolution']] = (
+            shap_df.feature.str
+            .split(':', expand=True, n=1)
+            .rename(columns={0: 'feature', 1: 'convolution'})
+        )
+
+    shap_df = (
+        shap_df
+        .groupby(['feature', 'locus'])['value']
+        .sum()
+        .unstack()
+        .fillna(0)
+        .T
+    )
+
+    expl = shap.Explanation(
+        shap_df.values,
+        feature_names=shap_df.columns,
+        data=corpus.state.locus_features.sel(
+                feature=[
+                    f'{s}:0' if f'{s}:0' in corpus.state.feature.values else s
+                    for s in shap_df.columns
+                ]
+            ).values
+    )
+
+    return expl
 
 
 def borrow_kwargs(*borrow_sigs):

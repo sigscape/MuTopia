@@ -11,7 +11,9 @@ import xarray as xr
 import os
 from pyfaidx import Fasta
 import numpy as np
-from functools import partial
+from functools import partial, reduce
+from itertools import starmap
+
 
 COMPLEMENT = {"A": "T", "T": "A", "G": "C", "C": "G"}
 
@@ -34,6 +36,24 @@ def _fetch_contributions(corpus, exposures=None):
             [exposures(corpus, sample_name) for sample_name in CS.list_samples(corpus)]
         )
     return contributions
+
+
+def locus_slice(dataset, chrom : str, start : int, end : int):
+    check_structure(dataset)
+
+    regions = dataset.regions
+    query_region = [(chrom, start, end)]
+    region = starmap(RegionOverlapComparitor, zip(regions.chrom, regions.start, regions.end))
+    query = list(starmap(RegionOverlapComparitor, query_region))
+
+    regions_mask = np.array([any(r == q for q in query) for r in region])
+
+    if not np.any(regions_mask):
+        raise ValueError("No regions match query")
+    
+    logger.info(f"Found {np.sum(regions_mask)}/{len(regions_mask)} regions matching query.")
+
+    return dataset.isel(locus=regions_mask)
 
 
 def deepscan_neutral_matagenesis(
@@ -129,7 +149,11 @@ def annot_empirical_marginal(
 ):
     check_structure(corpus)
 
-    X_emp = corpus.X.sum(dim=("sample",))
+    X_emp = reduce(
+        lambda x,y : x + y,
+        (corpus.fetch_sample(sample_name) for sample_name in CS.list_samples(corpus))
+    )
+
     X_emp = X_emp.asdense() if X_emp.is_sparse() else X_emp
 
     logger.info('Added key to varm: "empirical_marginal"')

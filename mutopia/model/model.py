@@ -307,16 +307,17 @@ class Model:
         corpus,
         threads=1,
     ):
-        self._check_corpus(corpus, enforce_sample=False)
-
-        if not CS.has_corpusstate(corpus):
-            corpus = self.setup_corpus(corpus)
-
+        
         try:
             import shap
         except ImportError:
             raise ImportError('SHAP is required to calculate SHAP values')
         
+        self._check_corpus(corpus, enforce_sample=False)
+
+        if not CS.has_corpusstate(corpus):
+            corpus = self.setup_corpus(corpus)
+
         locus_model = self.model_state_.models['theta_model']
         X = locus_model._fetch_feature_matrix(corpus)
 

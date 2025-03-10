@@ -135,7 +135,7 @@ def model():
 @click.option(
     "-l2",
     "--l2-regularization",
-    type=click.FloatRange(0.0, 1000.0),
+    type=click.FloatRange(0.0, 100000.0),
     default=None,
     help="L2 regularization for locus model",
 )
@@ -424,7 +424,7 @@ def study():
 @click.option(
     "-l2",
     "--l2-regularization",
-    type=click.FloatRange(0.0, 1000.0),
+    type=click.FloatRange(0.0, 100000.0),
     default=None,
     help="L2 regularization for locus model",
 )
@@ -724,11 +724,11 @@ def predict(
     dataset = model.annot_contributions(dataset, threads=threads)
     dataset.contributions.name = 'contributions'
     
-    dataset.contributions.to_netcdf(
+    '''dataset.contributions.to_netcdf(
         corpus_path,
         mode='a',
         **disk.WRITE_KW,
-    )
+    )'''
 
     disk._write_model_state(
         dataset,

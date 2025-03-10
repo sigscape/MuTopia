@@ -145,7 +145,7 @@ class LDAUpdateSparse(LocalUpdate):
         )
 
         weighted_posterior = calc_local_variables(*args)
-        elbo = bound(*args, weighted_posterior)        
+        elbo = bound(*args, weighted_posterior)
 
         suffstats = {
             **sample_dict,
@@ -284,11 +284,22 @@ class LDAUpdateSparse(LocalUpdate):
         sample,
         corpus,
         model_state,
+        alpha=None,
     ):
+
+        subsample_rate = (
+                corpus
+                .regions
+                .context_frequencies
+                .sum().item()/
+                model_state.get_genome_size(corpus)
+            )
+        
         self.estep_iterations=10000
         self.difference_tol=5e-5
 
-        subsample_rate = corpus.regions.context_frequencies.sum().item()/model_state.get_genome_size(corpus)
+        if not alpha is None:
+            raise ValueError('Cannot refit the model with a fixed alpha.')
 
         with ParContext(1) as par:
             _, update_fns = self.get_update_fns(
@@ -299,13 +310,47 @@ class LDAUpdateSparse(LocalUpdate):
                 locus_subsample=subsample_rate,
             )
 
-        suffstats = next(update_fns)()[0]
+        suffstats, _, ll = next(update_fns)()
+        posterior = suffstats['weighted_posterior']/suffstats['weights']*subsample_rate
 
-        return (
-            suffstats['weighted_posterior']/suffstats['weights']*subsample_rate, 
-            suffstats['gamma']
-        )
+        return (ll, posterior)
     
+
+    def marginal_ll_sample(
+        self,
+        sample,
+        corpus,
+        model_state,
+        alpha=None,
+        threads=1,
+        sample_steps=1000,
+        reps=100,
+    ):
+        # marginalize out gamma, and just return the mutation annotations.
+        # For panel and exome data, there may be too few mutations to 
+        # infer anything useful from gamma. We'll lower the variance of estimation
+        # instead and just marginalize it out.
+
+        sample_dict = self._convert_sample(sample, dtype=self.dtype)
+        alpha = np.ascontiguousarray(self.alpha[CS.get_name(corpus)] if alpha is None else alpha)
+
+        # KxI - I=number of mutations, K=number of signatures
+        conditional_likelihood = self._conditional_observation_likelihood(
+            corpus,
+            model_state,
+            **sample_dict,
+            logsafe=False,
+        ).astype(self.dtype, copy=False)
+        
+        return AIS_marginal_ll(
+            alpha,
+            conditional_likelihood,
+            sample_dict['weights'],
+            threads=threads,
+            inner_iters=sample_steps,
+            outer_iters=reps,
+        )
+
 
     def _apply_per_sample(
         self,

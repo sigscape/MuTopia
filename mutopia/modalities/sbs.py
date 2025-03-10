@@ -1,7 +1,7 @@
 import json
 import numpy as np
 import os
-from functools import reduce
+from functools import reduce, partial
 from itertools import chain
 from collections import Counter
 from tqdm import tqdm
@@ -234,42 +234,23 @@ class SBSMode(ModeConfig):
             ),
             dims=("clustered", "configuration", "context", "locus"),
         )
+    
 
-
-    def annotate_mutations(
+    def ingest_uncollaposed(
         self,
-        model,
-        dataset,
         vcf_file,
-        chr_prefix="",
-        pass_only=True,
-        weight_col=None,
-        mutation_rate_file=None,
-        sample_weight=None,
-        sample_name=None,
-        skip_sort=False,
-        cluster=True,
-        output=sys.stdout,
         *,
         locus_dim,
         regions_file,
         fasta_file,
-        **kw,
+        **ingest_kw,
     ):
-        
-        logger.info("Ingesting mutations ...")
+
         mut_ids, coords, weights = featurize_mutations(
             vcf_file,
             regions_file,
             fasta_file,
-            chr_prefix=chr_prefix,
-            weight_col=weight_col,
-            mutation_rate_file=mutation_rate_file,
-            sample_weight=sample_weight,
-            sample_name=sample_name,
-            pass_only=pass_only,
-            skip_sort=skip_sort,
-            cluster=cluster,
+            **ingest_kw,
         )
 
         # create the sample array for inference
@@ -285,21 +266,55 @@ class SBSMode(ModeConfig):
             dims=("clustered", "configuration", "context", "locus"),
         )
 
+        return (mut_ids, sample_arr)
+
+
+    def annotate_mutations(
+        self,
+        model,
+        dataset,
+        vcf_file,
+        chr_prefix="",
+        output=sys.stdout,
+        refit=True,
+        *,
+        locus_dim,
+        regions_file,
+        fasta_file,
+        **ingest_kw,
+    ):
+        
+        logger.info("Ingesting mutations ...")
+        mut_ids, sample_arr = self.ingest_uncollaposed(
+            vcf_file,
+            locus_dim=locus_dim,
+            regions_file=regions_file,
+            fasta_file=fasta_file,
+            chr_prefix=chr_prefix,
+            **ingest_kw,
+        )
+
         logger.info("Inferring source processes ...")
         # run the inference algorithm to find the process contributions
-        locals_model = model.model_state_.locals_model
-        
-        weighted_posterior, gamma_hat = locals_model.posterior_assign_sample(
-            sample_arr,
-            dataset,
-            model.model_state_
+        weighted_posterior, _ = (
+            model
+            .model_state_
+            .locals_model
+            .posterior_assign_sample(
+                sample_arr,
+                dataset,
+                model.model_state_,
+                skip_refit=refit,
+            )
         )
 
         # print the results for the user's entertainment
+        contributions = weighted_posterior.sum(axis=1)
+
         print(
             tabulate(
                 pd.DataFrame(
-                    gamma_hat/gamma_hat.sum(), 
+                    contributions/contributions.sum(),
                     index=model.component_names, 
                     columns=['Fraction of\nmutations'],
                 ).sort_values(
@@ -331,6 +346,29 @@ class SBSMode(ModeConfig):
             chr_prefix=chr_prefix,
             description={},
             output=output,
+        )
+
+
+    def model_competition(
+        self,
+        model,
+        dataset,
+        vcf_file,
+        *,
+        locus_dim,
+        regions_file,
+        fasta_file,
+        alphas,
+        **ingest_kw,
+    ):
+        
+        logger.info("Ingesting mutations ...")
+        _, sample_arr = self.ingest_uncollaposed(
+            vcf_file,
+            locus_dim=locus_dim,
+            regions_file=regions_file,
+            fasta_file=fasta_file,
+            **ingest_kw,
         )
 
 
