@@ -148,8 +148,8 @@ def update_tau(mu, nu):
     return np.sqrt(2*np.pi) * np.sum(mu**2 + nu**2, axis = -1)
 
 
-def update_alpha(alpha, gamma):
+def update_alpha(alpha0, gamma):
     
     N = gamma.shape[0]
     log_phat = log_dirichlet_expectation(gamma).mean(-2)
-    return update_dir_prior(alpha, N, log_phat)
+    return update_dir_prior(alpha0, N, log_phat)

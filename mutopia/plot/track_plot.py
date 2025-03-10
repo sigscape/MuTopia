@@ -25,12 +25,13 @@ def moving_average(arr, bin_width=None, alpha=10):
 def renorm(x):
     return x/x.sum()
 
-def reorder_rows(data, labels):
+def reorder_rows(data, labels=None):
     row_idx = leaves_list(optimal_leaf_ordering(linkage(data, method='ward'), data))
-    return {
-        'matrix' : data[row_idx],
-        'row_labels' : labels[row_idx],
-    }
+    out = {'matrix' : data[row_idx]}
+    if labels is not None:
+        out['row_labels'] = labels[row_idx]
+    
+    return out
 
 def _trace_plot(
     start, end, idx, check_len,
@@ -72,9 +73,13 @@ def _set_axlabel(ax, label):
     ax.set_ylabel(label, rotation=0, labelpad=5, fontsize=9, ha='right', va='center')
 
 
-def _clean_ax(ax, axlabel=None):
+def _clean_ax(ax, axlabel=None, yticks=True):
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
+    
+    if not yticks:
+        ax.set(yticks=[])
+    
     #ax.spines['bottom'].set_visible(False)
     ax.set(xticks=[])
     if not axlabel is None:
@@ -116,6 +121,7 @@ def line_plot(
     vals,
     label=None,
     height=1,
+    yticks=True,
     **kwargs,
 ):
     def _plot(ax, start, end, idx, check_len):
@@ -127,7 +133,7 @@ def line_plot(
         x[0::2] = start
         x[1::2] = end
         ax.plot(x, np.repeat(vals[idx], 2), **kwargs)
-        _clean_ax(ax, axlabel=label)    
+        _clean_ax(ax, axlabel=label, yticks=yticks)    
         return ax
     
     _plot.height = height
@@ -139,6 +145,7 @@ def bar_plot(
     vals,
     label=None,
     height=1,
+    yticks=True,
     **kwargs,
 ):
     def _plot(ax, start, end, idx, check_len):
@@ -149,7 +156,7 @@ def bar_plot(
         center = start + (end - start)/2
         width = end - start
         ax.bar(center, vals[idx], width=width, **kwargs)
-        _clean_ax(ax, axlabel=label)
+        _clean_ax(ax, axlabel=label, yticks=yticks)    
         return ax
     
     _plot.height = height
@@ -161,6 +168,7 @@ def scatter_plot(
     vals,
     label=None,
     height=1,
+    yticks=True,
     **kwargs,
 ):
     def _plot(ax, start, end, idx, check_len):
@@ -169,7 +177,7 @@ def scatter_plot(
             raise ValueError('vals and must have one entry per region in the provided corpus.')
         
         ax.scatter(start + (end - start)/2, vals[idx], **kwargs)
-        _clean_ax(ax, axlabel=label)
+        _clean_ax(ax, axlabel=label, yticks=yticks)    
         return ax
     
     _plot.height = height
@@ -182,6 +190,7 @@ def heatmap_plot(
     row_labels = [],
     palette='crest_r',
     label=None,
+    yticks=True,
     height=1,
 ):
     def _plot(ax, start, end, idx, check_len):
@@ -198,6 +207,8 @@ def heatmap_plot(
         ax.set_yticks(np.arange(nrows)+0.5)
         ax.set_yticklabels(row_labels, fontsize=7)
         ax.set(xticks=[])
+        if not yticks:
+            ax.set_yticks([])
         if not label is None:
             _set_axlabel(ax, label)
         return ax

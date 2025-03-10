@@ -1,12 +1,15 @@
 from abc import ABC, abstractmethod
 from joblib import delayed
 from xarray import DataArray
-from tqdm import tqdm
+from functools import partial
+from tqdm import tqdm, trange
 from numba import njit, vectorize
 import numpy as np
 from numba.extending import get_cython_function_address
 import ctypes
 from functools import wraps
+from scipy.stats import dirichlet_multinomial
+from scipy.special import logsumexp
 from ...corpus.interfaces import *
 from ...utils import ParContext
 from ._dirichlet_update import update_alpha
@@ -241,6 +244,153 @@ def mixture_update_step(
     )
 
 
+
+@njit(nogil=True)
+def dirichlet_multinomial_logpmf(x, alpha):
+    alpha0 = np.sum(alpha)
+    n = np.sum(x)
+    return (
+        gammaln(alpha0)
+        + gammaln(n+1)
+        - gammaln(n+alpha0)
+        + np.sum(
+            gammalnvec(x + alpha)
+            - gammalnvec(alpha)
+            - gammalnvec(x + 1)
+        )
+    )
+
+@njit(nogil=True)
+def _gibbs_draw(
+    alpha, #K
+    log_conditional_likelihood, #K
+    Nk, #K
+    N, #(1,)
+    gumbel_draws, #K
+    temperature, #(1,)
+):
+    logits = (
+        temperature*log_conditional_likelihood 
+        + np.log(alpha + Nk)
+        - np.log(N - 1 + alpha)
+    )
+    return np.argmax(logits + gumbel_draws)
+    
+
+@njit(nogil=True)
+def _gibbs_sample_scan(
+    alpha,
+    log_conditional_likelihood,
+    weights,
+    Nk,
+    z,
+    gumbel_draws,
+    temperature,
+):
+    log_weight=0
+    N = np.sum(Nk)
+    
+    for i in range(len(weights)):
+        
+        Nk[z[i]] -= 1
+        z[i] = _gibbs_draw(
+            alpha,
+            log_conditional_likelihood[:,i],
+            Nk, 
+            N,
+            gumbel_draws[:,i],
+            temperature,
+        )
+        Nk[z[i]] += 1
+
+        log_weight += weights[i]*log_conditional_likelihood[z[i],i]
+
+    return Nk, z, log_weight
+
+
+@njit(nogil=True)
+def _ais_inner(
+    alpha,
+    log_conditional_likelihood,
+    weights,
+    Nk,
+    z,
+    iters,
+    seed,
+    beta,
+):
+    temperatures = np.linspace(0, 1, iters)
+    K,I = log_conditional_likelihood.shape
+    ais_weight = 0
+    np.random.seed(seed)
+
+    for j in range(1, len(temperatures)):
+
+        gumbel_draws = np.random.gumbel(0, 1, (K,I))
+        
+        Nk, z, log_weight = _gibbs_sample_scan(
+            alpha,
+            log_conditional_likelihood,
+            weights,
+            Nk,
+            z,
+            gumbel_draws,
+            temperatures[j],
+        )
+        
+        ais_weight += log_weight*(temperatures[j] - temperatures[j-1])
+
+    return ais_weight
+
+
+def AIS_marginal_ll(
+    alpha,
+    conditional_likelihood,
+    weights,
+    threads=1,
+    inner_iters=1000,
+    outer_iters=10,
+    init_seed=10,
+    beta=1,
+    quiet=False
+):
+    
+    K,I = conditional_likelihood.shape
+    log_conditional_likelihood = np.log(conditional_likelihood)
+    alpha = np.ascontiguousarray(alpha)
+
+    def init_ais(i):
+        z = (
+            np.random.RandomState(init_seed+i)
+            .choice(K, size=I, p=dirichlet_multinomial.pmf(np.diag(np.ones(K)), alpha, n=1))
+        )
+        Nk = np.array([(z==k).sum() for k in range(K)])
+
+        return partial(
+            _ais_inner,
+            alpha,
+            log_conditional_likelihood,
+            weights,
+            Nk,
+            z,
+            inner_iters,
+            init_seed+i,
+            beta,
+        )
+    
+    with ParContext(threads) as par:
+        w_ais = np.array(list(par(
+            delayed(init_ais(i))() for i in (
+                trange(outer_iters) if not quiet else range(outer_iters)
+            )
+        )))
+
+    w_mean = logsumexp(w_ais) - np.log(outer_iters)
+    w_var = np.var(w_ais)/outer_iters
+    
+    return w_mean, np.sqrt(w_var)
+
+
 def random_locals(random_state, n_components):
     def init_locals(corpus, sample_name):
         return random_state.gamma(100., 1./100., size=(n_components,))
@@ -283,7 +433,14 @@ class LocalUpdate(PrimitiveModel):
         self.estep_iterations=10000
         self.difference_tol=5e-5
 
-        subsample_rate = corpus.regions.context_frequencies.sum().item()/model_state.get_genome_size(corpus)
+        subsample_rate = (
+            corpus
+            .regions
+            .context_frequencies
+            .sum()
+            .item()/
+            model_state.get_genome_size(corpus)
+        )
 
         samples, update_fns = self.get_update_fns(
             (corpus,),
@@ -380,10 +537,8 @@ class LocalUpdate(PrimitiveModel):
             )
         )
 
-
     def spawn_sstats(self, corpus):
         return []
-    
 
     @staticmethod
     def reduce_sparse_sstats(
@@ -407,6 +562,7 @@ class LocalUpdate(PrimitiveModel):
     ):
         sstats.append(gamma)
         return sstats
+
 
     def partial_fit(
         self, sstats, learning_rate

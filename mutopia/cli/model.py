@@ -135,7 +135,7 @@ def model():
 @click.option(
     "-l2",
     "--l2-regularization",
-    type=click.FloatRange(0.0, 1000.0),
+    type=click.FloatRange(0.0, 100000.0),
     default=None,
     help="L2 regularization for locus model",
 )
@@ -424,7 +424,7 @@ def study():
 @click.option(
     "-l2",
     "--l2-regularization",
-    type=click.FloatRange(0.0, 1000.0),
+    type=click.FloatRange(0.0, 100000.0),
     default=None,
     help="L2 regularization for locus model",
 )
