@@ -295,11 +295,13 @@ class SBSMode(ModeConfig):
             model.model_state_
         )
 
+        contributions = weighted_posterior.sum(axis=1)
+
         # print the results for the user's entertainment
         print(
             tabulate(
                 pd.DataFrame(
-                    gamma_hat/gamma_hat.sum(), 
+                    contributions/contributions.sum(), 
                     index=model.component_names, 
                     columns=['Fraction of\nmutations'],
                 ).sort_values(
