@@ -61,10 +61,15 @@ def retry_until_write(func, n_tries=1000, sleep=1):
 @retry_until_write
 def read_attrs(dataset):
     with nc.Dataset(dataset, 'r') as dset:
-        return {
+        attrs = {
             attr : getattr(dset, attr)
             for attr in dset.ncattrs()
         }
+
+        attrs['name'] = dset.__dict__['name']
+
+    return attrs
+    
     
 @retry_until_write
 def read_dims(dataset):
