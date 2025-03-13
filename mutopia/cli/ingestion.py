@@ -388,8 +388,8 @@ def set_attrs(
     type=click.Path(exists=True),
 )
 def info(dataset):
-    attrs = disk.read_attrs(dataset)
     
+    attrs = disk.read_attrs(dataset)
     n_features = len(disk.list_features(dataset))
 
     try:
@@ -399,14 +399,19 @@ def info(dataset):
 
     click.echo(f'Num features: {n_features}')
     click.echo(f'Num samples: {n_samples}')
+    click.echo(f'Epigenome name: {attrs["name"]}')
 
     click.echo('Dataset dims:')
     for k,v in disk.read_dims(dataset).items():
-        click.echo(f'\t{k}: {v}')
+        if not k == 'sample':
+            click.echo(f'\t{k}: {v}')
     
     click.echo('Dataset attributes:')
     for k,v in attrs.items():
-        click.echo(f'\t{k}: {v}')
+        if not k == 'name':
+            click.echo(f'\t{k}: {v}')
+
+        
     
 
 @ingestion.group("offsets")
