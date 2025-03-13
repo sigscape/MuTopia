@@ -70,7 +70,6 @@ def read_attrs(dataset):
 
     return attrs
     
-    
 @retry_until_write
 def read_dims(dataset):
     with nc.Dataset(dataset, 'r') as dset:
@@ -78,6 +77,15 @@ def read_dims(dataset):
             dim : len(dset.dimensions[dim])
             for dim in dset.dimensions.keys()
         }
+
+@retry_until_write
+def read_coords(dataset):
+    with nc.Dataset(dataset, 'r') as dset:
+        return {
+            coord : dset.variables[coord][:]
+            for coord in dset.dimensions.keys()
+        }
+
 
 @retry_until_write
 def write_context_freqs(

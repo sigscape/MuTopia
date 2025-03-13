@@ -324,6 +324,7 @@ class LDAUpdateSparse(LocalUpdate):
         alpha=None,
         threads=1,
         sample_steps=1000,
+        quiet=False,
         reps=100,
     ):
         # marginalize out gamma, and just return the mutation annotations.
@@ -349,6 +350,7 @@ class LDAUpdateSparse(LocalUpdate):
             threads=threads,
             inner_iters=sample_steps,
             outer_iters=reps,
+            quiet=quiet,
         )
 
 

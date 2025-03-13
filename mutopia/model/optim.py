@@ -247,6 +247,21 @@ def fit_model(
     for corpus in train_corpuses + test_corpuses:
         check_dims(corpus, model_state)
         check_corpus(corpus)
+
+    # Ensure all train corpuses have different names
+    corpus_names = [CS.get_name(corpus) for corpus in train_corpuses]
+    if len(corpus_names) != len(set(corpus_names)):
+        raise ValueError("All train corpuses must have different names.")
+    
+    corpus_names = [CS.get_name(corpus) for corpus in test_corpuses]
+    if len(corpus_names) != len(set(corpus_names)):
+        raise ValueError("All test corpuses must have different names.")
+    
+    num_training_samples = sum(
+        len(CS.list_samples(corpus)) 
+        for corpus in train_corpuses
+    )
+    logger.info(f'Found n={num_training_samples} training samples across {len(train_corpuses)} corpuses.')
     
     check_feature_consistency(*train_corpuses, *test_corpuses)
     check_dim_consistency(*train_corpuses, *test_corpuses)
