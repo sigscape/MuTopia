@@ -1001,16 +1001,21 @@ def ingest_sample(
 ):
     
     attrs = disk.read_attrs(dataset)
+    locus_coords = disk.read_coords(dataset)['locus']
+
     modality = Modality(attrs['dtype'].upper()).get_config()
 
     fasta = fasta or attrs['fasta_file']
     if not os.path.exists(fasta):
         raise click.FileError(f'No such file exists: {fasta}, provide a valid fasta file using the `--fasta/-fa` argument.')
+    
+    regions_file=disk.fetch_regions_path(dataset)
+    num_regions = sum(1 for _ in stream_bed12(regions_file))
 
     sample_arr = modality.ingest_observations(
         sample_file,
-        regions_file=disk.fetch_regions_path(dataset),
-        locus_dim=disk.read_dims(dataset)['locus'],
+        regions_file=regions_file,
+        locus_dim=num_regions,
         fasta_file=fasta,
         chr_prefix=chr_prefix,
         pass_only=pass_only,
@@ -1022,6 +1027,8 @@ def ingest_sample(
         skip_sort=skip_sort,
         cluster=cluster,
     )
+
+    sample_arr = sample_arr.isel(locus=locus_coords)
 
     disk.write_sample(
         dataset,

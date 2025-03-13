@@ -16,13 +16,6 @@ class CorpusState:
         *,
         parallel_context,
     ):
-        
-        '''for model in model_state.models.values():
-            model.update_corpusstate(
-                corpus, 
-                from_scratch=from_scratch
-            )'''
-        
         for _ in parallel_context(
             delayed(model.update_corpusstate)(
                 corpus,
@@ -98,7 +91,6 @@ class CorpusState:
             state_elements.update(
                 model.prepare_corpusstate(corpus)
             )
-
 
         # a smidge of interface chicanery here
         # The "corpus" passed to this function may be a nested series of interfaces, or it could be a plain G-Tensor.

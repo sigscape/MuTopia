@@ -292,7 +292,7 @@ def _gibbs_sample_scan(
     
     for i in range(len(weights)):
         
-        Nk[z[i]] -= 1
+        Nk[z[i]] -= weights[i]
         z[i] = _gibbs_draw(
             alpha,
             log_conditional_likelihood[:,i],
@@ -301,7 +301,7 @@ def _gibbs_sample_scan(
             gumbel_draws[:,i],
             temperature,
         )
-        Nk[z[i]] += 1
+        Nk[z[i]] += weights[i]
 
         log_weight += weights[i]*log_conditional_likelihood[z[i],i]
 
@@ -317,7 +317,6 @@ def _ais_inner(
     z,
     iters,
     seed,
-    beta,
 ):
     temperatures = np.linspace(0, 1, iters)
     K,I = log_conditional_likelihood.shape
@@ -351,7 +350,6 @@ def AIS_marginal_ll(
     inner_iters=1000,
     outer_iters=10,
     init_seed=10,
-    beta=1,
     quiet=False
 ):
     
@@ -364,7 +362,7 @@ def AIS_marginal_ll(
             np.random.RandomState(init_seed+i)
             .choice(K, size=I, p=dirichlet_multinomial.pmf(np.diag(np.ones(K)), alpha, n=1))
         )
-        Nk = np.array([(z==k).sum() for k in range(K)])
+        Nk = np.array([weights[z==k].sum() for k in range(K)])
 
         return partial(
             _ais_inner,
@@ -375,7 +373,6 @@ def AIS_marginal_ll(
             z,
             inner_iters,
             init_seed+i,
-            beta,
         )
     
     with ParContext(threads) as par:

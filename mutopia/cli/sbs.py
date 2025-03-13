@@ -1,6 +1,7 @@
 import mutopia as mu
 from mutopia.modalities._sbs_clustering import *
 from mutopia.corpus import disk_interface as disk
+from ..genome_utils.bed12_utils import stream_bed12
 import click
 from functools import partial
 from typing import *
@@ -310,6 +311,7 @@ def marginal_ll(
             raise click.BadParameter(f'Alphas must be of length {model.n_components}.')
 
     attrs = disk.read_attrs(dataset)
+    coords = disk.read_coords(dataset)
     corpus = disk.load_dataset(dataset, with_samples=False, with_state=True)
 
     fasta = fasta or attrs['fasta_file']
@@ -318,15 +320,20 @@ def marginal_ll(
     
     if not mu.model.CS.has_corpusstate(corpus):
         raise ValueError(f'The provided G-Tensor is not annotated. Please run `mutopia predict <model> {corpus.attrs["filename"]}` with a trained model to annotate the corpus.')
+    
+    regions_file=disk.fetch_regions_path(dataset)
+    num_regions = sum(1 for _ in stream_bed12(regions_file))
         
     logger.info("Ingesting mutations ...")
     _, sample = mu.SBS.ingest_uncollaposed(
         sample_file,
         **ingest_kwargs,
         fasta_file=fasta,
-        regions_file=disk.fetch_regions_path(dataset),
-        locus_dim=disk.read_dims(dataset)['locus'],
+        regions_file=regions_file,
+        locus_dim=num_regions,
     )
+
+    sample = sample.isel(locus=coords['locus'])
 
     model_state = model.model_state_
 
