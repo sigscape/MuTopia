@@ -854,6 +854,44 @@ def rm_features(
         click.echo(f'Removed feature: {feature_name}')
 
 
+@featurecmds.command("edit")
+@click.argument(
+    'dataset',
+    type=click.Path(exists=True),
+)
+@click.argument(
+    'feature_name',
+    type=str,
+)
+@click.option(
+    '-g',
+    '--group',
+    type=str,
+    default=None,
+    help='Group to assign the feature to',
+)
+@click.option(
+    '-norm',
+    '--normalization',
+    type=click.Choice([x.value for x in FeatureType]),
+    help='Normalization to apply to the feature',
+    default=None,
+)
+def edit_feature(*,
+    dataset : str,
+    feature_name : str,
+    group : Union[None, str] = None,
+    normalization : Union[None, str] = None,
+):
+    
+    disk.edit_feature_attrs(
+        dataset,
+        feature_name,
+        group=group,
+        normalization=FeatureType(normalization),
+    )
+
+
 @ingestion.group("sample")
 def samplecmds():
     pass

@@ -165,6 +165,31 @@ def list_features(dataset):
             for feature_name, feature in dset.groups['features'].variables.items()
             if not 'active' in feature.__dict__ or feature.__dict__['active']
         }
+
+
+@retry_until_write
+def edit_feature_attrs(
+    dataset,
+    name,
+    group=None,
+    normalization : FeatureType = None,
+):
+    
+    with nc.Dataset(dataset, 'a') as dset:
+        if not 'features' in dset.groups:
+            raise ValueError('No `features` group found in dataset - are you sure this is a G-Tensor?')
+
+        features = dset.groups['features']
+        try:
+            feature = features[name]
+        except IndexError:
+            raise ValueError(f'Feature {name} not found in dataset.')
+
+        if group is not None:
+            feature.group = group
+
+        if normalization is not None:
+            feature.normalization = normalization.value
 ##
 #
 ##
