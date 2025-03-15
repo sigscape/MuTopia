@@ -325,6 +325,7 @@ def retrain(
     study, study_attrs, model_kw = load_study(study_name, storage)
     model_kw.update(kwargs)
     model_kw.update(study.trials[trial_number].params)
+    model_kw['max_features'] = 1/(model_kw.get('convolution_width',0) + 1)
 
     if 'eval_every' in model_kw:
         model_kw.pop('eval_every')
@@ -336,13 +337,15 @@ def retrain(
         )
     )
 
-    train_corpuses = tuple(map(lazy_load if lazy else eager_load, study_attrs['train_corpuses']))
-    test_corpuses = tuple(map(lazy_load if lazy else eager_load, study_attrs['test_corpuses']))
-    example_corpus = train_corpuses[0]
+    train, test = list(zip(*[
+        (lazy_train_test_load if lazy else eager_train_test_load)(corpus, study_attrs['test_chroms'])
+        for corpus in study_attrs['train_corpuses']
+    ]))
+    example_corpus = train[0]
 
     model, *_ = example_corpus.modality().make_model(
-        train_corpuses,
-        test_corpuses,
+        train,
+        test,
         eval_every=5,
         seed=seed or trial_number,
         **model_kw,
