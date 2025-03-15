@@ -8,6 +8,7 @@ from numpy import isfinite
 from .corpus.interfaces import *
 from .utils import logger
 
+
 def sample_params(study, trial, extensive=0):
 
     params={}
@@ -21,19 +22,15 @@ def sample_params(study, trial, extensive=0):
         }
 
     if extensive>1:
-        params.update({
-            'context_reg' : trial.suggest_float('context_reg', 1e-5, 5e-2, log=True),
-            'max_features' : trial.suggest_categorical('max_features', [0.25, 0.33, 0.5, 0.75, 1.]),
-        })
+        params['convolution_width'] = trial.suggest_categorical('convolution_width', [0, 1, 2])
+        params['max_features'] = 1/(params['convolution_width']+1)
 
     if extensive>2:
         params.update({
+            'context_reg' : trial.suggest_float('context_reg', 1e-5, 5e-2, log=True),
             'context_conditioning' : trial.suggest_float('context_conditioning', 1e-9, 1e-2, log=True),
             'init_variance_context' : trial.suggest_float('init_variance_context', 0.025, 0.15),
         })
-
-        #'context_encoder' : trial.suggest_categorical('context_encoder', ['diagonal', 'kmer']),
-        #'kmer_reg' : trial.suggest_float('kmer_reg', 1e-4, 5e-2, log=True),
 
     if extensive>3:
         params.update({
@@ -268,10 +265,9 @@ def run_trial(
     model_kw.update(kwargs)
     
     train, test = list(zip(*[
-        lazy_train_test(
-            (lazy_load if lazy else eager_load)(corpus), 
-            study_attrs['test_chroms']
-        ) 
+        (lazy_train_test_load if lazy else eager_train_test_load)(
+            corpus, study_attrs['test_chroms']
+        )
         for corpus in study_attrs['train_corpuses']
     ]))
     

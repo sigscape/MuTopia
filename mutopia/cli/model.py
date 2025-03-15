@@ -288,10 +288,9 @@ def train(
         file=click.get_text_stream('stderr')
     )
     train, test = list(zip(*[
-        lazy_train_test(
-            (lazy_load if lazy else eager_load)(corpus), 
-            test_chroms
-        ) 
+        (lazy_train_test_load if lazy else eager_train_test_load)(
+            corpus, test_chroms
+        )
         for corpus in train_corpuses
     ]))
 
