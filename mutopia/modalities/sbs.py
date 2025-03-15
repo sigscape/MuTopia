@@ -382,7 +382,8 @@ def SBSModel(
     train_corpuses,
     test_corpuses,
     num_components=15,
-    init_components=None,
+    init_components=[],
+    fix_components=[],
     seed=0,
     # context model
     context_reg=0.0001,
@@ -439,6 +440,7 @@ def SBSModel(
         kmer_reg=kmer_reg,
         conditioning_alpha=conditioning_alpha,
         init_components=init_components,
+        fix_components=fix_components,
         max_iter=max_iter,
     )
 

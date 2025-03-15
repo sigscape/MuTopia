@@ -38,22 +38,17 @@ def model():
 
 
 @model.command("train")
-@click.argument("output", type=click.Path(exists=False))
-@click.option(
-    "-train",
-    "--train-corpuses",
-    required=True,
-    multiple=True,
+@click.argument(
+    'train_corpuses',
     type=click.Path(exists=True),
-    help="Paths to training corpuses. Invoke multiple times for multiple corpuses: `-train <path1> -train <path2>`",
+    nargs=-1,
 )
 @click.option(
-    "-test",
-    "--test-corpuses",
+    "-o",
+    "--output",
+    type=click.Path(writable=True),
     required=True,
-    type=click.Path(exists=True),
-    multiple=True,
-    help="Paths to testing corpuses. Invoke multiple times for multiple corpuses: `-test <path1> -test <path2>`",
+    help="Path to save the trained model to.",
 )
 @click.option(
     '-k',
@@ -66,9 +61,17 @@ def model():
     "-init",
     "--init-components",
     type=str,
-    default=None,
+    default=[],
     multiple=True,
     help="List of components to initialize.",
+)
+@click.option(
+    "-fix",
+    "--fix-components",
+    type=str,
+    default=[],
+    multiple=True,
+    help="List of components to fix.",
 )
 @click.option(
     "-creg",
@@ -241,27 +244,29 @@ def model():
     default=None,
     help="Bootstrap the training and testing corpuses",
 )
+@click.option(
+    "--test-chroms",
+    '-test',
+    multiple=True,
+    type=str,
+    default=['chr1'],
+    help="Chromosomes to use for testing. If not specified, all chromosomes are used.",
+)
 def train(
-    output,
     *,
+    output,
     train_corpuses: List[str],
-    test_corpuses: List[str],
-    init_components : Union[None, List[str]],
+    #test_corpuses: List[str],
     time_profile: bool = False,
     lazy: bool = False,
     bootstrap : Union[int, None] = None,
+    test_chroms : List[str] = ['chr1'],
     **model_kw,
 ):  
     if not len(train_corpuses) > 0:
         raise click.exceptions.BadOptionUsage(
             "train-corpuses",
             "At least one training corpus is required",
-        )
-
-    if not len(test_corpuses) > 0:
-        raise click.exceptions.BadOptionUsage(
-            "test-corpuses",
-            "At least one testing corpus is required",
         )
     
     model_kw = {k: v for k, v in model_kw.items() if v is not None}
@@ -278,11 +283,20 @@ def train(
         file=click.get_text_stream('stderr')
     )
     
-    train_corpuses = tuple(map(lazy_load if lazy else eager_load, train_corpuses))
-    test_corpuses = tuple(map(lazy_load if lazy else eager_load, test_corpuses))
+    click.echo(
+        'Testing on chromosomes: {}'.format(','.join(test_chroms)),
+        file=click.get_text_stream('stderr')
+    )
+    train, test = list(zip(*[
+        lazy_train_test(
+            (lazy_load if lazy else eager_load)(corpus), 
+            test_chroms
+        ) 
+        for corpus in train_corpuses
+    ]))
 
-    if bootstrap:
-        train_corpuses, test_corpuses = _setup_bootstrap(train_corpuses, test_corpuses, seed=bootstrap)
+    #if bootstrap:
+    #    train_corpuses, test_corpuses = _setup_bootstrap(train_corpuses, test_corpuses, seed=bootstrap)
     
     if time_profile:
         model_kw['eval_every'] = 1
@@ -290,9 +304,8 @@ def train(
         logger.setLevel('DEBUG')
 
     model, _, test_scores = mu.MutopiaModel(
-        train_corpuses,
-        test_corpuses,
-        init_components=init_components if len(init_components) > 0 else None,
+        train,
+        test,
         **model_kw,
     )
 
@@ -308,19 +321,10 @@ def study():
 
 @study.command("create")
 @click.argument("study_name", type=str)#, help="Name of the study")
-@click.option(
-    "-train",
-    "--train-corpuses",
-    multiple=True,
+@click.argument(
+    'train_corpuses',
     type=click.Path(exists=True),
-    help="Paths to training corpuses. Invoke multiple times for multiple corpuses: `-train <path1> -train <path2>`",
-)
-@click.option(
-    "-test",
-    "--test-corpuses",
-    type=click.Path(exists=True),
-    multiple=True,
-    help="Paths to testing corpuses. Invoke multiple times for multiple corpuses: `-test <path1> -test <path2>`",
+    nargs=-1,
 )
 @click.option(
     "--min-components",
@@ -355,9 +359,17 @@ def study():
     "-init",
     "--init-components",
     type=str,
-    default=None,
+    default=[],
     multiple=True,
     help="List of components to initialize.",
+)
+@click.option(
+    "-fix",
+    "--fix-components",
+    type=str,
+    default=[],
+    multiple=True,
+    help="List of components to fix.",
 )
 @click.option(
     "-creg",
@@ -489,30 +501,31 @@ def study():
     default=0,
     help='How extensively to tune the hyperparameters of the model, use -e, -ee, -eee, etc. for more tuning.'
 )
+@click.option(
+    '--test-chroms',
+    '-test',
+    multiple=True,
+    type=str,
+    default=['chr1'],
+    help="Chromosomes to use for testing. If not specified, all chromosomes are used.",
+)
 def create_study(
     study_name: str,
     *,
     train_corpuses: List[str],
-    test_corpuses: List[str],
     min_components: int,
     max_components: int,
     seed: int = 0,
     save_model: bool = False,
     output_dir: str = '.',
     extensive: int = 0,
-    init_components: Union[List[str], None] = None,
+    test_chroms : List[str] = ['chr1'],
     **model_kw,
 ):
     if not len(train_corpuses) > 0:
         raise click.exceptions.BadOptionUsage(
             "train-corpuses",
             "At least one training corpus is required",
-        )
-
-    if not len(test_corpuses) > 0:
-        raise click.exceptions.BadOptionUsage(
-            "test-corpuses",
-            "At least one testing corpus is required",
         )
     
     model_kw = {k: v for k, v in model_kw.items() if v is not None}
@@ -525,7 +538,6 @@ def create_study(
 
     mu.tune.create_study(
         list(map(os.path.abspath, train_corpuses)),
-        list(map(os.path.abspath, test_corpuses)),
         eval_every=5,
         min_components=min_components,
         max_components=max_components,
@@ -534,7 +546,7 @@ def create_study(
         save_model=save_model,
         output_dir=os.path.abspath(output_dir),
         extensive=extensive,
-        init_components=init_components if len(init_components) > 0 else None,
+        test_chroms=test_chroms,
         **model_kw,
     )
 

@@ -1,5 +1,6 @@
 import sparse
 import xarray as xr
+import pickle
 import datatree
 from numpy import nan, array, float16, float32
 from functools import wraps
@@ -384,6 +385,12 @@ def _list_sample_names(filename):
 
 
 def load_dataset(filename, with_samples=True, with_state=True):
+
+    if filename.endswith('.pkl'):
+        with open(filename, 'rb') as f:
+            corpus = pickle.load(f)
+        
+        return corpus
     
     with xr.open_dataset(filename, engine='netcdf4') as root, \
         xr.open_dataset(filename, group='regions', engine='netcdf4') as regions, \

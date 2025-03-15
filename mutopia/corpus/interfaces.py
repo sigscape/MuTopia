@@ -9,6 +9,24 @@ def eager_load(corpus):
     return CorpusInterface(load_dataset(corpus, with_samples=True, with_state=False))
 
 
+def lazy_train_test(corpus, test_chroms):
+
+    test_mask = corpus.regions.chrom.isin(test_chroms)
+
+    if test_mask.sum() == 0:
+        raise ValueError(f'None of the chromosomes in {",".join(test_chroms)} are present in the corpus. ')
+
+    train = LazySlicer(corpus, locus=~test_mask)
+    test = LazySlicer(corpus, locus=test_mask)
+
+    del corpus
+
+    train._base_corpus = train._base_corpus.drop_nodes(['features','regions'])
+    test._base_corpus = test._base_corpus.drop_nodes(['features','regions'])
+
+    return train, test
+
+
 def _fetch_sample_from_disk(
     dataset,
     sample_name : str,

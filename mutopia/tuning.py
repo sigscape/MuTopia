@@ -5,7 +5,7 @@ from functools import partial
 from optuna.storages import JournalStorage
 from optuna.storages.journal import JournalFileBackend
 from numpy import isfinite
-from .corpus.interfaces import lazy_load, eager_load
+from .corpus.interfaces import *
 from .utils import logger
 
 def sample_params(study, trial, extensive=0):
@@ -105,12 +105,12 @@ def summary(study_name, storage=None):
 
 def create_study(
     train_corpuses,
-    test_corpuses,
     seed=0,
     storage=None,
     save_model=False,
     output_dir=None,
     extensive=0,
+    test_chroms=['chr1'],
     *,
     min_components, 
     max_components,
@@ -135,9 +135,9 @@ def create_study(
     study.set_user_attr('min_components', min_components)
     study.set_user_attr('max_components', max_components)
     study.set_user_attr('train_corpuses', train_corpuses)
-    study.set_user_attr('test_corpuses', test_corpuses)
     study.set_user_attr('save_model', save_model)
     study.set_user_attr('extensive', extensive)
+    study.set_user_attr('test_corpuses', test_chroms)
     study.set_user_attr('output_dir', output_dir)
 
     for key, value in model_kw.items():
@@ -170,6 +170,7 @@ def load_study(study_name, storage = None, prune=True):
         'save_model' : model_attrs.pop('save_model'),
         'output_dir' : model_attrs.pop('output_dir'),
         'extensive' : model_attrs.pop('extensive', 0),
+        'test_chroms' : model_attrs.pop('test_chroms', ['chr1']),
     }
 
     return (
@@ -265,18 +266,24 @@ def run_trial(
 
     study, study_attrs, model_kw = load_study(study_name, storage)
     model_kw.update(kwargs)
-    train_corpuses = tuple(map(lazy_load if lazy else eager_load, study_attrs['train_corpuses']))
-    test_corpuses = tuple(map(lazy_load if lazy else eager_load, study_attrs['test_corpuses']))
     
-    example_corpus = train_corpuses[0]
+    train, test = list(zip(*[
+        lazy_train_test(
+            (lazy_load if lazy else eager_load)(corpus), 
+            study_attrs['test_chroms']
+        ) 
+        for corpus in study_attrs['train_corpuses']
+    ]))
+    
+    example_corpus = train[0]
 
     if 'eval_every' in model_kw:
         model_kw.pop('eval_every')
 
     model_fn = partial(
         example_corpus.modality().make_model,
-        train_corpuses,
-        test_corpuses,
+        train,
+        test,
         eval_every=5,
         **model_kw,
     )

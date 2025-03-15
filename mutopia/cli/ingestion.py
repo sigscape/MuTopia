@@ -8,6 +8,7 @@ from mutopia.corpus import GTensor, write_dataset, update_view
 import netCDF4 as nc
 from shutil import copyfile
 from itertools import starmap
+import pickle
 
 from ..corpus.interfaces import *
 from ..genome_utils.fancy_iterators import RegionOverlapComparitor
@@ -1075,3 +1076,23 @@ def list_samples(dataset : str):
         return
     
     print(*samples, sep='\n')
+
+
+@ingestion.command("freeze")
+@click.argument(
+    'dataset',
+    type=click.Path(exists=True),
+)
+@click.argument(
+    'output',
+    type=click.Path(writable=True),
+)
+def freeze(
+    dataset : str,
+    output : str,
+):
+    
+    dataset = disk.load_dataset(dataset)
+
+    with open(output, 'wb') as f:
+        pickle.dump(dataset, f, protocol=-1)

@@ -31,7 +31,8 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         init_variance : float = 0.1,
         conditioning_alpha : float = 1e-9,
         dtype = float,
-        init_components = None,
+        init_components = [],
+        fix_components = [],
         context_conditioning = 1e-5,
         *,
         n_components : int,
@@ -40,6 +41,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         super().__init__(*corpuses)
         
         self.n_components = n_components
+        self.n_fixed_components = len(fix_components)
         self.context_dim = corpuses[0].dims['context']
         self.context_names = list(corpuses[0].coords['context'].data)
         self.dtype = dtype
@@ -78,73 +80,104 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
             + [False]*self.transformer.n_coefs * (self.context_transformer.n_states+1)
         )
 
-        if isinstance(self.context_transformer, DiagonalEncoder):
-
-            if not init_components is None:
-                self.init_from_signatures(
-                    corpuses[0].modality().load_components(*init_components)
+        if len(fix_components) > 0 or len(init_components) > 0:
+            self.init_from_signatures(
+                corpuses[0].modality().load_components(
+                    *fix_components, *init_components
                 )
-
-            eln_solver = partial(
-                get_eln_solver,
-                **get_reg_params(reg, context_conditioning),
-                tol=tol,
-                random_state=random_state,
-                max_iter=100,
-            ) # f(X) -> f(z, w, beta) -> beta
-
-            ridge_solver = partial(
-                partial_ls_solver,
-                alpha=conditioning_alpha,
-            ) # f(X) -> f(z, w, beta) -> beta
-
-            split_solver = partial(
-                setup_mixed_solver,
-                is_regularized = ~self.is_intercept_,
-                unreg_solver = ridge_solver, # f(X) -> f(z, w, beta) -> beta
-                reg_solver = eln_solver, # f(X) -> f(z, w, beta) -> beta
             )
-        else:
-            
-            raise ValueError('Only diagonal context encoders are supported')
-            if not init_components is None:
-                raise ValueError('Cannot initialize from signatures with non-diagonal context encoders')
-            
-            eln = partial(
-                get_eln_solver,
-                tol=tol,
-                random_state=random_state,
-                max_iter=100,
-            )
+        
+        optim_kw = dict(
+            is_intercept = self.is_intercept_,
+            tol=tol,
+            max_iter=max_iter,
+        )
 
-            strand_solver = partial(
-                eln,
-                **get_reg_params(reg, context_conditioning),
-            ) # f(X) -> f(z, w, beta) -> beta
+        ridge_solver = partial(
+            partial_ls_solver,
+            alpha=conditioning_alpha,
+        ) # f(X) -> f(z, w, beta) -> beta
 
-            context_solver = partial(
-                eln,
-                **get_reg_params(kmer_reg, context_conditioning),
-            )
+        eln_solver = partial(
+            get_eln_solver,
+            **get_reg_params(reg, context_conditioning),
+            tol=tol,
+            random_state=random_state,
+            max_iter=100,
+        ) # f(X) -> f(z, w, beta) -> beta
 
-            split_solver = partial(
-                setup_mixed_solver,
-                is_regularized = ~self.is_intercept_,
-                unreg_solver = context_solver, # f(X) -> f(z, w, beta) -> beta
-                reg_solver = strand_solver, # f(X) -> f(z, w, beta) -> beta
-            )
+        self.model = self._make_optimizer(
+            X,
+            ridge_solver,
+            eln_solver,
+            **optim_kw,
+        )
+
+        passthrough_solver = lambda X : lambda z, w, beta : beta
+
+        self.fixed_model = self._make_optimizer(
+            X,
+            passthrough_solver,
+            eln_solver,
+            **optim_kw,
+        ) # f(X) -> f(z, w, beta) -> beta
+
+        '''raise ValueError('Only diagonal context encoders are supported')
+        if not init_components is None:
+            raise ValueError('Cannot initialize from signatures with non-diagonal context encoders')
+        
+        eln = partial(
+            get_eln_solver,
+            tol=tol,
+            random_state=random_state,
+            max_iter=100,
+        )
+
+        strand_solver = partial(
+            eln,
+            **get_reg_params(reg, context_conditioning),
+        ) # f(X) -> f(z, w, beta) -> beta
+
+        context_solver = partial(
+            eln,
+            **get_reg_params(kmer_reg, context_conditioning),
+        )
+
+        split_solver = partial(
+            setup_mixed_solver,
+            is_regularized = ~self.is_intercept_,
+            unreg_solver = context_solver, # f(X) -> f(z, w, beta) -> beta
+            reg_solver = strand_solver, # f(X) -> f(z, w, beta) -> beta
+        )'''
+
+    def _make_optimizer(
+        self,
+        X,
+        unreg_solver,
+        reg_solver,
+        *,
+        is_intercept,
+        tol,
+        max_iter,
+    ):
+        split_solver = partial(
+            setup_mixed_solver,
+            is_regularized = ~is_intercept,
+            unreg_solver = unreg_solver, # f(X) -> f(z, w, beta) -> beta
+            reg_solver = reg_solver, # f(X) -> f(z, w, beta) -> beta
+        )
 
         solver = partial(
             right_intercept_solver,
             solver=split_solver,
         )
 
-        self.model = make_optimizer(
+        return make_optimizer(
             X,
             solver,
             tol=tol,
             max_iter=max_iter,
-        )
+        )        
 
 
     @property
@@ -179,8 +212,11 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
 
     
     def prepare_to_save(self):
-        del self.model 
-        # the model is not serializable because it has nested functions
+        if hasattr(self, 'model'):
+            del self.model
+
+        if hasattr(self, 'fixed_model'):
+            del self.fixed_model
 
     ##
     # Satisfaction of SparseDataBase interface
@@ -384,7 +420,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         yield partial(
             self._run_regression,
             *get_poisson_targets_weights(target, eta),
-            model = self.model,
+            model = self.fixed_model if k < self.n_fixed_components else self.model,
             update_vec = self._coefs[k],
             learning_rate = learning_rate,
         )
@@ -392,7 +428,6 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
     @property
     def coefs_(self):
         return self._coefs[:,:-1] #self.n_corpuses]
-    
 
     def _calc_lambda(self, k, design_matrix):
         return (self.coefs_[k] @ design_matrix.T)\
