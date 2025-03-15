@@ -308,6 +308,8 @@ class SBSMode(ModeConfig):
             )
         )
 
+        contributions = weighted_posterior.sum(axis=1)
+
         # print the results for the user's entertainment
         contributions = weighted_posterior.sum(axis=1)
 

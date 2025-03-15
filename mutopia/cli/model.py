@@ -718,10 +718,16 @@ def report(
     default=1,
     help="Number of threads to use",
 )
+@click.option(
+    "--contributions/--no-contributions",
+    is_flag=True,
+    default=True,
+)
 def predict(
     model: str,
     dataset: str,
     threads: int = 1,
+    contributions=True,
 ):
     
     model = mu.load_model(model)
@@ -731,20 +737,22 @@ def predict(
     logger.info('Setting up corpus ...')
     dataset = model.setup_corpus(dataset)
 
-    logger.info('Annotating contributions ...')
-    dataset = model.annot_contributions(dataset, threads=threads)
-    dataset.contributions.name = 'contributions'
-    
-    '''dataset.contributions.to_netcdf(
-        corpus_path,
-        mode='a',
-        **disk.WRITE_KW,
-    )'''
-
     disk._write_model_state(
         dataset,
         corpus_path,
     )
+
+    if contributions:
+
+        logger.info('Annotating contributions ...')
+        dataset = model.annot_contributions(dataset, threads=threads)
+        dataset.contributions.name = 'contributions'
+        
+        dataset.contributions.to_netcdf(
+            corpus_path,
+            mode='a',
+            **disk.WRITE_KW,
+        )
 
 
 @model.group("tools")
