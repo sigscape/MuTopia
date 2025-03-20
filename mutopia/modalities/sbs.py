@@ -17,7 +17,7 @@ from ..utils import logger
 from ..genome_utils.bed12_utils import stream_bed12
 from .mode_config import ModeConfig
 from ._sbs_nucdata import *
-from ._sbs_ingestion import featurize_mutations, _revcomp
+from ._sbs_ingestion import featurize_mutations
 from ._sbs_clustering import transfer_annotations_to_vcf
 
 _transition_palette = {
@@ -165,7 +165,7 @@ class SBSMode(ModeConfig):
 
             return [
                 [counts[context] + pseudocount for context in contexts],
-                [counts[_revcomp(context)] + pseudocount for context in contexts],
+                [counts[revcomp(context)] + pseudocount for context in contexts],
             ]
 
         with Fasta(fasta_file) as fasta_object:

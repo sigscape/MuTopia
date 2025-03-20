@@ -99,6 +99,11 @@ COSMIC_SORT_ORDER = [
  'T[T>G]T'
 ]
 
+COMPLEMENT = {'A' : 'T','T' : 'A','G' : 'C','C' : 'G'}
+
+def revcomp(seq):
+    return ''.join(reversed([COMPLEMENT[nuc] for nuc in seq]))
+
 CONTEXTS = sorted(
     map(lambda x : ''.join(x), 
         map(
@@ -121,6 +126,14 @@ def format_as_cosmic(context, mut):
         mut = 'T' if context[1] == 'C' else 'C'
     cosmic = "{}[{}>{}]{}".format(context[0], context[1], mut, context[2])
     return cosmic
+
+def unformat(cosmic):
+    context = cosmic[0] + cosmic[2] + cosmic[6]
+    mut = cosmic[4]
+    return context, mut
+
+def reflect(context, mut):
+    return revcomp(context), COMPLEMENT[mut]
 
 MUTOPIA_ORDER = [
     format_as_cosmic(context, mut)

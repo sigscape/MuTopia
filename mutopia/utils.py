@@ -305,11 +305,16 @@ def get_explanation(corpus, component):
         import shap
     except ImportError:
         raise ImportError('SHAP is required to calculate SHAP values')
+    
+    if not component in corpus.varm['SHAP_values'].shap_component.values:
+        raise ValueError(f'The corpus does not have SHAP values for component {component}.')
+
+    shap_values = corpus.varm['SHAP_values']
 
     shap_df = (
         DataFrame(
-            corpus.varm['SHAP_values'][component].data,
-            columns=corpus.transformed_features.values,
+            shap_values.sel(shap_component=component).data,
+            columns=shap_values.transformed_features.values,
         )
         .melt(
             ignore_index=False, 
@@ -321,7 +326,7 @@ def get_explanation(corpus, component):
     )
     
     # handle this case to remove the convolution
-    if all(shap_df.feature.str.contains(':')):
+    if any(shap_df.feature.str.contains(':')):
         shap_df[['feature', 'convolution']] = (
             shap_df.feature.str
             .split(':', expand=True, n=1)
@@ -341,11 +346,11 @@ def get_explanation(corpus, component):
         shap_df.values,
         feature_names=shap_df.columns,
         data=corpus.state.locus_features.sel(
-                feature=[
-                    f'{s}:0' if f'{s}:0' in corpus.state.feature.values else s
-                    for s in shap_df.columns
-                ]
-            ).values
+            feature=[
+                f'{s}:0' if f'{s}:0' in corpus.state.feature.values else s
+                for s in shap_df.columns
+            ]
+        ).values
     )
 
     return expl

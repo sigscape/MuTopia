@@ -25,8 +25,11 @@ def moving_average(arr, bin_width=None, alpha=10):
 def renorm(x):
     return x/x.sum()
 
-def reorder_rows(data, labels=None):
-    row_idx = leaves_list(optimal_leaf_ordering(linkage(data, method='ward'), data))
+def apply_rows(fn, mat):
+    return np.array([fn(row) for row in mat])
+
+def reorder_rows(data, labels=None, method='ward', **kwargs):
+    row_idx = leaves_list(optimal_leaf_ordering(linkage(data, method=method, **kwargs), data))
     out = {'matrix' : data[row_idx]}
     if labels is not None:
         out['row_labels'] = labels[row_idx]
@@ -116,6 +119,40 @@ def xaxis_plot(height=0.1):
     return _plot
 
 
+@borrow_kwargs(plt.Rectangle)
+def ideogram(cytobands_df, height=0.15, **kwargs):
+
+    color_lookup = {
+        'gneg': 'lightgrey',
+        'gpos25': (.6, .6, .6),
+        'gpos50': (.4, .4, .4),
+        'gpos75': (.2, .2, .2),
+        'gpos100': (0., 0., 0.),
+        'acen': (.8, .4, .4),
+        'gvar': (.8, .8, .8),
+        'stalk': (.9, .9, .9),
+    }
+
+    def _plot(ax, *args, **_):
+
+        for (_start, _end, _diecolor) in zip(cytobands_df.start, cytobands_df.end, cytobands_df.stain):
+            ax.add_patch(plt.Rectangle(
+                (_start, 0), _end - _start, 1,
+                color=color_lookup[_diecolor],
+                **kwargs
+            ))
+        
+        ax.spines['right'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+        ax.set(yticks=[], xticks=[])
+        return ax
+    
+    _plot.height = height
+    return _plot
+
+
 @borrow_kwargs(plt.plot)
 def line_plot(
     vals,
@@ -146,21 +183,27 @@ def bar_plot(
     label=None,
     height=1,
     yticks=True,
+    color=None,  # Ensure color is used below or remove this line if unnecessary
     **kwargs,
 ):
-    def _plot(ax, start, end, idx, check_len):
-        
+    def _plot(ax, start, end, idx, check_len, color=None):
+
         if not len(vals) == check_len:
             raise ValueError('vals and must have one entry per region in the provided corpus.')
         
         center = start + (end - start)/2
         width = end - start
-        ax.bar(center, vals[idx], width=width, **kwargs)
+
+        if not color is None and not isinstance(color, str):
+            color = np.array(color)[idx]
+
+        ax.bar(center, vals[idx], width=width, color=color, **kwargs)
         _clean_ax(ax, axlabel=label, yticks=yticks)    
         return ax
     
-    _plot.height = height
-    return _plot
+    fn = partial(_plot, color=color)
+    fn.height = height
+    return fn
 
 
 @borrow_kwargs(plt.scatter)
@@ -192,6 +235,7 @@ def heatmap_plot(
     label=None,
     yticks=True,
     height=1,
+    **kwargs,
 ):
     def _plot(ax, start, end, idx, check_len):
         
@@ -203,7 +247,7 @@ def heatmap_plot(
         y=np.concatenate([[start[0]], end])
         z = matrix[:, idx]
 
-        ax.pcolormesh(y, x, z, cmap=palette)
+        ax.pcolormesh(y, x, z, cmap=palette, **kwargs)
         ax.set_yticks(np.arange(nrows)+0.5)
         ax.set_yticklabels(row_labels, fontsize=7)
         ax.set(xticks=[])
@@ -216,13 +260,15 @@ def heatmap_plot(
     _plot.height = height
     return _plot
 
-
+@borrow_kwargs(plt.Rectangle)
 def categorical_plot(
     vals, 
     order=None,
     label=None, 
     height=1,
-    palette='Greys', 
+    palette='Greys',
+    edgecolor=None,
+    **kwargs,
 ):
     
     categories = order or list(sorted(set(vals)))
@@ -249,7 +295,8 @@ def categorical_plot(
                 ax.add_patch(plt.Rectangle(
                     (_start, 0.1*j), _end - _start, 0.1,
                     color=palette[j],
-                    edgecolor=None,
+                    edgecolor=edgecolor,
+                    **kwargs,
                 ))
 
         ax.set(
