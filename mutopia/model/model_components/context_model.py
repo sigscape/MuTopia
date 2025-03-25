@@ -246,7 +246,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         # Use numpy advanced indexing to update context_sstats
         np.add.at(sstats, (slice(None), context, mesoscale_states), weighted_posterior)
 
-        return sstats.astype(self.dtype)
+        return sstats.astype(self.dtype, copy=False)
     ##
     # End of SparseDataBase interface
     ##
@@ -269,7 +269,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         np.add.at(sstats, (slice(None), slice(None), plus_idx), weights[:,0])
         np.add.at(sstats, (slice(None), slice(None), minus_idx), weights[:,1])
 
-        return sstats.astype(self.dtype)
+        return sstats.astype(self.dtype, copy=False)
 
 
     def init_from_signatures(self, signatures):

@@ -263,20 +263,21 @@ class LDAUpdateSparse(LocalUpdate):
         updates = (
             self._get_update_fn(
                 exposures_fn(corpus, sample_name),
-                sample=CS.fetch_sample(corpus, sample_name),
+                sample=sample,
                 corpus=corpus,
                 model_state=model_state,
                 learning_rate=learning_rate,
                 locus_subsample=locus_subsample,
                 batch_subsample=batch_subsample,
             )
-            for (corpus, sample_name) in samples
+            for corpus in corpuses
+            for (sample_name, sample) in zip(
+                CS.list_samples(corpus),
+                corpus
+            )
         )
 
-        return (
-            samples,
-            updates
-        )
+        return (samples, updates)
     
 
     def posterior_assign_sample(
@@ -439,6 +440,7 @@ class LDAUpdateSparse(LocalUpdate):
         *,
         parallel_context,
     ):
+    
         context_sums = {
             CS.get_name(corpus) : np.sum(
                 corpus.regions.context_frequencies.data,
@@ -452,12 +454,15 @@ class LDAUpdateSparse(LocalUpdate):
                 self._sample_deviance,
                 corpus=corpus,
                 model_state=model_state,
-                sample=CS.fetch_sample(corpus, sample_name),
+                sample=sample,
                 gamma=exposures_fn(corpus, sample_name),
                 context_sum=context_sums[CS.get_name(corpus)],
             )
             for corpus in corpuses
-            for sample_name in CS.list_samples(corpus)
+            for sample_name, sample in zip(
+                CS.list_samples(corpus),
+                corpus
+            )
         )
 
         return deviance_fns
@@ -502,11 +507,14 @@ class LDAUpdateSparse(LocalUpdate):
                 self._deviance_residuals,
                 corpus=corpus,
                 model_state=model_state,
-                sample=CS.fetch_sample(corpus, sample_name),
+                sample=sample,
                 gamma=exposures_fn(corpus, sample_name),
             )
             for corpus in corpuses
-            for sample_name in CS.list_samples(corpus)
+            for sample_name, sample in zip(
+                CS.list_samples(corpus),
+                corpus
+            )
         )
 
         return residuals_fns    

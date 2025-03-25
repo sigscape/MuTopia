@@ -2,7 +2,7 @@ import sparse
 import xarray as xr
 import pickle
 import datatree
-from numpy import nan, array, float16, float32
+from numpy import nan, array, float32, int32
 from functools import wraps
 import time
 import netCDF4 as nc
@@ -220,8 +220,11 @@ def write_sample(
     *,
     sample_name,
 ):
-    dset = arr.sparse_to_coo() if isinstance(arr.data, sparse.SparseArray) else \
-                arr.to_dataset(name='data', promote_attrs=True)
+    dset = (
+        arr.sparse_to_coo() 
+        if isinstance(arr.data, sparse.SparseArray) else \
+        arr.to_dataset(name='data', promote_attrs=True)
+    )
     
     if len(dset.data) == 0:
         maxval=1.
@@ -242,6 +245,9 @@ def write_sample(
                 'scale_factor': prec, 
                 '_FillValue': 0., 
                 'add_offset' : -prec
+            },
+            'indices' : {
+                'dtype' : 'uint32', 
             }
         },
         **WRITE_KW,
@@ -345,7 +351,7 @@ def write_dataset(dataset, filename, bar=False):
 def _load_sparse_sample(group, coo=False):
 
     weights = group['data'][...].data
-    coords = group['indices'][...].data
+    coords = group['indices'][...].data.astype(int32, copy=False)
     dims = tuple(map(str, group['obs_indices'][...]))
     shape = group.shape
 
@@ -363,7 +369,7 @@ def _load_sparse_sample(group, coo=False):
     )
 
     if not coo:
-        return arr.tocsr('locus')
+        return arr.ascsr('locus')
 
     return arr
 
@@ -385,6 +391,36 @@ def _backend_load_sample(dset, sample_name, coo=False):
     loader = _load_sparse_sample if is_sparse else _load_dense_sample
     
     return loader(group, coo=coo)
+
+
+def load_sample(filename, sample_name):
+
+    if filename.endswith('.pkl'):
+        raise NotImplementedError('Loading samples from pickled files is not supported.')
+    
+    with retry_until_write(nc.Dataset)(filename, 'r') as dset:
+        return _backend_load_sample(
+            dset, 
+            f'raw/X/{sample_name}',
+            coo=False,
+        )
+
+
+def yield_samples(filename, *sample_names):
+
+    if filename.endswith('.pkl'):
+        raise NotImplementedError('Loading samples from pickled files is not supported.')
+    
+    with retry_until_write(nc.Dataset)(filename, 'r') as dset:
+        for sample_name in sample_names:
+            try:
+                yield _backend_load_sample(
+                    dset, 
+                    f'raw/X/{sample_name}',
+                    coo=False,
+                )
+            except KeyError:
+                raise ValueError(f'Sample {sample_name} not found in dataset.')
 
 
 class NoSamplesError(ValueError):
@@ -453,7 +489,7 @@ def load_dataset(filename, with_samples=True, with_state=True):
     if has_samples and with_samples:
 
         with retry_until_write(nc.Dataset)(filename, 'r') as dset:
-            samples = xr.concat([
+            samples = [
                 _backend_load_sample(
                     dset, 
                     f'raw/X/{sample_name}',
@@ -463,13 +499,15 @@ def load_dataset(filename, with_samples=True, with_state=True):
                     sample_names,
                     desc=f'Loading samples',
                     ncols=100,
-                )],
-                dim='sample'
-            )
+                )
+            ]
+
+        samples = xr.concat(samples, dim='sample')
 
         dataset.update({'X' : samples})
 
         if isinstance(dataset['X'].data, sparse.SparseArray):
+            dataset.X.data.coords = dataset.X.data.coords.astype(int32, copy=False)
             dataset['X'].ascsr('sample','locus')
 
     dataset.attrs['filename'] = filename
