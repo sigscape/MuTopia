@@ -25,14 +25,12 @@ def lazy_train_test_load(corpus, test_chroms):
     test_mask = corpus.regions.chrom.isin(test_chroms)
     if test_mask.sum() == 0:
         raise ValueError(f'None of the chromosomes in {",".join(test_chroms)} are present in the corpus. ')
-
+    
     train = LazySlicer(corpus, locus=~test_mask)
     test = LazySlicer(corpus, locus=test_mask)
 
-    del corpus
-
-    train._base_corpus = train._base_corpus.drop_nodes(['features','regions'])
-    test._base_corpus = test._base_corpus.drop_nodes(['features','regions'])
+    train._base_corpus.corpus = train._base_corpus.drop_nodes(['features','regions','varm'], errors='ignore')
+    test._base_corpus.corpus = test._base_corpus.drop_nodes(['features','regions','varm'], errors='ignore')
 
     return train, test
 
