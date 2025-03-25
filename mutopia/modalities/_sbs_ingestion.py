@@ -241,7 +241,7 @@ def featurize_mutations(
         )
 
     coords = np.array(coords).T.astype(np.int32)
-    weights = np.array(weights)
+    weights = np.array(weights).astype(np.float32)
 
     if not sample_weight is None:
         weights*=sample_weight

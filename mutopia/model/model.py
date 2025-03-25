@@ -264,11 +264,16 @@ class Model:
                     parallel_context=par
                 )
         
-        
-        corpus = corpus.assign_coords({
-            'component' : self.component_names,
-        })
-        corpus['contributions'] = contributions
+        corpus = CorpusInterface(corpus)
+        corpus.corpus = (
+            corpus
+            .assign_coords({
+                'component' : self.component_names,
+            })
+            .assign({
+                'contributions' : contributions,
+            })
+        )
 
         logger.info('Added key to dataset: "contributions"')
         return corpus
@@ -292,7 +297,6 @@ class Model:
                 with_context=False,
             )
 
-        corpus = corpus.assign_coords({'component' : self.component_names})
         corpus.varm['component_distributions'] =\
              np.exp(lmrt - lmrt.max(skipna=True)).fillna(0.)
         
@@ -390,18 +394,20 @@ class Model:
 
         use_components = list(map(
             self._get_k,
-            components if not components is None else list(range(self.n_components))
+            components if not len(components)==0 else list(range(self.n_components))
         ))
 
-        with ParContext(threads) as par:
+        '''with ParContext(threads) as par:
             shap_matrix = np.array(list(par(
-                [delayed(_component_shap)(k) for k in use_components]
+                delayed(_component_shap)(k) for k in use_components
             )))
 
-        #shap_matrix = np.array([
-        #    _component_shap(k)
-        #    for k in use_components
-        #])
+        print(shap_matrix)'''
+
+        shap_matrix = np.array([
+            _component_shap(k)
+            for k in use_components
+        ])
         
         corpus.varm['SHAP_values'] = xr.DataArray(
             shap_matrix,
