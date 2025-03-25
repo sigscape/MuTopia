@@ -180,7 +180,7 @@ class SBSMode(ModeConfig):
 
         # LxDxC => DxCxL
         trinuc_matrix = (
-            np.array(trinuc_matrix).transpose(((1, 2, 0))).astype(np.float32)
+            np.array(trinuc_matrix).transpose(((1, 2, 0))).astype(np.float32, copy=False)
         )
         # DON'T (!) add a pseudocount
 
@@ -348,29 +348,6 @@ class SBSMode(ModeConfig):
             chr_prefix=chr_prefix,
             description={},
             output=output,
-        )
-
-
-    def model_competition(
-        self,
-        model,
-        dataset,
-        vcf_file,
-        *,
-        locus_dim,
-        regions_file,
-        fasta_file,
-        alphas,
-        **ingest_kw,
-    ):
-        
-        logger.info("Ingesting mutations ...")
-        _, sample_arr = self.ingest_uncollaposed(
-            vcf_file,
-            locus_dim=locus_dim,
-            regions_file=regions_file,
-            fasta_file=fasta_file,
-            **ingest_kw,
         )
 
 

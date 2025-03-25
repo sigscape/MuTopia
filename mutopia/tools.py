@@ -146,12 +146,19 @@ def deepscan_neutral_matagenesis(
 
 def annot_empirical_marginal(
     corpus,
+    bar=True,
 ):
     check_structure(corpus)
 
     X_emp = reduce(
         lambda x,y : x + y,
-        (corpus.fetch_sample(sample_name) for sample_name in CS.list_samples(corpus))
+        (
+            corpus.fetch_sample(sample_name).ascoo() 
+            for sample_name in tqdm(
+                CS.list_samples(corpus),
+                desc="Reducing samples",
+            )
+        )
     )
 
     X_emp = X_emp.asdense() if X_emp.is_sparse() else X_emp

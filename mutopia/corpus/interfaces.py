@@ -1,12 +1,21 @@
 import os
-from functools import lru_cache
-from .disk_interface import _backend_load_sample, load_dataset
+import mutopia.corpus.disk_interface as disk
+
+def load_dataset(corpus, with_samples=False, with_state=False):
+    '''
+    Loads a dataset from disk. If the dataset is not present,
+    it will be created.
+    '''
+    return (LazySampleLoader if not with_samples else CorpusInterface)(
+        disk.load_dataset(corpus, with_samples=with_samples, with_state=with_state)
+    )
+
 
 def lazy_load(corpus):
-    return LazySampleLoader(CorpusInterface(load_dataset(corpus, with_samples=False, with_state=False)))
+    return load_dataset(corpus, with_samples=False, with_state=False)
 
 def eager_load(corpus):
-    return CorpusInterface(load_dataset(corpus, with_samples=True, with_state=False))
+    return load_dataset(corpus, with_samples=True, with_state=False)
 
 
 def lazy_train_test_load(corpus, test_chroms):
@@ -44,22 +53,6 @@ def eager_train_test_load(corpus, test_chroms):
     return train, test
 
 
-def _fetch_sample_from_disk(
-    dataset,
-    sample_name : str,
-):
-    filename = dataset.attrs['filename']
-    if not os.path.exists(filename):
-        raise FileNotFoundError(f'No such file exists anymore: {filename}, maybe it was deleted?')
-
-    sample = _backend_load_sample(
-        filename, 
-        f'raw/X/{sample_name}'
-    )
-
-    return sample
-
-
 class CorpusInterface:
     '''
     Sometimes, we'd like to drop something else into the EM step
@@ -91,6 +84,10 @@ class CorpusInterface:
             self._corpus.corpus = value
         else:
             self._corpus = value
+
+    def __iter__(self):
+        for sample in self.list_samples():
+            yield self.fetch_sample(sample)
         
 
 class LazySampleLoader(CorpusInterface):
@@ -104,14 +101,20 @@ class LazySampleLoader(CorpusInterface):
     @property
     def X(self):
         return self._X
+    
+    def _get_filename(self):
+        filename = self._corpus.attrs['filename']
+        if not os.path.exists(filename):
+            raise FileNotFoundError(f'No such file exists anymore: {filename}, maybe it was deleted?')
+        return filename
 
     def fetch_sample(self, sample_name):
-        return _fetch_sample_from_disk(
-            self._corpus, 
-            sample_name,
-        )
-
+        return disk.load_sample(self._get_filename(), sample_name)
     
+    def __iter__(self):
+        return disk.yield_samples(self._get_filename(), *self.list_samples())
+
+
 class LazySlicer(CorpusInterface):
     '''
     Making slices of the corpus is memory-intensive.
@@ -143,6 +146,7 @@ class LazySlicer(CorpusInterface):
         self._corpus = sliced\
             .isel(**self._apply_slices)
         
+    
     @property
     def X(self):
         return self._base_corpus.X
@@ -153,10 +157,14 @@ class LazySlicer(CorpusInterface):
     def fetch_sample(self, sample_name):
         if not sample_name is None:
             return self._base_corpus.fetch_sample(sample_name)\
-                    .isel(**{d:s for d,s in self._apply_slices.items()})
+                    .isel(**self._apply_slices)
         else:
             return self.X.isel(**self._apply_slices)
         
+    def __iter__(self):
+        for sample in self._base_corpus:
+            yield sample.isel(**self._apply_slices)
+
 
 class SampleCorpusFusion(CorpusInterface):
 
@@ -174,6 +182,9 @@ class SampleCorpusFusion(CorpusInterface):
     def fetch_sample(self, sample_name):
         return self._sample
         
+    def __iter__(self):
+        yield self._sample
+
 
 class BootstrapCorpus(CorpusInterface):
 
