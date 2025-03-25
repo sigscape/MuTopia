@@ -280,9 +280,11 @@ def rm_sample(
 ##
 
 def _write_model_state(dataset, filename):
-    dataset.state.to_dataset().drop_vars(
-        [name for name, d in dataset.state.data_vars.items() if d.is_sparse()]
-    ).to_netcdf(
+    dataset.state.to_dataset().drop_vars([
+        name 
+        for name, d in dataset.state.data_vars.items() 
+        if d.is_sparse()
+    ]).to_netcdf(
         filename,
         group='/state', 
         mode='a', 
@@ -340,15 +342,34 @@ def write_dataset(dataset, filename, bar=False):
             )
 
 
-def _load_sparse_sample(filename, sample_name, coo=False):
-    with xr.open_dataset(filename, group=sample_name, engine='netcdf4') as sample:
-        s = sample.load().coo_to_sparse()
-        if coo:
-            return s.ascoo()
-        return s
+def _load_sparse_sample(group, coo=False):
+
+    weights = group['data'][...].data
+    coords = group['indices'][...].data
+    dims = tuple(map(str, group['obs_indices'][...]))
+    shape = group.shape
+
+    arr = sparse.COO(
+        coords,
+        weights,
+        shape=shape,
+        fill_value=0.,
+    )
+    
+    arr = xr.DataArray(
+        arr, 
+        dims=dims,
+        attrs={'active' : 1},
+    )
+
+    if not coo:
+        return arr.tocsr('locus')
+
+    return arr
 
 
 def _load_dense_sample(filename, sample_name, **kwargs):
+    raise NotImplementedError()
     with xr.open_dataarray(
         filename, 
         group=sample_name,
@@ -357,16 +378,13 @@ def _load_dense_sample(filename, sample_name, **kwargs):
         return dset.load()
     
 
-def _backend_load_sample(filename, sample_name, coo=False):
-
-    with nc.Dataset(filename, 'r') as dset:
-        sample=dset[sample_name]
-        attrs=sample.ncattrs()
-        is_sparse = 'format' in attrs and getattr(sample, 'format') == 'COO'
-    
+def _backend_load_sample(dset, sample_name, coo=False):
+    group = dset[sample_name]
+    attrs = group.__dict__
+    is_sparse = attrs.get('format', 'not coo') == 'COO'
     loader = _load_sparse_sample if is_sparse else _load_dense_sample
-
-    return loader(filename, sample_name, coo=coo)
+    
+    return loader(group, coo=coo)
 
 
 class NoSamplesError(ValueError):
@@ -410,7 +428,7 @@ def load_dataset(filename, with_samples=True, with_state=True):
             '/varm' : varm.load(),
         })
 
-    with nc.Dataset(filename, 'r') as dset:
+    with retry_until_write(nc.Dataset)(filename, 'r') as dset:
         has_state = 'state' in dset.groups
 
     if with_state and has_state:
@@ -433,10 +451,11 @@ def load_dataset(filename, with_samples=True, with_state=True):
         dataset = dataset.assign_coords({'sample': sample_names})
 
     if has_samples and with_samples:
-        samples = xr.concat(
-            [
+
+        with retry_until_write(nc.Dataset)(filename, 'r') as dset:
+            samples = xr.concat([
                 _backend_load_sample(
-                    filename, 
+                    dset, 
                     f'raw/X/{sample_name}',
                     coo=True,
                 )
@@ -444,10 +463,9 @@ def load_dataset(filename, with_samples=True, with_state=True):
                     sample_names,
                     desc=f'Loading samples',
                     ncols=100,
-                )
-            ],
-            dim='sample'
-        )
+                )],
+                dim='sample'
+            )
 
         dataset.update({'X' : samples})
 
