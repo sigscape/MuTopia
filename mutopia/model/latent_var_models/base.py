@@ -476,7 +476,7 @@ class LocalUpdate(PrimitiveModel):
                 SampleCorpusFusion(CorpusInterface(corpus), sample),
                 model_state,
                 parallel_context=par,
-            ).ravel()
+            )
 
 
     @abstractmethod

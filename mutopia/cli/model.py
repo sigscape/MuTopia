@@ -723,35 +723,66 @@ def report(
     is_flag=True,
     default=True,
 )
+@click.option(
+    "--output",
+    '-o',
+    type=click.Path(writable=True),
+    default=None,
+    help="Output file to write predictions to. If not specified, predictions are written to the dataset file.",
+)
 def predict(
     model: str,
     dataset: str,
     threads: int = 1,
     contributions=True,
+    output=None,
 ):
     
     model = mu.load_model(model)
     corpus_path = dataset
     dataset = lazy_load(dataset)
 
+    inplace = not ('component' in dataset.dims) and output is None
+    if not inplace and output is None:
+        raise click.BadOptionUsage(
+            "output",
+            "Output file *must* be specified since the dataset already has a \"state\".",
+        )
+
+    if inplace:
+        logger.info('Modifying dataset in place ...')
+
+    dataset = CorpusInterface(dataset)
+    dataset.corpus = dataset.assign_coords({
+        'sample' : dataset.list_samples(),
+    })
+    
     logger.info('Setting up corpus ...')
     dataset = model.setup_corpus(dataset)
-
-    disk._write_model_state(
-        dataset,
-        corpus_path,
-    )
-
+    
     if contributions:
-
         logger.info('Annotating contributions ...')
         dataset = model.annot_contributions(dataset, threads=threads)
         dataset.contributions.name = 'contributions'
+
+    if inplace:
         
+        disk._write_model_state(
+            dataset,
+            corpus_path,
+        )
+
         dataset.contributions.to_netcdf(
             corpus_path,
-            mode='a',
-            **disk.WRITE_KW,
+            mode='a', 
+            **disk.WRITE_KW
+        )
+    
+    else:
+        disk.write_dataset(
+            dataset,
+            output,
+            bar=True
         )
 
 

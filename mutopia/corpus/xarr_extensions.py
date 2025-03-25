@@ -27,20 +27,15 @@ class OnDiskCoo(BaseAccessor):
 
         self._validate(self, ['obs_indices'], {'indices' : None, 'data' : None})
 
-        indices = self._xrds['indices'].data.astype(int)
+        indices = self._xrds['indices'].data
         data = self._xrds[data_var].data
         shape = self._xrds.attrs['shape']
         dims = tuple(list(self._xrds.coords['obs_indices'].values))
-        compress = dims.index('locus')
-
-        sparsified_data = sparse.GCXS(
-            sparse.COO(
-                indices,
-                data,
-                shape=shape,
-                fill_value=0.,
-            ),
-            compressed_axes=(compress,),
+        
+        sparsified_data = sparse.COO(
+            indices,
+            data,
+            shape=shape,
             fill_value=0.,
         )
 

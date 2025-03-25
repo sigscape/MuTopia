@@ -10,7 +10,7 @@ from ..plot.coef_matrix_plot import _plot_interaction_matrix
 from ..corpus import *
 from ..corpus.interfaces import CorpusInterface
 from functools import partial  
-from joblib import dump
+from joblib import dump, delayed
 from collections import defaultdict
 import typing
    
@@ -35,12 +35,20 @@ class Model:
     
     @property
     def component_names(self):
-        #return self.model_state_.component_names
         try:
             self.component_names_
         except AttributeError:
-            return ['component_{}'.format(i) for i in range(1, self.n_components+1)]
-    
+            return ['M{}'.format(i) for i in range(0, self.n_components)]
+        
+    def _get_k(self, component_name):
+        if isinstance(component_name, int):
+            return component_name
+
+        try:
+            return self.component_names.index(component_name)
+        except ValueError:
+            raise ValueError(f'Component {component_name} not found in model.')
+
 
     def _check_corpus(self, corpus, enforce_sample=True):
         check_corpus(corpus, enforce_sample=enforce_sample)
@@ -94,6 +102,8 @@ class Model:
         if len(select) == 0:
             select = ['Baseline']
 
+        component = self._get_k(component)
+
         return self.modality_.plot(
             self.model_state_.format_signature(component, normalization=normalization), 
             *select,
@@ -109,6 +119,8 @@ class Model:
         height=2.,
         show=True,
     ):
+
+        component = self._get_k(component)
 
         signatures = self.model_state_.format_signature(component, normalization=normalization)
         n_rows = len(signatures.mesoscale_state)
@@ -175,6 +187,8 @@ class Model:
             **kw,
         ):
 
+        component = self._get_k(component)
+
         flatten = partial(self.modality_._flatten_observations)
 
         interactions = self.model_state_.format_interactions(component)
@@ -197,6 +211,39 @@ class Model:
             **kw
         )
     
+    def signature_panel(
+        self,
+        ncols=3,
+        normalization='global',
+        width=3.5,
+        height=1.25,
+        show=True,
+        **kwargs,
+    ):
+        
+        K = self.n_components
+        nrows = int(np.ceil(K/ncols))
+
+        fig, ax = plt.subplots(
+            nrows, ncols, 
+            figsize=(width*ncols,height*nrows), 
+            gridspec_kw={'hspace': 0.5, 'wspace': 0.25}
+        )
+
+        for k in range(self.n_components):
+            _ax=np.ravel(ax)[k]
+            self.plot_signature(k, ax=_ax, normalization=normalization, **kwargs)
+            _ax.set_ylabel(self.component_names[k], fontsize=7)
+            _ax.set_xticks([])
+
+        for _ax in np.ravel(ax)[self.n_components:]:
+            _ax.axis('off')
+
+        if show:
+            plt.show()
+        else:
+            return fig
+    
 
     def annot_contributions(
         self,
@@ -217,11 +264,16 @@ class Model:
                     parallel_context=par
                 )
         
-        
-        corpus = corpus.assign_coords({
-            'component' : self.component_names,
-        })
-        corpus['contributions'] = contributions
+        corpus = CorpusInterface(corpus)
+        corpus.corpus = (
+            corpus
+            .assign_coords({
+                'component' : self.component_names,
+            })
+            .assign({
+                'contributions' : contributions,
+            })
+        )
 
         logger.info('Added key to dataset: "contributions"')
         return corpus
@@ -245,7 +297,6 @@ class Model:
                 with_context=False,
             )
 
-        corpus = corpus.assign_coords({'component' : self.component_names})
         corpus.varm['component_distributions'] =\
              np.exp(lmrt - lmrt.max(skipna=True)).fillna(0.)
         
@@ -292,7 +343,7 @@ class Model:
                 marginal_exposures
             )
         
-        corpus.varm['predicted_marginal'] = marginal
+        corpus.varm['predicted_marginal'] = np.exp(marginal - marginal.max(skipna=True)).fillna(0.)
         corpus.varm['predicted_locus_marginal'] = (np.exp(marginal) * corpus.regions.context_frequencies)\
             .sum(dim=dims_except_for(marginal.dims, 'locus'))/corpus.regions.length
         
@@ -305,6 +356,7 @@ class Model:
     def annot_SHAP_values(
         self,
         corpus,
+        *components,
         threads=1,
     ):
         
@@ -326,10 +378,9 @@ class Model:
         )
         
         def _component_shap(k):
-            
             logger.info(f'Calculating SHAP values for {self.component_names[k]} ...')
 
-            return shap.TreeExplainer(
+            shaps = shap.TreeExplainer(
                 locus_model.rate_models[k],
                 X[background_idx],
             ).shap_values(
@@ -337,19 +388,41 @@ class Model:
                 check_additivity=False,
                 approximate=False,
             )
+
+            return np.squeeze(shaps)
         
+
+        use_components = list(map(
+            self._get_k,
+            components if not len(components)==0 else list(range(self.n_components))
+        ))
+
+        '''with ParContext(threads) as par:
+            shap_matrix = np.array(list(par(
+                delayed(_component_shap)(k) for k in use_components
+            )))
+
+        print(shap_matrix)'''
+
         shap_matrix = np.array([
-            np.squeeze(_component_shap(k))
-            for k in range(self.n_components)
+            _component_shap(k)
+            for k in use_components
         ])
+        
+        corpus.varm['SHAP_values'] = xr.DataArray(
+            shap_matrix,
+            dims=('shap_component','locus','transformed_features'),
+        )
 
         features = corpus.state.coords['feature'].data
 
-        corpus = corpus.assign_coords({'transformed_features' : features})
-        corpus.varm['SHAP_values'] = xr.DataArray(
-                shap_matrix,
-                dims=('component','locus','transformed_features'),
-            )
+        corpus = update_view(
+            corpus,
+            varm = corpus.varm.assign_coords({
+                'transformed_features' : features,
+                'shap_component' : [self.component_names[k] for k in use_components],
+            }).to_dataset(),
+        )
 
         logger.info('Added key to varm: "SHAP_values"')
         return corpus

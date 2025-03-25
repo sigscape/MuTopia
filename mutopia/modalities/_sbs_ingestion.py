@@ -33,16 +33,13 @@ class BadWeightError(Exception):
     pass
 
 CONTEXT_IDX_MAP = dict(zip(CONTEXTS, range(len(CONTEXTS))))
-COMPLEMENT = {'A' : 'T','T' : 'A','G' : 'C','C' : 'G'}
 
-def _revcomp(seq):
-    return ''.join(reversed([COMPLEMENT[nuc] for nuc in seq]))
 
 def _convert_to_bases(context, alt):
     configuration = 0
     if not context[1] in 'CT': 
         configuration = 1
-        context, alt = _revcomp(context), COMPLEMENT[alt]
+        context, alt = revcomp(context), COMPLEMENT[alt]
     
     mut = 'N->' + (alt if alt in 'AG' else 'T/C')
     return context, mut, configuration
@@ -244,7 +241,7 @@ def featurize_mutations(
         )
 
     coords = np.array(coords).T.astype(np.int32)
-    weights = np.array(weights)
+    weights = np.array(weights).astype(np.float32)
 
     if not sample_weight is None:
         weights*=sample_weight
