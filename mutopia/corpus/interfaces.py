@@ -1,7 +1,7 @@
 import os
 import mutopia.corpus.disk_interface as disk
 
-def load_dataset(corpus, with_samples=False, with_state=False):
+def load_dataset(corpus, with_samples=True, with_state=True):
     '''
     Loads a dataset from disk. If the dataset is not present,
     it will be created.
@@ -86,6 +86,12 @@ class CorpusInterface:
     def __iter__(self):
         for sample in self.list_samples():
             yield self.fetch_sample(sample)
+
+    def __setitem__(self, key, value):
+        self._corpus[key] = value
+
+    def __getitem__(self, key):
+        return self._corpus[key]
         
 
 class LazySampleLoader(CorpusInterface):
