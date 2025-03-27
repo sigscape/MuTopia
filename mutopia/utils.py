@@ -312,17 +312,14 @@ def get_explanation(corpus, component):
     shap_values = corpus.varm['SHAP_values']
 
     shap_df = (
-        DataFrame(
-            shap_values.sel(shap_component=component).data,
-            columns=shap_values.transformed_features.values,
-        )
+        shap_values.sel(shap_component=component)
+        .to_pandas()
         .melt(
             ignore_index=False, 
             var_name='feature', 
             value_name='value'
         )
-        .reset_index()\
-        .rename(columns={'index':'locus'})
+        .reset_index()
     )
     
     # handle this case to remove the convolution
@@ -335,22 +332,39 @@ def get_explanation(corpus, component):
 
     shap_df = (
         shap_df
-        .groupby(['feature', 'locus'])['value']
+        .groupby(['feature', 'shap_locus'])['value']
         .sum()
         .unstack()
         .fillna(0)
         .T
     )
 
+    data = (
+        corpus.state
+        .locus_features
+        .sel(locus=shap_df.index)
+        .sel(feature=[
+            f'{s}:0' if f'{s}:0' in corpus.state.feature.values else s
+            for s in shap_df.columns
+        ])
+    ).values
+
+    display_features = (
+        corpus.features
+        .assign_coords(locus=corpus.locus.data)
+        .sel(locus=shap_df.index)
+    )
+
+    display_data = DataFrame([
+        display_features[s].data
+        for s in shap_df.columns
+    ]).T
+
     expl = shap.Explanation(
         shap_df.values,
         feature_names=shap_df.columns,
-        data=corpus.state.locus_features.sel(
-            feature=[
-                f'{s}:0' if f'{s}:0' in corpus.state.feature.values else s
-                for s in shap_df.columns
-            ]
-        ).values
+        data=data,
+        display_data=display_data,
     )
 
     return expl

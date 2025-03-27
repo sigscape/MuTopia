@@ -71,11 +71,16 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
 
         known_categories = get_known_categories(self.base_transformer_, len(self.feature_names_out_))
 
+        interaction_groups = get_feature_interaction_group_idxs(
+            corpus, 
+            self.base_transformer_.get_feature_names_out(feature_names_in)
+        )
+
         self.rate_models = [
             self._make_model(
                 **model_kw,
                 X = X,
-                interaction_groups = get_feature_interaction_group_idxs(corpus, self.base_transformer_),
+                interaction_groups = interaction_groups,
                 categorical_features = categorical_features,
                 known_categories = known_categories,
                 random_state = random_state,

@@ -37,7 +37,7 @@ def model():
     pass
 
 
-@model.command("train")
+@model.command("train", help='Train a mutopia model.')
 @click.argument(
     'train_corpuses',
     type=click.Path(exists=True),
@@ -688,9 +688,9 @@ def list_studies():
     click.echo('\n'.join(studies))
 
 
-@model.command("report")
+@model.command("report", help='Write a PDF report of the signatures discovered by the model.')
 @click.argument("model_path", type=click.Path(exists=True))
-@click.argument("output", type=click.Path(writable=True))
+@click.option("-o", "--output", type=click.Path(writable=True), default=None)
 def report(
     model_path: str,
     output: str,
@@ -698,9 +698,16 @@ def report(
     import matplotlib.backends.backend_pdf
     matplotlib.rcParams['figure.max_open_warning']=100
 
-    model = mu.load_model(model_path)
+    model : mu.model.Model = mu.load_model(model_path)
     
+    if output is None:
+        output = os.path.splitext(model_path)[0] + '.report.pdf'
+
     pdf = matplotlib.backends.backend_pdf.PdfPages(output)
+
+    fig = model.signature_panel(ncols=3, show=False)
+    pdf.savefig(fig, dpi=300, bbox_inches='tight')
+
     for i in range(model.n_components):
         fig = model.signature_report(i, show=False)
         pdf.savefig(fig, dpi=300, bbox_inches='tight')
@@ -708,7 +715,7 @@ def report(
     pdf.close()
 
 
-@model.command("predict")
+@model.command("predict", help='Predict the contributions of the signatures to each sample.')
 @click.argument("model", type=click.Path(exists=True))
 @click.argument("dataset", type=click.Path(exists=True))
 @click.option(
@@ -784,6 +791,76 @@ def predict(
             output,
             bar=True
         )
+
+
+@model.command("SHAP", help="Calculate SHAP values for the model.")
+@click.argument("model", type=click.Path(exists=True))
+@click.argument("dataset", type=click.Path(exists=True))
+@click.argument("components", type=str, nargs=-1)
+@click.option(
+    "-@",
+    "--threads",
+    type=click.IntRange(1, 1000),
+    default=1,
+    help="Number of threads to use",
+)
+@click.option(
+    "--n-samples",
+    type=click.IntRange(1, 100000),
+    default=2000,
+    help="Number of samples to use for SHAP calculation",
+)
+@click.option(
+    "--scan/--no-scan",
+    type=bool,
+    default=False,
+    is_flag=True,
+    help="Use scan for SHAP calculation",
+)
+def shap(
+    model: str, 
+    dataset: str, 
+    components = [],
+    threads: int = 1,
+    n_samples=2000, 
+    scan=False
+):
+    corpus_path = dataset
+    model = mu.load_model(model)
+    dataset = lazy_load(dataset)
+    
+    logger.info('Calculating SHAP values ...')
+    dataset = model.annot_SHAP_values(
+        dataset,
+        *components,
+        threads=threads,
+        n_samples=n_samples,
+        scan=scan,
+    )
+    
+    dataset.varm.SHAP_values.name = 'SHAP_values'
+    dataset.varm.SHAP_values.to_netcdf(
+        corpus_path,
+        mode='a',
+        group='varm',
+        **disk.WRITE_KW
+    )
+
+
+@model.command("tables", help='Write an excel file of signatures, contributions, and SHAP values.')
+@click.argument("model", type=click.Path(exists=True))
+@click.argument("dataset", type=click.Path(exists=True))
+@click.argument("output", type=click.Path(writable=True))
+def excel(
+    model: str,
+    dataset: str,
+    output: str,
+):
+    
+    model = mu.load_model(model)
+    dataset = lazy_load(dataset)
+
+    model.execel_report(dataset, output)
 
 
 @model.group("tools")

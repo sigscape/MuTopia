@@ -20,14 +20,27 @@ from mutopia.genome_utils.fancy_iterators import streaming_groupby, \
     repeat_first, repeat_last
 
 
-'''
-TODO: make this work again ...
-'''
 def get_feature_interaction_group_idxs(
     corpus,
-    transformer,
+    feature_names,
 ):
-    None
+    feature_names = list(feature_names)
+    groups = [corpus.features[feature_name].attrs['group'] for feature_name in feature_names]
+
+    if len(set(groups)) == 1:
+        return None
+    
+    interaction_groups = defaultdict(list)
+    interacting_features = defaultdict(list)
+    for idx, (group, feature_name) in enumerate(zip(groups, feature_names)):
+        interaction_groups[group].append(idx)
+        interacting_features[group].append(feature_name)
+
+    interacting_features = [f'\n\t- {k}: {str_wrapped_list(v).strip()}' for k,v in interacting_features.items()]
+    logger.info('Found interaction groups:' + ''.join(interacting_features))
+    
+    interaction_groups = list(interaction_groups.values())
+    return interaction_groups
 
 
 def get_categorical_feature_idxs(

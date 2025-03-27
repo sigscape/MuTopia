@@ -1,7 +1,6 @@
 from datatree import DataTree
 import xarray as xr
 import numpy as np
-import warnings
 from typing import Union, List, Dict
 from numpy.typing import NDArray
 from ..utils import FeatureType, check_structure, logger
@@ -170,6 +169,7 @@ def update_view(
     tree,
     **kwargs : Dict[str, xr.Dataset],
 ):
+    
     for node, dset in kwargs.items():
         DataTree(
             data=dset,

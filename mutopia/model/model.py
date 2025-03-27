@@ -135,10 +135,12 @@ class Model:
 
         max_n_states = max(map(len, state_groups.values()))
         n_sigs = len(state_groups)
-        fig = plt.figure(figsize=(
-            max(width*max_n_states, 10),
-            height*n_sigs + 3
-        ))
+        fig = plt.figure(
+            figsize=(
+                max(width*max_n_states, 10),
+                height*n_sigs + 3
+            )
+        )
 
         gs = fig.add_gridspec(
             2, 1,
@@ -358,6 +360,9 @@ class Model:
         corpus,
         *components,
         threads=1,
+        scan=False,
+        n_samples=2000,
+        seed=42,
     ):
         
         try:
@@ -369,15 +374,25 @@ class Model:
 
         if not CS.has_corpusstate(corpus):
             corpus = self.setup_corpus(corpus)
-
+        
+        if not scan:
+            subset_loci = (
+                np.random.RandomState(seed)
+                .choice(corpus.locus.size, max(n_samples, 1500), replace=False)
+            )
+            subset = corpus.isel(locus=subset_loci)
+        else:
+            subset = corpus
+        
         locus_model = self.model_state_.models['theta_model']
-        X = locus_model._fetch_feature_matrix(corpus)
+        X = locus_model._fetch_feature_matrix(subset)
 
         background_idx = np.random.RandomState(0).choice(
             len(X), size = min(1000, len(X)), replace = False
         )
         
         def _component_shap(k):
+            
             logger.info(f'Calculating SHAP values for {self.component_names[k]} ...')
 
             shaps = shap.TreeExplainer(
@@ -397,31 +412,29 @@ class Model:
             components if not len(components)==0 else list(range(self.n_components))
         ))
 
-        '''with ParContext(threads) as par:
+        with ParContext(threads) as par:
             shap_matrix = np.array(list(par(
                 delayed(_component_shap)(k) for k in use_components
             )))
 
-        print(shap_matrix)'''
-
-        shap_matrix = np.array([
-            _component_shap(k)
-            for k in use_components
-        ])
-        
-        corpus.varm['SHAP_values'] = xr.DataArray(
-            shap_matrix,
-            dims=('shap_component','locus','transformed_features'),
-        )
 
         features = corpus.state.coords['feature'].data
+        coords = {
+            'shap_features' : features,
+            'shap_component' : [self.component_names[k] for k in use_components],
+        }
+        
+        if not scan:
+            coords['shap_locus'] = subset.locus.data
 
-        corpus = update_view(
-            corpus,
-            varm = corpus.varm.assign_coords({
-                'transformed_features' : features,
-                'shap_component' : [self.component_names[k] for k in use_components],
-            }).to_dataset(),
+        corpus.varm['SHAP_values'] = xr.DataArray(
+            shap_matrix,
+            dims=(
+                'shap_component',
+                'locus' if scan else 'shap_locus',
+                'shap_features'
+            ),
+            coords=coords,
         )
 
         logger.info('Added key to varm: "SHAP_values"')
@@ -471,3 +484,88 @@ class Model:
         logger.info('Added key to varm: "residuals"')
 
         return corpus
+    
+
+    def format_signature(self, component, normalization='global'):
+        
+        component = self._get_k(component)
+
+        return self.modality_._flatten_observations(
+            self.model_state_.format_signature(
+                component,
+                normalization=normalization
+            )
+        )
+    
+    @property
+    def alpha_(self):
+        return self.model_state_.locals_model.alpha
+    
+
+    def execel_report(self, corpus, output):
+        
+        try:
+            from pandas import ExcelWriter
+        except ImportError:
+            raise ImportError('openpyxl is required to save excel reports, install with `pip install openpyxl`')
+        
+        renorm = lambda x : x/x.sum()*1000
+
+        with ExcelWriter(output) as writer:
+
+            for sig in self.component_names:
+                (
+                    renorm(self.format_signature(sig))
+                    .to_pandas().T
+                    .to_excel(
+                        writer,
+                        sheet_name=f'Signature_{sig}',
+                    )
+                )
+
+
+            if hasattr(corpus, 'contributions'):
+                (
+                    corpus
+                    .contributions
+                    .to_pandas()
+                    .to_excel(
+                        writer,
+                        sheet_name='Sample_contributions',
+                    )
+                )
+
+            if hasattr(corpus.varm, 'SHAP_values'):
+                
+                shap_components = corpus.varm.SHAP_values.coords['shap_component'].values
+                expl = get_explanation(corpus, shap_components[0])
+
+                DataFrame(
+                    expl.data,
+                    columns=expl.feature_names,
+                ).to_excel(
+                    writer,
+                    sheet_name='SHAP_transformed_features',
+                    index=False,
+                )
+
+                display_data = expl.display_data.copy()
+                display_data.columns = expl.feature_names
+                display_data.to_excel(
+                    writer,
+                    sheet_name='SHAP_original_features',
+                    index=False,
+                )
+
+                for component in shap_components:
+
+                    expl = get_explanation(corpus, component)
+
+                    DataFrame(
+                        expl.values,
+                        columns=expl.feature_names,
+                    ).to_excel(
+                        writer,
+                        sheet_name='SHAP_values_{}'.format(component),
+                        index=False,
+                    )

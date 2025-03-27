@@ -272,7 +272,6 @@ def _gibbs_draw(
     logits = (
         temperature*log_conditional_likelihood 
         + np.log(alpha + Nk)
-        - np.log(N - 1 + alpha)
     )
     return np.argmax(logits + gumbel_draws)
     
