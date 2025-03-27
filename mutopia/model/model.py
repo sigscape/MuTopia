@@ -135,10 +135,12 @@ class Model:
 
         max_n_states = max(map(len, state_groups.values()))
         n_sigs = len(state_groups)
-        fig = plt.figure(figsize=(
-            max(width*max_n_states, 10),
-            height*n_sigs + 3
-        ))
+        fig = plt.figure(
+            figsize=(
+                max(width*max_n_states, 10),
+                height*n_sigs + 3
+            )
+        )
 
         gs = fig.add_gridspec(
             2, 1,
