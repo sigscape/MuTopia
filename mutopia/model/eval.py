@@ -1,10 +1,7 @@
 import numpy as np
-import xarray as xr
-import sparse as sp
 from functools import reduce, partial
 from joblib import delayed
 from .corpus_state import CorpusState as CS
-from ..utils import dims_except_for, match_dims
 import warnings
 
 def _reduce_sum(g):

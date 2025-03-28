@@ -261,49 +261,38 @@ def dirichlet_multinomial_logpmf(x, alpha):
     )
 
 @njit(nogil=True)
-def _gibbs_draw(
-    alpha, #K
-    log_conditional_likelihood, #K
-    Nk, #K
-    N, #(1,)
-    gumbel_draws, #K
-    temperature, #(1,)
-):
-    logits = (
-        temperature*log_conditional_likelihood 
-        + np.log(alpha + Nk)
-    )
-    return np.argmax(logits + gumbel_draws)
-    
+def _categorical_draw(logits):
+    logits = np.exp(logits - logits.max())
+    cdf = np.cumsum(logits)
+    z = cdf[-1]
+    u = np.random.uniform(0,1)
+    return np.searchsorted(cdf, u * z)
 
-@njit(nogil=True)
-def _gibbs_sample_scan(
+
+@njit(
+    'Tuple((float32[::1],int64[::1],float32))(float32[::1], float32[:,::1], float32[::1], float32[::1], int64[::1], float32)',
+    nogil=True
+)
+def _gibbs_sample_scan_block(
     alpha,
     log_conditional_likelihood,
     weights,
     Nk,
     z,
-    gumbel_draws,
     temperature,
 ):
-    log_weight=0
-    N = np.sum(Nk)
     
+    log_weight = 0.
     for i in range(len(weights)):
-        
         Nk[z[i]] -= weights[i]
-        z[i] = _gibbs_draw(
-            alpha,
-            log_conditional_likelihood[:,i],
-            Nk, 
-            N,
-            gumbel_draws[:,i],
-            temperature,
+        logits = (
+            temperature*log_conditional_likelihood[i]
+            + np.log(alpha + Nk)
         )
+        z[i] = _categorical_draw(logits)
         Nk[z[i]] += weights[i]
-
-        log_weight += weights[i]*log_conditional_likelihood[z[i],i]
-
+        log_weight += weights[i]*log_conditional_likelihood[i,z[i]]
+    
     return Nk, z, log_weight
 
 
@@ -318,21 +307,17 @@ def _ais_inner(
     seed,
 ):
     temperatures = np.linspace(0, 1, iters)
-    K,I = log_conditional_likelihood.shape
     ais_weight = 0
     np.random.seed(seed)
 
     for j in range(1, len(temperatures)):
-
-        gumbel_draws = np.random.gumbel(0, 1, (K,I))
         
-        Nk, z, log_weight = _gibbs_sample_scan(
+        Nk, z, log_weight = _gibbs_sample_scan_block(
             alpha,
             log_conditional_likelihood,
             weights,
             Nk,
             z,
-            gumbel_draws,
             temperatures[j],
         )
         
@@ -353,38 +338,55 @@ def AIS_marginal_ll(
 ):
     
     K,I = conditional_likelihood.shape
-    log_conditional_likelihood = np.log(conditional_likelihood)
-    alpha = np.ascontiguousarray(alpha)
-
+    log_conditional_likelihood = np.ascontiguousarray(
+        np.log(conditional_likelihood).T,
+        dtype=np.float32
+    )
+    weights = np.ascontiguousarray(weights, dtype=np.float32)
+    
     def init_ais(i):
+
+        seed = init_seed+i
         z = (
-            np.random.RandomState(init_seed+i)
+            np.random.RandomState(seed)
             .choice(K, size=I, p=dirichlet_multinomial.pmf(np.diag(np.ones(K)), alpha, n=1))
         )
-        Nk = np.array([weights[z==k].sum() for k in range(K)])
+        z = np.ascontiguousarray(z, dtype=np.int64)
+        
+        Nk = np.array(
+            [weights[z==k].sum() for k in range(K)], 
+            dtype=np.float32,
+        )
+        Nk = np.ascontiguousarray(Nk, dtype=np.float32)
 
         return partial(
             _ais_inner,
-            alpha,
+            np.ascontiguousarray(alpha, dtype=np.float32),
             log_conditional_likelihood,
             weights,
             Nk,
             z,
             inner_iters,
-            init_seed+i,
+            seed,
         )
     
     with ParContext(threads) as par:
-        w_ais = np.array(list(par(
-            delayed(init_ais(i))() for i in (
-                trange(outer_iters) if not quiet else range(outer_iters)
-            )
-        )))
-
-    w_mean = logsumexp(w_ais) - np.log(outer_iters)
-    w_var = np.var(w_ais)/outer_iters
+        w_ais = par(
+            delayed(init_ais(i))() 
+            for i in (trange(outer_iters) if not quiet else range(outer_iters))
+        )
     
-    return w_mean, np.sqrt(w_var)
+    w_ais = np.array(list(w_ais))
+
+    base_w = w_ais.max()
+    w_ais = np.exp(w_ais - base_w)
+    
+    #w_mean = logsumexp(w_ais) - np.log(outer_iters)
+    #w_var = np.var(w_ais)/outer_iters
+    w_mean = np.mean(w_ais)
+    w_var = np.var(w_ais)
+    
+    return np.log(w_mean) + base_w, np.sqrt(w_var)
 
 
 def random_locals(random_state, n_components):
@@ -401,8 +403,8 @@ class LocalUpdate(PrimitiveModel):
             corpuses,
             n_components,
             prior_alpha=1.0,
-            estep_iterations=300,
-            difference_tol=1e-4,
+            estep_iterations=1000,
+            difference_tol=5e-5,
             dtype=float,
             *,
             random_state,

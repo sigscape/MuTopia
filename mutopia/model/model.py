@@ -4,7 +4,7 @@ import xarray as xr
 import matplotlib.pyplot as plt
 from ..utils import *
 from .model_components import *
-from .eval import deviance_locus, pearson_residuals
+from .eval import deviance_locus, pearson_residuals, _update_normalizers
 from .latent_var_models import *
 from ..plot.coef_matrix_plot import _plot_interaction_matrix
 from ..corpus import *
@@ -48,7 +48,14 @@ class Model:
             return self.component_names.index(component_name)
         except ValueError:
             raise ValueError(f'Component {component_name} not found in model.')
-
+        
+    def renormalize_model(self, corpus):
+        with ParContext(1) as par:
+            _update_normalizers(
+                self.model_state_,
+                (corpus,),
+                parallel_context=par,
+            )
 
     def _check_corpus(self, corpus, enforce_sample=True):
         check_corpus(corpus, enforce_sample=enforce_sample)
