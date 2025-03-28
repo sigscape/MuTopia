@@ -324,9 +324,9 @@ class LDAUpdateSparse(LocalUpdate):
         model_state,
         alpha=None,
         threads=1,
-        sample_steps=1000,
+        sample_steps=10000,
         quiet=False,
-        reps=100,
+        reps=10,
     ):
         # marginalize out gamma, and just return the mutation annotations.
         # For panel and exome data, there may be too few mutations to 
@@ -334,7 +334,7 @@ class LDAUpdateSparse(LocalUpdate):
         # instead and just marginalize it out.
 
         sample_dict = self._convert_sample(sample, dtype=self.dtype)
-        alpha = np.ascontiguousarray(self.alpha[CS.get_name(corpus)] if alpha is None else alpha)
+        alpha = self.alpha[CS.get_name(corpus)] if alpha is None else alpha
 
         # KxI - I=number of mutations, K=number of signatures
         conditional_likelihood = self._conditional_observation_likelihood(
@@ -342,7 +342,7 @@ class LDAUpdateSparse(LocalUpdate):
             model_state,
             **sample_dict,
             logsafe=False,
-        ).astype(self.dtype, copy=False)
+        )
         
         return AIS_marginal_ll(
             alpha,
