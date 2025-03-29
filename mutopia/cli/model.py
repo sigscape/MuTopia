@@ -766,6 +766,7 @@ def predict(
     
     logger.info('Setting up corpus ...')
     dataset = model.setup_corpus(dataset)
+    model.renormalize_model(dataset)
     
     if contributions:
         logger.info('Annotating contributions ...')
@@ -858,7 +859,7 @@ def excel(
 ):
     
     model = mu.load_model(model)
-    dataset = lazy_load(dataset)
+    dataset = mu.gt.load_dataset(dataset, with_samples=False)
 
     model.execel_report(dataset, output)
 

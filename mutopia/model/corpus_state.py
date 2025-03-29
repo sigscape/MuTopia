@@ -41,6 +41,10 @@ class CorpusState:
     @classmethod
     def list_samples(cls, corpus):
         return list(corpus.list_samples())
+    
+    @classmethod
+    def iter_samples(cls, corpus):
+        return zip(corpus.list_samples(), corpus.iter_samples())
 
     @classmethod
     def fetch_sample(cls, corpus, sample_name):

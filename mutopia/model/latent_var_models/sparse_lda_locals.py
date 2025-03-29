@@ -271,10 +271,7 @@ class LDAUpdateSparse(LocalUpdate):
                 batch_subsample=batch_subsample,
             )
             for corpus in corpuses
-            for (sample_name, sample) in zip(
-                CS.list_samples(corpus),
-                corpus
-            )
+            for (sample_name, sample) in CS.iter_samples(corpus)
         )
 
         return (samples, updates)
@@ -317,25 +314,20 @@ class LDAUpdateSparse(LocalUpdate):
         return (ll, posterior)
     
 
-    def marginal_ll_sample(
+    def _marginal_ll_sample(
         self,
-        sample,
         corpus,
+        sample,
         model_state,
-        alpha=None,
-        threads=1,
-        sample_steps=10000,
-        quiet=False,
-        reps=10,
+        alpha,
+        steps=100000,
+        seed=42,
     ):
         # marginalize out gamma, and just return the mutation annotations.
         # For panel and exome data, there may be too few mutations to 
         # infer anything useful from gamma. We'll lower the variance of estimation
         # instead and just marginalize it out.
-
         sample_dict = self._convert_sample(sample, dtype=self.dtype)
-        alpha = self.alpha[CS.get_name(corpus)] if alpha is None else alpha
-
         # KxI - I=number of mutations, K=number of signatures
         conditional_likelihood = self._conditional_observation_likelihood(
             corpus,
@@ -348,11 +340,35 @@ class LDAUpdateSparse(LocalUpdate):
             alpha,
             conditional_likelihood,
             sample_dict['weights'],
-            threads=threads,
-            inner_iters=sample_steps,
-            outer_iters=reps,
-            quiet=quiet,
+            steps=steps,
+            seed=seed,
         )
+    
+
+    def get_marginal_ll_fns(
+        self,
+        corpuses,
+        model_state,
+        alpha=None,
+        steps=100000,
+        seed=42,
+    ):
+
+        marginal_ll_fns = (
+            partial(
+                self._marginal_ll_sample,
+                corpus,
+                sample,
+                model_state,
+                alpha=self.alpha[CS.get_name(corpus)] if alpha is None else alpha,
+                steps=steps,
+                seed=seed,
+            )
+            for corpus in corpuses
+            for (_, sample) in CS.iter_samples(corpus)
+        )
+
+        return marginal_ll_fns
 
 
     def _apply_per_sample(
@@ -432,6 +448,7 @@ class LDAUpdateSparse(LocalUpdate):
             d_sat - d_null,
         )
     
+
     def get_deviance_fns(
         self,
         corpuses,
@@ -459,10 +476,7 @@ class LDAUpdateSparse(LocalUpdate):
                 context_sum=context_sums[CS.get_name(corpus)],
             )
             for corpus in corpuses
-            for sample_name, sample in zip(
-                CS.list_samples(corpus),
-                corpus
-            )
+            for (sample_name, sample) in CS.iter_samples(corpus)
         )
 
         return deviance_fns
@@ -511,10 +525,7 @@ class LDAUpdateSparse(LocalUpdate):
                 gamma=exposures_fn(corpus, sample_name),
             )
             for corpus in corpuses
-            for sample_name, sample in zip(
-                CS.list_samples(corpus),
-                corpus
-            )
+            for (sample_name, sample) in CS.iter_samples(corpus)
         )
 
         return residuals_fns    

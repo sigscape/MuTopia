@@ -83,10 +83,6 @@ class CorpusInterface:
         else:
             self._corpus = value
 
-    def __iter__(self):
-        for sample in self.list_samples():
-            yield self.fetch_sample(sample)
-
     def __setitem__(self, key, value):
         self._corpus[key] = value
 
@@ -115,7 +111,7 @@ class LazySampleLoader(CorpusInterface):
     def fetch_sample(self, sample_name):
         return disk.load_sample(self._get_filename(), sample_name)
     
-    def __iter__(self):
+    def iter_samples(self):
         return disk.yield_samples(self._get_filename(), *self.list_samples())
 
 
@@ -165,8 +161,8 @@ class LazySlicer(CorpusInterface):
         else:
             return self.X.isel(**self._apply_slices)
         
-    def __iter__(self):
-        for sample in self._base_corpus:
+    def iter_samples(self):
+        for sample in self._base_corpus.iter_samples():
             yield sample.isel(**self._apply_slices)
 
 
@@ -186,7 +182,7 @@ class SampleCorpusFusion(CorpusInterface):
     def fetch_sample(self, sample_name):
         return self._sample
         
-    def __iter__(self):
+    def iter_samples(self):
         yield self._sample
 
 

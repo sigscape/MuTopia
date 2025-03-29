@@ -138,4 +138,11 @@ class FetchSample(BaseAccessor):
 class FetchSample(BaseAccessor):
     def __call__(self):
         return self._xrds.sample.values
+    
+
+@register_datatree_accessor('iter_samples')
+class FetchSample(BaseAccessor):
+    def __call__(self):
+        for sample_name in self._xrds.list_samples():
+            yield self._xrds['X'].sel(sample=sample_name)
 

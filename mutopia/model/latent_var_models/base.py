@@ -283,7 +283,10 @@ def _gibbs_sample_scan_block(
 ):
     
     log_weight = 0.
-    for i in range(len(weights)):
+    I=log_conditional_likelihood.shape[0]
+    sampling_order = np.random.permutation(I)
+
+    for i in sampling_order:
         Nk[z[i]] -= weights[i]
         logits = (
             temperature*log_conditional_likelihood[i]
@@ -304,11 +307,10 @@ def _ais_inner(
     Nk,
     z,
     iters,
-    seed,
 ):
     temperatures = np.linspace(0, 1, iters)
+    logweights = np.zeros(iters, dtype=np.float32)
     ais_weight = 0
-    np.random.seed(seed)
 
     for j in range(1, len(temperatures)):
         
@@ -322,71 +324,48 @@ def _ais_inner(
         )
         
         ais_weight += log_weight*(temperatures[j] - temperatures[j-1])
+        logweights[j] = log_weight
 
-    return ais_weight
+    return (
+        ais_weight, 
+        logweights, 
+        Nk,
+    )
 
 
 def AIS_marginal_ll(
     alpha,
     conditional_likelihood,
     weights,
-    threads=1,
-    inner_iters=1000,
-    outer_iters=10,
-    init_seed=10,
-    quiet=False
+    steps=100000,
+    seed=42,
 ):
     
     K,I = conditional_likelihood.shape
+    np.random.seed(seed)
+
     log_conditional_likelihood = np.ascontiguousarray(
         np.log(conditional_likelihood).T,
         dtype=np.float32
     )
     weights = np.ascontiguousarray(weights, dtype=np.float32)
+    alpha = np.ascontiguousarray(alpha, dtype=np.float32)
     
-    def init_ais(i):
+    z = np.random.choice(K, size=I, p=alpha/np.sum(alpha))
+    z = np.ascontiguousarray(z, dtype=np.int64)
+    
+    Nk = np.array(
+        [weights[z==k].sum() for k in range(K)], 
+        dtype=np.float32,
+    )
+    Nk = np.ascontiguousarray(Nk, dtype=np.float32)
 
-        seed = init_seed+i
-        z = (
-            np.random.RandomState(seed)
-            .choice(K, size=I, p=dirichlet_multinomial.pmf(np.diag(np.ones(K)), alpha, n=1))
-        )
-        z = np.ascontiguousarray(z, dtype=np.int64)
-        
-        Nk = np.array(
-            [weights[z==k].sum() for k in range(K)], 
-            dtype=np.float32,
-        )
-        Nk = np.ascontiguousarray(Nk, dtype=np.float32)
-
-        return partial(
-            _ais_inner,
-            np.ascontiguousarray(alpha, dtype=np.float32),
-            log_conditional_likelihood,
-            weights,
-            Nk,
-            z,
-            inner_iters,
-            seed,
-        )
-    
-    with ParContext(threads) as par:
-        w_ais = par(
-            delayed(init_ais(i))() 
-            for i in (trange(outer_iters) if not quiet else range(outer_iters))
-        )
-    
-    w_ais = np.array(list(w_ais))
-
-    base_w = w_ais.max()
-    w_ais = np.exp(w_ais - base_w)
-    
-    #w_mean = logsumexp(w_ais) - np.log(outer_iters)
-    #w_var = np.var(w_ais)/outer_iters
-    w_mean = np.mean(w_ais)
-    w_var = np.var(w_ais)
-    
-    return np.log(w_mean) + base_w, np.sqrt(w_var)
+    return _ais_inner(
+        alpha,
+        log_conditional_likelihood,
+        weights,
+        Nk, z, steps,
+    )
 
 
 def random_locals(random_state, n_components):

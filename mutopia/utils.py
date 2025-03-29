@@ -1,7 +1,7 @@
 import sparse
 import numpy as np
 from pandas import DataFrame
-from joblib import Parallel
+from joblib import Parallel, delayed
 from contextlib import contextmanager
 from enum import Enum
 import inspect
@@ -91,14 +91,22 @@ def str_wrapped_list(x, n=4):
 
 
 @contextmanager
-def ParContext(n_jobs, verbose=0):
+def ParContext(n_jobs, verbose=0, ordered=True):
     yield Parallel(
         n_jobs=n_jobs, 
         backend='threading', 
-        return_as='generator', 
+        return_as='generator' if ordered else 'generator_unordered', 
         verbose=verbose,
         pre_dispatch='n_jobs',
     )
+
+
+def parallel_gen(function_generator, threads, ordered=True):
+    with ParContext(threads, ordered=ordered) as par:
+        for x in par(
+            delayed(fn)() for fn in function_generator
+        ):
+            yield x
 
 
 def check_dims(corpus, model_state):

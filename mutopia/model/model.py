@@ -2,6 +2,7 @@ from .corpus_state import CorpusState as CS
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
+from tqdm import trange
 from ..utils import *
 from .model_components import *
 from .eval import deviance_locus, pearson_residuals, _update_normalizers
@@ -424,7 +425,6 @@ class Model:
                 delayed(_component_shap)(k) for k in use_components
             )))
 
-
         features = corpus.state.coords['feature'].data
         coords = {
             'shap_features' : features,
@@ -465,7 +465,47 @@ class Model:
                 (corpus,),
                 exposures_fn=using_exposures_from(corpus) if exposures is None else exposures,
                 parallel_context=par,
-            )
+            ).item()
+
+
+    def marginal_ll(
+        self,
+        corpus,
+        threads=1,
+        alpha=None,
+        steps=64000,
+    ):
+        
+        if isinstance(alpha, str):
+            if alpha == 'uniform':
+                alpha = np.ones(self.n_components)
+            else:
+                raise ValueError('Alpha must be a list of floats or "uniform"')
+        
+        self._check_corpus(corpus)
+
+        if not CS.has_corpusstate(corpus):
+            corpus = self.setup_corpus(corpus)
+
+        ll_fns = self.model_state_.locals_model.get_marginal_ll_fns(
+            (corpus,),
+            self.model_state_,
+            alpha=alpha,
+            steps=steps,
+        )
+
+        bar = trange(
+            len(corpus.list_samples()), 
+            desc='Calculating marginal lls', 
+            leave=False
+        )
+
+        ll=0.
+        for sample_ll, *_ in parallel_gen(ll_fns, threads, ordered=False):
+            ll += sample_ll
+            bar.update(1)
+
+        return ll
 
     
     def annot_residuals(
