@@ -814,7 +814,9 @@ def list_features(
     dataset : str,
 ):
     feature_info = disk.list_features(dataset)
-    del feature_info['sample']
+
+    if 'sample' in feature_info:
+        del feature_info['sample']
     
     if len(feature_info)==0:
         click.echo("No features found in the dataset.")
