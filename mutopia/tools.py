@@ -260,6 +260,7 @@ def simulate_from_model(
     corpus, 
     seed=None,
     exposures=None,
+    scale_num_mutations=1.
 ):
      
     model_state = _get_state(model)
@@ -280,7 +281,7 @@ def simulate_from_model(
         )
 
         n_mutations = int(
-            contributions.sum() - model_state.locals_model.alpha[CS.get_name(corpus)].sum()
+            scale_num_mutations*contributions.sum() - model_state.locals_model.alpha[CS.get_name(corpus)].sum()
         )
 
         p_vec = np.exp(log_marginal_mutrate).data.ravel()

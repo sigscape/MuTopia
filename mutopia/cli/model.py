@@ -124,7 +124,7 @@ def model():
 @click.option(
     "--use-groups/--no-use-groups",
     type=bool,
-    default=False,
+    default=True,
     is_flag=True,
     help="Use groups in locus model",
 )
@@ -877,11 +877,18 @@ def tools():
     type=int,
     default=42,
 )
+@click.option(
+    '-scale',
+    '--scale-num-mutations',
+    type=float,
+    default=1.,
+)
 def simulate_from_model(
     model : str,
     dataset : str,
     output : str,
     seed : int = 0,
+    scale_num_mutations=1.
 ):
     
     dataset = disk.load_dataset(
@@ -895,6 +902,7 @@ def simulate_from_model(
         model,
         dataset,
         seed=seed,
+        scale_num_mutations=scale_num_mutations,
     )
 
     disk.write_dataset(
