@@ -1,15 +1,13 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from joblib import delayed
 from xarray import DataArray
-from functools import partial
-from tqdm import tqdm, trange
-from numba import njit, vectorize
+from tqdm import tqdm
+from numba import njit, vectorize, objmode
 import numpy as np
 from numba.extending import get_cython_function_address
 import ctypes
 from functools import wraps
-from scipy.stats import dirichlet_multinomial
-from scipy.special import logsumexp
+from ...utils import logger
 from ...corpus.interfaces import *
 from ...utils import ParContext
 from ._dirichlet_update import update_alpha
@@ -115,11 +113,6 @@ def _update_step(
 
     exp_Elog_gamma = np.exp(log_dirichlet_expectation(gamma))
     
-    '''# NxK @ K => N
-    X_tild = exp_Elog_gamma @ conditional_likelihood
-    #                                    KxN @ N => K
-    gamma_sstats = exp_Elog_gamma*(conditional_likelihood @ (weights/X_tild))'''
-
     X_div_X_tild = np.where(
         weights>0.,
         weights/(exp_Elog_gamma @ conditional_likelihood),
@@ -194,57 +187,150 @@ def bound(
     return np.sum(weighted_posterior * np.nan_to_num(flattened_logweight, nan=0.)) + entropy_sstats
 
 
-@flatten_tensor_for_update
+
+'''
+Mixture model inference functions
+'''
+
 @njit(nogil=True)
-def mixture_update_step(
-    gamma, # D*K
-    delta, # D
+def _categorical_draw(logits):
+    logits = np.exp(logits - logits.max())
+    cdf = np.cumsum(logits)
+    z = cdf[-1]
+    u = np.random.uniform(0,1)
+    return np.searchsorted(cdf, u * z)
+
+
+@njit(nogil=True)
+def _gibbs_sample_mixture_step(
     alpha, # D*K
     tau, # D
-    conditional_likelihood,  # *(D*K)xI
+    fraction_map, # Dx(D*K)
+    component_map, # Kx(D*K)
+    log_conditional_likelihood, # Ix(D*K)
     weights, # I
-    fraction_map, # DxD*K,
+    Nk,
+    z,
+    temperature,
 ):
+    log_weight = 0.
+    I=log_conditional_likelihood.shape[0]
+    sampling_order = np.random.permutation(I)
 
-    Elog_gamma = log_dirichlet_expectation(gamma)
-    exp_Elog_gamma = np.exp(Elog_gamma) # D*K
-    exp_Elog_delta = np.exp(log_dirichlet_expectation(delta)) # D
+    for i in sampling_order:
+        Nk[z[i]] -= weights[i]
+        logits = (
+            temperature*log_conditional_likelihood[i]
+            + np.log(alpha + (Nk @ component_map.T)) @ component_map
+            + np.log(tau + (Nk @ fraction_map.T)) @ fraction_map
+        )
+        z[i] = _categorical_draw(logits)
+        Nk[z[i]] += weights[i]
+        log_weight += weights[i]*log_conditional_likelihood[i,z[i]]
     
-    # (D @ D*K) => D*K) * D*K => D*K
-    exp_Elog_prior = (exp_Elog_delta @ fraction_map) * exp_Elog_gamma
+    return Nk, z, log_weight
 
-    X_div_X_tild = np.where(
-        weights>0.,
-        weights/(exp_Elog_prior @ conditional_likelihood),
-        0.
-    ) # (I,)
-    
-    # (D*KxI @ I => D*K) * D*K => D*K
-    sstats = (conditional_likelihood @ X_div_X_tild)*exp_Elog_prior
 
-    weighted_phi = np.outer(exp_Elog_prior, X_div_X_tild)*conditional_likelihood
-    phi = weighted_phi/weights[None,:]
-    entropy_sstats = -np.sum(weighted_phi * np.where(phi > 0, np.log(phi), 0.))
+@njit(nogil=True)
+def _parallel_categorical_draw(logits, u):
+    logits = np.exp(logits - logits.max())
+    cdf = np.cumsum(logits)
+    z = cdf[-1]
+    return np.searchsorted(cdf, u * z)
 
-    prior_elbo = dirichlet_bound(tau, delta)
-    
-    M = fraction_map.T
-    prior_elbo += np.sum(
-        gammalnvec(alpha @ M) - gammalnvec(gamma @ M) + \
-            (gammalnvec(gamma) - gammalnvec(alpha) + (alpha - gamma) * Elog_gamma) @ M
+
+@njit(nogil=True, )
+def _gibbs_sample_mixture_step_implicit(
+    alpha, # D*K
+    tau, # D
+    fraction_map, # Dx(D*K)
+    log_conditional_likelihood, # Ix(D*K)
+    weights, # I
+    Nk,
+    temperature,
+):
+    '''
+    This function performs Gibbs sampling for a mixture of MuTopia models,
+    but with block sampling. The major advantage of block gibbs sampling is that
+    one needs not explicitly store the latent variable assignments (z) for each mutation.
+
+    For samples with large number of mutations, mutations are essientailly independent given the current
+    mixture contributions, and so this estimator is not much less efficient than the full Gibbs sampler.
+    '''
+    log_weight = 0.
+    I,_ =log_conditional_likelihood.shape
+    new_Nk = np.zeros_like(Nk)
+    u = np.random.uniform(0, 1, size=I)
+
+    logits = (
+        temperature*log_conditional_likelihood
+        + np.log(alpha + Nk)
+        - np.log((alpha + Nk) @ fraction_map.T) @ fraction_map
+        + np.log(tau + (Nk @ fraction_map.T)) @ fraction_map
     )
 
-    flattened_logweight = np.log(exp_Elog_prior)[:,None] + np.log(conditional_likelihood)
-    elbo = np.sum(weighted_phi * np.nan_to_num(flattened_logweight, nan=0.)) + entropy_sstats + prior_elbo
+    for i in range(I):
+        k = _parallel_categorical_draw(logits[i], u[i])
+        log_weight += weights[i]*log_conditional_likelihood[i,k]
+        new_Nk[k] += weights[i]
 
-    return (
-        alpha + sstats, 
-        tau + sstats @ fraction_map.T,
-        elbo,
+    return new_Nk, log_weight
+
+
+def _gibbs_sample_mixture(
+    alpha,
+    tau,
+    fraction_map,
+    component_map,
+    log_conditional_likelihood,
+    weights,
+    steps,
+    seed,
+):
+    
+    contiguous = lambda x : np.ascontiguousarray(x, dtype=np.float32)
+    
+    np.random.seed(seed)
+    I, Kd = log_conditional_likelihood.shape
+    D = tau.shape[0]
+
+    prop_prior = (tau @ fraction_map) * (alpha)
+
+    z = np.random.choice(Kd, size=I, p=prop_prior/np.sum(prop_prior))
+    Nk = np.array(
+        [weights[z==k].sum() for k in range(Kd)], 
+        dtype=np.float32,
+    )
+    Nk = contiguous(Nk)
+    fraction_map = contiguous(fraction_map)
+    alpha = contiguous(alpha)
+    tau = contiguous(tau)
+
+    args = (
+        alpha,
+        tau,
+        fraction_map,
+        log_conditional_likelihood,
+        weights,
     )
 
+    warmup=100
+
+    for t in range(steps + warmup):
+        # Perform a Gibbs sampling step
+        Nk, ll = _gibbs_sample_mixture_step_implicit(
+            *args, 
+            Nk, 
+            min(1, t/warmup) # warm up for 100 steps
+        )
+        
+        if t > warmup:
+            yield (Nk, Nk @ fraction_map.T, ll)
 
 
+'''
+Annealed importance sampling (AIS) for marginal likelihood estimation
+'''
 @njit(nogil=True)
 def dirichlet_multinomial_logpmf(x, alpha):
     alpha0 = np.sum(alpha)
@@ -260,20 +346,11 @@ def dirichlet_multinomial_logpmf(x, alpha):
         )
     )
 
-@njit(nogil=True)
-def _categorical_draw(logits):
-    logits = np.exp(logits - logits.max())
-    cdf = np.cumsum(logits)
-    z = cdf[-1]
-    u = np.random.uniform(0,1)
-    return np.searchsorted(cdf, u * z)
-
-
 @njit(
     'Tuple((float32[::1],int64[::1],float32))(float32[::1], float32[:,::1], float32[::1], float32[::1], int64[::1], float32)',
     nogil=True
 )
-def _gibbs_sample_scan_block(
+def _gibbs_sample_step(
     alpha,
     log_conditional_likelihood,
     weights,
@@ -299,6 +376,87 @@ def _gibbs_sample_scan_block(
     return Nk, z, log_weight
 
 
+@njit(
+    'Tuple((float32[:, ::1], float32[::1]))(float32[::1], float32[:,::1], float32[::1], float32[::1], int64[::1], int64, int64)',
+    nogil=True
+)
+def _gibbs_sample_posterior(
+    alpha,
+    log_conditional_likelihood,
+    weights,
+    Nk,
+    z,
+    steps,
+    warmup,
+):
+    
+    posterior = np.zeros_like(log_conditional_likelihood)
+    gamma = np.zeros_like(Nk)
+
+    for t in range(steps + warmup):
+        Nk, z, _ = _gibbs_sample_step(
+            alpha,
+            log_conditional_likelihood, 
+            weights,
+            Nk,
+            z,
+            min(1., t/warmup)
+        )
+
+        if t >= warmup:
+            for i in range(len(z)):
+                posterior[i, z[i]] += 1/steps
+
+            gamma += Nk/steps
+
+        if t % 500 == 0 and t > warmup:
+            with objmode():
+                logger.info('Completed ' + str(t-warmup) + '/' + str(steps) + ' Gibb\'s sampling steps.')
+
+    return (posterior, gamma)
+        
+
+
+def gibbs_sample_posterior(
+    alpha,
+    conditional_likelihood,
+    weights,
+    steps=5000,
+    warmup=1000,
+    seed=42,
+):
+    
+    K,I = conditional_likelihood.shape
+    np.random.seed(seed)
+
+    log_conditional_likelihood = np.ascontiguousarray(
+        np.log(conditional_likelihood).T,
+        dtype=np.float32
+    )
+    weights = np.ascontiguousarray(weights, dtype=np.float32)
+    alpha = np.ascontiguousarray(alpha, dtype=np.float32)
+    
+    z = np.random.choice(K, size=I, p=alpha/np.sum(alpha))
+    z = np.ascontiguousarray(z, dtype=np.int64)
+    
+    Nk = np.array(
+        [weights[z==k].sum() for k in range(K)], 
+        dtype=np.float32,
+    )
+    Nk = np.ascontiguousarray(Nk, dtype=np.float32)
+
+    posterior, gamma = _gibbs_sample_posterior(
+        alpha,
+        log_conditional_likelihood,
+        weights,
+        Nk, z, 
+        steps, warmup,
+    )
+
+    return posterior.T, gamma
+
+
+
 @njit(nogil=True)
 def _ais_inner(
     alpha,
@@ -308,23 +466,22 @@ def _ais_inner(
     z,
     iters,
 ):
-    temperatures = np.linspace(0, 1, iters)
     logweights = np.zeros(iters, dtype=np.float32)
     ais_weight = 0
 
-    for j in range(1, len(temperatures)):
+    for t in range(1, iters+1):
         
-        Nk, z, log_weight = _gibbs_sample_scan_block(
+        Nk, z, log_weight = _gibbs_sample_step(
             alpha,
             log_conditional_likelihood,
             weights,
             Nk,
             z,
-            temperatures[j],
+            t/iters,
         )
         
-        ais_weight += log_weight*(temperatures[j] - temperatures[j-1])
-        logweights[j] = log_weight
+        ais_weight += log_weight*1/iters
+        logweights[t] = log_weight
 
     return (
         ais_weight, 

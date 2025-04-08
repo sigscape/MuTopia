@@ -283,35 +283,37 @@ class LDAUpdateSparse(LocalUpdate):
         corpus,
         model_state,
         alpha=None,
+        steps=5000,
+        warmup=1000,
+        seed=42,
     ):
-
-        subsample_rate = (
-                corpus
-                .regions
-                .context_frequencies
-                .sum().item()/
-                model_state.get_genome_size(corpus)
-            )
         
-        self.estep_iterations=10000
-        self.difference_tol=5e-5
+        if alpha is None:
+            alpha = self.alpha[CS.get_name(corpus)]
 
-        if not alpha is None:
-            raise ValueError('Cannot refit the model with a fixed alpha.')
-
-        with ParContext(1) as par:
-            _, update_fns = self.get_update_fns(
-                (SampleCorpusFusion(CorpusInterface(corpus), sample),),
+        sample_dict = self._convert_sample(sample, dtype=self.dtype)
+        
+        conditional_likelihood = \
+            self._conditional_observation_likelihood(
+                corpus, 
                 model_state,
-                parallel_context=par,
-                exposures_fn=random_locals(np.random.RandomState(1776), self.n_components),
-                locus_subsample=subsample_rate,
-            )
+                logsafe=False, # we want the actual likelihood, don't remove the max for numerical stability
+                **sample_dict
+            ).astype(self.dtype, copy=False)
+        
+        weights = sample_dict['weights']
 
-        suffstats, _, ll = next(update_fns)()
-        posterior = suffstats['weighted_posterior']/suffstats['weights']*subsample_rate
+        p_z, gamma = gibbs_sample_posterior(
+            alpha,
+            conditional_likelihood,
+            weights,
+            steps=steps,
+            warmup=warmup,
+            seed=seed,
+        )
 
-        return (ll, posterior)
+        return p_z, gamma
+    
     
 
     def _marginal_ll_sample(

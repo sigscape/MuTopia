@@ -208,6 +208,7 @@ class SBSMode(ModeConfig):
         cluster=True,
         *,
         locus_dim,
+        locus_coords,
         regions_file,
         fasta_file,
         **kw,
@@ -226,7 +227,7 @@ class SBSMode(ModeConfig):
             cluster=cluster,
         )
 
-        return xr.DataArray(
+        sample_arr = xr.DataArray(
             COO(
                 coords,
                 weights,
@@ -234,6 +235,8 @@ class SBSMode(ModeConfig):
             ),
             dims=("clustered", "configuration", "context", "locus"),
         )
+
+        return sample_arr.isel(locus=locus_coords)
     
 
     def ingest_uncollaposed(
@@ -241,6 +244,7 @@ class SBSMode(ModeConfig):
         vcf_file,
         *,
         locus_dim,
+        locus_coords,
         regions_file,
         fasta_file,
         **ingest_kw,
@@ -266,6 +270,11 @@ class SBSMode(ModeConfig):
             dims=("clustered", "configuration", "context", "locus"),
         )
 
+        sample_arr = sample_arr.isel(locus=locus_coords)
+        
+        mut_id_mask = np.isin(coords[-1,:], locus_coords)
+        mut_ids = [_id for _id, include in zip(mut_ids, mut_id_mask) if include]
+
         return (mut_ids, sample_arr)
 
 
@@ -276,42 +285,32 @@ class SBSMode(ModeConfig):
         vcf_file,
         chr_prefix="",
         output=sys.stdout,
-        refit=True,
-        *,
-        locus_dim,
-        regions_file,
-        fasta_file,
+        steps=5000,
+        warmup=1000,
         **ingest_kw,
     ):
         
         logger.info("Ingesting mutations ...")
         mut_ids, sample_arr = self.ingest_uncollaposed(
             vcf_file,
-            locus_dim=locus_dim,
-            regions_file=regions_file,
-            fasta_file=fasta_file,
             chr_prefix=chr_prefix,
             **ingest_kw,
         )
 
         logger.info("Inferring source processes ...")
         # run the inference algorithm to find the process contributions
-        weighted_posterior, _ = (
+        posterior, contributions = (
             model
-            .model_state_
+            .model_state_ 
             .locals_model
             .posterior_assign_sample(
                 sample_arr,
                 dataset,
                 model.model_state_,
-                skip_refit=refit,
+                steps=steps,
+                warmup=warmup,
             )
         )
-
-        contributions = weighted_posterior.sum(axis=1)
-
-        # print the results for the user's entertainment
-        contributions = weighted_posterior.sum(axis=1)
 
         print(
             tabulate(
@@ -332,14 +331,14 @@ class SBSMode(ModeConfig):
 
         # create a dataframe to store the posterior distribution
         posterior_df = pd.DataFrame(
-            np.log(weighted_posterior.T),
-            index=pd.Index(
+            np.log(posterior.T),
+            index=pd.MultiIndex.from_tuples(
                 mut_ids,
-                name=("CHROM","POS"),
+                names=["CHROM","POS"],
             ),
             columns=['logp_' + str(k) for k in model.component_names],
         ).reset_index()
-
+        
         logger.info("Annotating VCF ...")
         # transfer the annotations to the VCF file
         transfer_annotations_to_vcf(

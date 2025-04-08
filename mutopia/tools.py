@@ -3,7 +3,7 @@ from .genome_utils.fancy_iterators import RegionOverlapComparitor
 from .genome_utils.bed12_utils import unstack_regions
 from .model.corpus_state import CorpusState as CS
 from .model.model_components.base import idx_array_to_design
-from .model.latent_var_models.base import mixture_update_step
+from .model.latent_var_models.base import _gibbs_sample_mixture
 from .utils import dims_except_for, check_structure, logger, ParContext
 from tqdm import tqdm
 from sparse import COO
@@ -155,10 +155,11 @@ def annot_empirical_marginal(
         (
             corpus.fetch_sample(sample_name).ascoo() 
             for sample_name in tqdm(
-                CS.list_samples(corpus),
+                CS.list_samples(corpus)[1:],
                 desc="Reducing samples",
             )
-        )
+        ),
+        corpus.fetch_sample(CS.list_samples(corpus)[0]).asdense()
     )
 
     X_emp = X_emp.asdense() if X_emp.is_sparse() else X_emp
@@ -180,108 +181,28 @@ def _get_state(model):
     return model.model_state_
 
 
-def _infer_mixture_model(
-    tau=None,
-    alpha=None,
-    seed=None,
-    max_iter=10000,
-    tol=5e-5,
-    *,
-    update_fn,
-    model_pairs,
-    conditional_likelihood,
-    weights,
-    fraction_map,
-):
-
-    # 1. initialize the priors
-    if tau is None:
-        tau = np.ones(len(model_pairs), order="C")
-    elif not len(tau) == len(model_pairs):
-        raise ValueError("Length of tau must match the number of models")
-
-    if alpha is None:
-        # (D*K,)
-        alpha = np.ascontiguousarray(
-            np.concatenate(
-                [
-                    _get_state(model).locals_model.alpha[CS.get_name(corpus)]
-                    for model, corpus in model_pairs
-                ]
-            )
-        )
-    elif not len(alpha) == sum(model.n_components for model, _ in model_pairs):
-        raise ValueError(
-            "Length of alpha must match the number of components in the models"
-        )
-
-    update_fn = partial(
-        update_fn,
-        conditional_likelihood=conditional_likelihood,
-        weights=weights,
-        fraction_map=fraction_map,
-        tau=tau,
-        alpha=alpha,
-    )
-
-    # 2. initialize the variational parameters
-    random_state = np.random.RandomState(seed or 42)
-
-    delta = random_state.gamma(100.0, 1.0 / 100.0, size=(len(model_pairs),))  # D
-
-    gamma = np.ascontiguousarray(
-        np.concatenate(
-            [
-                random_state.gamma(100.0, 1.0 / 100.0, size=(model.n_components,))
-                for model, _ in model_pairs
-            ]
-        )
-    )  # (D*K,)
-
-    # 3. run the update steps until convergence
-    scores = []
-    for i in range(max_iter):
-
-        gamma, delta, elbo = update_fn(gamma, delta)
-        scores.append(elbo)
-
-        if i % 10 == 0:
-            logger.info(f"Iteration {i+1} - ELBO: {elbo:.3f}")
-
-        if i > 0 and np.abs(scores[-1] - scores[-2]) < tol:
-            break
-    
-    # 4. summarize the results
-    changepoints = np.cumsum([0,] + [model.n_components for model, _ in model_pairs])
-    contributions={}
-    for i, (_, corpus) in enumerate(model_pairs):
-        gamma_hat = gamma[changepoints[i]:changepoints[i+1]]
-        contributions[CS.get_name(corpus)] = gamma_hat / gamma_hat.sum()
-
-    return {
-        'estimated_fractions' : delta/delta.sum(),
-        'contributions' : contributions,
-        'scores' : scores,
-    }
-
-
 def setup_mixture_model(
     sample,
-    *model_pairs,
+    model,
+    *corpuses,
+    alpha=None,
+    tau=None,
+    steps=64000,
+    seed=None,
 ):
 
     # extract sample dictionary using the first model
-    sample_dict = _get_state(model_pairs[0][0]).locals_model._convert_sample(sample)
-
-    weights = np.ascontiguousarray(sample_dict["weights"])
+    sample_dict = _get_state(model).locals_model._convert_sample(sample)
+    weights = sample_dict["weights"]
 
     likelihoods = []
-    for model, corpus in model_pairs:
+    for corpus in corpuses:
 
-        state = _get_state(model)
-        locals_model = state.locals_model
-
-        model.setup_corpus(corpus)
+        if not CS.has_corpusstate(corpus):
+            state = _get_state(model)
+            locals_model = state.locals_model
+            corpus = model.setup_corpus(corpus)
+            model.renormalize_model(corpus)
 
         likelihoods.append(
             locals_model._conditional_observation_likelihood(
@@ -292,30 +213,45 @@ def setup_mixture_model(
             )
         )
 
-    likelihoods = np.ascontiguousarray(np.vstack(likelihoods))
+    conditional_likelihood = np.vstack(likelihoods)
+    del likelihoods
 
     fraction_map = (
         idx_array_to_design(
-            np.array(
-                [
-                    j
-                    for j, (state, _) in enumerate(model_pairs)
-                    for _ in range(state.n_components)
-                ]
-            ),
-            len(model_pairs),
+            np.array([
+                j
+                for j, _ in enumerate(corpuses)
+                for _ in range(model.n_components)
+            ]),
+            len(corpuses),
         )
         .todense()
         .T
     )
 
-    return partial(
-        _infer_mixture_model,
-        conditional_likelihood=likelihoods,
-        weights=weights,
-        fraction_map=fraction_map,
-        model_pairs=model_pairs,
+    component_map = np.vstack([
+        np.eye(model.n_components)
+        for _ in corpuses
+    ]).T
+
+    log_conditional_likelihood = np.ascontiguousarray(
+        np.log(conditional_likelihood).T
     )
+
+    weights = np.ascontiguousarray(weights)
+
+    args = (
+        alpha,
+        tau,
+        fraction_map,
+        component_map,
+        log_conditional_likelihood,
+        weights,
+        steps,
+        seed or 42,
+    )
+
+    pass
 
 
 

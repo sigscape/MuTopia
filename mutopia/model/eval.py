@@ -89,15 +89,6 @@ def pearson_residuals(
     *,
     parallel_context,
 ):
-    '''
-    This function computes the deviance of the model on the corpuses.
-    It is a slow implementation that is useful for debugging and testing,
-    and offers more flexibility in what you're testing.
-
-    However, you can't use this to monitor the progress of model training
-    because it takes too much time and memory. For this, use the more
-    specialized `deviance` function.
-    '''
 
     _update_normalizers(
         model_state, 

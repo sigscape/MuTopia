@@ -169,10 +169,15 @@ def annotate(
     dataset : str,
     model : str,
     sample_file : str,
+    fasta=None,
     **kwargs,
 ):
     
     attrs = disk.read_attrs(dataset)
+    regions_file=disk.fetch_regions_path(dataset)
+    num_regions = sum(1 for _ in stream_bed12(regions_file))
+    locus_coords = disk.read_coords(dataset)['locus']
+
     corpus = disk.load_dataset(dataset, with_samples=False, with_state=True)
     model = mu.load_model(model)
 
@@ -188,10 +193,12 @@ def annotate(
         corpus,
         sample_file,
         **kwargs,
-        regions_file=disk.fetch_regions_path(dataset),
-        locus_dim=disk.read_dims(dataset)['locus'],
+        regions_file=regions_file,
+        locus_dim=num_regions,
+        locus_coords=locus_coords,
         fasta_file=fasta,
     )
+
 
 @sbs.command("marginal-ll")
 @click.argument(
