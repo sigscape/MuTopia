@@ -1,7 +1,53 @@
 import sparse
 import xarray as xr
 import typing
-from datatree import register_datatree_accessor
+from xarray.core.formatting_html import *
+from xarray.core.formatting_html import _get_indexes_dict, _obj_repr
+from collections import defaultdict
+
+
+
+def _get_section(var_name):
+        return var_name.split('/')[0].title() if '/' in var_name else 'Data'
+
+def dataset_repr(ds) -> str:
+
+    obj_type = f"xarray.{type(ds).__name__}"
+
+    header_components = [f"<div class='xr-obj-type'>{escape(obj_type)}</div>"]
+
+    sections = defaultdict(dict)
+    for var_name, var in ds.data_vars.items():
+        if not var_name=='X':
+            sections[_get_section(var_name)][var_name] = var
+        else:
+            sections['X']['X'] = var
+
+    sections = [
+        dim_section(ds),
+        *[
+            datavar_section(
+                section,
+                name=section_name,
+            )
+            for section_name, section in sections.items()
+        ],
+        coord_section(ds.coords),
+        index_section(_get_indexes_dict(ds.xindexes)),
+        attr_section(ds.attrs),
+    ]
+
+    return _obj_repr(ds, header_components, sections)
+
+## MONKEY PATCH!
+xr.Dataset._repr_html_ = dataset_repr
+xr.Dataset.features = property(lambda self : (
+    self[[k for k in self.data_vars.keys() if _get_section(k)=='Features']]\
+        .pipe(lambda x : x.rename({k : k.removeprefix('features/') for k in x.data_vars.keys()}))
+    )
+)
+##
+
 
 class BaseAccessor:
     def __init__(self, xrds):
@@ -128,19 +174,19 @@ class IsSparse(BaseAccessor):
         return isinstance(self._xrds.data, sparse.SparseArray)
 
 
-@register_datatree_accessor('fetch_sample')
+@xr.register_dataset_accessor('fetch_sample')
 class FetchSample(BaseAccessor):
     def __call__(self, sample_name):
         return self._xrds['X'].sel(sample=sample_name)
 
 
-@register_datatree_accessor('list_samples')
+@xr.register_dataset_accessor('list_samples')
 class FetchSample(BaseAccessor):
     def __call__(self):
         return self._xrds.sample.values
     
 
-@register_datatree_accessor('iter_samples')
+@xr.register_dataset_accessor('iter_samples')
 class FetchSample(BaseAccessor):
     def __call__(self):
         for sample_name in self._xrds.list_samples():
