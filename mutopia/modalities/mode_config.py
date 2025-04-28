@@ -1,12 +1,19 @@
 import xarray as xr
 from abc import ABC, abstractmethod
 from sparse import SparseArray, COO
+import os
+import json
+import numpy as np
 from ..plot.signature_plot import _plot_linear_signature
+from ..utils import categorical_palette
+
 
 class ModeConfig(ABC):
 
     MODE_ID = None
     PALETTE = None
+    X_LABELS = None
+    DATABASE = None
 
     @property
     def sizes(self):
@@ -34,24 +41,34 @@ class ModeConfig(ABC):
     def sample_params(self):
         raise NotImplementedError
     
-    @classmethod
-    @abstractmethod
-    def load_components(
-        cls,
-        init_components,
-    ):
-        raise NotImplementedError
     
+    @classmethod
+    def available_components(cls):
+        filepath = os.path.join(os.path.dirname(__file__), cls.DATABASE)
+        with open(filepath, 'r') as f:
+            database = json.load(f)
+            
+        return list(database.keys())
+
 
     @classmethod
-    @abstractmethod
-    def get_context_frequencies(
-        cls,
-        regions_file,
-        fasta_file,
-        n_jobs = 1,
-    ):
-        raise NotImplementedError
+    def load_components(cls, *init_components):
+        
+        filepath = os.path.join(os.path.dirname(__file__), cls.DATABASE)
+        with open(filepath, 'r') as f:
+            database = json.load(f)
+
+        comps = []
+        for component in init_components:
+            if not component in database:
+                raise ValueError(f"Component {component} not found in database")
+            
+            comps.append([database[component][l] for l in cls().coords['context']])
+        
+        return xr.DataArray(
+            np.array(comps, dtype=float),
+            dims = ('component', 'context'),
+        )
     
 
     @classmethod
@@ -123,7 +140,6 @@ class ModeConfig(ABC):
         signature,
         select = [],
         sig_names = None,
-        normalize = False,
     ):
         '''
         Parse a signature tensor into a list of signatures.
@@ -138,10 +154,21 @@ class ModeConfig(ABC):
 
         if len(select) > 0:
             lead_dim = signature.dims[0]
+            
+            select=[
+                feature_name
+                for feature_name in signature[lead_dim].values 
+                if any(feature_name==q or feature_name.rsplit(':',1)[0] == q for q in select)
+            ]
+
+            if len(select) == 0:
+                raise ValueError('No signatures selected. Check the `select` argument.')
+
+            pl_signatures = list(signature.sel(mesoscale_state=select).data)
+
             if sig_names and not len(select) == len(sig_names):
                 raise ValueError('If both `sig_names` and `select` are specified, they must have the same length.')
-            
-            pl_signatures = list(signature.loc[{lead_dim : list(select)}].data)
+
             sig_names = sig_names or select
             return pl_signatures, sig_names, lead_dim
 
@@ -157,10 +184,11 @@ class ModeConfig(ABC):
     
 
     @classmethod
-    def plot(cls,
+    def plot(
+        cls,
         signature,
         *select,
-        palette = 'tab10',
+        palette = categorical_palette,
         sig_names = None,
         normalize = False,
         title=None,
@@ -176,7 +204,6 @@ class ModeConfig(ABC):
             signature,
             select=select,
             sig_names=sig_names,
-            normalize=normalize,
         )
 
         if len(pl_signatures) > 100:
@@ -189,7 +216,7 @@ class ModeConfig(ABC):
             pl_signatures = [s/s.sum() for s in pl_signatures]
         
         ax = _plot_linear_signature(
-            signature.coords['context'].values,
+            signature.coords['context'].values if cls.X_LABELS is None else cls.X_LABELS,
             palette if len(pl_signatures) > 1 else cls.PALETTE,
             plot_kw=kwargs,
             legend_title = legend_title,

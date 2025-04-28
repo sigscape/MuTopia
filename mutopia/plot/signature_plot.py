@@ -1,7 +1,8 @@
 
-import numpy as np
+from math import sqrt
 from itertools import chain
 import matplotlib.pyplot as plt
+from matplotlib import ticker
 from ..utils import borrow_kwargs
 
 def _plot_linear_signature(
@@ -13,11 +14,12 @@ def _plot_linear_signature(
     width = 5.25,
     plot_kw = {},
     **signatures,
-):    
+):   
+    
     plot_kw = dict(
         width = 1,
         edgecolor = 'white',
-        linewidth = 0.5,
+        linewidth = 0.4,
         error_kw = {'alpha' : 0.5, 'linewidth' : 0.5},
         **plot_kw,
     )
@@ -25,44 +27,44 @@ def _plot_linear_signature(
     extent=max(chain(*signatures.values()))
     n_sigs = len(signatures)
     sig_dim = len(next(iter(signatures.values())))
+    n_bars = sig_dim*n_sigs
+
+    def _get_color(i):
+        if isinstance(palette, str):
+            return plt.get_cmap(palette)(i) 
+        elif len(palette) < sig_dim:
+            return palette[i % len(palette)]
+        else:
+            return palette
 
     if ax is None:
-        _, ax = plt.subplots(1,1,figsize=(width*n_sigs, height))
+        _, ax = plt.subplots(1,1,figsize=(width*n_sigs, height*sqrt(n_sigs)))
 
     for i, (label, s) in enumerate(signatures.items()):
         ax.bar(
-            height = np.array(s)/extent, 
-            x = range(i, n_sigs*len(xlabels), n_sigs),
-            color = plt.get_cmap(palette)(i) if isinstance(palette, str) else palette,
+            height = [v/extent for v in s], 
+            x = range(i, n_bars, n_sigs),
+            color=_get_color(i),
             **plot_kw,
             label=label,
         )
 
-    ax.set(
-        yticks = [0.25, 0.5, 0.75, 1.], 
-        xlim = (-1, sig_dim*n_sigs + 1),
-        ylim = (0, 1.1)
-    )
-
-    ax.set_xticks(
-        ticks = np.arange(0, sig_dim*n_sigs, n_sigs) + 0.5*(n_sigs - 1),
-        labels = xlabels,
-        fontsize=4,
-        fontweight="light",
-        rotation=90,
-        )
-
     ax.axhline(0, color = 'black', linewidth = 0.5)
-
     for s in ['left','right','top',]:
         ax.spines[s].set_visible(False)
 
-    ## add a whitegrid at the quarter, half, and top marks of the y-axis
-    ax.yaxis.grid(color='white', linestyle='-', linewidth=0.5, alpha=0.5)
-    ax.set_yticklabels([], fontsize=8)
-
-    # keep the grid but remove the ytick markers
-    ax.tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
+    ax.set(
+        xlim = (-0.5, n_bars - 0.5),
+        ylim = (0, 1.1),
+        yticks=[],
+    )
+    
+    n_sections = len(xlabels) + 1
+    ax.xaxis.set_major_locator(ticker.LinearLocator(n_sections))
+    ax.xaxis.set_minor_locator(ticker.LinearLocator(2*n_sections - 1))
+    ax.xaxis.set_major_formatter(ticker.NullFormatter())
+    ax.xaxis.set_minor_formatter(ticker.FuncFormatter(lambda x, pos: xlabels[pos]))
+    ax.tick_params(axis='x', which='minor', tick1On=False, tick2On=False, labelsize=8)
 
     if len(signatures) > 1:
         ax.legend(

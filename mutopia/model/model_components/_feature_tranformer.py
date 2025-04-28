@@ -25,7 +25,10 @@ def get_feature_interaction_group_idxs(
     feature_names,
 ):
     feature_names = list(feature_names)
-    groups = [corpus.features[feature_name].attrs['group'] for feature_name in feature_names]
+    groups = [
+        corpus.features[feature_name.rsplit(':', 1)[0]].attrs['group']
+        for feature_name in feature_names
+    ]
 
     if len(set(groups)) == 1:
         return None

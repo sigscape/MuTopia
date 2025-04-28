@@ -448,8 +448,7 @@ def load_dataset(filename, with_samples=True, with_state=True):
     
     with xr.open_dataset(filename, engine='netcdf4') as root, \
         xr.open_dataset(filename, group='regions', engine='netcdf4') as regions, \
-        xr.open_dataset(filename, group='features', engine='netcdf4') as features, \
-        xr.open_dataset(filename, group='varm', engine='netcdf4') as varm:
+        xr.open_dataset(filename, group='features', engine='netcdf4') as features:
 
         features = features.load()
         for fname, feature in features.data_vars.items():
@@ -461,7 +460,6 @@ def load_dataset(filename, with_samples=True, with_state=True):
             '/' : root.load(),
             '/regions' : regions.load(),
             '/features' : features,
-            '/varm' : varm.load(),
         })
 
     with retry_until_write(nc.Dataset)(filename, 'r') as dset:

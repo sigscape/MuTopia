@@ -29,8 +29,8 @@ def lazy_train_test_load(corpus, test_chroms):
     train = LazySlicer(corpus, locus=~test_mask)
     test = LazySlicer(corpus, locus=test_mask)
 
-    train._base_corpus.corpus = train._base_corpus.drop_nodes(['features','regions','varm'], errors='ignore')
-    test._base_corpus.corpus = test._base_corpus.drop_nodes(['features','regions','varm'], errors='ignore')
+    train._base_corpus.corpus = train._base_corpus.drop_nodes(['features','regions'], errors='ignore')
+    test._base_corpus.corpus = test._base_corpus.drop_nodes(['features','regions'], errors='ignore')
 
     return train, test
 

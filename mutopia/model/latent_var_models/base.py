@@ -2,12 +2,12 @@ from abc import abstractmethod
 from joblib import delayed
 from xarray import DataArray
 from tqdm import tqdm
+from ...utils import logger
 from numba import njit, vectorize, objmode
 import numpy as np
 from numba.extending import get_cython_function_address
 import ctypes
 from functools import wraps
-from ...utils import logger
 from ...corpus.interfaces import *
 from ...utils import ParContext
 from ._dirichlet_update import update_alpha
@@ -191,13 +191,20 @@ def bound(
 '''
 Mixture model inference functions
 '''
-
 @njit(nogil=True)
 def _categorical_draw(logits):
     logits = np.exp(logits - logits.max())
     cdf = np.cumsum(logits)
     z = cdf[-1]
     u = np.random.uniform(0,1)
+    return np.searchsorted(cdf, u * z)
+
+
+@njit(nogil=True)
+def _parallel_categorical_draw(logits, u):
+    logits = np.exp(logits - logits.max())
+    cdf = np.cumsum(logits)
+    z = cdf[-1]
     return np.searchsorted(cdf, u * z)
 
 
@@ -229,14 +236,6 @@ def _gibbs_sample_mixture_step(
         log_weight += weights[i]*log_conditional_likelihood[i,z[i]]
     
     return Nk, z, log_weight
-
-
-@njit(nogil=True)
-def _parallel_categorical_draw(logits, u):
-    logits = np.exp(logits - logits.max())
-    cdf = np.cumsum(logits)
-    z = cdf[-1]
-    return np.searchsorted(cdf, u * z)
 
 
 @njit(nogil=True, )
@@ -376,10 +375,7 @@ def _gibbs_sample_step(
     return Nk, z, log_weight
 
 
-@njit(
-    'Tuple((float32[:, ::1], float32[::1]))(float32[::1], float32[:,::1], float32[::1], float32[::1], int64[::1], int64, int64)',
-    nogil=True
-)
+@njit(nogil=True)
 def _gibbs_sample_posterior(
     alpha,
     log_conditional_likelihood,
@@ -388,10 +384,11 @@ def _gibbs_sample_posterior(
     z,
     steps,
     warmup,
+    quiet,
 ):
     
     posterior = np.zeros_like(log_conditional_likelihood)
-    gamma = np.zeros_like(Nk)
+    gammas = np.zeros((steps, Nk.shape[0]), dtype=np.float32)
 
     for t in range(steps + warmup):
         Nk, z, _ = _gibbs_sample_step(
@@ -407,13 +404,14 @@ def _gibbs_sample_posterior(
             for i in range(len(z)):
                 posterior[i, z[i]] += 1/steps
 
-            gamma += Nk/steps
+            #gamma += Nk/steps
+            gammas[t - warmup] = Nk
 
-        if t % 500 == 0 and t > warmup:
+        if not quiet and (t % 500 == 0) and t > warmup:
             with objmode():
                 logger.info('Completed ' + str(t-warmup) + '/' + str(steps) + ' Gibb\'s sampling steps.')
 
-    return (posterior, gamma)
+    return (posterior, gammas)
         
 
 
@@ -424,6 +422,7 @@ def gibbs_sample_posterior(
     steps=5000,
     warmup=1000,
     seed=42,
+    quiet=False,
 ):
     
     K,I = conditional_likelihood.shape
@@ -449,8 +448,11 @@ def gibbs_sample_posterior(
         alpha,
         log_conditional_likelihood,
         weights,
-        Nk, z, 
-        steps, warmup,
+        Nk, 
+        z, 
+        steps, 
+        warmup,
+        quiet,
     )
 
     return posterior.T, gamma

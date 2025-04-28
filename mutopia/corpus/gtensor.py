@@ -4,6 +4,9 @@ import numpy as np
 from typing import Union, List, Dict
 from numpy.typing import NDArray
 from ..utils import FeatureType, check_structure, logger
+from itertools import starmap
+from ..genome_utils.fancy_iterators import RegionOverlapComparitor
+from ..genome_utils.bed12_utils import unstack_regions
 
 
 def GTensor(
@@ -67,7 +70,6 @@ def GTensor(
                 ),
             }),
             '/features' : xr.Dataset(),
-            '/varm' : xr.Dataset(),
         },
     )
 
@@ -178,3 +180,21 @@ def update_view(
         )
 
     return tree
+
+
+def locus_slice(dataset, chrom : str, start : int, end : int):
+    check_structure(dataset)
+
+    regions = dataset.regions
+    query_region = [(chrom, start, end)]
+    region = starmap(RegionOverlapComparitor, zip(regions.chrom, regions.start, regions.end))
+    query = list(starmap(RegionOverlapComparitor, query_region))
+
+    regions_mask = np.array([any(r == q for q in query) for r in region])
+
+    if not np.any(regions_mask):
+        raise ValueError("No regions match query")
+    
+    logger.info(f"Found {np.sum(regions_mask)}/{len(regions_mask)} regions matching query.")
+
+    return dataset.isel(locus=regions_mask)

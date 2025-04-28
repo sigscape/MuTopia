@@ -14,6 +14,15 @@ from ._kmer_encoder import DiagonalEncoder
 from ...utils import dims_except_for
 
 
+def _reduce_locus_exp_offsets(
+    context_effects,
+    exposures,
+    idx_selector,
+    conditional_rates,
+):
+    pass
+
+
 class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
     '''
     The dimensions of context models are hard-coded because contexts are always
@@ -122,33 +131,6 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
             **optim_kw,
         ) # f(X) -> f(z, w, beta) -> beta
 
-        '''raise ValueError('Only diagonal context encoders are supported')
-        if not init_components is None:
-            raise ValueError('Cannot initialize from signatures with non-diagonal context encoders')
-        
-        eln = partial(
-            get_eln_solver,
-            tol=tol,
-            random_state=random_state,
-            max_iter=100,
-        )
-
-        strand_solver = partial(
-            eln,
-            **get_reg_params(reg, context_conditioning),
-        ) # f(X) -> f(z, w, beta) -> beta
-
-        context_solver = partial(
-            eln,
-            **get_reg_params(kmer_reg, context_conditioning),
-        )
-
-        split_solver = partial(
-            setup_mixed_solver,
-            is_regularized = ~self.is_intercept_,
-            unreg_solver = context_solver, # f(X) -> f(z, w, beta) -> beta
-            reg_solver = strand_solver, # f(X) -> f(z, w, beta) -> beta
-        )'''
 
     def _make_optimizer(
         self,
@@ -438,6 +420,15 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         return self._calc_lambda(k, self.encoding_matrix_)
     
 
+    def _get_mesoscale_feature_name(self, raw_name):
+        return raw_name.replace(':-1', ':A/G-centered').replace(':1', ':C/T-centered')
+    
+    def get_mesoscale_feature_names(self):
+        return list(map(
+            self._get_mesoscale_feature_name, 
+            self.transformer.get_feature_names_out()
+        ))
+
     def format_signature(self, k, normalization='global'):
 
         if not normalization in ('global','weighted','none'):
@@ -464,7 +455,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
             dims=('context','mesoscale_state'),
             coords={
                 'context' : self.context_names,
-                'mesoscale_state' : ['Baseline'] + self.transformer.get_feature_names_out()
+                'mesoscale_state' : ['Baseline'] + self.get_mesoscale_feature_names(),
             }
         )
     
@@ -483,7 +474,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
             data=self.coefs_[k][-r*c:].reshape((c,r)).T,
             dims=('feature','context'),
             coords={
-                'feature'  : self.transformer.get_feature_names_out(),
+                'feature'  : self.get_mesoscale_feature_names(),
                 'context'  : ['Shared effect'] + self.context_names
             }
         )

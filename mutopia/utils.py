@@ -1,6 +1,7 @@
 import sparse
 import numpy as np
 from pandas import DataFrame
+from xarray import DataArray
 from joblib import Parallel, delayed
 from contextlib import contextmanager
 from enum import Enum
@@ -11,6 +12,15 @@ import logging
 import subprocess
 from gzip import open as gzopen
 import time
+from matplotlib.colors import LinearSegmentedColormap
+
+# Create a custom diverging colormap
+diverging_palette = LinearSegmentedColormap.from_list(
+    "custom_diverging",
+    ["#427aa1ff", "#FAFAFA",  "#e07a5fff"]  # White or a neutral color at center
+)
+
+categorical_palette = ["#427aa1ff","#e07a5fff",'#acacacff',"#83c5beff"]
 
 
 @contextmanager
@@ -314,10 +324,10 @@ def get_explanation(corpus, component):
     except ImportError:
         raise ImportError('SHAP is required to calculate SHAP values')
     
-    if not component in corpus.varm['SHAP_values'].shap_component.values:
+    if not component in corpus['SHAP_values'].shap_component.values:
         raise ValueError(f'The corpus does not have SHAP values for component {component}.')
 
-    shap_values = corpus.varm['SHAP_values']
+    shap_values = corpus['SHAP_values']
 
     shap_df = (
         shap_values.sel(shap_component=component)
@@ -338,9 +348,11 @@ def get_explanation(corpus, component):
             .rename(columns={0: 'feature', 1: 'convolution'})
         )
 
+    locus_dim = 'locus' if 'locus' in shap_df.columns else 'shap_locus'
+
     shap_df = (
         shap_df
-        .groupby(['feature', 'shap_locus'])['value']
+        .groupby(['feature', locus_dim])['value']
         .sum()
         .unstack()
         .fillna(0)
@@ -439,3 +451,31 @@ def stream_subprocess_output(process):
         yield line
 
     close_process(process)
+
+
+def equal_size_quantiles(corpus, var_name, n_bins=10):
+
+    bin_nums = np.arange(corpus.dims['locus'])
+    sorted_vals = DataFrame(
+        {
+            'length' : corpus.regions.length.values,
+            'value' : corpus[var_name].values,
+        },
+        index=bin_nums,
+    )
+    sorted_vals = sorted_vals.sort_values(by='value', ascending=True)
+    
+    sorted_vals['cumm_fraction'] = sorted_vals['length'].cumsum()
+    sorted_vals['cumm_fraction'] /= sorted_vals['cumm_fraction'].iloc[-1]
+
+    sorted_vals['bin'] = (sorted_vals.cumm_fraction // (1/(n_bins - 1))).astype(int)
+
+    key = f'{var_name.rsplit("/", 1)[-1]}_qbins_{n_bins}'
+    corpus[key] = DataArray(
+        sorted_vals['bin'].loc[bin_nums].values,
+        dims='locus',
+    )
+
+    logger.info('Added key: ' + key)
+
+    return corpus

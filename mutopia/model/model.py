@@ -37,10 +37,11 @@ class Model:
     @property
     def component_names(self):
         try:
-            self.component_names_
+            return self._component_names
         except AttributeError:
             return ['M{}'.format(i) for i in range(0, self.n_components)]
         
+    
     def _get_k(self, component_name):
         if isinstance(component_name, int):
             return component_name
@@ -50,7 +51,7 @@ class Model:
         except ValueError:
             raise ValueError(f'Component {component_name} not found in model.')
         
-    def renormalize_model(self, corpus):
+    def _renormalize_model(self, corpus):
         with ParContext(1) as par:
             _update_normalizers(
                 self.model_state_,
@@ -58,17 +59,30 @@ class Model:
                 parallel_context=par,
             )
 
+    def rename_components(self, corpus, names : typing.List[str]):
+        if not len(names) == self.n_components:
+            raise ValueError('The number of names must match the number of components')
+        
+        name_map = dict(zip(self.component_names, names))
+        new_coords = {'component' : names}
+        
+        if 'shap_component' in corpus.coords:
+            try:
+                new_coords['shap_component'] = [name_map[c] for c in corpus.coords['shap_component'].data]
+            except KeyError:
+                raise KeyError('Some components in corpus do not match the model components. Just delete the SHAP_values and try again.')
+
+        corpus = corpus.assign_coords(new_coords)
+        self._component_names = names
+
+        return corpus
+
+
     def _check_corpus(self, corpus, enforce_sample=True):
         check_corpus(corpus, enforce_sample=enforce_sample)
         if enforce_sample:
             check_dims(corpus, self.model_state_)
-        
 
-    def set_component_names(self, names : typing.List[str]):
-        if not len(names) == self.n_components:
-            raise ValueError('The number of names must match the number of components')
-        
-        self.component_names_ = names
 
 
     def setup_corpus(self, corpus):
@@ -191,7 +205,7 @@ class Model:
 
     def plot_interaction_matrix(self, 
             component,
-            palette='coolwarm',
+            palette=diverging_palette,
             gridspec=None,
             normalization='global',
             **kw,
@@ -205,16 +219,15 @@ class Model:
         
         shared_effects = interactions.sel(context='Shared effect').to_pandas()
         interactions = flatten(interactions.drop_sel(context='Shared effect')).to_pandas()
-        
-        baseline = flatten(
-            self.model_state_.format_signature(component, normalization=normalization).sel(
-                mesoscale_state='Baseline',
-            )
-        ).to_pandas()
+
+        signature = self.model_state_.format_signature(
+            component, 
+            normalization=normalization
+        )
 
         return _plot_interaction_matrix(
+            partial(self.modality_.plot, signature, 'Baseline'),
             interactions,
-            baseline,
             shared_effects, #.iloc[:,0],
             palette=palette,
             gridspec=gridspec,
@@ -237,14 +250,13 @@ class Model:
         fig, ax = plt.subplots(
             nrows, ncols, 
             figsize=(width*ncols,height*nrows), 
-            gridspec_kw={'hspace': 0.5, 'wspace': 0.25}
+            gridspec_kw={'hspace': 0.5, 'wspace': 0.25},
         )
 
         for k in range(self.n_components):
             _ax=np.ravel(ax)[k]
             self.plot_signature(k, ax=_ax, normalization=normalization, **kwargs)
-            _ax.set_ylabel(self.component_names[k], fontsize=7)
-            _ax.set_xticks([])
+            _ax.set_ylabel(self.component_names[k], fontsize=8)
 
         for _ax in np.ravel(ax)[self.n_components:]:
             _ax.axis('off')
@@ -307,15 +319,16 @@ class Model:
                 with_context=False,
             )
 
-        corpus.varm['component_distributions'] =\
-             np.exp(lmrt - lmrt.max(skipna=True)).fillna(0.)
+        corpus['component_distributions'] =\
+            np.exp(lmrt - lmrt.max(skipna=True)).fillna(0.).astype(np.float32)
         
-        corpus.varm['component_locus_distributions'] =\
-            (corpus.varm.component_distributions * corpus.regions.context_frequencies)\
-            .sum(dim=dims_except_for(corpus.varm.component_distributions.dims, 'locus', 'component'))/corpus.regions.length
-        
-        logger.info('Added key to varm: "component_distributions"')
-        logger.info('Added key to varm: "component_locus_distributions"')
+        corpus['component_locus_distributions'] = (
+            (corpus.component_distributions * corpus.regions.context_frequencies)\
+            .sum(dim=dims_except_for(corpus.component_distributions.dims, 'locus', 'component'))/corpus.regions.length
+        ).astype(np.float32)
+            
+        logger.info('Added key: "component_distributions"')
+        logger.info('Added key: "component_locus_distributions"')
         return corpus
         
 
@@ -331,7 +344,7 @@ class Model:
             corpus = self.setup_corpus(corpus)
 
         try:
-            corpus.varm['component_distributions']
+            corpus['component_distributions']
         except KeyError:
             corpus = self.annot_component_distributions(corpus, threads)
 
@@ -349,16 +362,18 @@ class Model:
             
         marginal = \
             self.model_state_._log_marginalize_mutrate(
-                np.log(corpus.varm['component_distributions']),
+                np.log(corpus['component_distributions']),
                 marginal_exposures
             )
         
-        corpus.varm['predicted_marginal'] = np.exp(marginal - marginal.max(skipna=True)).fillna(0.)
-        corpus.varm['predicted_locus_marginal'] = (np.exp(marginal) * corpus.regions.context_frequencies)\
-            .sum(dim=dims_except_for(marginal.dims, 'locus'))/corpus.regions.length
+        corpus['predicted_marginal'] = np.exp(marginal - marginal.max(skipna=True)).fillna(0.).astype(np.float32)
+        corpus['predicted_locus_marginal'] = (
+            (np.exp(marginal) * corpus.regions.context_frequencies)\
+                .sum(dim=dims_except_for(marginal.dims, 'locus'))/corpus.regions.length
+        ).astype(np.float32)
         
-        logger.info('Added key to varm: "predicted_marginal"')
-        logger.info('Added key to varm: "predicted_locus_marginal"')
+        logger.info('Added key: "predicted_marginal"')
+        logger.info('Added key: "predicted_locus_marginal"')
         
         return corpus
 
@@ -434,7 +449,7 @@ class Model:
         if not scan:
             coords['shap_locus'] = subset.locus.data
 
-        corpus.varm['SHAP_values'] = xr.DataArray(
+        corpus['SHAP_values'] = xr.DataArray(
             shap_matrix,
             dims=(
                 'shap_component',
@@ -444,7 +459,7 @@ class Model:
             coords=coords,
         )
 
-        logger.info('Added key to varm: "SHAP_values"')
+        logger.info('Added key: "SHAP_values"')
         return corpus
 
 
@@ -527,8 +542,8 @@ class Model:
                 parallel_context=par,
             )
         
-        corpus.varm['pearson_residuals'] = residuals
-        logger.info('Added key to varm: "residuals"')
+        corpus['pearson_residuals'] = residuals.astype(np.float32)
+        logger.info('Added key: "residuals"')
 
         return corpus
     
@@ -582,9 +597,9 @@ class Model:
                     )
                 )
 
-            if hasattr(corpus.varm, 'SHAP_values'):
+            if hasattr(corpus, 'SHAP_values'):
                 
-                shap_components = corpus.varm.SHAP_values.coords['shap_component'].values
+                shap_components = corpus.SHAP_values.coords['shap_component'].values
                 expl = get_explanation(corpus, shap_components[0])
 
                 DataFrame(

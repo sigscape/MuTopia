@@ -19,13 +19,14 @@ from .mode_config import ModeConfig
 from ._sbs_nucdata import *
 from ._sbs_ingestion import featurize_mutations
 from ._sbs_clustering import transfer_annotations_to_vcf
+import matplotlib.colors as mcolors
 
 _transition_palette = {
-    ("C", "A"): (0.33, 0.75, 0.98),
+    ("C", "A"): mcolors.to_rgb("#427aa1ff"),
     ("C", "G"): (0.0, 0.0, 0.0),
-    ("C", "T"): (0.85, 0.25, 0.22),
+    ("C", "T"): mcolors.to_rgb("#d1664aff"),
     ("T", "A"): (0.78, 0.78, 0.78),
-    ("T", "C"): (0.51, 0.79, 0.24),
+    ("T", "C"): mcolors.to_rgb("#64b3aaff"),
     ("T", "G"): (0.89, 0.67, 0.72),
 }
 
@@ -41,13 +42,19 @@ class SBSMode(ModeConfig):
     MODE_ID = "sbs"
     MUTOPIA_TO_COSMIC_IDX = MUTOPIA_TO_COSMIC_IDX
     PALETTE = MUTATION_PALETTE
+    X_LABELS = ['{}>{}'.format(*m) for m in _transition_palette.keys()]
+    DATABASE = "musical_sbs.json"
 
     @property
     def coords(self):
         return {
             "clustered": ["no", "yes"],
             "configuration": CONFIGURATIONS,
-            "context": MUTOPIA_ORDER,
+            #"context": pd.MultiIndex.from_tuples(
+            #    [(f'{s[0]}N{s[6]}',s[2:5]) for s in MUTOPIA_ORDER],
+            #    names=['adjacent', 'mutation']
+            #),
+            "context" : MUTOPIA_ORDER,
         }
 
     @property
@@ -58,76 +65,17 @@ class SBSMode(ModeConfig):
     def sample_params(self):
         return sample_params
 
-    @property
-    def available_components(self):
-        filepath = os.path.join(os.path.dirname(__file__), "musical_sbs.json")
-        with open(filepath, "r") as f:
-            database = json.load(f)
-
-        return list(database.keys())
-
-    @classmethod
-    def load_components(cls, *init_components):
-
-        filepath = os.path.join(os.path.dirname(__file__), "musical_sbs.json")
-        with open(filepath, "r") as f:
-            database = json.load(f)
-
-        comps = []
-        for component in init_components:
-            if not component in database:
-                raise ValueError(f"Component {component} not found in database")
-            comps.append(
-                np.array(
-                    [database[component][context_mut] for context_mut in MUTOPIA_ORDER]
-                )
-            )
-
-        return xr.DataArray(
-            np.array(comps),
-            dims=("component", "context",),
-        )
-
-    @classmethod
-    def unstack(cls, corpus):
-
-        from ..corpus import update_view
-
-        corpus = update_view(
-            corpus,
-            regions=corpus.regions.assign_coords(
-                {"mutation": corpus.coords["mutation"]}
-            ).to_dataset(),
-        )
-        corpus.regions.context_frequencies = (
-            corpus.regions.context_frequencies.expand_dims({"mutation": 3})
-        )
-
-        stacked = corpus.drop_nodes(("features",)).stack(
-            observation=("context", "mutation")
-        )
-
-        stacked = stacked.assign_coords(
-            observation=stacked.indexes["observation"].map(
-                lambda x: format_as_cosmic(*x)
-            )
-        )
-
-        stacked = stacked.rename({"observation": "context"})
-        corpus = update_view(
-            stacked,
-            features=corpus.features.to_dataset(),
-        )
-
-        return corpus
 
     @classmethod
     def _flatten_observations(cls, signature):
         signature = (
-            super()._flatten_observations(signature).isel(context=MUTOPIA_TO_COSMIC_IDX)
+            super()
+            ._flatten_observations(signature)
+            .sel(context=COSMIC_SORT_ORDER)
         )
 
         return signature
+
 
     def get_context_frequencies(
         self,
@@ -195,6 +143,7 @@ class SBSMode(ModeConfig):
             dims=("configuration", "context", "locus"),
         )
 
+
     def ingest_observations(
         self,
         vcf_file,
@@ -238,7 +187,7 @@ class SBSMode(ModeConfig):
 
         return sample_arr.isel(locus=locus_coords)
     
-
+    
     def ingest_uncollaposed(
         self,
         vcf_file,
@@ -276,7 +225,6 @@ class SBSMode(ModeConfig):
         mut_ids = [_id for _id, include in zip(mut_ids, mut_id_mask) if include]
 
         return (mut_ids, sample_arr)
-
 
     def annotate_mutations(
         self,

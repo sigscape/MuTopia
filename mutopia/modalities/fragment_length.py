@@ -101,6 +101,7 @@ class FragmentLength(ModeConfig):
 
     MODE_ID='FRAGMENT_LENGTH'
     PALETTE=(0.8, 0.8, 0.8)
+    DATABASE='fragment_lengths.json'
 
     @property
     def coords(self):
@@ -114,35 +115,7 @@ class FragmentLength(ModeConfig):
     def sample_params(self):
         return sample_params
     
-    @property
-    def available_components(self):
-        filepath = os.path.join(os.path.dirname(__file__), 'fragment_lengths.json')
-        with open(filepath, 'r') as f:
-            database = json.load(f)
-            
-        return list(database.keys())
-
-
-    @classmethod
-    def load_components(cls, *init_components):
-        
-        filepath = os.path.join(os.path.dirname(__file__), 'fragment_lengths.json')
-        with open(filepath, 'r') as f:
-            database = json.load(f)
-
-        comps = []
-        for component in init_components:
-            if not component in database:
-                raise ValueError(f"Component {component} not found in database")
-            
-            comps.append([database[component][l] for l in cls().coords['context']])
-        
-        return xr.DataArray(
-            np.array(comps, dtype=float),
-            dims = ('component', 'context'),
-        )
     
-
     def ingest_observations(
         self,
         bam_file : str,
@@ -275,7 +248,6 @@ class FragmentLength(ModeConfig):
             obs_matrix,
             dims = ('context', 'locus'),
         )
-
 
     def get_context_frequencies(
         self,

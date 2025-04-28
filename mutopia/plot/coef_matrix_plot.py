@@ -1,13 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-from matplotlib import gridspec
+from ..utils import diverging_palette
 
 def _plot_interaction_matrix(
+        signature_plot_fn,
         interaction_matrix : pd.DataFrame,
-        baseline_matrix : pd.Series,
         shared_effects : pd.Series,
-        palette='coolwarm',
+        palette=diverging_palette,
         gridspec=None,
     ):
 
@@ -29,25 +29,9 @@ def _plot_interaction_matrix(
         gs = gridspec.subgridspec(2,3, **gs_kw)
 
     base_ax = fig.add_subplot(gs[0,1])
-    baseline = baseline_matrix
-    baseline_x = np.arange(len(baseline))
-
-    base_ax.bar(
-        baseline_x,
-        height=baseline.values.ravel(),
-        color='lightgray',
-        edgecolor='grey',
-        linewidth=0.5
-    )
-    for spine in ['left','right','top']:
-        base_ax.spines[spine].set_visible(False)
-    base_ax.set(
-        yticks=[],
-        xlim = (-0.5, len(baseline)-0.5),
-        xticks=[],
-    )
-    base_ax.set_ylabel('Base\nmutation rate', rotation=0, labelpad=0.1, fontsize=8, ha='right', va='center')
-
+    signature_plot_fn(ax = base_ax)
+    base_ax.set_ylabel('Base\nmutation ', rotation=0, labelpad=0.1, fontsize=8, ha='right', va='center')
+    base_ax.set_xticklabels([])
 
     interaction_ax = fig.add_subplot(gs[1,1])
     interactions = interaction_matrix
@@ -68,12 +52,11 @@ def _plot_interaction_matrix(
         edgecolor='white',
         linewidth=0.1,
     )
-    interaction_ax.set_xticks(baseline_x - 0.5)
-    interaction_ax.set_xticklabels(baseline.index, rotation=90, fontsize=5)
-    interaction_ax.set(yticks=[])
-    interaction_ax.set_xlabel('Nucleotide context', fontsize=8)
+
+    interaction_ax.set(yticks=[], xticks=[])
+    interaction_ax.set_xlabel('Context', fontsize=8)
     for spine in interaction_ax.spines.values():
-        spine.set_visible(False)
+        spine.set(edgecolor='lightgrey', linewidth=0.5)
 
     common_ax = fig.add_subplot(gs[1,0])
     common_x = np.arange(2)
@@ -90,7 +73,8 @@ def _plot_interaction_matrix(
         linewidth=0.1,
     )
     for spine in common_ax.spines.values():
-        spine.set_visible(False)
+        spine.set(edgecolor='lightgrey', linewidth=0.5)
+        
     common_ax.set_yticks(np.arange(interaction_matrix.shape[0]))
     common_ax.set_yticklabels(interaction_matrix.index, fontsize=8)
     common_ax.set(xticks=[0.5])

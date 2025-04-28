@@ -303,16 +303,17 @@ class LDAUpdateSparse(LocalUpdate):
         
         weights = sample_dict['weights']
 
-        p_z, gamma = gibbs_sample_posterior(
+        p_z, gammas = gibbs_sample_posterior(
             alpha,
             conditional_likelihood,
             weights,
             steps=steps,
             warmup=warmup,
             seed=seed,
+            quiet=True,
         )
 
-        return p_z, gamma
+        return p_z, gammas
     
     
 

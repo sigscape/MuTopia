@@ -4,7 +4,7 @@ import mutopia.tools as tl
 import mutopia.tuning as tune
 from .lib import MutopiaModel, load_model
 from .modalities import get_mode, Modality
-from .utils import FeatureType
+from .utils import FeatureType, diverging_palette, categorical_palette
 import mutopia.model as model
 from mutopia.utils import using_exposures_from
 

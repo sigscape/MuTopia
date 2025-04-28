@@ -839,8 +839,8 @@ def shap(
         scan=scan,
     )
     
-    dataset.varm.SHAP_values.name = 'SHAP_values'
-    dataset.varm.SHAP_values.to_netcdf(
+    dataset.SHAP_values.name = 'SHAP_values'
+    dataset.SHAP_values.to_netcdf(
         corpus_path,
         mode='a',
         group='varm',

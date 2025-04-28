@@ -1,18 +1,16 @@
 from .modalities._sbs_nucdata import CONTEXTS
-from .genome_utils.fancy_iterators import RegionOverlapComparitor
-from .genome_utils.bed12_utils import unstack_regions
 from .model.corpus_state import CorpusState as CS
 from .model.model_components.base import idx_array_to_design
-from .model.latent_var_models.base import _gibbs_sample_mixture
 from .utils import dims_except_for, check_structure, logger, ParContext
+from .genome_utils.fancy_iterators import RegionOverlapComparitor
+from .genome_utils.bed12_utils import unstack_regions
 from tqdm import tqdm
 from sparse import COO
 import xarray as xr
 import os
 from pyfaidx import Fasta
 import numpy as np
-from functools import partial, reduce
-from itertools import starmap
+from functools import reduce
 
 
 COMPLEMENT = {"A": "T", "T": "A", "G": "C", "C": "G"}
@@ -38,24 +36,6 @@ def _fetch_contributions(corpus, exposures=None):
     return contributions
 
 
-def locus_slice(dataset, chrom : str, start : int, end : int):
-    check_structure(dataset)
-
-    regions = dataset.regions
-    query_region = [(chrom, start, end)]
-    region = starmap(RegionOverlapComparitor, zip(regions.chrom, regions.start, regions.end))
-    query = list(starmap(RegionOverlapComparitor, query_region))
-
-    regions_mask = np.array([any(r == q for q in query) for r in region])
-
-    if not np.any(regions_mask):
-        raise ValueError("No regions match query")
-    
-    logger.info(f"Found {np.sum(regions_mask)}/{len(regions_mask)} regions matching query.")
-
-    return dataset.isel(locus=regions_mask)
-
-
 def deepscan_neutral_matagenesis(
     model,
     corpus,
@@ -68,7 +48,7 @@ def deepscan_neutral_matagenesis(
 ):
 
     try:
-        corpus.varm["component_distributions"]
+        corpus["component_distributions"]
     except KeyError:
         corpus = model.annot_component_distributions(corpus)
 
@@ -100,7 +80,7 @@ def deepscan_neutral_matagenesis(
         np.arange(len(subset.coords["locus"])),
     )
 
-    component_dists = subset.varm["component_distributions"]
+    component_dists = subset["component_distributions"]
     region_mutation_rate = (
         component_dists.isel(locus=idx)
         .sum(dim=dims_except_for(component_dists.dims, "locus", "component", "context"))
@@ -164,15 +144,15 @@ def annot_empirical_marginal(
 
     X_emp = X_emp.asdense() if X_emp.is_sparse() else X_emp
 
-    logger.info('Added key to varm: "empirical_marginal"')
-    corpus.varm["empirical_marginal"] = (
+    logger.info('Added key: "empirical_marginal"')
+    corpus["empirical_marginal"] = (
         X_emp / corpus.regions.context_frequencies
     ).fillna(0.0)
 
-    logger.info('Added key to varm: "empirical_locus_marginal"')
-    corpus.varm["empirical_locus_marginal"] = (
+    logger.info('Added key: "empirical_locus_marginal"')
+    corpus["empirical_locus_marginal"] = (
         X_emp.sum(dim=dims_except_for(X_emp.dims, "locus")) / corpus.regions.length
-    )
+    ).fillna(0.0).astype(np.float32)
 
     return corpus
 
