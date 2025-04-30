@@ -1,4 +1,4 @@
-import mutopia.corpus as gt
+import mutopia.gtensor as gt
 import mutopia.plot as pl
 import mutopia.tools as tl
 import mutopia.tuning as tune

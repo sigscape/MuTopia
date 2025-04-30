@@ -1,10 +1,9 @@
 
-from .corpus_state import CorpusState as CS
+from . import corpus_state as CS
 from .eval import *
 from ..utils import *
-from ..corpus.interfaces import *
+from ..gtensor import *
 from tqdm import trange
-import pandas as pd
 
 
 def VI_step(
@@ -201,8 +200,8 @@ def slice_generator(
                 corpus,
                 keep_features=False,
                 locus = random_state.choice(
-                    corpus.dims['locus'],
-                    int(locus_subsample*corpus.dims['locus']),
+                    CS.get_dims(corpus)['locus'],
+                    int(locus_subsample*CS.get_dims(corpus)['locus']),
                     replace=False
                 )
             )
@@ -264,7 +263,6 @@ def fit_model(
     logger.info(f'Found n={num_training_samples} training samples across {len(train_corpuses)} corpuses.')
     
     check_feature_consistency(*train_corpuses, *test_corpuses)
-    check_dim_consistency(*train_corpuses, *test_corpuses)
 
     logger.info('Preprocessing training corpuses...')
     train_corpuses = [CS.init_corpusstate(corpus, model_state) for corpus in train_corpuses]

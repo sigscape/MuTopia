@@ -4,15 +4,15 @@ from functools import partial
 import os
 import numpy as np
 import mutopia.ingestion as ingest
-from mutopia.corpus import GTensor, write_dataset, update_view
+from mutopia.gtensor import GTensor, write_dataset, update_view
 import netCDF4 as nc
 from shutil import copyfile
 from itertools import starmap
 import pickle
 
-from ..corpus.interfaces import *
+from ..gtensor.interfaces import *
 from ..genome_utils.fancy_iterators import RegionOverlapComparitor
-import mutopia.corpus.disk_interface as disk
+import mutopia.gtensor.disk_interface as disk
 from ..modalities import Modality
 from ..genome_utils.bed12_utils import stream_bed12
 from ..utils import FeatureType, logger

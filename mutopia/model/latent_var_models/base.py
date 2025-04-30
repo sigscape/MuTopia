@@ -8,10 +8,10 @@ import numpy as np
 from numba.extending import get_cython_function_address
 import ctypes
 from functools import wraps
-from ...corpus.interfaces import *
+from ...gtensor.interfaces import *
 from ...utils import ParContext
 from ._dirichlet_update import update_alpha
-from ..corpus_state import CorpusState as CS
+from .. import corpus_state as CS
 from ..model_components.base import _svi_update_fn, PrimitiveModel
 
 '''

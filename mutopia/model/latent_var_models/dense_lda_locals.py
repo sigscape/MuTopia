@@ -2,10 +2,9 @@ from xarray import DataArray
 import numpy as np
 from functools import partial
 import warnings
-from ..model_components.base import _svi_update_fn, PrimitiveModel
-from ..corpus_state import CorpusState as CS
-from ...utils import match_dims
-from ._dirichlet_update import update_alpha
+from ..model_components.base import _svi_update_fn
+from .. import corpus_state as CS
+from ...gtensor import match_dims
 from .base import *
 
 

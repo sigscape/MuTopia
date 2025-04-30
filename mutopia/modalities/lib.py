@@ -2,7 +2,7 @@ from .sbs import SBSMode
 from .fragment_motif import InFragmentMotif, OutFragmentMotif
 from .fragment_length import FragmentLength
 from enum import Enum
-import datatree
+from xarray import register_dataset_accessor
 
 def get_mode(corpus):
     return Modality(
@@ -10,10 +10,11 @@ def get_mode(corpus):
     ).get_config()
 
 
-@datatree.register_datatree_accessor("modality")
+@register_dataset_accessor("modality")
 class ModalityAccessor:
     def __init__(self, xrds):
         self._xrds = xrds
+        
     def __call__(self):
         return get_mode(self._xrds)
 

@@ -2,7 +2,7 @@
 from .model_components import *
 from .model_components.base import _svi_update_fn
 from .latent_var_models import *
-from .corpus_state import CorpusState as CS
+from . import corpus_state as CS
 import numpy as np
 import warnings
 from functools import partial
@@ -35,7 +35,7 @@ class ModelState:
         }
 
         self._genome_size = {
-            CS.get_name(corpus) : corpus.regions.context_frequencies.sum().item()
+            CS.get_name(corpus) : CS.get_regions(corpus).context_frequencies.sum().item()
             for corpus in corpuses
         }
 
@@ -81,8 +81,8 @@ class ModelState:
                     for model in self.nonlocals.values()
                     if model.requires_normalization
                 ),  # sum over models
-                np.log(corpus.regions.exposures) \
-                    + np.log(corpus.regions.context_frequencies)  # start with the background rates
+                np.log(CS.get_regions(corpus).exposures) \
+                    + np.log(CS.get_regions(corpus).context_frequencies)  # start with the background rates
             )
 
         return un_normalized
@@ -104,11 +104,11 @@ class ModelState:
                         model.predict(k, corpus)
                         for model in self.nonlocals.values()
                     ),  # sum over models
-                    np.log(corpus.regions.exposures) \
+                    np.log(CS.get_regions(corpus).exposures) \
                     + CS.fetch_normalizers(corpus)[k]
                 )
             if with_context:
-                y_hat += np.log(corpus.regions.context_frequencies)
+                y_hat += np.log(CS.get_regions(corpus).context_frequencies)
 
         return y_hat
     
@@ -218,8 +218,8 @@ class ModelState:
             log_mutation_rate = reduce(
                 lambda x,y: x+y, 
                 model_predictions.values(),  # sum over models
-                np.log(corpus.regions.exposures) \
-                    + np.log(corpus.regions.context_frequencies)  # start with the background rates
+                np.log(CS.get_regions(corpus).exposures) \
+                    + np.log(CS.get_regions(corpus).context_frequencies)  # start with the background rates
             )
 
             '''

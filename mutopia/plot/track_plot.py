@@ -9,7 +9,7 @@ from numpy._core._multiarray_umath import _array_converter
 from functools import cache
 from ..genome_utils.bed12_utils import unstack_regions
 from ..utils import borrow_kwargs, logger
-from ..corpus.gtensor import locus_slice
+from ..gtensor.gtensor import slice_regions
 plt.rc('axes', linewidth=0.75)
 
 
@@ -30,36 +30,36 @@ def pipeline(*fns):
 
 
 def acc(var_name, **sel):
-    def _accessor(corpus):
-        return corpus[var_name].sel(**sel).transpose(...,'locus')
+    def _accessor(dataset):
+        return dataset[var_name].sel(**sel).transpose(...,'locus')
     return _accessor
 
 
 def feature_matrix(*feature_names):
 
     """
-    Accessor function to retrieve multiple features from a corpus.
+    Accessor function to retrieve multiple features from a dataset.
     
     Parameters:
     - feature_names: Names of the features to access.
     
     Returns:
-    A function that retrieves the specified features from the corpus.
+    A function that retrieves the specified features from the dataset.
     """
-    def _accessor(corpus):
+    def _accessor(dataset):
         
         fnames = (
             list(feature_names) if len(feature_names) > 0 
             else 
-            [name for name, arr in corpus.features.items() if np.issubdtype(arr.dtype, np.number)]
+            [name for name, arr in dataset.sections.features.items() if np.issubdtype(arr.dtype, np.number)]
         )
 
         feature_matrix = DataArray(
-            np.vstack([corpus.features[name].values for name in fnames]),
+            np.vstack([dataset.sections.features[name].values for name in fnames]),
             dims=('feature', 'locus'),
             coords={
                 'feature': fnames,
-                'locus': corpus.coords['locus'].values
+                'locus': dataset.coords['locus'].values
             },
             name='Features',
         )
@@ -114,13 +114,13 @@ class _GenomeView:
     def __init__(
         self,
         *,
-        corpus,
+        dataset,
         chrom,
         start,
         end,
         plot_kw,
     ):
-        self.corpus = corpus
+        self.dataset = dataset
         self.chrom = chrom
         self.start = start
         self.end = end
@@ -154,7 +154,7 @@ class _GenomeView:
         axs = {}
         
         kw = {
-            'corpus': self.corpus,
+            'dataset': self.dataset,
             'chrom': self.chrom,
             'fig': fig,
             **self._plot_kw,
@@ -171,7 +171,7 @@ class _GenomeView:
     def smooth(self, alpha=10):
         smooth_fn = partial(
             _moving_average,
-            self.corpus.regions.length.values,
+            self.dataset.sections.regions.length.values,
             alpha=alpha,
         )
 
@@ -179,14 +179,14 @@ class _GenomeView:
 
 
 
-def make_view(corpus,*, chrom, start, end):
+def make_view(dataset,*, chrom, start, end):
 
-    corpus = locus_slice(corpus, chrom, start, end)
-    n_regions = corpus.coords['locus'].size
+    dataset = slice_regions(dataset, chrom, start, end)
+    n_regions = dataset.coords['locus'].size
 
     starts, ends, idxs = unstack_regions(
-        corpus.coords['locus'].values,
-        os.path.join(os.path.dirname(corpus.attrs['filename']), corpus.attrs['regions_file']),
+        dataset.coords['locus'].values,
+        os.path.join(os.path.dirname(dataset.attrs['filename']), dataset.attrs['regions_file']),
         np.arange(n_regions),
     )
 
@@ -198,7 +198,7 @@ def make_view(corpus,*, chrom, start, end):
     )
 
     return _GenomeView(
-        corpus=corpus,
+        dataset=dataset,
         chrom=chrom,
         start=start,
         end=end,
@@ -250,7 +250,7 @@ def stack_plots(*plotting_fns, height=1, label=None, legend=True, name=None, ax_
 
 def scale_bar(length=10000, height=0.1, name=None, label=None):
     
-    def _plot(ax,*, corpus, chrom, start, end, idx, check_len, fig):
+    def _plot(ax,*, dataset, chrom, start, end, idx, check_len, fig):
 
         end = start[-1]
 
@@ -285,7 +285,7 @@ def scale_bar(length=10000, height=0.1, name=None, label=None):
 
 def xaxis_plot(height=0.1, name=None):
     
-    def _plot(ax,*, corpus, chrom, start, end, idx, check_len, fig):
+    def _plot(ax,*, dataset, chrom, start, end, idx, check_len, fig):
         ax.tick_params(
             axis='x', 
             top=True, labeltop=True, 
@@ -320,7 +320,7 @@ def _check_flat_input(vals, check_len):
         vals = np.array(vals)
 
     if not len(vals) == check_len:
-            raise ValueError('vals and must have one entry per region in the provided corpus.')
+            raise ValueError('vals and must have one entry per region in the provided dataset.')
 
     return vals.squeeze()
 
@@ -380,9 +380,9 @@ def line_plot(
     ax_fn = lambda x : x,
     **kwargs,
 ):
-    def _plot(ax,*, corpus, chrom, start, end, idx, check_len, fig):
+    def _plot(ax,*, dataset, chrom, start, end, idx, check_len, fig):
 
-        vals = _check_flat_input(accessor(corpus), check_len)
+        vals = _check_flat_input(accessor(dataset), check_len)
         
         x = np.empty((start.size + end.size,), dtype=start.dtype)
         x[0::2] = start
@@ -411,9 +411,9 @@ def fill_plot(
     ax_fn = lambda x : x,
     **kwargs,
 ):
-    def _plot(ax,*, corpus, chrom, start, end, idx, check_len, fig):
+    def _plot(ax,*, dataset, chrom, start, end, idx, check_len, fig):
 
-        vals = _check_flat_input(accessor(corpus), check_len)
+        vals = _check_flat_input(accessor(dataset), check_len)
         
         x = np.empty((start.size + end.size,), dtype=start.dtype)
         x[0::2] = start
@@ -440,9 +440,9 @@ def bar_plot(
     **kwargs,
 ):
     
-    def _plot(ax,*, corpus, chrom, start, end, idx, check_len, fig):
+    def _plot(ax,*, dataset, chrom, start, end, idx, check_len, fig):
 
-        vals = _check_flat_input(accessor(corpus), check_len)
+        vals = _check_flat_input(accessor(dataset), check_len)
         
         center = start + (end - start)/2
         width = end - start
@@ -479,9 +479,9 @@ def scatterplot(
     **kwargs,
 ):
     
-    def _plot(ax,*, corpus, chrom, start, end, idx, check_len, fig):
+    def _plot(ax,*, dataset, chrom, start, end, idx, check_len, fig):
 
-        vals = _check_flat_input(accessor(corpus), check_len)
+        vals = _check_flat_input(accessor(dataset), check_len)
         
         ax.scatter(
             start + (end - start)/2, 
@@ -527,14 +527,14 @@ def heatmap_plot(
             x = x.T
 
         if not x.shape[1] == expected:
-            raise ValueError('The passed matrix must have the same number of columns as there are regions in the corpus')
+            raise ValueError('The passed matrix must have the same number of columns as there are regions in the dataset')
         
         return x
         
         
-    def _plot(ax,*, corpus, chrom, start, end, idx, check_len, fig):
+    def _plot(ax,*, dataset, chrom, start, end, idx, check_len, fig):
         
-        matrix = accessor(corpus)
+        matrix = accessor(dataset)
         axlabel = label or _name_or_none(matrix)
 
         if not isinstance(matrix, (np.ndarray, DataArray)):
@@ -607,9 +607,9 @@ def categorical_plot(
     **kwargs,
 ):
         
-    def _plot(ax,*, corpus, chrom, start, end, idx, check_len, fig):
+    def _plot(ax,*, dataset, chrom, start, end, idx, check_len, fig):
 
-        vals = _check_flat_input(accessor(corpus), check_len)
+        vals = _check_flat_input(accessor(dataset), check_len)
 
         categories = order or (
             vals.attrs['classes'][1:]
@@ -708,7 +708,7 @@ def static_track(
         **properties,
     )
 
-    def _plot(ax,*, corpus, chrom, start, end, idx, check_len, fig):
+    def _plot(ax,*, dataset, chrom, start, end, idx, check_len, fig):
 
         track.plot(
             ax,

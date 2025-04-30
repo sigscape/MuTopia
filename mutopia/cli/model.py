@@ -1,8 +1,8 @@
 
 import mutopia as mu
-from mutopia.corpus.interfaces import *
+from mutopia.gtensor.interfaces import *
 from mutopia.model.corpus_state import CorpusState as CS
-import mutopia.corpus.disk_interface as disk
+import mutopia.gtensor.disk_interface as disk
 import netCDF4 as nc
 from ..utils import logger
 

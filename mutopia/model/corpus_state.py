@@ -1,175 +1,138 @@
-
+'''
+Why go through the trouble of creating these redundant functions?
+This interface is meant to be used by the model, which should not depend on the underlying
+structure of the datasets.
+'''
 import xarray as xr
-from datatree import DataTree
+from ..gtensor import *
 import numpy as np
 from joblib import delayed
-from ..corpus.interfaces import CorpusInterface
 
-class CorpusState:
 
-    @classmethod
-    def update_corpusstate(
-        cls,
-        corpus,
-        model_state,
-        from_scratch=False,
-        *,
-        parallel_context,
-    ):
-        for _ in parallel_context(
-            delayed(model.update_corpusstate)(
-                corpus,
-                from_scratch=from_scratch
-            ) for model in model_state.models.values()
-        ):
-            pass
-        
-        return corpus
-    
-    @classmethod
-    def has_corpusstate(cls, corpus):
-        try:
-            corpus.state
-            return True
-        except AttributeError:
-            return False
-    
-    @classmethod
-    def is_marginal_corpus(cls, corpus):
-        return len(cls.list_samples(corpus)) <= 1
-    
-    @classmethod
-    def list_samples(cls, corpus):
-        return list(corpus.list_samples())
-    
-    @classmethod
-    def iter_samples(cls, corpus):
-        return zip(corpus.list_samples(), corpus.iter_samples())
+def init_corpusstate(
+    dataset,
+    model_state,
+):
 
-    @classmethod
-    def fetch_sample(cls, corpus, sample_name):
-        if sample_name is None:
-            return corpus.X
-        return corpus.fetch_sample(sample_name)
-
-    @classmethod
-    def sample_dims(cls, corpus):
-        return corpus.X.dims
-    
-    @classmethod
-    def observation_dims(cls, corpus):
-        return [d for d in cls.sample_dims(corpus) if not d in ('locus', 'sample')]
-
-    @classmethod
-    def update_normalizers(cls, corpus, normalizers):
-        
-        '''train_genome_size = model_state.get_genome_size(corpus)
-        this_genome_size = cls.genome_size(corpus)
-
-        cls.fetch_normalizers(corpus)[:] = \
-            model_state.get_normalizers(corpus) - np.log(this_genome_size/train_genome_size)
-        
-        return corpus'''
-        cls.fetch_normalizers(corpus)[:] = normalizers
-        return corpus
-    
-
-    @classmethod
-    def init_corpusstate(
-                cls,
-                corpus,
-                model_state,
-            ):
-
-        sample_names = cls.list_samples(corpus)
-        n_components = model_state.n_components
-            
-        state_elements = {
-            'normalizers' : xr.DataArray(
-                np.zeros(n_components, dtype=float),
-                dims=('component',),
-            ),
-        }
-
-        for model in model_state.models.values():
-            state_elements.update(
-                model.prepare_corpusstate(corpus)
-            )
-
-        # a smidge of interface chicanery here
-        # The "corpus" passed to this function may be a nested series of interfaces, or it could be a plain G-Tensor.
-        # Since we want to be able to modify the wrapped corpus, we add one more layer of indirection,
-        # then modify the corpus in place.
-        corpus = CorpusInterface(corpus)
-        corpus.corpus = corpus.drop_dims('component', errors='ignore')
-
-        DataTree(
-            data=xr.Dataset(
-                state_elements,
-                coords={
-                    **corpus.coords,
-                    'sample' : sample_names,
-                },
-                attrs={
-                    'genome_size' : corpus.regions.context_frequencies\
-                                        .sum().data.item()
-                }
-            ),
-            name='state',
-            parent=corpus.corpus,
+    if 'State' in dataset.sections.names:
+        dataset = (
+            dataset
+            .drop_vars(dataset.sections.groups['State'])
+            .drop_dims(("component", "feature"))
         )
 
-        return corpus
-    
-
-    @staticmethod
-    def genome_size(corpus):
-        return corpus.state.attrs['genome_size']
-    
-    @staticmethod
-    def fetch_normalizers(corpus):
-        return corpus.state['normalizers'].data
-    
-    @staticmethod
-    def fetch_val(corpus, key):
-        return corpus.state[key]
-    
-    @staticmethod
-    def get_name(corpus):
-        return corpus.attrs['name']
-    
-    @staticmethod
-    def update(corpus, **items):
-        corpus.state = corpus.state.assign(**items)
-        return corpus
-
-    @classmethod
-    def update_topic_compositions(cls, corpus, sample_name, gamma):
-        cls.fetch_topic_compositions(corpus, sample_name)[:] = gamma
-        return corpus
-    
-
-    @classmethod
-    def fetch_topic_compositions(cls, corpus, sample_name):
-        gamma = cls.fetch_val(corpus, 'topic_compositions')\
-                    .sel(sample=sample_name)\
-                    .transpose('component',...)\
-                    .data
+    sample_names = dataset.list_samples()
+    n_components = model_state.n_components
+    genome_size = (
+        dataset.sections.regions
+        .context_frequencies
+        .sum().data.item()
+    )
         
-        if len(gamma.shape) > 1:
-            gamma = gamma[:,0]
+    state_elements = {
+        'normalizers' : xr.DataArray(
+            np.zeros(n_components, dtype=float),
+            dims=('component',),
+            attrs={'genome_size' : genome_size},
+        ),
+    }
 
-        return gamma
+    for model in model_state.models.values():
+        state_elements.update(
+            model.prepare_corpusstate(dataset)
+        )
+
+    state_elements = {'State/' + k : v for k, v in state_elements.items()}
+
+    dataset = (
+        dataset
+        .drop_dims('component', errors='ignore')
+        .assign_coords(sample=sample_names)
+        .assign(**state_elements)
+    )
+
+    return dataset
+
+
+def update_corpusstate(
+    dataset,
+    model_state,
+    from_scratch=False,
+    *,
+    parallel_context,
+):
+    for _ in parallel_context(
+        delayed(model.update_corpusstate)(
+            dataset,
+            from_scratch=from_scratch
+        ) for model in model_state.models.values()
+    ):
+        pass
     
+    return dataset
+
+def get_dims(dataset):
+    return dataset.sizes
+
+def get_regions(dataset):
+    return dataset.sections.regions
+
+def get_features(dataset):
+    return dataset.sections.features
+
+def list_samples(dataset):
+    return list(dataset.list_samples())
+
+def iter_samples(dataset):
+    return zip(list_samples(dataset), dataset.iter_samples())
+
+def has_corpusstate(dataset):
+    return 'State' in dataset.sections
+
+def is_marginal_corpus(dataset):
+    return len(list_samples(dataset)) <= 1
+
+def fetch_val(dataset, key):
+    return dataset['State/' + key]
+
+def fetch_normalizers(dataset):
+    return fetch_val(dataset, 'normalizers').data
+
+def update_normalizers(dataset, normalizers):
+    fetch_normalizers(dataset)[:] = normalizers
+    return dataset
+
+def genome_size(dataset):
+    return fetch_val(dataset, 'normalizers').attrs['genome_size']
+
+def get_name(dataset):
+    return dataset.attrs['name']
+
+def fetch_topic_compositions(dataset, sample_name):
     
-    @classmethod
-    def using_exposures_from(cls, *corpuses):
-        
-        corpus_dict = {cls.get_name(corpus) : corpus for corpus in corpuses}
+    gamma = fetch_val(dataset, 'topic_compositions')\
+                .sel(sample=sample_name)\
+                .transpose('component',...)\
+                .data
     
-        return lambda corpus, sample_name : \
-            cls.fetch_topic_compositions(
-                corpus_dict[cls.get_name(corpus)],
-                sample_name
-            )
+    if len(gamma.shape) > 1:
+        gamma = gamma[:,0]
+
+    return gamma
+
+
+def update_topic_compositions(dataset, sample_name, gamma):
+    fetch_topic_compositions(dataset, sample_name)[:] = gamma
+    return dataset
+
+
+def using_exposures_from(*corpuses):
+    
+    corpus_dict = {get_name(dataset) : dataset for dataset in corpuses}
+
+    return lambda dataset, sample_name : \
+        fetch_topic_compositions(
+            corpus_dict[get_name(dataset)],
+            sample_name
+        )
         

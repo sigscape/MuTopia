@@ -1,7 +1,7 @@
 import numpy as np
 from functools import reduce, partial
 from joblib import delayed
-from .corpus_state import CorpusState as CS
+from . import corpus_state as CS
 import warnings
 
 def _reduce_sum(g):
@@ -111,12 +111,8 @@ def pearson_residuals(
         log_mutrate = log_marginal_mutrate_fn(exposures)
         
         ysum = obs.data.sum()
-
-        #obs = obs.sum(dim=dims_except_for(log_mutrate.dims, 'locus'))
         
-        y_hat = np.exp(log_mutrate + np.log(ysum))#\
-            #.sum(dim=dims_except_for(log_mutrate.dims, 'locus'))
-            #.transpose(*obs.dims)
+        y_hat = np.exp(log_mutrate + np.log(ysum))
 
         return (obs - y_hat)/np.sqrt(y_hat)
 

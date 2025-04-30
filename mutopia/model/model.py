@@ -1,4 +1,4 @@
-from .corpus_state import CorpusState as CS
+from . import corpus_state as CS
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
@@ -8,8 +8,7 @@ from .model_components import *
 from .eval import deviance_locus, pearson_residuals, _update_normalizers
 from .latent_var_models import *
 from ..plot.coef_matrix_plot import _plot_interaction_matrix
-from ..corpus import *
-from ..corpus.interfaces import CorpusInterface
+from ..gtensor import *
 from functools import partial  
 from joblib import dump, delayed
 from collections import defaultdict

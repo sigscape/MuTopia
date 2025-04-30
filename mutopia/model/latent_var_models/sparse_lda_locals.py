@@ -3,9 +3,8 @@ import numpy as np
 from functools import partial, reduce
 import sparse
 from ..model_components.base import _svi_update_fn
-from ..corpus_state import CorpusState as CS
-from ...utils import dims_except_for
-from ...corpus.interfaces import *
+from .. import corpus_state as CS
+from ...gtensor import dims_except_for
 from math import prod
 from .base import *
 import warnings
@@ -71,7 +70,7 @@ class LDAUpdateSparse(LocalUpdate):
         **idx_dict,
     ):
         
-        freqs = corpus.regions.context_frequencies\
+        freqs = CS.get_regions(corpus).context_frequencies\
                     .transpose(...,'locus')
         
         idx_arrs = [idx_dict[dim] for dim in freqs.dims[:-1]]
@@ -80,7 +79,7 @@ class LDAUpdateSparse(LocalUpdate):
             warnings.simplefilter("ignore")
             
             return np.log(freqs.data[*idx_arrs, locus]) \
-                + np.log(corpus.regions.exposures.data[locus])
+                + np.log(CS.get_regions(corpus).exposures.data[locus])
 
 
     @classmethod
@@ -433,7 +432,7 @@ class LDAUpdateSparse(LocalUpdate):
         contributions = np.ascontiguousarray(gamma/np.sum(gamma))        
 
         # 1. figure out the missing dimensions
-        missing_dims = dims_except_for(sample.dims, *corpus.regions.context_frequencies.dims)
+        missing_dims = dims_except_for(sample.dims, *CS.get_regions(corpus).context_frequencies.dims)
         # 2. figure out the number of possible types of observations missing
         n_types = prod(corpus.sizes[dim] for dim in missing_dims)
         # 3. penalize the log context effect for the missing dimensions
@@ -463,7 +462,7 @@ class LDAUpdateSparse(LocalUpdate):
     
         context_sums = {
             CS.get_name(corpus) : np.sum(
-                corpus.regions.context_frequencies.data,
+                CS.get_regions(corpus).context_frequencies.data,
             )
             for corpus in corpuses
         }

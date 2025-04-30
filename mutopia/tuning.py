@@ -5,7 +5,7 @@ from functools import partial
 from optuna.storages import JournalStorage
 from optuna.storages.journal import JournalFileBackend
 from numpy import isfinite
-from .corpus.interfaces import *
+from .gtensor.interfaces import *
 from .utils import logger
 
 

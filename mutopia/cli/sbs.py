@@ -1,6 +1,6 @@
 import mutopia as mu
 from mutopia.modalities._sbs_clustering import *
-from mutopia.corpus import disk_interface as disk
+from mutopia.gtensor import disk_interface as disk
 from ..genome_utils.bed12_utils import stream_bed12
 import click
 from functools import partial

@@ -3,7 +3,7 @@ from sparse import COO, GCXS
 from abc import ABC, abstractmethod
 from numba import njit
 import sys
-from ..corpus_state import CorpusState as CS
+from .. import corpus_state as CS
 
 class PrimitiveModel(ABC):
 
@@ -91,7 +91,7 @@ class DenseDataBase(ABC):
 
 
 def get_feature_classes(corpus, feature):
-    feature = corpus.features[feature]
+    feature = CS.get_features(corpus)[feature]
     try:
         return list(feature.attrs['classes'])
     except KeyError:
@@ -217,15 +217,6 @@ def design_csr(X, B):
 
     return out
 
-
-'''@njit
-def rescale_Xy(X, y, weights):
-    (ptr, idx, data) = X
-    for j, (s, e) in enumerate(zip(ptr[:-1], ptr[1:])):
-        y[j] *= weights[j]
-        for i in range(s, e):
-            data[i] *= weights[j]
-'''
 
 def jitpartial(func, /, *args):
     @njit

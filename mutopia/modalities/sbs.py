@@ -48,13 +48,10 @@ class SBSMode(ModeConfig):
     @property
     def coords(self):
         return {
-            "clustered": ["no", "yes"],
-            "configuration": CONFIGURATIONS,
-            #"context": pd.MultiIndex.from_tuples(
-            #    [(f'{s[0]}N{s[6]}',s[2:5]) for s in MUTOPIA_ORDER],
-            #    names=['adjacent', 'mutation']
-            #),
-            "context" : MUTOPIA_ORDER,
+            "clustered": ("clustered", ["no", "yes"]),
+            "configuration": ("configuration", CONFIGURATIONS),
+            "context" : ("context", MUTOPIA_ORDER),
+            "mutation" : ("context", [s[2:5] for s in MUTOPIA_ORDER]),
         }
 
     @property
