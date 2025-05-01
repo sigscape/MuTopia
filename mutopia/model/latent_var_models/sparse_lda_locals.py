@@ -481,8 +481,7 @@ class LDAUpdateSparse(LocalUpdate):
             for (sample_name, sample) in CS.iter_samples(corpus)
         )
 
-        return deviance_fns
-        
+        return deviance_fns    
 
     def _deviance_residuals(
         self,

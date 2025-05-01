@@ -543,7 +543,7 @@ class LocalUpdate(PrimitiveModel):
             prior_alpha=1.0,
             estep_iterations=1000,
             difference_tol=5e-5,
-            dtype=np.float32,
+            dtype=float,
             *,
             random_state,
         ):
