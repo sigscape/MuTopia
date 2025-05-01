@@ -1,6 +1,7 @@
 from functools import partial, reduce
 import numpy as np
 from xarray import DataArray
+from numba import njit
 from ._glm_compiled import (
     make_optimizer,
     setup_mixed_solver,
@@ -21,15 +22,57 @@ from ._strand_transformer import MesoscaleEncoder, DesignMatrixHelper
 from ...gtensor import dims_except_for
 
 
-def _reduce_locus_exp_offsets(
-    context_effects,
-    exposures,
-    idx_selector,
-    conditional_rates,
+'''
+@staticmethod
+def get_exp_offset(offsets, corpus):
+
+    def aggregate_by_design(arr, design_matrix):
+        #       SxL @ (LxC) => (SxC) => (CxS) => (C*S)
+        return (design_matrix @ arr.T).T.ravel()
+
+    def get_design(state, key):
+        return CS.fetch_val(state, key).data.to_scipy_sparse().tocsc().T
+
+    exp_offsets = (
+        np.exp(offsets).transpose("configuration", "context", "locus").data
+    )
+
+    return aggregate_by_design(
+        exp_offsets[0], get_design(corpus, "plus_mesoscale_design")
+    ) + aggregate_by_design(
+        exp_offsets[1], get_design(corpus, "minus_mesoscale_design")
+    )
+'''
+
+'''
+@njit("f32[:,::1](i32, f32[:,::1], f32[::1], f32[::1], i32[::1])", nogil=True)
+def _one_strand_reduce(
+    num_states,
+    context_effects, # (L x C*D)
+    exposures, # L
+    locus_effects, # L
+    idx_selector, # L,D
 ):
-    pass
+    D = 2
+    _, CD = context_effects.shape
+    C = CD/D
 
+    out = np.zeros(
+        (num_states, C), 
+        dtype=context_effects.dtype
+    )
 
+    for l, s in enumerate(idx_selector):
+        out[s, :] += (
+            locus_effects[l] 
+            * exposures[l] 
+            * context_effects[l,:].reshape(C, D).T
+        )
+
+    return out
+'''
+    
+    
 class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
     """
     The dimensions of context models are hard-coded because contexts are always
@@ -47,7 +90,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         kmer_reg=0.005,
         init_variance: float = 0.1,
         conditioning_alpha: float = 1e-9,
-        dtype=float,
+        dtype=np.float32,
         init_components=[],
         fix_components=[],
         context_conditioning=1e-5,
@@ -77,11 +120,11 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         self._context_distribution /= self._context_distribution.sum()
 
         self.context_transformer = context_encoder.fit(self.context_names)
-        self.transformer = MesoscaleEncoder().fit(corpuses)
+        self.mesoscale_transformer = MesoscaleEncoder().fit(corpuses)
 
         self.encoding_matrix_ = DesignMatrixHelper.compose_encoding_matrix(
             self.context_transformer.encoding_matrix,
-            self.transformer.encoding_matrix,
+            self.mesoscale_transformer.encoding_matrix,
             shared_effects=True,
         ).astype(dtype)
 
@@ -94,7 +137,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         self.is_intercept_ = np.array(
             [True] * self.context_transformer.n_coefs
             + [False]
-            * self.transformer.n_coefs
+            * self.mesoscale_transformer.n_coefs
             * (self.context_transformer.n_states + 1)
         )
 
@@ -176,6 +219,10 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
     @property
     def requires_dims(self):
         return ("configuration", "context", "locus")
+    
+    @property
+    def num_mesoscale_states(self):
+        return self.mesoscale_transformer.n_states
 
     def post_fit(self, corpuses):
 
@@ -271,6 +318,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
 
         return sstats.astype(self.dtype, copy=False)
 
+
     def init_from_signatures(self, signatures):
 
         k = signatures.shape[0]
@@ -309,24 +357,17 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
     def prepare_corpusstate(self, corpus):
         return dict(
             mesoscale_idx=DataArray(
-                np.array(
-                    [
-                        self.transformer.encode(corpus),
-                        self.transformer.encode(corpus, invert=True),
-                    ]
+                np.asfortranarray(
+                    np.array([
+                        self.mesoscale_transformer.encode(corpus),
+                        self.mesoscale_transformer.encode(corpus, invert=True),
+                    ]),
+                    dtype=np.int64,
                 ),
                 dims=(
                     "configuration",
                     "locus",
                 ),
-            ),
-            plus_mesoscale_design=DataArray(
-                self.transformer.transform(corpus),
-                dims=("locus", "mesoscale_state"),
-            ),
-            minus_mesoscale_design=DataArray(
-                self.transformer.transform(corpus, invert=True),
-                dims=("locus", "mesoscale_state"),
             ),
             log_context_distribution=DataArray(
                 self._get_log_context_distribution(corpus),
@@ -335,7 +376,12 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         )
 
     def _get_log_context_distribution(self, corpus_state):
-        return np.array([self._format_component(k) for k in range(self.n_components)])
+        return np.array(
+            [self._format_component(k) for k in range(self.n_components)],
+            dtype=self.dtype,
+            order="C",
+        )
+
 
     def update_corpusstate(self, corpus, **kwargs):
         CS.fetch_val(corpus, "log_context_distribution").data[:] = (
@@ -343,10 +389,11 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         )
 
     def _get_sstats_dim(self):
-        return (self.n_components, self.context_dim, self.transformer.n_states_)
+        return (self.n_components, self.context_dim, self.mesoscale_transformer.n_states_)
 
     def spawn_sstats(self, corpus_state):
         return np.zeros(self._get_sstats_dim(), self._coefs.dtype)
+
 
     def predict(self, k, corpus_state):
 
@@ -363,9 +410,10 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         )
 
         return DataArray(
-            context_effects,
+            np.asfortranarray(context_effects, dtype=self.dtype),
             dims=("configuration", "context", "locus"),
         )
+
 
     @staticmethod
     def _run_regression(
@@ -380,25 +428,6 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
             update_vec, model(y, sample_weight)(update_vec), learning_rate=learning_rate
         )
 
-    @staticmethod
-    def get_exp_offset(offsets, corpus):
-
-        def aggregate_by_design(arr, design_matrix):
-            #       SxL @ (LxC) => (SxC) => (CxS) => (C*S)
-            return (design_matrix @ arr.T).T.ravel()
-
-        def get_design(state, key):
-            return CS.fetch_val(state, key).data.to_scipy_sparse().tocsc().T
-
-        exp_offsets = (
-            np.exp(offsets).transpose("configuration", "context", "locus").data
-        )
-
-        return aggregate_by_design(
-            exp_offsets[0], get_design(corpus, "plus_mesoscale_design")
-        ) + aggregate_by_design(
-            exp_offsets[1], get_design(corpus, "minus_mesoscale_design")
-        )
 
     def partial_fit(
         self,
@@ -408,7 +437,6 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         corpuses,
         learning_rate=1.0,
     ):
-
         corpus_names = [CS.get_name(state) for state in corpuses]
 
         eta = reduce(
@@ -443,7 +471,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         return list(
             map(
                 self._get_mesoscale_feature_name,
-                self.transformer.get_feature_names_out(),
+                self.mesoscale_transformer.get_feature_names_out(),
             )
         )
 
@@ -456,7 +484,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
 
         encoding_matrix = DesignMatrixHelper.compose_encoding_matrix(
             self.context_transformer.encoding_matrix,
-            self.transformer.independent_effects_encoding(),
+            self.mesoscale_transformer.independent_effects_encoding(),
         )
 
         # C x S
@@ -485,7 +513,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
     def get_interaction_summary(self, k):
 
         c = self.context_transformer.n_states + 1
-        r = self.transformer.n_coefs
+        r = self.mesoscale_transformer.n_coefs
 
         return DataArray(
             data=self.coefs_[k][-r * c :].reshape((c, r)).T,
@@ -553,11 +581,11 @@ class UnstrandedContextModel(StrandedContextModel, SparseDataBase):
     def prepare_corpusstate(self, corpus):
         return dict(
             mesoscale_idx=DataArray(
-                self.transformer.encode(corpus),
+                self.mesoscale_transformer.encode(corpus),
                 dims=("locus",),
             ),
             mesoscale_design=DataArray(
-                self.transformer.transform(corpus),
+                self.mesoscale_transformer.transform(corpus),
                 dims=("locus", "mesoscale_state"),
             ),
             log_context_distribution=DataArray(

@@ -543,7 +543,7 @@ class LocalUpdate(PrimitiveModel):
             prior_alpha=1.0,
             estep_iterations=1000,
             difference_tol=5e-5,
-            dtype=float,
+            dtype=np.float32,
             *,
             random_state,
         ):
@@ -661,8 +661,8 @@ class LocalUpdate(PrimitiveModel):
         return self.random_state.gamma(
             100., 
             1./100., 
-            size=(self.n_components, n_samples)
-        )
+            size=(self.n_components, n_samples),
+        ).astype(self.dtype)
     
 
     def prepare_corpusstate(self, corpus):

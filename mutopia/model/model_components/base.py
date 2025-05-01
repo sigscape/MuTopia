@@ -52,10 +52,10 @@ class RateModel(PrimitiveModel, ABC):
     def predict(self, k, corpus):
         raise NotImplementedError
     
-    @staticmethod
-    @abstractmethod
-    def get_exp_offset(offsets, corpus):
-        raise NotImplementedError    
+    #@staticmethod
+    #@abstractmethod
+    #def get_exp_offset(offsets, corpus):
+    #    raise NotImplementedError    
 
     @abstractmethod
     def format_signature(self, k, normalization='global'):

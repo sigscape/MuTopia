@@ -15,11 +15,11 @@ def init_corpusstate(
 ):
 
     if 'State' in dataset.sections.names:
-        dataset = (
-            dataset
-            .drop_vars(dataset.sections.groups['State'])
-            .drop_dims(("component", "feature"))
-        )
+        dataset = dataset.drop_vars(dataset.sections.groups['State'])
+        if 'component' in dataset.dims:
+            dataset = dataset.drop_dims('component')
+        if 'feature' in dataset.dims:
+            dataset = dataset.drop_dims('feature')
 
     sample_names = dataset.list_samples()
     n_components = model_state.n_components

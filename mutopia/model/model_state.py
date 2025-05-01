@@ -18,11 +18,13 @@ class ModelState:
 
     def __init__(self,
                 corpuses,
+                offsets_fn = None,
                 *,
                 locals_model,
                 **models,
                 ):
 
+        self.offsets_fn = offsets_fn
         self.locals_model = locals_model
         self._models = {}
 
@@ -182,7 +184,7 @@ class ModelState:
         ]
 
         offset_fns = (
-            partial(self._get_exp_offsets_k_c, k, corpus)
+            partial(self.offsets_fn or self._get_exp_offsets_k_c, k, corpus)
             for k, corpus in args
         )
             
@@ -197,9 +199,7 @@ class ModelState:
                     [CS.get_name(corpus)]\
                     [k] = _offsets
                 
-                norm_update_fn(
-                    k, corpus, norm,
-                )
+                norm_update_fn(k, corpus, norm)
 
         return all_offsets
     
@@ -268,8 +268,12 @@ class ModelState:
         *,
         parallel_context
     ):
-        norm_fn = lambda k : \
-            -logsumexp(self._get_propto_log_mutation_rate(k, corpus).data)
+        
+        if self.offsets_fn is None:
+            norm_fn = lambda k : \
+                -logsumexp(self._get_propto_log_mutation_rate(k, corpus).data)
+        else:
+            norm_fn = lambda k : self.offsets_fn(k, corpus)[0]
 
         return np.array(list(parallel_context(
             delayed(norm_fn)(k) for k in range(self.n_components)

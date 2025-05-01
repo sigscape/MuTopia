@@ -1,6 +1,5 @@
-import json
 import numpy as np
-import os
+from numba import njit
 from functools import reduce, partial
 from itertools import chain
 from collections import Counter
@@ -301,6 +300,77 @@ def _make_feature_name(subsequence_code):
     return "".join([default[i] for i in range(3)])
 
 
+
+@njit(
+    "Tuple((float32, float32[:,:],float32[:]))(int64, float32[:,::1], float32[::1], float32[::1], float32[:,:], int64[:,::1])", 
+    nogil=True
+)
+def _fast_exp_offsets(
+    num_states,
+    context_freqs, # (L x C*D)
+    exposures, # L
+    locus_effects, # L
+    context_effects, # S x C
+    idx_selector, # L,D
+):
+    
+    D = 2
+    L, CD = context_freqs.shape
+    C = CD//D
+
+    assert exposures.shape[0] == L
+    assert locus_effects.shape[0] == L
+    assert idx_selector.shape == (L, D)
+
+    context_offsets = np.zeros((num_states, C), dtype=context_freqs.dtype)
+    locus_offsets = np.zeros(L, dtype=context_freqs.dtype)
+    normalizer = 0
+
+    for l, (s_d0, s_d1) in enumerate(idx_selector):
+
+        # (D, C)
+        o = exposures[l] * context_freqs[l,:].reshape(C, D).T
+
+        context_offsets[s_d0, :] += o[0]*locus_effects[l]
+        context_offsets[s_d1, :] += o[1]*locus_effects[l]
+
+        locus_offsets[l] += (
+            (context_effects[s_d0, :] * o[0]).sum()
+            + (context_effects[s_d1, :] * o[1]).sum()
+        )
+
+        normalizer += locus_offsets[l]*locus_effects[l]
+        
+    return (
+        -np.log(normalizer),
+        context_offsets.T,
+        locus_offsets,
+    )
+
+
+contig_f32 = partial(np.ascontiguousarray, dtype=np.float32)
+
+def _get_exp_offsets_k_c(k, corpus, num_states):
+
+    args = (
+        (
+            corpus.sections.regions
+            .context_frequencies
+            .transpose('locus','context', 'configuration')
+            .data
+            .reshape(-1, 192)
+        ),
+        corpus.sections.regions.exposures.data,
+        contig_f32( np.exp(corpus.sections.state.log_locus_distribution).sel(component=k).data ),
+        np.exp(corpus.sections.state.log_context_distribution).sel(component=k).transpose(..., 'context').data,
+        corpus.sections.state.mesoscale_idx.data.T,
+    )
+
+    (normalizer, context_offsets, locus_offsets) = _fast_exp_offsets(num_states, *args)
+
+    return (normalizer, {'context_model': context_offsets, 'theta_model': locus_offsets})
+
+
 def SBSModel(
     train_corpuses,
     test_corpuses,
@@ -405,6 +475,10 @@ def SBSModel(
         context_model=context_model,
         theta_model=theta_model,
         locals_model=locals_model,
+        offsets_fn = partial(
+            _get_exp_offsets_k_c,
+            num_states=context_model.num_mesoscale_states,
+        )
     )
 
     (model_state, train_scores, test_scores) = fit_model(

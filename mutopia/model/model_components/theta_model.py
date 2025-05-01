@@ -42,9 +42,8 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         add_corpus_intercepts=False,
         convolution_width=1,
         model_kw={},
-        dtype=float,
+        dtype=np.float32,
         init_variance=0.05,
-        smoothing_size=1000,
         transformers=[],
         *,
         n_components: int,
@@ -125,9 +124,14 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         return ("locus",)
 
     def _init_log_locus_distribution(self, locus_features):
+        
         X = locus_features[:, self.n_categorical_features_ :]
+        
         return DataArray(
-            (np.nan_to_num(X, nan=-3.0) @ self.init_projection_.T).T,
+            np.asfortranarray(
+                (np.nan_to_num(X, nan=-3.0) @ self.init_projection_.T).T,
+                dtype=self.dtype,
+            ),
             dims=("component", "locus"),
         )
 
@@ -137,7 +141,7 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
 
         return dict(
             locus_features=DataArray(
-                X,
+                np.ascontiguousarray(X, dtype=self.dtype),
                 dims=("locus", "feature"),
                 coords={
                     "feature": self.feature_names_out_,
@@ -251,7 +255,6 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         )
 
         sstats += weights
-
         return sstats
 
     def format_signature(self, k, normalization="none"):

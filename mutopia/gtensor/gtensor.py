@@ -431,3 +431,21 @@ def check_feature_consistency(*corpuses):
                 f'The corpus {corpus_name} has extra features: {", ".join(extra_features)}.\n'
                 "Extra features will be ignored during training."
             )
+
+
+def prepare_data(corpus):
+    
+    corpus['Regions/context_frequencies'] = corpus['Regions/context_frequencies']\
+        .transpose(..., 'context', 'locus')
+    
+    corpus['Regions/context_frequencies'].data = np.asfortranarray(
+        corpus['Regions/context_frequencies'].data,
+        dtype=np.float32,
+    )
+
+    corpus['Regions/exposures'].data = np.ascontiguousarray(
+        corpus['Regions/exposures'],
+        dtype=np.float32,
+    )
+
+    return corpus

@@ -482,7 +482,7 @@ class LDAUpdateSparse(LocalUpdate):
         )
 
         return deviance_fns
-    
+        
 
     def _deviance_residuals(
         self,
