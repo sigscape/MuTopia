@@ -114,17 +114,25 @@ def SVI_step(
     on a subset of the data. Now we need to transfer this information
     to the full data set (this is just a copying step, no computation).
     '''
-    for corpus in list(corpuses) + list(slices):
-        CS.update_normalizers(
-            corpus,  
-            factor_model._step_normalizers(
-                corpus,
-                normalizers[CS.get_name(corpus)],
-                learning_rate=learning_rate,
-                subsample_rate=locus_subsample,
-            )
-        )
+
+    print(normalizers)
     
+    update_norm = lambda corpus : CS.update_normalizers(
+        corpus,  
+        factor_model._step_normalizers(
+            corpus,
+            normalizers[CS.get_name(corpus)],
+            learning_rate=learning_rate,
+            subsample_rate=locus_subsample,
+        )
+    )
+    
+    for sliced in slices:
+        update_norm(sliced)
+    
+    for corpus in corpuses:
+        update_norm(corpus)
+        
     '''
     Okay, now we can calculate the sufficient statistics.
     '''
@@ -429,4 +437,5 @@ def fit_model(
         factor_model,
         locals_model,
         test_scores,
+        train_corpuses,
     )

@@ -50,12 +50,6 @@ class FactorModel:
     def __getitem__(self, model_name):
         return self._models[model_name]
     
-    def __getattr__(self, model_name):
-        if model_name in self._models:
-            return self._models[model_name]
-        else:
-            raise AttributeError(f"Model {model_name} not found.")
-
     
     @property
     def requires_dims(self):
@@ -194,7 +188,7 @@ class FactorModel:
             for k, corpus in args
         )
             
-        for (k, corpus), (norm, exp_offsets) in zip(args, parallel_gen(offset_fns, par_context)):
+        for (k, corpus), (norm, exp_offsets) in zip(args, parallel_map(offset_fns, par_context)):
             for model_name, _offsets in exp_offsets.items():
                 
                 all_offsets\
@@ -259,6 +253,7 @@ class FactorModel:
         subsample_rate=1.
     ):
         curr = self._normalizers[CS.get_name(corpus)]
+
         return  _svi_update_fn(
             curr,
             np.log(subsample_rate or 1.) + normalizers,

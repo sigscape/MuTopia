@@ -65,7 +65,7 @@ class MuTopiaModel(ABC, BaseEstimator):
             **self.get_params()
         )
 
-        (self.factor_model_, self.locals_model_, self.test_scores_) = \
+        (self.factor_model_, self.locals_model_, self.test_scores_, data) = \
             fit_model(
                 train_datasets,
                 test_datasets,
@@ -74,7 +74,7 @@ class MuTopiaModel(ABC, BaseEstimator):
                 **self.get_params()
             )
         
-        return self
+        return data
 
     @property
     def n_components(self):
