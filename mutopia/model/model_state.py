@@ -2,6 +2,7 @@
 from .model_components import *
 from .model_components.base import _svi_update_fn
 from .latent_var_models import *
+from ..utils import parallel_map, parallel_gen
 from . import corpus_state as CS
 import numpy as np
 import warnings
@@ -9,23 +10,20 @@ from functools import partial
 from joblib import delayed
 from itertools import chain
 from scipy.special import logsumexp
-from functools import cache, wraps, reduce
+from functools import reduce
 from collections import defaultdict
 import xarray as xr
 
 
-class ModelState:
+class FactorModel:
 
     def __init__(self,
-                corpuses,
-                offsets_fn = None,
-                *,
-                locals_model,
-                **models,
-                ):
+        corpuses,
+        offsets_fn = None,
+        **models,
+    ):
 
         self.offsets_fn = offsets_fn
-        self.locals_model = locals_model
         self._models = {}
 
         for model_name, model in models.items():
@@ -47,23 +45,25 @@ class ModelState:
 
     @property
     def models(self):
-        return {
-            'locals' : self.locals_model,
-            **self._models
-        }
-    
-    @property
-    def nonlocals(self):
         return self._models
+    
+    def __getitem__(self, model_name):
+        return self._models[model_name]
+    
+    def __getattr__(self, model_name):
+        if model_name in self._models:
+            return self._models[model_name]
+        else:
+            raise AttributeError(f"Model {model_name} not found.")
+
     
     @property
     def requires_dims(self):
         return reduce(
             lambda x,y : x.union(y.requires_dims),
-            self.nonlocals.values(),
+            self.models.values(),
             set(['sample'])
         )
-
 
     def get_normalizers(self, corpus):
         return self._normalizers[CS.get_name(corpus)]
@@ -80,7 +80,7 @@ class ModelState:
                 lambda x,y: x+y, 
                 (
                     model.predict(k, corpus)
-                    for model in self.nonlocals.values()
+                    for model in self.models.values()
                     if model.requires_normalization
                 ),  # sum over models
                 np.log(CS.get_regions(corpus).exposures) \
@@ -104,7 +104,7 @@ class ModelState:
                     lambda x,y: x+y, 
                     (
                         model.predict(k, corpus)
-                        for model in self.nonlocals.values()
+                        for model in self.models.values()
                     ),  # sum over models
                     np.log(CS.get_regions(corpus).exposures) \
                     + CS.fetch_normalizers(corpus)[k]
@@ -118,15 +118,17 @@ class ModelState:
     def _get_log_mutation_rate_tensor(
         self, 
         corpus,
+        par_context=None,
         *,
-        parallel_context,
         with_context=True,
     ):
         return xr.concat(
-            list(parallel_context(
-                delayed(self.predict)(k, corpus, with_context=with_context)
-                for k in range(self.n_components)
-            )),
+            parallel_map(
+                (
+                    partial(self.predict, k, corpus, with_context=with_context, par_context=par_context) 
+                    for k in range(self.n_components)
+                )
+            ),
             dim='component'
         )
     
@@ -168,14 +170,18 @@ class ModelState:
     
 
     def get_exp_offsets_dict(self, 
-        corpuses,*,
-        parallel_context,
-        norm_update_fn,
+        corpuses,
+        *,
+        par_context=None,
     ):
         '''
         We want `all_offsets` to be a dictionary of <model_name> -> <corpus> -> <k> -> <offset>
         '''
         all_offsets = defaultdict(lambda : defaultdict(dict))
+        normalizers = {
+            CS.get_name(corpus) : np.zeros_like(self.get_normalizers(corpus))
+            for corpus in corpuses
+        }
         
         args = [
             (k, corpus)
@@ -188,10 +194,7 @@ class ModelState:
             for k, corpus in args
         )
             
-        for (k, corpus), (norm, exp_offsets) in zip(
-            args,
-            parallel_context(delayed(fn)() for fn in offset_fns)
-        ):
+        for (k, corpus), (norm, exp_offsets) in zip(args, parallel_gen(offset_fns, par_context)):
             for model_name, _offsets in exp_offsets.items():
                 
                 all_offsets\
@@ -199,16 +202,16 @@ class ModelState:
                     [CS.get_name(corpus)]\
                     [k] = _offsets
                 
-                norm_update_fn(k, corpus, norm)
+                normalizers[CS.get_name(corpus)][k] = norm
 
-        return all_offsets
+        return all_offsets, normalizers
     
     
     def _get_exp_offsets_k_c(self, k, corpus):
 
         model_predictions = {
             model_name : model.predict(k, corpus)
-            for model_name, model in self.nonlocals.items()
+            for model_name, model in self.models.items()
             if model.requires_normalization
         }
 
@@ -238,7 +241,7 @@ class ModelState:
                         log_mutation_rate - model_predictions[model_name],
                         corpus
                     )
-                    for model_name, model in self.nonlocals.items()
+                    for model_name, model in self.models.items()
                     if model.requires_normalization
                 }
             )
@@ -249,24 +252,23 @@ class ModelState:
             )
         
 
-    def _update_normalizer(self, 
-        k, corpus, logsum_mutation_rate, 
+    def _step_normalizers(self, 
+        corpus,
+        normalizers, 
         learning_rate=1., 
         subsample_rate=1.
     ):
-        norm = self._normalizers[CS.get_name(corpus)]
-        
-        norm[k] = _svi_update_fn(
-            norm[k],
-            np.log(subsample_rate or 1.) + logsum_mutation_rate,
+        curr = self._normalizers[CS.get_name(corpus)]
+        return  _svi_update_fn(
+            curr,
+            np.log(subsample_rate or 1.) + normalizers,
             learning_rate
         )
         
     
     def _calc_normalizers(self, 
         corpus,
-        *,
-        parallel_context
+        par_context=None,
     ):
         
         if self.offsets_fn is None:
@@ -274,10 +276,20 @@ class ModelState:
                 -logsumexp(self._get_propto_log_mutation_rate(k, corpus).data)
         else:
             norm_fn = lambda k : self.offsets_fn(k, corpus)[0]
+            
 
-        return np.array(list(parallel_context(
-            delayed(norm_fn)(k) for k in range(self.n_components)
-        )))
+        return np.array(parallel_map(
+            (partial(norm_fn, k) for k in range(self.n_components)),
+            par_context
+        ))
+    
+
+    def update_normalizers(self, corpuses, par_context=None):
+        for corpus in corpuses:
+            CS.update_normalizers(
+                corpus, 
+                self._calc_normalizers(corpus, par_context)
+            )
         
 
     def format_signature(self, k, normalization='global'):
@@ -285,7 +297,7 @@ class ModelState:
             lambda x,y : x+y,
             (
                 model.format_signature(k, normalization=normalization)
-                for model in self.nonlocals.values()
+                for model in self.models.values()
             )
         ))
     
@@ -295,31 +307,17 @@ class ModelState:
             lambda x,y : x+y,
             (
                 model.get_interaction_summary(k)
-                for model in self.nonlocals.values()
+                for model in self.models.values()
                 if hasattr(model, 'get_interaction_summary')
             )
         )
     
 
-    def optim_prior(self, corpuses):
-
-        sstats = {
-            CS.get_name(corpus) : [
-                CS.fetch_topic_compositions(corpus, sname)
-                for sname in CS.list_samples(corpus)
-            ]
-            for corpus in corpuses
-        }
-
-        self.locals_model.partial_fit(sstats, learning_rate=1.)
-        
-
     def Mstep(self,
         corpuses,
         sstats,
         offsets,
-        *,
-        parallel_context,
+        par_context=None,
         learning_rate=1.,
         update_prior=True,
         use_parallel=True,
@@ -337,75 +335,10 @@ class ModelState:
                     learning_rate=learning_rate,
                 )
             for k in range(self.n_components)
-            for model_name, model in self.nonlocals.items()
+            for model_name, model in self.models.items()
         ))
 
-        it = parallel_context(delayed(fn)() for fn in update_fns) if use_parallel \
-                else (fn() for fn in update_fns)
+        it = parallel_gen(update_fns, par_context, ordered=False) \
+            if use_parallel else (fn() for fn in update_fns)
         
         for _ in it: pass
-
-
-    def Estep(
-        self,
-        corpuses,
-        learning_rate = 1.,
-        locus_subsample = 1.,
-        batch_subsample = 1.,
-        *,
-        parallel_context,
-    ):
-
-        latent_vars_model = self.locals_model
-
-        '''
-        A suffstats dictionary with the following structure:
-        sstats[parameter_name][corpus_name] <- suffstats
-        '''
-        sstats = self.get_sstats_dict(corpuses)
-        elbo = 0.
-
-        '''
-        Construct the update function for each sample from the corpus
-        in a generator fashion. Curry the initial gamma value for the 
-        update, but don't call the update function yet - we want to
-        pass this expression to the multiprocessing pool.
-        '''
-        samples, updates = self.locals_model.get_update_fns(
-            corpuses,
-            self,
-            learning_rate=learning_rate,
-            locus_subsample=locus_subsample,
-            batch_subsample=batch_subsample,
-            parallel_context=parallel_context,
-        )
-        
-        for (corpus, sample_name), (sample_suffstats, gamma_new, bound) in zip(
-            samples, 
-            parallel_context(delayed(update)() for update in updates)
-        ):
-                
-                elbo += bound
-                # Update the topic compositions for the sample
-                CS.update_topic_compositions(
-                    corpus, 
-                    sample_name, 
-                    gamma_new
-                )
-                
-                for model_name, model in self.models.items():
-                    '''
-                    The latent variables model handle the observation data format
-                    and the gamma updates. Here, the model state just delegates the
-                    suffstat reduction back to the latent variables model, which
-                    calls the model's reduce_sstats method depending on the data type.
-                    '''
-                    latent_vars_model.reduce_model_sstats(
-                        model,
-                        sstats[model_name + '_sstats'][CS.get_name(corpus)],
-                        corpus,
-                        **sample_suffstats
-                    )
-
-
-        return sstats, elbo

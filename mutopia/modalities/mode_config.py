@@ -4,6 +4,7 @@ from sparse import SparseArray, COO
 import os
 import json
 import numpy as np
+from ..model import MuTopiaModel
 from ..plot.signature_plot import _plot_linear_signature
 from ..utils import categorical_palette
 
@@ -33,12 +34,7 @@ class ModeConfig(ABC):
     
     @property
     @abstractmethod
-    def make_model(self):
-        raise NotImplementedError
-    
-    @property
-    @abstractmethod
-    def sample_params(self):
+    def MuTopiaModel(self) -> MuTopiaModel:
         raise NotImplementedError
     
     
@@ -69,6 +65,20 @@ class ModeConfig(ABC):
             np.array(comps, dtype=float),
             dims = ('component', 'context'),
         )
+    
+
+    @classmethod
+    @abstractmethod
+    def get_context_frequencies(
+        cls,
+        *,
+        regions_file,
+        fasta_file,
+    ):
+        '''
+        This should return a list of context frequencies, which can be either dense or sparse.
+        '''
+        raise NotImplementedError
     
 
     @classmethod

@@ -8,7 +8,7 @@ from ...gtensor import match_dims
 from .base import *
 
 
-class LDAUpdateDense(LocalUpdate):
+class LDAUpdateDense(LocalsModel):
     
     def _convert_sample(self, sample):
         return np.ascontiguousarray(sample.load().data, dtype=self.dtype)
@@ -148,7 +148,7 @@ class LDAUpdateDense(LocalUpdate):
         )
     
 
-    def get_update_fns(
+    def _get_update_fns(
         self,
         corpuses,
         model_state,
@@ -237,7 +237,7 @@ class LDAUpdateDense(LocalUpdate):
         )
     
 
-    def get_deviance_fns(
+    def _get_deviance_fns(
         self,
         corpuses,
         model_state,

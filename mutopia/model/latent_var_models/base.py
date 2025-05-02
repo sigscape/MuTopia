@@ -9,10 +9,11 @@ from numba.extending import get_cython_function_address
 import ctypes
 from functools import wraps
 from ...gtensor.interfaces import *
-from ...utils import ParContext
+from ...utils import ParContext, parallel_map
 from ._dirichlet_update import update_alpha
 from .. import corpus_state as CS
 from ..model_components.base import _svi_update_fn, PrimitiveModel
+
 
 '''
 Numba only works with 2D arrays, not arbitrary tensors. Luckily,
@@ -528,14 +529,14 @@ def AIS_marginal_ll(
 
 
 def random_locals(random_state, n_components):
-    def init_locals(corpus, sample_name):
+    def init_locals(dataset, sample_name):
         return random_state.gamma(100., 1./100., size=(n_components,))
     
     return init_locals
 
 
 
-class LocalUpdate(PrimitiveModel):
+class LocalsModel(PrimitiveModel):
 
     def __init__(self,
             corpuses,
@@ -554,41 +555,117 @@ class LocalUpdate(PrimitiveModel):
         self.dtype = dtype
 
         self.alpha = {
-            CS.get_name(corpus) : np.ones(n_components, dtype=dtype)*prior_alpha
-            for corpus in corpuses
+            CS.get_name(dataset) : np.ones(n_components, dtype=dtype)*prior_alpha
+            for dataset in corpuses
         }
+
+
+    def update_prior(self, corpuses):
+
+        sstats = {
+            CS.get_name(dataset) : [
+                CS.fetch_topic_compositions(dataset, sname)
+                for sname in CS.list_samples(dataset)
+            ]
+            for dataset in corpuses
+        }
+
+        self.partial_fit(sstats, learning_rate=1.)
+
+
+    def Estep(
+        self,
+        corpuses,
+        factor_model,
+        learning_rate = 1.,
+        locus_subsample = 1.,
+        batch_subsample = 1.,
+        *,
+        par_context,
+    ):
+
+        '''
+        A suffstats dictionary with the following structure:
+        sstats[parameter_name][corpus_name] <- suffstats
+        '''
+        sstats = factor_model.get_sstats_dict(corpuses)
+        elbo = 0.
+
+        '''
+        Construct the update function for each sample from the dataset
+        in a generator fashion. Curry the initial gamma value for the 
+        update, but don't call the update function yet - we want to
+        pass this expression to the multiprocessing pool.
+        '''
+        samples, updates = self._get_update_fns(
+            corpuses,
+            factor_model,
+            learning_rate=learning_rate,
+            locus_subsample=locus_subsample,
+            batch_subsample=batch_subsample,
+            par_context=par_context,
+        )
+        
+        for (dataset, sample_name), (sample_suffstats, gamma_new, bound) in zip(
+            samples, 
+            par_context(delayed(update)() for update in updates)
+        ):
+                
+                elbo += bound
+                # Update the topic compositions for the sample
+                CS.update_topic_compositions(
+                    dataset, 
+                    sample_name, 
+                    gamma_new
+                )
+                
+                for model_name, model in factor_model.models.items():
+                    '''
+                    The latent variables model handle the observation data format
+                    and the gamma updates. Here, the model state just delegates the
+                    suffstat reduction back to the latent variables model, which
+                    calls the model's reduce_sstats method depending on the data type.
+                    '''
+                    self.reduce_model_sstats(
+                        model,
+                        sstats[model_name + '_sstats'][CS.get_name(dataset)],
+                        dataset,
+                        **sample_suffstats
+                    )
+
+        return sstats, elbo
 
 
     def predict(
         self, 
-        corpus, 
-        model_state, 
+        dataset, 
+        factor_model, 
         *, 
-        parallel_context
+        par_context
     ):
         self.estep_iterations=10000
         self.difference_tol=5e-5
 
         subsample_rate = (
-            corpus
+            dataset
             .regions
             .context_frequencies
             .sum()
             .item()/
-            model_state.get_genome_size(corpus)
+            factor_model.get_genome_size(dataset)
         )
 
-        samples, update_fns = self.get_update_fns(
-            (corpus,),
-            model_state,
-            parallel_context=parallel_context,
+        samples, update_fns = self._get_update_fns(
+            (dataset,),
+            factor_model,
+            par_context=par_context,
             exposures_fn=random_locals(np.random.RandomState(1776), self.n_components),
             locus_subsample=subsample_rate,
         )
             
         gammas = []
         for s in tqdm(
-            parallel_context(delayed(update_fn)() for update_fn in update_fns),
+            parallel_map(update_fns, par_context),
             total=len(samples),
             ncols=100,
             desc='Estimating contributions',
@@ -604,51 +681,132 @@ class LocalUpdate(PrimitiveModel):
     def predict_sample(
         self,
         sample,
-        corpus,
-        model_state,
+        dataset,
+        factor_model,
     ):
         self.estep_iterations=10000
         self.difference_tol=5e-5
 
         with ParContext(1) as par:
             return self.predict(
-                SampleCorpusFusion(CorpusInterface(corpus), sample),
-                model_state,
-                parallel_context=par,
+                SampleCorpusFusion(CorpusInterface(dataset), sample),
+                factor_model,
+                par_context=par,
             )
+        
+
+    def deviance(
+        self,
+        factor_model,
+        corpuses,
+        exposures_fn=CS.fetch_topic_compositions,
+        par_context=None,
+    ):
+        
+        factor_model.update_normalizers(corpuses, par_context)
+        
+        dev_fns = self._get_deviance_fns(
+            corpuses,
+            factor_model,
+            exposures_fn=exposures_fn,
+            par_context=par_context,
+        )
+        
+        d_fit, d_null = list(zip(*parallel_map(dev_fns, par_context)))
+
+        return (1 - sum(d_fit)/sum(d_null))
 
 
     @abstractmethod
-    def get_update_fns(
+    def _get_update_fns(
         self,
         corpuses,
-        model_state,
+        factor_model,
         learning_rate=1.,
         subsample_rate=1.,
         exposures_fn=CS.fetch_topic_compositions,
         *,
-        parallel_context
+        par_context
     ):
         raise NotImplementedError
     
 
     @abstractmethod
-    def get_deviance_fns(
+    def _get_deviance_fns(
         self,
         corpuses,
-        model_state,
+        factor_model,
         exposures_fn=None,
-        *,
-        parallel_context,
+        par_context=None,
     ):
         raise NotImplementedError
+    
+
+
+    def pearson_residuals(
+        factor_model,
+        corpuses,
+        exposures_fn = CS.fetch_topic_compositions,
+        *,
+        par_context,
+    ):
+        raise NotImplementedError()
+    
+        '''
+        def _reduce_sum(g):
+            return reduce(lambda x,y : x+y, g)
+        
+        _update_normalizers(
+            factor_model, 
+            corpuses, 
+            par_context=par_context
+        )
+
+        # () -> F(dataset) -> F(exposures) -> y_hat
+        get_log_mutation_rate_fn = lambda dataset : partial(
+            factor_model._log_marginalize_mutrate,
+            factor_model._get_log_mutation_rate_tensor(
+                dataset, 
+                par_context=par_context,
+                with_context=True,
+            )
+        )
+
+        def _sample_squared_residuals(obs, log_marginal_mutrate_fn, exposures):
+
+            log_mutrate = log_marginal_mutrate_fn(exposures)
+            
+            ysum = obs.data.sum()
+            
+            y_hat = np.exp(log_mutrate + np.log(ysum))
+
+            return (obs - y_hat)/np.sqrt(y_hat)
+
+
+        def _corpus_squared_residuals(dataset):
+            
+            log_marginal_mutrate_fn = get_log_mutation_rate_fn(dataset)
+            
+            return _reduce_sum(par_context(
+                delayed(_sample_squared_residuals)(
+                    CS.fetch_sample(dataset, sample_name),
+                    log_marginal_mutrate_fn,
+                    exposures_fn(dataset, sample_name)
+                )
+                for sample_name in CS.list_samples(dataset)
+            ))
+        
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            
+            return _reduce_sum(map(_corpus_squared_residuals, corpuses))'''
     
 
     @staticmethod
     def reduce_model_sstats(
         model,
         carry,
-        corpus,
+        dataset,
         **sample_sstats,
     ):
         raise NotImplementedError
@@ -665,21 +823,21 @@ class LocalUpdate(PrimitiveModel):
         ).astype(self.dtype)
     
 
-    def prepare_corpusstate(self, corpus):
+    def prepare_corpusstate(self, dataset):
         return dict(
             topic_compositions = DataArray(
-                self.init_locals( len(CS.list_samples(corpus)) ),
+                self.init_locals( len(CS.list_samples(dataset)) ),
                 dims=('component','sample')
             )
         )
 
-    def spawn_sstats(self, corpus):
+    def spawn_sstats(self, dataset):
         return []
 
     @staticmethod
     def reduce_sparse_sstats(
         sstats, 
-        corpus,
+        dataset,
         *,
         gamma,
         **kw,
@@ -691,7 +849,7 @@ class LocalUpdate(PrimitiveModel):
     @staticmethod
     def reduce_dense_sstats(
         sstats, 
-        corpus,
+        dataset,
         *,
         gamma,
         **kw,

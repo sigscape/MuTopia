@@ -5,13 +5,17 @@ import matplotlib.pyplot as plt
 from tqdm import trange
 from ..utils import *
 from .model_components import *
-from .eval import deviance_locus, pearson_residuals, _update_normalizers
 from .latent_var_models import *
 from ..plot.coef_matrix_plot import _plot_interaction_matrix
 from ..gtensor import *
+from .optim import fit_model
+from .model_state import FactorModel
+from .latent_var_models.base import LocalsModel
 from functools import partial  
 from joblib import dump, delayed
 from collections import defaultdict
+from sklearn.base import BaseEstimator
+from abc import ABC, abstractmethod
 import typing
    
 '''
@@ -19,19 +23,62 @@ The Model class is a wrapper around a trained model state object,
 and provides the high-level interface for interacting with the model.
 This is the entry point for the user to interact with and annotate data.
 '''
-class Model:
+class MuTopiaModel(ABC, BaseEstimator):
 
-    def __init__(
+    @abstractmethod
+    def sample_params(
         self,
-        model_state,
-        modality,
+        study,
+        trial,
+        extensive=0,
     ):
-        self.model_state_ = model_state
-        self.modality_ = modality
+        pass
+
+
+    @abstractmethod
+    def _init_model(**params) -> tuple[FactorModel, LocalsModel]:
+        pass
+
+
+    def fit(
+        self,
+        *train_datasets,
+        test_datasets=None,
+    ):
+        
+        self.modality_ = train_datasets[0].modality()
+
+        if len(train_datasets) == 0:
+            raise ValueError('At least one dataset is required to fit the model.')
+
+        if test_datasets is None:
+            train_datasets, test_datasets = list(zip(*map(
+                lambda dataset : train_test_split(dataset, self.test_chroms), train_datasets
+            )))
+
+        random_state = np.random.RandomState(self.seed)
+        
+        models = self._init_model(
+            train_datasets,
+            test_datasets,
+            random_state,
+            **self.get_params()
+        )
+
+        (self.factor_model_, self.locals_model_, self.test_scores_) = \
+            fit_model(
+                train_datasets,
+                test_datasets,
+                random_state,
+                *models,
+                **self.get_params()
+            )
+        
+        return self
 
     @property
     def n_components(self):
-        return self.model_state_.n_components
+        return self.num_components
     
     @property
     def component_names(self):
@@ -50,13 +97,6 @@ class Model:
         except ValueError:
             raise ValueError(f'Component {component_name} not found in model.')
         
-    def _renormalize_model(self, corpus):
-        with ParContext(1) as par:
-            _update_normalizers(
-                self.model_state_,
-                (corpus,),
-                parallel_context=par,
-            )
 
     def rename_components(self, corpus, names : typing.List[str]):
         if not len(names) == self.n_components:
@@ -83,23 +123,23 @@ class Model:
             check_dims(corpus, self.model_state_)
 
 
-
     def setup_corpus(self, corpus):
         
         logger.info('Setting up dataset state ...')
 
-        corpus = CS.init_corpusstate(corpus, self.model_state_)
+        corpus = CS.init_corpusstate(corpus, self.factor_model_, self.locals_model_)
         
         with ParContext(1) as par:
             CS.update_corpusstate(
-                corpus, self.model_state_, 
+                corpus, 
+                self.factor_model_,
                 from_scratch=True,
-                parallel_context=par,
+                par_context=par,
             )
         
         CS.update_normalizers(
             corpus, 
-            self.model_state_.get_normalizers(corpus)
+            self.factor_model_.get_normalizers(corpus)
         )
 
         logger.info('Done ...')
@@ -108,7 +148,7 @@ class Model:
 
     def save(self, path):
 
-        for model in self.model_state_.models.values():
+        for model in self.factor_model_.models.values():
             model.prepare_to_save()
 
         dump(self, path)
@@ -126,7 +166,7 @@ class Model:
         component = self._get_k(component)
 
         return self.modality_.plot(
-            self.model_state_.format_signature(component, normalization=normalization), 
+            self.factor_model_.format_signature(component, normalization=normalization), 
             *select,
             **kwargs
         )
@@ -143,7 +183,7 @@ class Model:
 
         component = self._get_k(component)
 
-        signatures = self.model_state_.format_signature(component, normalization=normalization)
+        signatures = self.factor_model_.format_signature(component, normalization=normalization)
         n_rows = len(signatures.mesoscale_state)
 
         state_groups = defaultdict(list)
@@ -214,12 +254,12 @@ class Model:
 
         flatten = partial(self.modality_._flatten_observations)
 
-        interactions = self.model_state_.format_interactions(component)
+        interactions = self.factor_model_.format_interactions(component)
         
         shared_effects = interactions.sel(context='Shared effect').to_pandas()
         interactions = flatten(interactions.drop_sel(context='Shared effect')).to_pandas()
 
-        signature = self.model_state_.format_signature(
+        signature = self.factor_model_.format_signature(
             component, 
             normalization=normalization
         )
@@ -278,11 +318,11 @@ class Model:
             corpus = self.setup_corpus(corpus)
 
         with ParContext(threads, verbose=verbose) as par:
-            contributions = self.model_state_.locals_model\
+            contributions = self.locals_model\
                 .predict(
                     corpus,
-                    self.model_state_,
-                    parallel_context=par
+                    self.factor_model_,
+                    par_context=par
                 )
         
         corpus = CorpusInterface(corpus)
@@ -312,9 +352,9 @@ class Model:
             corpus = self.setup_corpus(corpus)
 
         with ParContext(threads) as par:
-            lmrt = self.model_state_._get_log_mutation_rate_tensor(
+            lmrt = self.factor_model_._get_log_mutation_rate_tensor(
                 corpus,
-                parallel_context=par,
+                par_context=par,
                 with_context=False,
             )
 
@@ -360,7 +400,7 @@ class Model:
             )
             
         marginal = \
-            self.model_state_._log_marginalize_mutrate(
+            self.factor_model_._log_marginalize_mutrate(
                 np.log(corpus['component_distributions']),
                 marginal_exposures
             )
@@ -406,7 +446,7 @@ class Model:
         else:
             subset = corpus
         
-        locus_model = self.model_state_.models['theta_model']
+        locus_model = self.factor_model_.models['theta_model']
         X = locus_model._fetch_feature_matrix(subset)
 
         background_idx = np.random.RandomState(0).choice(
@@ -474,11 +514,11 @@ class Model:
             corpus = self.setup_corpus(corpus)
 
         with ParContext(threads) as par:
-            return deviance_locus(
-                self.model_state_,
+            return self.locals_model_.deviance(
+                self.factor_model_,
                 (corpus,),
                 exposures_fn=using_exposures_from(corpus) if exposures is None else exposures,
-                parallel_context=par,
+                par_context=par,
             ).item()
 
 
@@ -501,9 +541,9 @@ class Model:
         if not CS.has_corpusstate(corpus):
             corpus = self.setup_corpus(corpus)
 
-        ll_fns = self.model_state_.locals_model.get_marginal_ll_fns(
+        ll_fns = self.locals_model.get_marginal_ll_fns(
             (corpus,),
-            self.model_state_,
+            self.factor_model_,
             alpha=alpha,
             steps=steps,
         )
@@ -528,23 +568,25 @@ class Model:
         exposures=None,
         threads=1,
     ):
-        self._check_corpus(corpus)
+        raise NotImplementedError('This method is not implemented yet.')
+    
+        '''self._check_corpus(corpus)
 
         if not CS.has_corpusstate(corpus):
             corpus = self.setup_corpus(corpus)
         
         with ParContext(threads) as par:
             residuals = pearson_residuals(
-                self.model_state_,
+                self.factor_model_,
                 (corpus,),
                 exposures_fn=using_exposures_from(corpus) if exposures is None else exposures,
-                parallel_context=par,
+                par_context=par,
             )
         
         corpus['pearson_residuals'] = residuals.astype(np.float32)
         logger.info('Added key: "residuals"')
 
-        return corpus
+        return corpus'''
     
 
     def format_signature(self, component, normalization='global'):
@@ -552,7 +594,7 @@ class Model:
         component = self._get_k(component)
 
         return self.modality_._flatten_observations(
-            self.model_state_.format_signature(
+            self.factor_model_.format_signature(
                 component,
                 normalization=normalization
             )
@@ -560,7 +602,7 @@ class Model:
     
     @property
     def alpha_(self):
-        return self.model_state_.locals_model.alpha
+        return self.locals_model_.alpha
     
 
     def execel_report(self, corpus, output):

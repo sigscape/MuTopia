@@ -5,13 +5,15 @@ structure of the datasets.
 '''
 import xarray as xr
 from ..gtensor import *
+from ..utils import parallel_gen
 import numpy as np
-from joblib import delayed
+from functools import partial
 
 
 def init_corpusstate(
     dataset,
-    model_state,
+    factor_model,
+    locals_model,
 ):
 
     if 'State' in dataset.sections.names:
@@ -22,7 +24,7 @@ def init_corpusstate(
             dataset = dataset.drop_dims('feature')
 
     sample_names = dataset.list_samples()
-    n_components = model_state.n_components
+    n_components = factor_model.n_components
     genome_size = (
         dataset.sections.regions
         .context_frequencies
@@ -37,11 +39,10 @@ def init_corpusstate(
         ),
     }
 
-    for model in model_state.models.values():
-        state_elements.update(
-            model.prepare_corpusstate(dataset)
-        )
+    for model in factor_model.models.values():
+        state_elements.update(model.prepare_corpusstate(dataset))
 
+    state_elements.update(locals_model.prepare_corpusstate(dataset))
     state_elements = {'State/' + k : v for k, v in state_elements.items()}
 
     dataset = (
@@ -58,14 +59,12 @@ def update_corpusstate(
     dataset,
     model_state,
     from_scratch=False,
-    *,
-    parallel_context,
+    par_context=None,
 ):
-    for _ in parallel_context(
-        delayed(model.update_corpusstate)(
-            dataset,
-            from_scratch=from_scratch
-        ) for model in model_state.models.values()
+    for _ in parallel_gen(
+        (partial(model.update_corpusstate, dataset, from_scratch=from_scratch) for model in model_state.models.values()),
+        par_context,
+        ordered=False,
     ):
         pass
     

@@ -1,30 +1,30 @@
 
 from . import corpus_state as CS
-from .eval import *
 from ..utils import *
 from ..gtensor import *
 from tqdm import trange
+from functools import partial
+from .model_state import FactorModel
+from .latent_var_models.base import LocalsModel
 
 
 def VI_step(
-    model_state,
+    factor_model : FactorModel,
+    locals_model : LocalsModel,
     corpuses,
     update_prior=True,
     learning_rate=1.,
     *,
     test_score_fn,
-    parallel_context,
+    par_context,
 ):
     
     args = dict(
         corpuses=corpuses,
-        parallel_context=parallel_context,
+        par_context=par_context,
     )
     
-    offsets = model_state.get_exp_offsets_dict(
-        **args,
-        norm_update_fn=model_state._update_normalizer
-    )
+    offsets, normalizers = factor_model.get_exp_offsets_dict(**args)
 
     '''
     In the previous "offsets" step, the normalizers were updated
@@ -32,7 +32,14 @@ def VI_step(
     on the full data set.
     '''
     for corpus in corpuses:
-        CS.update_normalizers(corpus, model_state.get_normalizers(corpus))
+        CS.update_normalizers(
+            corpus,  
+            factor_model._step_normalizers(
+                corpus,
+                normalizers[CS.get_name(corpus)],
+                learning_rate=learning_rate,
+            )
+        )
 
     '''
     The normalizers are updated in the previous function
@@ -42,18 +49,19 @@ def VI_step(
     Therefore, this is the best time to evaluate the loss functions.
     The elbo is calculated during the E-step because it's convenient.
     '''
-    stats, elbo = model_state.Estep(**args)
+    stats, elbo = locals_model.Estep(**args)
     '''
     We're agnostic to the form of the test set evaluation function,
     but it should be a function of the model state that returns the
     test set score.
     '''
     test_elbo = test_score_fn(
-        model_state,
-        parallel_context=parallel_context
+        factor_model,
+        locals_model,
+        par_context=par_context
     )
     
-    model_state.Mstep(
+    factor_model.Mstep(
         offsets=offsets,
         sstats=stats,
         update_prior=update_prior,
@@ -63,9 +71,9 @@ def VI_step(
     for corpus in corpuses:
         CS.update_corpusstate(
             corpus, 
-            model_state, 
+            factor_model, 
             from_scratch=False,
-            parallel_context=parallel_context,
+            par_context=par_context,
         )
 
     return elbo, test_elbo
@@ -73,12 +81,13 @@ def VI_step(
 
 
 def SVI_step(
-    model_state,
+    factor_model : FactorModel,
+    locals_model : LocalsModel,
     corpuses,
     update_prior=True,
     *,
     test_score_fn,
-    parallel_context,
+    par_context,
     batch_generator,
     learning_rate,
     locus_subsample,
@@ -92,34 +101,36 @@ def SVI_step(
     
     args = dict(
         corpuses=slices,
-        parallel_context=parallel_context,
+        par_context=par_context,
     )
 
     '''
     Get the offsets from the sliced data.
     '''
-    offsets = timer_wrapper(model_state.get_exp_offsets_dict)(
-        **args,
-        norm_update_fn=partial(
-            model_state._update_normalizer, 
-            learning_rate=learning_rate,
-            subsample_rate=locus_subsample
-        ),
-    )
+    offsets, normalizers = timer_wrapper(factor_model.get_exp_offsets_dict)(**args)
 
     '''
     In the previous "offsets" step, the normalizers were updated
     on a subset of the data. Now we need to transfer this information
     to the full data set (this is just a copying step, no computation).
     '''
-    for corpus in corpuses:
-        CS.update_normalizers(corpus,  model_state.get_normalizers(corpus))
+    for corpus in list(corpuses) + list(slices):
+        CS.update_normalizers(
+            corpus,  
+            factor_model._step_normalizers(
+                corpus,
+                normalizers[CS.get_name(corpus)],
+                learning_rate=learning_rate,
+                subsample_rate=locus_subsample,
+            )
+        )
     
     '''
     Okay, now we can calculate the sufficient statistics.
     '''
-    sstats, elbo = timer_wrapper(model_state.Estep)(
+    sstats, elbo = timer_wrapper(locals_model.Estep)(
         **args, 
+        factor_model=factor_model,
         learning_rate=learning_rate,
         locus_subsample=locus_subsample or 1.,
         batch_subsample=batch_subsample or 1.,
@@ -129,15 +140,12 @@ def SVI_step(
     Calculate the bounds here because the normalizers and 
     locals have been updated for some set of model parameters.
     '''
-    test_score = timer_wrapper(test_score_fn, 'test_score')(
-        model_state, 
-        parallel_context=parallel_context
-    )
+    test_score = timer_wrapper(test_score_fn, 'test_score')(par_context=par_context)
 
     '''
     Update global model parameters
     '''
-    timer_wrapper(model_state.Mstep)(
+    timer_wrapper(factor_model.Mstep)(
         offsets=offsets,
         sstats=sstats,
         update_prior=update_prior,
@@ -155,9 +163,9 @@ def SVI_step(
     for corpus in corpuses:
         timer_wrapper(CS.update_corpusstate)(
             corpus, 
-            model_state, 
+            factor_model, 
             from_scratch=False,
-            parallel_context=parallel_context,
+            par_context=par_context,
         )
 
     return elbo, test_score
@@ -219,8 +227,9 @@ def _should_stop(stop_condition, scores):
 def fit_model( 
     train_corpuses,
     test_corpuses,
-    model_state,
     random_state,
+    factor_model : FactorModel,
+    locals_model : LocalsModel,
     # optimization settings
     empirical_bayes = True,
     begin_prior_updates = 50,
@@ -236,15 +245,18 @@ def fit_model(
     eval_every=10,
     verbose=0,
     time_limit=None,
-):
+    **kw,
+) -> tuple[FactorModel, LocalsModel, list]:
+    
     start_time = time.time()
+    models = (factor_model, locals_model)
     ##
     # If the data is sparse, we should make sure it's in the right format.
     # GCSX with locus and sample dimensions compressed.
     ##
     logger.info('Validating corpuses...')
     for corpus in train_corpuses + test_corpuses:
-        check_dims(corpus, model_state)
+        check_dims(corpus, factor_model)
         check_corpus(corpus)
 
     # Ensure all train corpuses have different names
@@ -265,14 +277,15 @@ def fit_model(
     check_feature_consistency(*train_corpuses, *test_corpuses)
 
     logger.info('Preprocessing training corpuses...')
-    train_corpuses = [CS.init_corpusstate(prepare_data(corpus), model_state) for corpus in train_corpuses]
+    train_corpuses = [CS.init_corpusstate(prepare_data(corpus), *models) for corpus in train_corpuses]
 
     logger.info('Preprocessing testing corpuses...')
-    test_corpuses = [CS.init_corpusstate(prepare_data(corpus), model_state) for corpus in test_corpuses]
+    test_corpuses = [CS.init_corpusstate(prepare_data(corpus), *models) for corpus in test_corpuses]
 
     test_score_fn = partial(
-        deviance_locus,
-        corpuses=test_corpuses,
+        locals_model.deviance,
+        factor_model,
+        test_corpuses,
         exposures_fn=CS.using_exposures_from(*train_corpuses)
     )
     
@@ -281,7 +294,6 @@ def fit_model(
     to decrease the computational burden.
     '''
     dummy_score_fn = lambda *x, **y : np.nan
-    train_scorer = lambda x : -x # we don't really care about train score - test score is what matters
 
     lr_schedule = partial(learning_rate_schedule, tau, kappa)
 
@@ -291,8 +303,8 @@ def fit_model(
         logger.warning('Using batch variational inference.')
         step_fn = partial(
             VI_step, 
-            model_state=model_state,
-            corpuses=train_corpuses,
+            *models,
+            train_corpuses,
         )
     else:
 
@@ -306,8 +318,8 @@ def fit_model(
 
         step_fn = partial(
             SVI_step, 
-            model_state=model_state,
-            corpuses=train_corpuses,
+            *models,
+            train_corpuses,
             batch_generator=subsampler,
             **subsample_rates,
         )
@@ -318,7 +330,6 @@ def fit_model(
     if not time_limit is None:
         logger.info(f'Training will stop after {time_limit} minutes.')
 
-    train_scores = []
     test_scores = []
     prior_has_been_updated = False
 
@@ -353,7 +364,7 @@ def fit_model(
                     prior_has_been_updated = True
 
                 train_score, test_score = timer_wrapper(step_fn, 'train_step')(
-                    parallel_context=par,
+                    par_context=par,
                     update_prior = update_prior,
                     learning_rate = lr_schedule(epoch),
                     test_score_fn=test_score_fn if evaluate_test else dummy_score_fn,
@@ -373,12 +384,10 @@ def fit_model(
                 for test_corpus in test_corpuses:
                     CS.update_corpusstate(
                         test_corpus,
-                        model_state,
+                        factor_model,
                         from_scratch=False,
-                        parallel_context=par,
+                        par_context=par,
                     )
-
-                train_scores.append(train_scorer(train_score))
                 
                 if evaluate_test:
                     test_scores.append(test_score)
@@ -389,7 +398,7 @@ def fit_model(
                 })
 
                 if not callback is None:
-                    callback(model_state, train_scores, test_scores)
+                    callback(factor_model, test_scores)
 
                 if stop_fn(test_scores):
                     logger.info('Early stopping criterion met. The model has converged.')
@@ -409,15 +418,15 @@ def fit_model(
     if num_epochs > 0:
         logger.info('Finalizing models ...')
 
-        for model in model_state.nonlocals.values():
+        for model in factor_model.models.values():
             model.post_fit(train_corpuses)
 
         if not empirical_bayes:
             logger.info('Updating priors ...')
-            model_state.optim_prior(train_corpuses)
+            locals_model.optim_prior(train_corpuses)
 
     return (
-        model_state,
-        train_scores,
+        factor_model,
+        locals_model,
         test_scores,
     )

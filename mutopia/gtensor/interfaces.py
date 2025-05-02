@@ -1,6 +1,6 @@
 import os
 import mutopia.gtensor.disk_interface as disk
-
+from .gtensor import train_test_split
 
 def load_dataset(corpus, with_samples=True, with_state=True):
     """
@@ -41,21 +41,7 @@ def lazy_train_test_load(corpus, test_chroms):
 
 
 def eager_train_test_load(corpus, test_chroms):
-
-    corpus = eager_load(corpus)
-
-    test_mask = corpus.regions.chrom.isin(test_chroms)
-    if test_mask.sum() == 0:
-        raise ValueError(
-            f'None of the chromosomes in {",".join(test_chroms)} are present in the corpus. '
-        )
-
-    train = corpus.isel(locus=~test_mask)
-    test = corpus.isel(locus=test_mask)
-
-    del corpus
-
-    return train, test
+    return train_test_split(eager_load(corpus))
 
 
 class CorpusInterface:

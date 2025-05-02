@@ -111,12 +111,15 @@ def ParContext(n_jobs, verbose=0, ordered=True):
     )
 
 
-def parallel_gen(function_generator, threads, ordered=True):
-    with ParContext(threads, ordered=ordered) as par:
-        for x in par(
-            delayed(fn)() for fn in function_generator
-        ):
+def parallel_gen(function_generator, par_context=None, threads=1, ordered=True):
+    with (par_context or ParContext(threads, ordered=ordered)) as par:
+        for x in par(delayed(fn)() for fn in function_generator):
             yield x
+
+
+def parallel_map(function_generator, par_context=None, threads=1, ordered=True):
+    with (par_context or ParContext(threads, ordered=ordered)) as par:
+        return list(par(delayed(fn)() for fn in function_generator))
 
 
 def using_exposures_from(corpus):

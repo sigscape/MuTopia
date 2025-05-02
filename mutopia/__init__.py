@@ -10,4 +10,4 @@ from mutopia.utils import using_exposures_from
 
 SBS=Modality.SBS.get_config()
 
-__version__ = '1.0.0a2'
+__version__ = '1.0.0a4'

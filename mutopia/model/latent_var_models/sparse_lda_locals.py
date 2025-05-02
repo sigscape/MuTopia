@@ -7,10 +7,11 @@ from .. import corpus_state as CS
 from ...gtensor import dims_except_for
 from math import prod
 from .base import *
+from ...utils import parallel_map
 import warnings
 
 
-class LDAUpdateSparse(LocalUpdate):
+class LDAUpdateSparse(LocalsModel):
 
 
     ##
@@ -64,13 +65,13 @@ class LDAUpdateSparse(LocalUpdate):
     @classmethod
     def _get_log_context_effect(
         self,
-        corpus,
+        dataset,
         *,
         locus,
         **idx_dict,
     ):
         
-        freqs = CS.get_regions(corpus).context_frequencies\
+        freqs = CS.get_regions(dataset).context_frequencies\
                     .transpose(...,'locus')
         
         idx_arrs = [idx_dict[dim] for dim in freqs.dims[:-1]]
@@ -79,14 +80,14 @@ class LDAUpdateSparse(LocalUpdate):
             warnings.simplefilter("ignore")
             
             return np.log(freqs.data[*idx_arrs, locus]) \
-                + np.log(CS.get_regions(corpus).exposures.data[locus])
+                + np.log(CS.get_regions(dataset).exposures.data[locus])
 
 
     @classmethod
     def _conditional_observation_likelihood(
         cls,
-        corpus,
-        model_state,
+        dataset,
+        factor_model,
         logsafe=True,
         *,
         weights,
@@ -97,10 +98,10 @@ class LDAUpdateSparse(LocalUpdate):
         # What's going on here: we have the normalized log mutation rate for each signature, configuration, context, locus.
         # For the mutations in this sample, we select over these axes.
         ##
-        logp_normalizer = CS.fetch_normalizers(corpus)[:,None]
+        logp_normalizer = CS.fetch_normalizers(dataset)[:,None]
 
         offset = cls._get_log_context_effect(
-            corpus,
+            dataset,
             **idx_dict
         )
 
@@ -110,8 +111,8 @@ class LDAUpdateSparse(LocalUpdate):
             logp_X = reduce(
                 lambda x,y: x+y,
                 (
-                    model.predict_sparse(corpus, **idx_dict)
-                    for model in model_state.nonlocals.values()
+                    model.predict_sparse(dataset, **idx_dict)
+                    for model in factor_model.models.values()
                 ),
                 logp_normalizer \
                     + offset
@@ -179,28 +180,28 @@ class LDAUpdateSparse(LocalUpdate):
         locus_subsample=1.,
         batch_subsample=1.,
         *,
-        corpus,
+        dataset,
         sample,
-        model_state,
+        factor_model,
     ):
         '''
         Why am I doing it this way? - one could pass 
         the update function pointfree to some multiprocessing
         generator.
 
-        I took pains to prevent the large corpus and model_state 
+        I took pains to prevent the large dataset and factor_model 
         objects from being pulled into the scope of the update function.
         '''
         
         # 1. get the information we need from the sample
         sample_dict = self._convert_sample(sample, dtype=self.dtype)
         weights = sample_dict['weights']/locus_subsample
-        alpha = np.ascontiguousarray(self.alpha[CS.get_name(corpus)])
+        alpha = np.ascontiguousarray(self.alpha[CS.get_name(dataset)])
 
         conditional_likelihood = \
             self._conditional_observation_likelihood(
-                corpus, 
-                model_state,
+                dataset, 
+                factor_model,
                 **sample_dict
             ).astype(self.dtype, copy=False)
         
@@ -235,16 +236,15 @@ class LDAUpdateSparse(LocalUpdate):
         return svi_update
     
 
-    def get_update_fns(
+    def _get_update_fns(
         self,
         corpuses,
-        model_state,
+        factor_model,
         learning_rate=1.,
         locus_subsample=1.,
         batch_subsample=1.,
         exposures_fn=CS.fetch_topic_compositions,
-        *,
-        parallel_context,
+        par_context=None,
     ):
         '''
         In this case, each update function can be computed independently,
@@ -254,23 +254,23 @@ class LDAUpdateSparse(LocalUpdate):
         '''
 
         samples = [
-            (corpus, sample_name)
-            for corpus in corpuses
-            for sample_name in CS.list_samples(corpus)
+            (dataset, sample_name)
+            for dataset in corpuses
+            for sample_name in CS.list_samples(dataset)
         ]
 
         updates = (
             self._get_update_fn(
-                exposures_fn(corpus, sample_name),
+                exposures_fn(dataset, sample_name),
                 sample=sample,
-                corpus=corpus,
-                model_state=model_state,
+                dataset=dataset,
+                factor_model=factor_model,
                 learning_rate=learning_rate,
                 locus_subsample=locus_subsample,
                 batch_subsample=batch_subsample,
             )
-            for corpus in corpuses
-            for (sample_name, sample) in CS.iter_samples(corpus)
+            for dataset in corpuses
+            for (sample_name, sample) in CS.iter_samples(dataset)
         )
 
         return (samples, updates)
@@ -279,8 +279,8 @@ class LDAUpdateSparse(LocalUpdate):
     def posterior_assign_sample(
         self,
         sample,
-        corpus,
-        model_state,
+        dataset,
+        factor_model,
         alpha=None,
         steps=5000,
         warmup=1000,
@@ -288,14 +288,14 @@ class LDAUpdateSparse(LocalUpdate):
     ):
         
         if alpha is None:
-            alpha = self.alpha[CS.get_name(corpus)]
+            alpha = self.alpha[CS.get_name(dataset)]
 
         sample_dict = self._convert_sample(sample, dtype=self.dtype)
         
         conditional_likelihood = \
             self._conditional_observation_likelihood(
-                corpus, 
-                model_state,
+                dataset, 
+                factor_model,
                 logsafe=False, # we want the actual likelihood, don't remove the max for numerical stability
                 **sample_dict
             ).astype(self.dtype, copy=False)
@@ -315,12 +315,11 @@ class LDAUpdateSparse(LocalUpdate):
         return p_z, gammas
     
     
-
-    def _marginal_ll_sample(
+    def marginal_ll_sample(
         self,
-        corpus,
+        dataset,
         sample,
-        model_state,
+        factor_model,
         alpha,
         steps=100000,
         seed=42,
@@ -332,8 +331,8 @@ class LDAUpdateSparse(LocalUpdate):
         sample_dict = self._convert_sample(sample, dtype=self.dtype)
         # KxI - I=number of mutations, K=number of signatures
         conditional_likelihood = self._conditional_observation_likelihood(
-            corpus,
-            model_state,
+            dataset,
+            factor_model,
             **sample_dict,
             logsafe=False,
         )
@@ -347,10 +346,10 @@ class LDAUpdateSparse(LocalUpdate):
         )
     
 
-    def get_marginal_ll_fns(
+    def _get_marginal_ll_fns(
         self,
         corpuses,
-        model_state,
+        factor_model,
         alpha=None,
         steps=100000,
         seed=42,
@@ -358,16 +357,16 @@ class LDAUpdateSparse(LocalUpdate):
 
         marginal_ll_fns = (
             partial(
-                self._marginal_ll_sample,
-                corpus,
+                self.marginal_ll_sample,
+                dataset,
                 sample,
-                model_state,
-                alpha=self.alpha[CS.get_name(corpus)] if alpha is None else alpha,
+                factor_model,
+                alpha=self.alpha[CS.get_name(dataset)] if alpha is None else alpha,
                 steps=steps,
                 seed=seed,
             )
-            for corpus in corpuses
-            for (_, sample) in CS.iter_samples(corpus)
+            for dataset in corpuses
+            for (_, sample) in CS.iter_samples(dataset)
         )
 
         return marginal_ll_fns
@@ -377,9 +376,9 @@ class LDAUpdateSparse(LocalUpdate):
         self,
         fn,
         *,
-        corpus,
+        dataset,
         sample,
-        model_state,
+        factor_model,
         gamma,
         **kw,
     ):
@@ -388,8 +387,8 @@ class LDAUpdateSparse(LocalUpdate):
         
         conditional_likelihood = \
             self._conditional_observation_likelihood(
-                corpus, 
-                model_state,
+                dataset, 
+                factor_model,
                 logsafe=False, # we want the actual likelihood, don't remove the max for numerical stability
                 **sample_dict
             ).astype(self.dtype, copy=False)
@@ -398,14 +397,14 @@ class LDAUpdateSparse(LocalUpdate):
 
         # the context frequencies are missing dimensions that the observations have ...
         log_context_effect = self._get_log_context_effect(
-            corpus,
+            dataset,
             **sample_dict
         )
 
         return fn(
-            corpus,
+            dataset,
             sample,
-            model_state,
+            factor_model,
             gamma=gamma,
             conditional_likelihood=conditional_likelihood,
             weights=weights,
@@ -415,11 +414,11 @@ class LDAUpdateSparse(LocalUpdate):
         )
 
 
-    def _sample_deviance(
+    def _deviance_sample(
         self,
-        corpus,
+        dataset,
         sample,
-        model_state,
+        factor_model,
         *,
         gamma,
         conditional_likelihood,
@@ -432,9 +431,9 @@ class LDAUpdateSparse(LocalUpdate):
         contributions = np.ascontiguousarray(gamma/np.sum(gamma))        
 
         # 1. figure out the missing dimensions
-        missing_dims = dims_except_for(sample.dims, *CS.get_regions(corpus).context_frequencies.dims)
+        missing_dims = dims_except_for(sample.dims, *CS.get_regions(dataset).context_frequencies.dims)
         # 2. figure out the number of possible types of observations missing
-        n_types = prod(corpus.sizes[dim] for dim in missing_dims)
+        n_types = prod(dataset.sizes[dim] for dim in missing_dims)
         # 3. penalize the log context effect for the missing dimensions
 
         # saturated
@@ -451,43 +450,43 @@ class LDAUpdateSparse(LocalUpdate):
         )
     
 
-    def get_deviance_fns(
+    def _get_deviance_fns(
         self,
         corpuses,
-        model_state,
+        factor_model,
         exposures_fn=CS.fetch_topic_compositions,
-        *,
-        parallel_context,
+        par_context=None,
     ):
     
         context_sums = {
-            CS.get_name(corpus) : np.sum(
-                CS.get_regions(corpus).context_frequencies.data,
+            CS.get_name(dataset) : np.sum(
+                CS.get_regions(dataset).context_frequencies.data,
             )
-            for corpus in corpuses
+            for dataset in corpuses
         }
 
         deviance_fns = (
             partial(
                 self._apply_per_sample,
-                self._sample_deviance,
-                corpus=corpus,
-                model_state=model_state,
+                self._deviance_sample,
+                dataset=dataset,
+                factor_model=factor_model,
                 sample=sample,
-                gamma=exposures_fn(corpus, sample_name),
-                context_sum=context_sums[CS.get_name(corpus)],
+                gamma=exposures_fn(dataset, sample_name),
+                context_sum=context_sums[CS.get_name(dataset)],
             )
-            for corpus in corpuses
-            for (sample_name, sample) in CS.iter_samples(corpus)
+            for dataset in corpuses
+            for (sample_name, sample) in CS.iter_samples(dataset)
         )
 
-        return deviance_fns    
+        return deviance_fns
+    
 
     def _deviance_residuals(
         self,
-        corpus,
+        dataset,
         sample,
-        model_state,
+        factor_model,
         *,
         gamma,
         conditional_likelihood,
@@ -508,25 +507,24 @@ class LDAUpdateSparse(LocalUpdate):
         return self._unconvert_sample(sample, sample_dict, resid)
 
 
-    def get_residual_fns(
+    def _get_residual_fns(
         self,
         corpuses,
-        model_state,
+        factor_model,
         exposures_fn=CS.fetch_topic_compositions,
-        *,
-        parallel_context,
+        par_context=None,
     ):
         residuals_fns = (
             partial(
                 self._apply_per_sample,
                 self._deviance_residuals,
-                corpus=corpus,
-                model_state=model_state,
+                dataset=dataset,
+                factor_model=factor_model,
                 sample=sample,
-                gamma=exposures_fn(corpus, sample_name),
+                gamma=exposures_fn(dataset, sample_name),
             )
-            for corpus in corpuses
-            for (sample_name, sample) in CS.iter_samples(corpus)
+            for dataset in corpuses
+            for (sample_name, sample) in CS.iter_samples(dataset)
         )
 
         return residuals_fns    
@@ -536,11 +534,11 @@ class LDAUpdateSparse(LocalUpdate):
     def reduce_model_sstats(
         model, 
         carry, 
-        corpus, 
+        dataset, 
         **sample_sstats
     ):
         return model.reduce_sparse_sstats(
                 carry, 
-                corpus,
+                dataset,
                 **sample_sstats
             )

@@ -53,7 +53,7 @@ def GTensor(
 
 
 def _add_feature(
-    corpus,
+    dataset,
     feature,
     group: str = "default",
     *,
@@ -64,7 +64,7 @@ def _add_feature(
     if not isinstance(feature, xr.DataArray):
         raise ValueError("feature must be an xarray.DataArray")
 
-    check_structure(corpus)
+    check_structure(dataset)
 
     try:
         FeatureType(normalization)
@@ -81,7 +81,7 @@ def _add_feature(
             f'The feature {name} has dtype {feature.data.dtype} but must be one of {", ".join(map(repr, allowed_types))}.'
         )
 
-    corpus.features[name] = xr.DataArray(
+    dataset.features[name] = xr.DataArray(
         data=np.array(arr),
         dims=("locus"),
         attrs={
@@ -91,24 +91,24 @@ def _add_feature(
     )
     logger.info(f'Added key to features: "{name}"')
 
-    return corpus
+    return dataset
 
 
 def _add_sample(
-    corpus,
+    dataset,
     sample: xr.DataArray,
     *,
     name: str,
 ):
-    check_structure(corpus)
+    check_structure(dataset)
     ## input validation
     if not isinstance(sample, xr.DataArray):
         raise ValueError("sample must be an xarray.DataArray")
 
-    if "sample" in corpus.dims:
+    if "sample" in dataset.dims:
         sample = sample.squeeze()
 
-    required_dims = set(corpus.modality().dims).union({"locus"})
+    required_dims = set(dataset.modality().dims).union({"locus"})
 
     if not set(sample.dims) == required_dims:
         raise ValueError(f"sample dims must be {required_dims}")
@@ -118,7 +118,7 @@ def _add_sample(
 
     root = xr.concat(
         [
-            corpus.to_dataset(),
+            dataset.to_dataset(),
             xr.Dataset({"X": sample}, coords={"sample": [name]}),
         ],
         dim="sample",
@@ -126,26 +126,42 @@ def _add_sample(
 
     root.X.ascsr("sample", "locus")
 
-    corpus = DataTree(data=root, children=corpus.children)
+    dataset = DataTree(data=root, children=dataset.children)
 
     logger.info(f'Added sample to .X: "{name}"')
 
-    return corpus
+    return dataset
 
 
-def get_explanation(corpus, component):
+def train_test_split(dataset, test_chroms: Union[str, List[str]]):
+
+    test_mask = dataset.sections.regions.chrom.isin(test_chroms)
+    if test_mask.sum() == 0:
+        raise ValueError(
+            f'None of the chromosomes in {",".join(test_chroms)} are present in the dataset. '
+        )
+
+    train = dataset.isel(locus=~test_mask)
+    test = dataset.isel(locus=test_mask)
+
+    del dataset
+
+    return train, test
+
+
+def get_explanation(dataset, component):
 
     try:
         import shap
     except ImportError:
         raise ImportError("SHAP is required to calculate SHAP values")
 
-    if not component in corpus["SHAP_values"].shap_component.values:
+    if not component in dataset["SHAP_values"].shap_component.values:
         raise ValueError(
-            f"The corpus does not have SHAP values for component {component}."
+            f"The dataset does not have SHAP values for component {component}."
         )
 
-    shap_values = corpus["SHAP_values"]
+    shap_values = dataset["SHAP_values"]
 
     shap_df = (
         shap_values.sel(shap_component=component)
@@ -167,15 +183,15 @@ def get_explanation(corpus, component):
     )
 
     data = (
-        corpus.state.locus_features.sel(locus=shap_df.index).sel(
+        dataset.state.locus_features.sel(locus=shap_df.index).sel(
             feature=[
-                f"{s}:0" if f"{s}:0" in corpus.state.feature.values else s
+                f"{s}:0" if f"{s}:0" in dataset.state.feature.values else s
                 for s in shap_df.columns
             ]
         )
     ).values
 
-    display_features = corpus.sections.features.assign_coords(locus=corpus.locus.data).sel(
+    display_features = dataset.sections.features.assign_coords(locus=dataset.locus.data).sel(
         locus=shap_df.index
     )
 
@@ -191,13 +207,13 @@ def get_explanation(corpus, component):
     return expl
 
 
-def equal_size_quantiles(corpus, var_name, n_bins=10):
+def equal_size_quantiles(dataset, var_name, n_bins=10):
 
-    bin_nums = np.arange(corpus.dims["locus"])
+    bin_nums = np.arange(dataset.dims["locus"])
     sorted_vals = DataFrame(
         {
-            "length": corpus.sections.regions.length.values,
-            "value": corpus[var_name].values,
+            "length": dataset.sections.regions.length.values,
+            "value": dataset[var_name].values,
         },
         index=bin_nums,
     )
@@ -209,14 +225,14 @@ def equal_size_quantiles(corpus, var_name, n_bins=10):
     sorted_vals["bin"] = (sorted_vals.cumm_fraction // (1 / (n_bins - 1))).astype(int)
 
     key = f'{var_name.rsplit("/", 1)[-1]}_qbins_{n_bins}'
-    corpus[key] = xr.DataArray(
+    dataset[key] = xr.DataArray(
         sorted_vals["bin"].loc[bin_nums].values,
         dims="locus",
     )
 
     logger.info("Added key: " + key)
 
-    return corpus
+    return dataset
 
 
 def slice_regions(dataset, chrom: str, start: int, end: int):
@@ -240,40 +256,40 @@ def slice_regions(dataset, chrom: str, start: int, end: int):
     return dataset.isel(locus=regions_mask)
 
 
-def annot_empirical_marginal(corpus):
+def annot_empirical_marginal(dataset):
 
-    check_structure(corpus)
+    check_structure(dataset)
 
     X_emp = reduce(
         lambda x, y: x + y,
         (
-            corpus.fetch_sample(sample_name).ascoo()
+            dataset.fetch_sample(sample_name).ascoo()
             for sample_name in tqdm(
-                corpus.list_samples()[1:],
+                dataset.list_samples()[1:],
                 desc="Reducing samples",
             )
         ),
-        corpus.fetch_sample(corpus.list_samples()[0]).asdense(),
+        dataset.fetch_sample(dataset.list_samples()[0]).asdense(),
     )
 
     X_emp = X_emp.asdense() if X_emp.is_sparse() else X_emp
 
     logger.info('Added key: "empirical_marginal"')
-    corpus["empirical_marginal"] = (
-        X_emp / corpus.sections.regions.context_frequencies
+    dataset["empirical_marginal"] = (
+        X_emp / dataset.sections.regions.context_frequencies
     ).fillna(0.0)
 
     logger.info('Added key: "empirical_locus_marginal"')
-    corpus["empirical_locus_marginal"] = (
+    dataset["empirical_locus_marginal"] = (
         (
             X_emp.sum(dim=dims_except_for(X_emp.dims, "locus"))
-            / corpus.sections.regions.length
+            / dataset.sections.regions.length
         )
         .fillna(0.0)
         .astype(np.float32)
     )
 
-    return corpus
+    return dataset
 
 
 def dims_except_for(dims, *keepdims):
@@ -286,30 +302,30 @@ def match_dims(X, **dim_sizes):
     )
 
 
-def check_dims(corpus, model_state):
+def check_dims(dataset, model_state):
     rm_dim = dims_except_for(
-        corpus.X.dims,
+        dataset.X.dims,
         *model_state.requires_dims,
     )
     if not len(rm_dim) == 0:
         logger.warning(
-            f'The corpus {corpus.attrs["name"]} has extra dimensions: {", ".join(rm_dim)}.\n'
+            f'The dataset {dataset.attrs["name"]} has extra dimensions: {", ".join(rm_dim)}.\n'
             f'The model requires the following dimensions: {", ".join(model_state.requires_dims)}.\n'
             "Having extra data dimensions will increase training time and memory usage,\n"
-            'remove them by summing over them: `corpus.sum(dim="extra_dim", keep_attrs=True)`.'
+            'remove them by summing over them: `dataset.sum(dim="extra_dim", keep_attrs=True)`.'
         )
 
     missing_dims = set(model_state.requires_dims).difference(
-        corpus.X.dims + ("sample",)
+        dataset.X.dims + ("sample",)
     )
     if not len(missing_dims) == 0:
         raise ValueError(
-            f'The corpus {corpus.attrs["name"]} is missing the following dimensions: {", ".join(missing_dims)}.\n'
+            f'The dataset {dataset.attrs["name"]} is missing the following dimensions: {", ".join(missing_dims)}.\n'
             f'The model requires the following dimensions: {", ".join(model_state.requires_dims)}.\n'
         )
 
 
-def check_structure(corpus):
+def check_structure(dataset):
 
     required_vars = {
         "chrom",
@@ -320,25 +336,25 @@ def check_structure(corpus):
         "exposures",
     }
 
-    if not "name" in corpus.attrs:
-        raise ValueError("The corpus is missing a name attribute.")
+    if not "name" in dataset.attrs:
+        raise ValueError("The dataset is missing a name attribute.")
 
-    sections = corpus.sections.names
+    sections = dataset.sections.names
 
     if not "Regions" in sections:
-        raise ValueError('The corpus is missing the "Regions" section.')
+        raise ValueError('The dataset is missing the "Regions" section.')
 
-    if not "Features" in sections or len(corpus.sections.features.data_vars) == 0:
+    if not "Features" in sections or len(dataset.sections.features.data_vars) == 0:
         raise ValueError(
-            'The corpus is missing the "Features" section, or it is empty.'
+            'The dataset is missing the "Features" section, or it is empty.'
         )
 
     for key in required_vars:
-        if not hasattr(corpus, "Regions/" + key):
-            raise ValueError(f'The corpus is missing the "{key}" node.')
+        if not hasattr(dataset, "Regions/" + key):
+            raise ValueError(f'The dataset is missing the "{key}" node.')
 
 
-def check_sample_data(corpus, dtype):
+def check_sample_data(dataset, dtype):
     pass
 
 
@@ -367,43 +383,43 @@ def check_feature(feature):
         )
 
 
-def check_corpus(corpus):
+def check_corpus(dataset):
 
-    check_structure(corpus)
+    check_structure(dataset)
 
-    for feature in corpus.sections.features.values():
+    for feature in dataset.sections.features.values():
         check_feature(feature)
 
 
-def check_feature_consistency(*corpuses):
+def check_feature_consistency(*datasets):
 
     type_dict = defaultdict(set)
     for feature_name, dtype in list(
         (feature_name, FeatureType(feature.attrs["normalization"]))
-        for corpus in corpuses
-        for feature_name, feature in corpus.sections.features.data_vars.items()
+        for dataset in datasets
+        for feature_name, feature in dataset.sections.features.data_vars.items()
     ):
         type_dict[feature_name].add(dtype)
 
     for feature_name, types in type_dict.items():
         if not len(types) == 1:
             raise ValueError(
-                f"The feature {feature_name} has inconsistent normalization types across corpuses: {str_wrapped_list(types)}"
+                f"The feature {feature_name} has inconsistent normalization types across datasets: {str_wrapped_list(types)}"
             )
 
-    def _get_classes(corpus, feature):
+    def _get_classes(dataset, feature):
         try:
             return feature.attrs["classes"]
         except KeyError as err:
             raise KeyError(
-                f'The feature {feature.name} in corpus {corpus.attrs["name"]} is missing the `classes` attribute.'
+                f'The feature {feature.name} in dataset {dataset.attrs["name"]} is missing the `classes` attribute.'
             ) from err
 
     priority_dict = defaultdict(list)
     for feature_name, classes in list(
-        (feature_name, tuple(_get_classes(corpus, feature)))
-        for corpus in corpuses
-        for feature_name, feature in corpus.sections.features.data_vars.items()
+        (feature_name, tuple(_get_classes(dataset, feature)))
+        for dataset in datasets
+        for feature_name, feature in dataset.sections.features.data_vars.items()
         if FeatureType(feature.attrs["normalization"])
         in (FeatureType.CATEGORICAL, FeatureType.MESOSCALE)
     ):
@@ -412,15 +428,15 @@ def check_feature_consistency(*corpuses):
     for feature_name, priorities in priority_dict.items():
         if not all(p == priorities[0] for p in priorities):
             raise ValueError(
-                f"The feature {feature_name} has inconsistent class priorities across corpuses:\n\t"
+                f"The feature {feature_name} has inconsistent class priorities across datasets:\n\t"
                 + "\n\t".join(map(lambda p: ", ".join(map(str, p)), priorities))
             )
 
     corpus_membership = {
-        corpus.attrs["name"]: {
-            feature_name for feature_name in corpus.sections.features.data_vars.keys()
+        dataset.attrs["name"]: {
+            feature_name for feature_name in dataset.sections.features.data_vars.keys()
         }
-        for corpus in corpuses
+        for dataset in datasets
     }
     shared_features = set.intersection(*corpus_membership.values())
 
@@ -428,24 +444,24 @@ def check_feature_consistency(*corpuses):
         extra_features = features.difference(shared_features)
         if len(extra_features) > 0:
             logger.warning(
-                f'The corpus {corpus_name} has extra features: {", ".join(extra_features)}.\n'
+                f'The dataset {corpus_name} has extra features: {", ".join(extra_features)}.\n'
                 "Extra features will be ignored during training."
             )
 
 
-def prepare_data(corpus):
+def prepare_data(dataset):
     
-    corpus['Regions/context_frequencies'] = corpus['Regions/context_frequencies']\
+    dataset['Regions/context_frequencies'] = dataset['Regions/context_frequencies']\
         .transpose(..., 'context', 'locus')
     
-    corpus['Regions/context_frequencies'].data = np.asfortranarray(
-        corpus['Regions/context_frequencies'].data,
+    dataset['Regions/context_frequencies'].data = np.asfortranarray(
+        dataset['Regions/context_frequencies'].data,
         dtype=np.float32,
     )
 
-    corpus['Regions/exposures'].data = np.ascontiguousarray(
-        corpus['Regions/exposures'],
+    dataset['Regions/exposures'].data = np.ascontiguousarray(
+        dataset['Regions/exposures'],
         dtype=np.float32,
     )
 
-    return corpus
+    return dataset
