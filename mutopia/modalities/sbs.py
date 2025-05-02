@@ -141,7 +141,6 @@ class SBSModel(MuTopiaModel):
         begin_prior_updates = 50,
         stop_condition=50,
         # optimization settings
-        test_chroms = ('chr1',),
         num_epochs = 2000,
         locus_subsample = None,
         batch_subsample = None,
@@ -152,6 +151,7 @@ class SBSModel(MuTopiaModel):
         eval_every=10,
         verbose=0,
         time_limit=None,
+        test_chroms=('chr1',),
     ):
         self.num_components = num_components
         self.init_components = init_components

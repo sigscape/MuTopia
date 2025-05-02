@@ -246,7 +246,7 @@ class FactorModel:
             )
         
 
-    def _step_normalizers(self, 
+    def _set_model_normalizers(self, 
         corpus,
         normalizers, 
         learning_rate=1., 
@@ -254,7 +254,7 @@ class FactorModel:
     ):
         curr = self._normalizers[CS.get_name(corpus)]
 
-        return  _svi_update_fn(
+        self._normalizers[CS.get_name(corpus)][:] = _svi_update_fn(
             curr,
             np.log(subsample_rate or 1.) + normalizers,
             learning_rate

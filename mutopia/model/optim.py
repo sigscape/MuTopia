@@ -32,14 +32,13 @@ def VI_step(
     on the full data set.
     '''
     for corpus in corpuses:
-        CS.update_normalizers(
-            corpus,  
-            factor_model._step_normalizers(
-                corpus,
-                normalizers[CS.get_name(corpus)],
-                learning_rate=learning_rate,
-            )
+        factor_model._set_model_normalizers(
+            corpus,
+            normalizers[CS.get_name(corpus)],
         )
+        
+    for corpus in corpuses:
+        CS.update_normalizers(corpus,  factor_model.get_normalizers(corpus))
 
     '''
     The normalizers are updated in the previous function
@@ -49,17 +48,13 @@ def VI_step(
     Therefore, this is the best time to evaluate the loss functions.
     The elbo is calculated during the E-step because it's convenient.
     '''
-    stats, elbo = locals_model.Estep(**args)
+    stats, elbo = locals_model.Estep(**args, factor_model=factor_model)
     '''
     We're agnostic to the form of the test set evaluation function,
     but it should be a function of the model state that returns the
     test set score.
     '''
-    test_elbo = test_score_fn(
-        factor_model,
-        locals_model,
-        par_context=par_context
-    )
+    test_elbo = test_score_fn(par_context=par_context)
     
     factor_model.Mstep(
         offsets=offsets,
@@ -113,25 +108,17 @@ def SVI_step(
     In the previous "offsets" step, the normalizers were updated
     on a subset of the data. Now we need to transfer this information
     to the full data set (this is just a copying step, no computation).
-    '''
-
-    print(normalizers)
-    
-    update_norm = lambda corpus : CS.update_normalizers(
-        corpus,  
-        factor_model._step_normalizers(
+    '''    
+    for corpus in corpuses:
+        factor_model._set_model_normalizers(
             corpus,
             normalizers[CS.get_name(corpus)],
             learning_rate=learning_rate,
-            subsample_rate=locus_subsample,
+            subsample_rate=locus_subsample or 1.,
         )
-    )
-    
-    for sliced in slices:
-        update_norm(sliced)
-    
+
     for corpus in corpuses:
-        update_norm(corpus)
+        CS.update_normalizers(corpus,  factor_model.get_normalizers(corpus))
         
     '''
     Okay, now we can calculate the sufficient statistics.
@@ -437,5 +424,4 @@ def fit_model(
         factor_model,
         locals_model,
         test_scores,
-        train_corpuses,
     )
