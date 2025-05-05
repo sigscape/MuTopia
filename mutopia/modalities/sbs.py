@@ -268,15 +268,15 @@ class SBSModel(MuTopiaModel):
             l2_regularization=l2_regularization,
         )
 
-        sparse = train_corpuses[0].X.is_sparse()
+        '''sparse = train_corpuses[0].X.is_sparse()
         if not all(
             corpus.X.is_sparse() == sparse for corpus in train_corpuses + test_corpuses
         ):
             raise ValueError(
                 "All corpuses must be either sparse or dense - mixtures are not allowed!"
-            )
+            )'''
 
-        locals_model = (LDAUpdateSparse if sparse else LDAUpdateDense)(
+        locals_model = LDAUpdateSparse(
             train_corpuses,
             n_components=num_components,
             random_state=random_state,

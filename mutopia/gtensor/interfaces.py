@@ -88,7 +88,8 @@ class LazySampleLoader(CorpusInterface):
         corpus: CorpusInterface,
     ):
         self._corpus = corpus
-        self._X = self.fetch_sample(self.list_samples()[0])
+        self._sample_vars = self._corpus[[v for v,k in self._corpus.data_vars.items() if 'sample' in k.dims]]
+        self._X = self.fetch_sample(self.list_samples()[0]).X
 
     @property
     def X(self):
@@ -103,10 +104,23 @@ class LazySampleLoader(CorpusInterface):
         return filename
 
     def fetch_sample(self, sample_name):
-        return disk.load_sample(self._get_filename(), sample_name)
+        return (
+            self._sample_vars.sel(sample=sample_name)
+            .merge(
+                disk.load_sample(self._get_filename(), sample_name)
+            )
+        )
 
     def iter_samples(self):
-        return disk.yield_samples(self._get_filename(), *self.list_samples())
+        for sample_name, data in zip(
+            self.list_samples(),
+            disk.yield_samples(self._get_filename(), *self.list_samples())
+        ):
+            yield (
+                self._sample_vars
+                .sel(sample=sample_name)
+                .merge(data)
+            )
 
 
 class LazySlicer(CorpusInterface):

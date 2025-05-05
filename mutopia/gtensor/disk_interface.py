@@ -99,22 +99,6 @@ def write_context_freqs(
     )
 
 
-@retry_until_write
-def write_locus_offsets(
-    dataset,
-    locus_offsets,
-):
-
-    locus_offsets.name = "exposures"
-
-    locus_offsets.to_netcdf(
-        dataset,
-        group="regions",
-        mode="a",
-        **WRITE_KW,
-    )
-
-
 ##
 # feature write, remove, and list
 ##
@@ -219,10 +203,12 @@ def edit_feature_attrs(
 @retry_until_write
 def write_sample(
     filename,
-    arr,
-    *,
+    sample,
     sample_name,
 ):
+    
+    arr = sample.X
+    
     dset = (
         arr.sparse_to_coo()
         if isinstance(arr.data, sparse.SparseArray)
@@ -240,7 +226,7 @@ def write_sample(
 
     dset.to_netcdf(
         filename,
-        group=f"/raw/{sample_name}",
+        group=f"/raw/X/{sample_name}",
         mode="a",
         encoding={
             "data": {
@@ -305,17 +291,10 @@ def write_dataset(dataset, filename, bar=False):
         )
     )
 
-    for section_name in section_names:
-
-        if section_name == "X":
-            continue
-
-        section = dataset.sections[section_name]
+    for section_name, section in dataset.drop_vars(["X"]).sections:
 
         # check if any are sparse - if so error with a nice message
-        sparse_vars = [
-            varname for varname, var in section.data_vars.items() if var.is_sparse()
-        ]
+        sparse_vars = [varname for varname, var in section.data_vars.items() if var.is_sparse()]
 
         if len(sparse_vars) > 0:
             raise ValueError(
@@ -332,6 +311,7 @@ def write_dataset(dataset, filename, bar=False):
         )
 
     if len(dataset.list_samples()) > 0:
+        
         for sample_name in (
             dataset.list_samples()
             if not bar
@@ -340,11 +320,14 @@ def write_dataset(dataset, filename, bar=False):
             write_sample(
                 filename,
                 dataset.fetch_sample(sample_name),
-                sample_name=f"X/{sample_name}",
+                sample_name,
             )
 
+def _is_sparse_coo(group):
+    return group.__dict__.get("format", "not coo") == "COO"
 
-def _load_sparse_sample(group, coo=False):
+
+def _load_sparse(group, coo=False, fill_value=0.0, **kw):
 
     weights = group["data"][...].data
     coords = group["indices"][...].data.astype(int32, copy=False)
@@ -355,13 +338,13 @@ def _load_sparse_sample(group, coo=False):
         coords,
         weights,
         shape=shape,
-        fill_value=0.0,
+        fill_value=fill_value,
     )
 
     arr = xr.DataArray(
         arr,
         dims=dims,
-        attrs={"active": 1},
+        name="X",
     )
 
     if not coo:
@@ -370,22 +353,24 @@ def _load_sparse_sample(group, coo=False):
     return arr
 
 
-def _load_dense_sample(filename, sample_name, **kwargs):
+def _load_dense(filename, sample_name, **kwargs):
     raise NotImplementedError()
     with xr.open_dataarray(filename, group=sample_name, engine="netcdf4") as dset:
         return dset.load()
 
 
 def _backend_load_sample(dset, sample_name, coo=False):
-    group = dset[sample_name]
-    attrs = group.__dict__
-    is_sparse = attrs.get("format", "not coo") == "COO"
-    loader = _load_sparse_sample if is_sparse else _load_dense_sample
+    
+    X_group = dset.groups["raw"]["X"][sample_name]
+    X = (_load_sparse if _is_sparse_coo(X_group) else _load_dense)(X_group, coo=coo)
+    
+    return (
+        xr.Dataset({"X": X})
+        .assign_coords({"sample": sample_name})
+    )
 
-    return loader(group, coo=coo)
 
-
-def load_sample(filename, sample_name):
+def load_sample(filename, sample_name, coo=False):
 
     if filename.endswith(".pkl"):
         raise NotImplementedError(
@@ -395,8 +380,8 @@ def load_sample(filename, sample_name):
     with retry_until_write(nc.Dataset)(filename, "r") as dset:
         return _backend_load_sample(
             dset,
-            f"raw/X/{sample_name}",
-            coo=False,
+            sample_name,
+            coo=coo,
         )
 
 
@@ -412,7 +397,7 @@ def yield_samples(filename, *sample_names, coo=False):
             try:
                 yield _backend_load_sample(
                     dset,
-                    f"raw/X/{sample_name}",
+                    sample_name,
                     coo=coo,
                 )
             except KeyError:
@@ -443,10 +428,11 @@ def _pack_samples(samples):
 
     samples = xr.concat(samples, dim="sample")
 
-    if isinstance(samples.data, sparse.SparseArray):
-        samples.data.coords = samples.data.coords.astype(int32, copy=False)
-        samples.ascsr("sample", "locus")
-
+    if isinstance(samples.X.data, sparse.SparseArray):
+        samples.X.ascsr('sample','locus')
+        X = samples.X.data
+        X.coords = X.astype(int32, copy=False)
+    
     return samples
 
 
@@ -455,6 +441,7 @@ def load_dataset(filename, with_samples=True, with_state=True):
     def open_ds(**kw):
         with retry_until_write(xr.open_dataset)(filename, engine="netcdf4", **kw) as ds:
             return ds.load()
+        
 
     if filename.endswith(".pkl"):
         with open(filename, "rb") as f:
@@ -475,6 +462,7 @@ def load_dataset(filename, with_samples=True, with_state=True):
             continue
 
         section = open_ds(group=section_name)
+        section = section[[k for k,v in section.data_vars.items() if v.attrs.get("active", 1) == 1]]
 
         # the "data" section is special - it contains everything not in another section
         if not section_name.title() == "Data":
@@ -493,7 +481,8 @@ def load_dataset(filename, with_samples=True, with_state=True):
         sample_names = _list_sample_names(filename)
         dataset = dataset.assign_coords({"sample": sample_names})
         samples = _pack_samples(list(yield_samples(filename, *sample_names, coo=True)))
-        dataset.update({"X": samples})
+        
+        dataset = dataset.merge(samples)
 
     except NoSamplesError:
         pass
