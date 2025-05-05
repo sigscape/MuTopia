@@ -69,25 +69,18 @@ def setup_mixture_model(
 
     fraction_map = (
         idx_array_to_design(
-            np.array([
-                j
-                for j, _ in enumerate(corpuses)
-                for _ in range(model.n_components)
-            ]),
+            np.array(
+                [j for j, _ in enumerate(corpuses) for _ in range(model.n_components)]
+            ),
             len(corpuses),
         )
         .todense()
         .T
     )
 
-    component_map = np.vstack([
-        np.eye(model.n_components)
-        for _ in corpuses
-    ]).T
+    component_map = np.vstack([np.eye(model.n_components) for _ in corpuses]).T
 
-    log_conditional_likelihood = np.ascontiguousarray(
-        np.log(conditional_likelihood).T
-    )
+    log_conditional_likelihood = np.ascontiguousarray(np.log(conditional_likelihood).T)
 
     weights = np.ascontiguousarray(weights)
 
@@ -105,15 +98,10 @@ def setup_mixture_model(
     pass
 
 
-
 def simulate_from_model(
-    model, 
-    corpus, 
-    seed=None,
-    exposures=None,
-    scale_num_mutations=1.
+    model, corpus, seed=None, exposures=None, scale_num_mutations=1.0
 ):
-     
+
     model_state = _get_state(model)
     random_state = np.random.RandomState(seed or 42)
 
@@ -125,14 +113,15 @@ def simulate_from_model(
         )
 
     def _resample_sample(contributions):
-        
+
         log_marginal_mutrate = model_state._log_marginalize_mutrate(
             lmrt,
             contributions,
         )
 
         n_mutations = int(
-            scale_num_mutations*contributions.sum() - model_state.locals_model.alpha[CS.get_name(corpus)].sum()
+            scale_num_mutations * contributions.sum()
+            - model_state.locals_model.alpha[CS.get_name(corpus)].sum()
         )
 
         p_vec = np.exp(log_marginal_mutrate).data.ravel()
@@ -143,9 +132,7 @@ def simulate_from_model(
                 n_mutations,
                 p_vec,
             )
-            .reshape(
-                log_marginal_mutrate.shape
-            )
+            .reshape(log_marginal_mutrate.shape)
             .astype(np.float32)
         )
 
@@ -153,12 +140,12 @@ def simulate_from_model(
             COO.from_numpy(dense_obs),
             dims=log_marginal_mutrate.dims,
         )
-    
+
     contributions = _fetch_contributions(corpus, exposures=exposures)
 
     if not CS.has_corpusstate(corpus):
         raise ValueError(
-            'The provided G-Tensor is not annotated. '
+            "The provided G-Tensor is not annotated. "
             f'Please run `mutopia predict <model> {corpus.attrs["filename"]}` with a trained model to annotate the corpus.'
         )
 
@@ -171,7 +158,7 @@ def simulate_from_model(
                 ncols=100,
             )
         ],
-        dim='sample'
+        dim="sample",
     )
 
     corpus_sampled = corpus.copy()

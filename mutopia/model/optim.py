@@ -1,4 +1,3 @@
-
 from . import corpus_state as CS
 from ..utils import *
 from ..gtensor import *
@@ -9,53 +8,53 @@ from .latent_var_models.base import LocalsModel
 
 
 def VI_step(
-    factor_model : FactorModel,
-    locals_model : LocalsModel,
-    corpuses,
+    factor_model: FactorModel,
+    locals_model: LocalsModel,
+    datasets,
     update_prior=True,
-    learning_rate=1.,
+    learning_rate=1.0,
     *,
     test_score_fn,
     par_context,
 ):
-    
+
     args = dict(
-        corpuses=corpuses,
+        datasets=datasets,
         par_context=par_context,
     )
-    
+
     offsets, normalizers = factor_model.get_exp_offsets_dict(**args)
 
-    '''
+    """
     In the previous "offsets" step, the normalizers were updated
     on a subset of the data. Now we need to update the normalizers
     on the full data set.
-    '''
-    for corpus in corpuses:
+    """
+    for dataset in datasets:
         factor_model._set_model_normalizers(
-            corpus,
-            normalizers[CS.get_name(corpus)],
+            dataset,
+            normalizers[CS.get_name(dataset)],
         )
-        
-    for corpus in corpuses:
-        CS.update_normalizers(corpus,  factor_model.get_normalizers(corpus))
 
-    '''
+    for dataset in datasets:
+        CS.update_normalizers(dataset, factor_model.get_normalizers(dataset))
+
+    """
     The normalizers are updated in the previous function
     (because the mutation rates are used to get the offsets, 
     so it's more efficient to use them to update the normalizers there).
 
     Therefore, this is the best time to evaluate the loss functions.
     The elbo is calculated during the E-step because it's convenient.
-    '''
+    """
     stats, elbo = locals_model.Estep(**args, factor_model=factor_model)
-    '''
+    """
     We're agnostic to the form of the test set evaluation function,
     but it should be a function of the model state that returns the
     test set score.
-    '''
+    """
     test_elbo = test_score_fn(par_context=par_context)
-    
+
     factor_model.Mstep(
         offsets=offsets,
         sstats=stats,
@@ -63,10 +62,10 @@ def VI_step(
         **args,
     )
 
-    for corpus in corpuses:
-        CS.update_corpusstate(
-            corpus, 
-            factor_model, 
+    for dataset in datasets:
+        CS.update_state(
+            dataset,
+            factor_model,
             from_scratch=False,
             par_context=par_context,
         )
@@ -74,11 +73,10 @@ def VI_step(
     return elbo, test_elbo
 
 
-
 def SVI_step(
-    factor_model : FactorModel,
-    locals_model : LocalsModel,
-    corpuses,
+    factor_model: FactorModel,
+    locals_model: LocalsModel,
+    datasets,
     update_prior=True,
     *,
     test_score_fn,
@@ -88,58 +86,57 @@ def SVI_step(
     locus_subsample,
     batch_subsample,
 ):
+    """
+    Generate the sliced datasets for the E-step.
+    """
+    slices = batch_generator(*datasets)
 
-    '''
-    Generate the sliced corpuses for the E-step.
-    '''
-    slices = batch_generator(*corpuses)
-    
     args = dict(
-        corpuses=slices,
+        datasets=slices,
         par_context=par_context,
     )
 
-    '''
+    """
     Get the offsets from the sliced data.
-    '''
+    """
     offsets, normalizers = timer_wrapper(factor_model.get_exp_offsets_dict)(**args)
 
-    '''
+    for dataset in datasets:
+        factor_model._set_model_normalizers(
+            dataset,
+            normalizers[CS.get_name(dataset)],
+            learning_rate=learning_rate,
+            subsample_rate=locus_subsample or 1.0,
+        )
+
+    """
     In the previous "offsets" step, the normalizers were updated
     on a subset of the data. Now we need to transfer this information
     to the full data set (this is just a copying step, no computation).
-    '''    
-    for corpus in corpuses:
-        factor_model._set_model_normalizers(
-            corpus,
-            normalizers[CS.get_name(corpus)],
-            learning_rate=learning_rate,
-            subsample_rate=locus_subsample or 1.,
-        )
+    """
+    for dataset in list(datasets) + list(slices):
+        CS.update_normalizers(dataset, factor_model.get_normalizers(dataset))
 
-    for corpus in corpuses:
-        CS.update_normalizers(corpus,  factor_model.get_normalizers(corpus))
-        
-    '''
+    """
     Okay, now we can calculate the sufficient statistics.
-    '''
+    """
     sstats, elbo = timer_wrapper(locals_model.Estep)(
-        **args, 
+        **args,
         factor_model=factor_model,
         learning_rate=learning_rate,
-        locus_subsample=locus_subsample or 1.,
-        batch_subsample=batch_subsample or 1.,
+        locus_subsample=locus_subsample or 1.0,
+        batch_subsample=batch_subsample or 1.0,
     )
 
-    '''
+    """
     Calculate the bounds here because the normalizers and 
     locals have been updated for some set of model parameters.
-    '''
-    test_score = timer_wrapper(test_score_fn, 'test_score')(par_context=par_context)
+    """
+    test_score = timer_wrapper(test_score_fn, "test_score")(par_context=par_context)
 
-    '''
+    """
     Update global model parameters
-    '''
+    """
     timer_wrapper(factor_model.Mstep)(
         offsets=offsets,
         sstats=sstats,
@@ -148,17 +145,17 @@ def SVI_step(
         **args,
     )
 
-    '''
-    Update the state of the original corpuses,
+    """
+    Update the state of the original datasets,
     - not the slices.
     Note at this point the normalizer and the rate parameters
     are not in sync - this is on purpose, we only want to update
     the normalizers on the subset data during the offset calculation.
-    '''
-    for corpus in corpuses:
-        timer_wrapper(CS.update_corpusstate)(
-            corpus, 
-            factor_model, 
+    """
+    for dataset in datasets:
+        timer_wrapper(CS.update_state)(
+            dataset,
+            factor_model,
             from_scratch=False,
             par_context=par_context,
         )
@@ -167,139 +164,140 @@ def SVI_step(
 
 
 def learning_rate_schedule(tau, kappa, epoch):
-    return (tau + epoch)**(-kappa)
+    return (tau + epoch) ** (-kappa)
 
 
 def slice_generator(
-        random_state,
-        *corpuses,
-        locus_subsample=None,
-        batch_subsample=None,
-    ):
+    random_state,
+    *datasets,
+    locus_subsample=None,
+    batch_subsample=None,
+):
 
-    def _subset_corpus(corpus):
+    def _subset_corpus(dataset):
 
         if not batch_subsample is None:
 
-            sample_names = CS.list_samples(corpus)
+            sample_names = CS.list_samples(dataset)
 
             new_samples = list(
                 random_state.choice(
                     sample_names,
-                    int(len(sample_names)*batch_subsample),
+                    int(len(sample_names) * batch_subsample),
                     replace=False,
                 )
             )
 
-            corpus = DifferentSamples(
-                corpus, 
+            dataset = DifferentSamples(
+                dataset,
                 new_samples,
             )
 
-
         if not locus_subsample is None:
 
-            corpus = LazySlicer(
-                corpus,
+            dataset = LazySlicer(
+                dataset,
                 keep_features=False,
-                locus = random_state.choice(
-                    CS.get_dims(corpus)['locus'],
-                    int(locus_subsample*CS.get_dims(corpus)['locus']),
-                    replace=False
-                )
+                locus=random_state.choice(
+                    CS.get_dims(dataset)["locus"],
+                    int(locus_subsample * CS.get_dims(dataset)["locus"]),
+                    replace=False,
+                ),
             )
 
-        return corpus
-    
-    return tuple(_subset_corpus(corpus) for corpus in corpuses)
+        return dataset
+
+    return tuple(_subset_corpus(dataset) for dataset in datasets)
 
 
 def _should_stop(stop_condition, scores):
-    return len(scores) > stop_condition \
-        and scores.index(max(scores)) < (len(scores) - stop_condition)
+    return len(scores) > stop_condition and scores.index(max(scores)) < (
+        len(scores) - stop_condition
+    )
 
 
-def fit_model( 
-    train_corpuses,
-    test_corpuses,
+def fit_model(
+    train_datasets,
+    test_datasets,
     random_state,
-    factor_model : FactorModel,
-    locals_model : LocalsModel,
+    factor_model: FactorModel,
+    locals_model: LocalsModel,
     # optimization settings
-    empirical_bayes = True,
-    begin_prior_updates = 50,
+    empirical_bayes=True,
+    begin_prior_updates=50,
     stop_condition=50,
     # optimization settings
-    num_epochs = 2000,
-    locus_subsample = None,
-    batch_subsample = None,
-    threads = 1,
-    kappa = 0.5,
-    tau = 1.,
+    num_epochs=2000,
+    locus_subsample=None,
+    batch_subsample=None,
+    threads=1,
+    kappa=0.5,
+    tau=1.0,
     callback=None,
     eval_every=10,
     verbose=0,
     time_limit=None,
     **kw,
 ) -> tuple[FactorModel, LocalsModel, list]:
-    
+
     start_time = time.time()
     models = (factor_model, locals_model)
     ##
     # If the data is sparse, we should make sure it's in the right format.
     # GCSX with locus and sample dimensions compressed.
     ##
-    logger.info('Validating corpuses...')
-    for corpus in train_corpuses + test_corpuses:
-        check_dims(corpus, factor_model)
-        check_corpus(corpus)
+    logger.info("Validating datasets...")
+    for dataset in train_datasets + test_datasets:
+        check_dims(dataset, factor_model)
+        check_corpus(dataset)
 
-    # Ensure all train corpuses have different names
-    corpus_names = [CS.get_name(corpus) for corpus in train_corpuses]
+    # Ensure all train datasets have different names
+    corpus_names = [name for name, _ in CS.expand_datasets(train_datasets)]
     if len(corpus_names) != len(set(corpus_names)):
-        raise ValueError("All train corpuses must have different names.")
-    
-    corpus_names = [CS.get_name(corpus) for corpus in test_corpuses]
-    if len(corpus_names) != len(set(corpus_names)):
-        raise ValueError("All test corpuses must have different names.")
-    
+        raise ValueError("All train datasets must have different names.")
+
     num_training_samples = sum(
-        len(CS.list_samples(corpus)) 
-        for corpus in train_corpuses
+        len(CS.list_samples(dataset)) for dataset in train_datasets
     )
-    logger.info(f'Found n={num_training_samples} training samples across {len(train_corpuses)} corpuses.')
-    
-    check_feature_consistency(*train_corpuses, *test_corpuses)
+    logger.info(
+        f"Found n={num_training_samples} training samples across {len(train_datasets)} datasets."
+    )
 
-    logger.info('Preprocessing training corpuses...')
-    train_corpuses = [CS.init_corpusstate(prepare_data(corpus), *models) for corpus in train_corpuses]
+    check_feature_consistency(*train_datasets, *test_datasets)
 
-    logger.info('Preprocessing testing corpuses...')
-    test_corpuses = [CS.init_corpusstate(prepare_data(corpus), *models) for corpus in test_corpuses]
+    logger.info("Preprocessing training datasets...")
+    train_datasets = [
+        CS.init_state(prepare_data(dataset), *models) for dataset in train_datasets
+    ]
+
+    logger.info("Preprocessing testing datasets...")
+    test_datasets = [
+        CS.init_state(prepare_data(dataset), *models) for dataset in test_datasets
+    ]
 
     test_score_fn = partial(
         locals_model.deviance,
         factor_model,
-        test_corpuses,
-        exposures_fn=CS.using_exposures_from(*train_corpuses)
+        test_datasets,
+        exposures_fn=CS.using_exposures_from(*train_datasets),
     )
-    
-    '''
+
+    """
     Sometimes we'd like to skip evaluating the test data
     to decrease the computational burden.
-    '''
-    dummy_score_fn = lambda *x, **y : np.nan
+    """
+    dummy_score_fn = lambda *x, **y: np.nan
 
     lr_schedule = partial(learning_rate_schedule, tau, kappa)
 
-    stop_fn = partial(_should_stop, stop_condition//eval_every)
+    stop_fn = partial(_should_stop, stop_condition // eval_every)
 
     if locus_subsample is None and batch_subsample is None:
-        logger.warning('Using batch variational inference.')
+        logger.warning("Using batch variational inference.")
         step_fn = partial(
-            VI_step, 
+            VI_step,
             *models,
-            train_corpuses,
+            train_datasets,
         )
     else:
 
@@ -308,22 +306,27 @@ def fit_model(
             batch_subsample=batch_subsample,
         )
 
-        logger.info(f'Using SVI.')
+        logger.info(f"Using SVI.")
         subsampler = partial(slice_generator, random_state, **subsample_rates)
 
         step_fn = partial(
-            SVI_step, 
+            SVI_step,
             *models,
-            train_corpuses,
+            train_datasets,
             batch_generator=subsampler,
             **subsample_rates,
         )
 
-    logger.info(f'Training model with {threads} threads.')
-    logger.info('The first few epochs take longer as things get warmed up -\n\texpect the time per epoch to decrease about 4-fold.')
-    logger.info(f'Model will stop training if no improvement in the last {stop_condition} epochs.')
+    logger.info(f"Training model with {threads} threads.")
+    logger.info(
+        "The first few epochs take longer as things get warmed up -\n\texpect the time per epoch to decrease about 4-fold."
+    )
+    logger.info(
+        f"Model will stop training if no improvement in the last {stop_condition} epochs."
+    )
+    logger.info(f"Training usually coverges much sooner than {num_epochs} epochs.")
     if not time_limit is None:
-        logger.info(f'Training will stop after {time_limit} minutes.')
+        logger.info(f"Training will stop after {time_limit} minutes.")
 
     test_scores = []
     prior_has_been_updated = False
@@ -331,78 +334,86 @@ def fit_model(
     with ParContext(threads, verbose) as par:
         try:
             progress_bar = trange(
-                1, num_epochs+1, 
-                desc='Training',
-                bar_format='Epoch: {n_fmt}/{total_fmt} |{bar}| [{elapsed}<{remaining}, {rate_fmt}] Scores{postfix}',
+                1,
+                num_epochs + 1,
+                desc="Training",
+                bar_format="Epoch: {n_fmt}/{total_fmt} |{bar}| [{elapsed}<{remaining}, {rate_fmt}] Scores{postfix}",
                 position=0,
             )
-            
+
             for epoch in progress_bar:
 
-                evaluate_test = (
-                    not eval_every is None and 
-                    (
-                        (epoch % eval_every == 0) \
-                        or epoch == 1 \
-                        or epoch == num_epochs
-                    )
+                evaluate_test = not eval_every is None and (
+                    (epoch % eval_every == 0) or epoch == 1 or epoch == num_epochs
                 )
-                
+
                 update_prior = (
                     epoch >= begin_prior_updates
                     and empirical_bayes
-                    and not any(CS.is_marginal_corpus(corpus) for corpus in train_corpuses)
+                    and not any(
+                        CS.is_marginal_corpus(dataset) for dataset in train_datasets
+                    )
                 )
 
                 if update_prior and not prior_has_been_updated:
-                    logger.info('Beginning to update priors.')
+                    logger.info("Beginning to update priors.")
                     prior_has_been_updated = True
 
-                train_score, test_score = timer_wrapper(step_fn, 'train_step')(
+                train_score, test_score = timer_wrapper(step_fn, "train_step")(
                     par_context=par,
-                    update_prior = update_prior,
-                    learning_rate = lr_schedule(epoch),
+                    update_prior=update_prior,
+                    learning_rate=lr_schedule(epoch),
                     test_score_fn=test_score_fn if evaluate_test else dummy_score_fn,
                 )
 
                 if np.isnan(train_score):
                     raise ValueError(
-                        'The model has diverged - some parameter is NaN. '
-                        'This usually means that the model is under-regularized.\n'
-                        'Try increasing one of the regularization parameters:\n'
-                        '  - conditioning_alpha\n'
-                        '  - mutation_reg\n'
-                        '  - context_reg\n'
-                        '  - l2_regularization\n'
+                        "The model has diverged - some parameter is NaN. "
+                        "This usually means that the model is under-regularized, or it suffered a bad initial condition.\n"
+                        "First, try re-initializing the model with a different random seed.\n"
+                        "If that doesn't work, try increasing one of these parameters (in order):\n"
+                        "  - locus_subsample\n"
+                        "  - batch_subsample (unless already at 1 or None)\n"
+                        "  - conditioning_alpha\n"
+                        "  - mutation_reg\n"
+                        "  - context_reg\n"
+                        "  - l2_regularization\n"
                     )
 
-                for test_corpus in test_corpuses:
-                    CS.update_corpusstate(
+                for test_corpus in test_datasets:
+                    CS.update_state(
                         test_corpus,
                         factor_model,
                         from_scratch=False,
                         par_context=par,
                     )
-                
+
                 if evaluate_test:
                     test_scores.append(test_score)
 
-                progress_bar.set_postfix({
-                    'Best' : f'{max(test_scores):2f}',
-                    'Recent' : ', '.join([f'{x:2f}' for x in test_scores[-5:]]),
-                })
+                progress_bar.set_postfix(
+                    {
+                        "Best": f"{max(test_scores):2f}",
+                        "Recent": ", ".join([f"{x:2f}" for x in test_scores[-5:]]),
+                    }
+                )
 
                 if not callback is None:
                     callback(factor_model, test_scores)
 
                 if stop_fn(test_scores):
-                    logger.info('Early stopping criterion met. The model has converged.')
+                    logger.info(
+                        "Early stopping criterion met. The model has converged."
+                    )
                     break
 
-                if not time_limit is None and (time.time() - start_time)/60 > time_limit:
-                    logger.info('Time limit reached. Stopping training.')
+                if (
+                    not time_limit is None
+                    and (time.time() - start_time) / 60 > time_limit
+                ):
+                    logger.info("Time limit reached. Stopping training.")
                     break
-        
+
         except (KeyboardInterrupt, SystemError, SystemExit):
             # sometimes interrupting an optimizer throws a system error ...
             pass
@@ -411,14 +422,14 @@ def fit_model(
             progress_bar.close()
 
     if num_epochs > 0:
-        logger.info('Finalizing models ...')
+        logger.info("Finalizing models ...")
 
         for model in factor_model.models.values():
-            model.post_fit(train_corpuses)
+            model.post_fit(train_datasets)
 
-        if not empirical_bayes:
-            logger.info('Updating priors ...')
-            locals_model.optim_prior(train_corpuses)
+        # if not empirical_bayes:
+        #    logger.info('Updating priors ...')
+        #    locals_model.optim_prior(train_datasets)
 
     return (
         factor_model,

@@ -1,9 +1,8 @@
-
 import mutopia as mu
-from mutopia.gtensor.interfaces import *
-from mutopia.model.corpus_state import CorpusState as CS
+from mutopia.gtensor import *
+from mutopia.modalities import get_mode
+from mutopia.model import corpus_state as CS
 import mutopia.gtensor.disk_interface as disk
-import netCDF4 as nc
 from ..utils import logger
 
 import click
@@ -11,23 +10,28 @@ from tabulate import tabulate
 from typing import *
 import numpy as np
 import os
-from tqdm import tqdm
 
 
 def _setup_bootstrap(train_corpuses, test_corpuses, seed):
-    
-    logger.warning('Bootstrapping training and testing corpuses ...')
-    test_corpus_map = {CS.get_name(corpus) : corpus for corpus in test_corpuses}
 
-    train_corpuses = tuple([
-        BootstrapCorpus(corpus, np.random.RandomState(seed)) 
-        for corpus in train_corpuses
-    ])
+    logger.warning("Bootstrapping training and testing corpuses ...")
+    test_corpus_map = {CS.get_name(corpus): corpus for corpus in test_corpuses}
 
-    test_corpuses = tuple([
-        DifferentSamples(test_corpus_map[CS.get_name(corpus)], corpus.list_samples())
-        for corpus in train_corpuses
-    ])
+    train_corpuses = tuple(
+        [
+            BootstrapCorpus(corpus, np.random.RandomState(seed))
+            for corpus in train_corpuses
+        ]
+    )
+
+    test_corpuses = tuple(
+        [
+            DifferentSamples(
+                test_corpus_map[CS.get_name(corpus)], corpus.list_samples()
+            )
+            for corpus in train_corpuses
+        ]
+    )
 
     return train_corpuses, test_corpuses
 
@@ -37,9 +41,9 @@ def model():
     pass
 
 
-@model.command("train", help='Train a mutopia model.')
+@model.command("train", help="Train a mutopia model.")
 @click.argument(
-    'train_corpuses',
+    "train_corpuses",
     type=click.Path(exists=True),
     nargs=-1,
 )
@@ -51,8 +55,8 @@ def model():
     help="Path to save the trained model to.",
 )
 @click.option(
-    '-k',
-    '--num-components',
+    "-k",
+    "--num-components",
     type=click.IntRange(1, 1000),
     required=True,
 )
@@ -115,11 +119,11 @@ def model():
     help="Maximum number of features to use per tree",
 )
 @click.option(
-    '--convolution-width',
-    '-cw',
+    "--convolution-width",
+    "-cw",
     type=click.IntRange(0, 5),
     default=None,
-    help='Width of the convolutional kernel',
+    help="Width of the convolutional kernel",
 )
 @click.option(
     "--use-groups/--no-use-groups",
@@ -203,11 +207,11 @@ def model():
     help='"Offset" parameter for stochastic variational inference',
 )
 @click.option(
-    '--init-variance-theta',
-    '-ivt',
+    "--init-variance-theta",
+    "-ivt",
     type=click.FloatRange(0.0, 1000.0),
     default=None,
-    help='Initial variance for theta',
+    help="Initial variance for theta",
 )
 @click.option(
     "-eval",
@@ -232,83 +236,82 @@ def model():
 )
 @click.option(
     "--time-limit",
-    '-t',
+    "-t",
     type=int,
     default=None,
     help="Time limit for training, in seconds",
 )
 @click.option(
     "--bootstrap",
-    '-b',
+    "-b",
     type=click.IntRange(0, np.iinfo(np.int32).max),
     default=None,
     help="Bootstrap the training and testing corpuses",
 )
 @click.option(
     "--test-chroms",
-    '-test',
+    "-test",
     multiple=True,
     type=str,
-    default=['chr1'],
+    default=["chr1"],
     help="Chromosomes to use for testing. If not specified, all chromosomes are used.",
 )
 def train(
     *,
     output,
     train_corpuses: List[str],
-    #test_corpuses: List[str],
     time_profile: bool = False,
     lazy: bool = False,
-    bootstrap : Union[int, None] = None,
-    test_chroms : List[str] = ['chr1'],
+    bootstrap: Union[int, None] = None,
+    test_chroms: List[str] = ["chr1"],
     **model_kw,
-):  
+):
     if not len(train_corpuses) > 0:
         raise click.exceptions.BadOptionUsage(
             "train-corpuses",
             "At least one training corpus is required",
         )
-    
+
     model_kw = {k: v for k, v in model_kw.items() if v is not None}
     click.echo(
-        f'Training model with parameters: ', 
-        file=click.get_text_stream('stderr')
+        f"Training model with parameters: ", file=click.get_text_stream("stderr")
     )
     click.echo(
         tabulate(
             model_kw.items(),
-            headers=['Parameter', 'Value'],
-            tablefmt='simple',
+            headers=["Parameter", "Value"],
+            tablefmt="simple",
         ),
-        file=click.get_text_stream('stderr')
+        file=click.get_text_stream("stderr"),
     )
-    
+
     click.echo(
-        'Testing on chromosomes: {}'.format(','.join(test_chroms)),
-        file=click.get_text_stream('stderr')
+        "Testing on chromosomes: {}".format(",".join(test_chroms)),
+        file=click.get_text_stream("stderr"),
     )
-    train, test = list(zip(*[
-        (lazy_train_test_load if lazy else eager_train_test_load)(
-            corpus, test_chroms
+    train, test = list(
+        zip(
+            *[
+                (lazy_train_test_load if lazy else eager_train_test_load)(
+                    corpus, test_chroms
+                )
+                for corpus in train_corpuses
+            ]
         )
-        for corpus in train_corpuses
-    ]))
-
-    #if bootstrap:
-    #    train_corpuses, test_corpuses = _setup_bootstrap(train_corpuses, test_corpuses, seed=bootstrap)
-    
-    if time_profile:
-        model_kw['eval_every'] = 1
-        model_kw['num_epochs'] = 1
-        logger.setLevel('DEBUG')
-
-    model, _, test_scores = mu.MutopiaModel(
-        train,
-        test,
-        **model_kw,
     )
 
-    click.echo('Best test score:\t{:.5f}'.format(max(test_scores)))
+    # if bootstrap:
+    #    train_corpuses, test_corpuses = _setup_bootstrap(train_corpuses, test_corpuses, seed=bootstrap)
+
+    if time_profile:
+        model_kw["eval_every"] = 1
+        model_kw["num_epochs"] = 1
+        logger.setLevel("DEBUG")
+
+    model = get_mode(train[0]).TopographyModel(**model_kw)
+    model = model.fit(train, test_datasets=test)
+
+    click.echo("Best test score:\t{:.5f}".format(max(model.test_scores_)))
 
     if not time_profile:
         model.save(output)
@@ -318,10 +321,11 @@ def train(
 def study():
     pass
 
+
 @study.command("create")
-@click.argument("study_name", type=str)#, help="Name of the study")
+@click.argument("study_name", type=str)  # , help="Name of the study")
 @click.argument(
-    'train_corpuses',
+    "train_corpuses",
     type=click.Path(exists=True),
     nargs=-1,
 )
@@ -348,10 +352,10 @@ def study():
 )
 @click.option(
     "-outdir",
-    "--output-dir", 
+    "--output-dir",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, writable=True),
-    default='.',
-    help="Directory to save model files"
+    default=".",
+    help="Directory to save model files",
 )
 @click.option("--seed", type=int, default=42, help="Random seed")
 @click.option(
@@ -406,11 +410,11 @@ def study():
     help="Learning rate for tree models",
 )
 @click.option(
-    '--convolution-width',
-    '-cw',
+    "--convolution-width",
+    "-cw",
     type=click.IntRange(0, 5),
     default=None,
-    help='Width of the convolutional kernel',
+    help="Width of the convolutional kernel",
 )
 @click.option(
     "--max-features",
@@ -493,19 +497,19 @@ def study():
     help='"Offset" parameter for stochastic variational inference',
 )
 @click.option(
-    '-e',
-    '--extensive',
+    "-e",
+    "--extensive",
     count=True,
     type=int,
     default=0,
-    help='How extensively to tune the hyperparameters of the model, use -e, -ee, -eee, etc. for more tuning.'
+    help="How extensively to tune the hyperparameters of the model, use -e, -ee, -eee, etc. for more tuning.",
 )
 @click.option(
-    '--test-chroms',
-    '-test',
+    "--test-chroms",
+    "-test",
     multiple=True,
     type=str,
-    default=['chr1'],
+    default=["chr1"],
     help="Chromosomes to use for testing. If not specified, all chromosomes are used.",
 )
 def create_study(
@@ -516,9 +520,9 @@ def create_study(
     max_components: int,
     seed: int = 0,
     save_model: bool = False,
-    output_dir: str = '.',
+    output_dir: str = ".",
     extensive: int = 0,
-    test_chroms : List[str] = ['chr1'],
+    test_chroms: List[str] = ["chr1"],
     **model_kw,
 ):
     if not len(train_corpuses) > 0:
@@ -526,14 +530,16 @@ def create_study(
             "train-corpuses",
             "At least one training corpus is required",
         )
-    
+
     model_kw = {k: v for k, v in model_kw.items() if v is not None}
-    click.echo(f'Fixing parameters: ')
-    click.echo(tabulate(
-        model_kw.items(),
-        headers=['Parameter', 'Value'],
-        tablefmt='simple',
-    ))
+    click.echo(f"Fixing parameters: ")
+    click.echo(
+        tabulate(
+            model_kw.items(),
+            headers=["Parameter", "Value"],
+            tablefmt="simple",
+        )
+    )
 
     mu.tune.create_study(
         list(map(os.path.abspath, train_corpuses)),
@@ -568,14 +574,14 @@ def create_study(
 )
 @click.option(
     "--time-limit",
-    '-t',
+    "-t",
     type=int,
     default=None,
     help="Time limit for training, in minutes",
 )
 def run_trial(
     study_name: str,
-    threads : int = 1,
+    threads: int = 1,
     time_limit: Union[None, int] = None,
     lazy: bool = False,
 ):
@@ -598,35 +604,37 @@ def dashboard(
 @study.command("summary")
 @click.argument("study_name", type=str)
 @click.option(
-    '--output',
-    '-o',
+    "--output",
+    "-o",
     type=click.Path(writable=True),
     default=None,
-    help='Output file to write summary to. If this is specified, the info is saved as a CSV instead of pretty-printed.'
+    help="Output file to write summary to. If this is specified, the info is saved as a CSV instead of pretty-printed.",
 )
 def summary(
     study_name: str,
     output=None,
 ):
     trials = mu.tune.summary(study_name)
-    trials = trials.sort_values('value', ascending=False, na_position='last')
-    sel_cols = ['number', 'value', 'state'] 
-    
-    if 'user_attrs_model_path' in trials.columns:
-        sel_cols+=['user_attrs_model_path']
-    sel_cols += [col for col in trials.columns if col.startswith('params_')]
-    
+    trials = trials.sort_values("value", ascending=False, na_position="last")
+    sel_cols = ["number", "value", "state"]
+
+    if "user_attrs_model_path" in trials.columns:
+        sel_cols += ["user_attrs_model_path"]
+    sel_cols += [col for col in trials.columns if col.startswith("params_")]
+
     trials = trials[sel_cols]
-    trials.columns = [col.removeprefix('params_') for col in trials.columns]
+    trials.columns = [col.removeprefix("params_") for col in trials.columns]
 
     if not output is None:
         trials.to_csv(output, index=False)
     else:
-        print(tabulate(
-            trials,
-            headers='keys',
-            tablefmt="simple",
-        ))
+        print(
+            tabulate(
+                trials,
+                headers="keys",
+                tablefmt="simple",
+            )
+        )
 
 
 @study.command("retrain")
@@ -649,7 +657,7 @@ def summary(
 )
 @click.option(
     "--time-limit",
-    '-t',
+    "-t",
     type=int,
     default=None,
     help="Time limit for training, in minutes",
@@ -661,14 +669,13 @@ def summary(
     help="Use a different random seed",
 )
 def retrain(
-    output : str,
+    output: str,
     study_name: str,
     trial_number: int,
-    threads : int = 1,
+    threads: int = 1,
     time_limit: Union[None, int] = None,
     seed: Union[None, int] = None,
     lazy: bool = False,
-    
 ):
     mu.tune.retrain(
         lazy=lazy,
@@ -683,39 +690,44 @@ def retrain(
 
 @study.command("ls")
 def list_studies():
-    click.echo('Available studies:')
+    click.echo("Available studies:")
     studies = mu.tune.list_studies()
-    click.echo('\n'.join(studies))
+    click.echo("\n".join(studies))
 
 
-@model.command("report", help='Write a PDF report of the signatures discovered by the model.')
+@model.command(
+    "report", help="Write a PDF report of the signatures discovered by the model."
+)
 @click.argument("model_path", type=click.Path(exists=True))
 @click.option("-o", "--output", type=click.Path(writable=True), default=None)
 def report(
     model_path: str,
     output: str,
-):  
+):
     import matplotlib.backends.backend_pdf
-    matplotlib.rcParams['figure.max_open_warning']=100
 
-    model : mu.model.Model = mu.load_model(model_path)
-    
+    matplotlib.rcParams["figure.max_open_warning"] = 100
+
+    model: mu.model.Model = mu.load_model(model_path)
+
     if output is None:
-        output = os.path.splitext(model_path)[0] + '.report.pdf'
+        output = os.path.splitext(model_path)[0] + ".report.pdf"
 
     pdf = matplotlib.backends.backend_pdf.PdfPages(output)
 
     fig = model.signature_panel(ncols=3, show=False)
-    pdf.savefig(fig, dpi=300, bbox_inches='tight')
+    pdf.savefig(fig, dpi=300, bbox_inches="tight")
 
     for i in range(model.n_components):
         fig = model.signature_report(i, show=False)
-        pdf.savefig(fig, dpi=300, bbox_inches='tight')
+        pdf.savefig(fig, dpi=300, bbox_inches="tight")
 
     pdf.close()
 
 
-@model.command("predict", help='Predict the contributions of the signatures to each sample.')
+@model.command(
+    "predict", help="Predict the contributions of the signatures to each sample."
+)
 @click.argument("model", type=click.Path(exists=True))
 @click.argument("dataset", type=click.Path(exists=True))
 @click.option(
@@ -732,7 +744,7 @@ def report(
 )
 @click.option(
     "--output",
-    '-o',
+    "-o",
     type=click.Path(writable=True),
     default=None,
     help="Output file to write predictions to. If not specified, predictions are written to the dataset file.",
@@ -744,54 +756,48 @@ def predict(
     contributions=True,
     output=None,
 ):
-    
+
     model = mu.load_model(model)
     corpus_path = dataset
     dataset = lazy_load(dataset)
 
-    inplace = not ('component' in dataset.dims) and output is None
+    inplace = not ("component" in dataset.dims) and output is None
     if not inplace and output is None:
         raise click.BadOptionUsage(
             "output",
-            "Output file *must* be specified since the dataset already has a \"state\".",
+            'Output file *must* be specified since the dataset already has a "state".',
         )
 
     if inplace:
-        logger.info('Modifying dataset in place ...')
+        logger.info("Modifying dataset in place ...")
 
     dataset = CorpusInterface(dataset)
-    dataset.corpus = dataset.assign_coords({
-        'sample' : dataset.list_samples(),
-    })
-    
-    logger.info('Setting up corpus ...')
+    dataset.corpus = dataset.assign_coords(
+        {
+            "sample": dataset.list_samples(),
+        }
+    )
+
+    logger.info("Setting up corpus ...")
     dataset = model.setup_corpus(dataset)
     model.renormalize_model(dataset)
-    
+
     if contributions:
-        logger.info('Annotating contributions ...')
+        logger.info("Annotating contributions ...")
         dataset = model.annot_contributions(dataset, threads=threads)
-        dataset.contributions.name = 'contributions'
+        dataset.contributions.name = "contributions"
 
     if inplace:
-        
+
         disk._write_model_state(
             dataset,
             corpus_path,
         )
 
-        dataset.contributions.to_netcdf(
-            corpus_path,
-            mode='a', 
-            **disk.WRITE_KW
-        )
-    
+        dataset.contributions.to_netcdf(corpus_path, mode="a", **disk.WRITE_KW)
+
     else:
-        disk.write_dataset(
-            dataset,
-            output,
-            bar=True
-        )
+        disk.write_dataset(dataset, output, bar=True)
 
 
 @model.command("SHAP", help="Calculate SHAP values for the model.")
@@ -819,18 +825,18 @@ def predict(
     help="Use scan for SHAP calculation",
 )
 def shap(
-    model: str, 
-    dataset: str, 
-    components = [],
+    model: str,
+    dataset: str,
+    components=[],
     threads: int = 1,
-    n_samples=2000, 
-    scan=False
+    n_samples=2000,
+    scan=False,
 ):
     corpus_path = dataset
     model = mu.load_model(model)
     dataset = lazy_load(dataset)
-    
-    logger.info('Calculating SHAP values ...')
+
+    logger.info("Calculating SHAP values ...")
     dataset = model.annot_SHAP_values(
         dataset,
         *components,
@@ -838,17 +844,14 @@ def shap(
         n_samples=n_samples,
         scan=scan,
     )
-    
-    dataset.SHAP_values.name = 'SHAP_values'
-    dataset.SHAP_values.to_netcdf(
-        corpus_path,
-        mode='a',
-        group='varm',
-        **disk.WRITE_KW
-    )
+
+    dataset.SHAP_values.name = "SHAP_values"
+    dataset.SHAP_values.to_netcdf(corpus_path, mode="a", group="varm", **disk.WRITE_KW)
 
 
-@model.command("tables", help='Write an excel file of signatures, contributions, and SHAP values.')
+@model.command(
+    "tables", help="Write an excel file of signatures, contributions, and SHAP values."
+)
 @click.argument("model", type=click.Path(exists=True))
 @click.argument("dataset", type=click.Path(exists=True))
 @click.argument("output", type=click.Path(writable=True))
@@ -857,7 +860,7 @@ def excel(
     dataset: str,
     output: str,
 ):
-    
+
     model = mu.load_model(model)
     dataset = mu.gt.load_dataset(dataset, with_samples=False)
 
@@ -867,6 +870,7 @@ def excel(
 @model.group("tools")
 def tools():
     pass
+
 
 @tools.command("simulate")
 @click.argument("model", type=click.Path(exists=True))
@@ -878,19 +882,15 @@ def tools():
     default=42,
 )
 @click.option(
-    '-scale',
-    '--scale-num-mutations',
+    "-scale",
+    "--scale-num-mutations",
     type=float,
-    default=1.,
+    default=1.0,
 )
 def simulate_from_model(
-    model : str,
-    dataset : str,
-    output : str,
-    seed : int = 0,
-    scale_num_mutations=1.
+    model: str, dataset: str, output: str, seed: int = 0, scale_num_mutations=1.0
 ):
-    
+
     dataset = disk.load_dataset(
         dataset,
         with_samples=False,

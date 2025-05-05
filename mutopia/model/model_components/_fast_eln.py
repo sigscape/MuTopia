@@ -4,6 +4,7 @@ from sklearn.utils import check_array, check_random_state
 from sklearn.exceptions import ConvergenceWarning
 import warnings
 
+
 def get_eln_solver(
     X,
     *,
@@ -12,7 +13,7 @@ def get_eln_solver(
     random_state=None,
     tol=1e-4,
     max_iter=1000,
-    selection="cyclic", # use cyclic to make it deterministic
+    selection="cyclic",  # use cyclic to make it deterministic
 ):
 
     X = check_array(
@@ -27,20 +28,20 @@ def get_eln_solver(
 
         y = np.asfortranarray(
             y,
-            dtype = X.dtype,
+            dtype=X.dtype,
         )
 
         # renormalize and make F-ordered
         sample_weight = np.asfortranarray(
-            sample_weight/np.sum(sample_weight) * X.shape[0],
+            sample_weight / np.sum(sample_weight) * X.shape[0],
             dtype=X.dtype,
         )
 
         coef_ = np.asfortranarray(coef_init, dtype=X.dtype)
-            
+
         n_samples, n_features = X.shape
         X_sparse_scaling = np.zeros(n_features, dtype=X.dtype)
-        
+
         if selection not in ["random", "cyclic"]:
             raise ValueError("selection should be either random or cyclic.")
         random = selection == "random"
@@ -49,7 +50,7 @@ def get_eln_solver(
         l2_reg = alpha * (1.0 - l1_ratio) * n_samples
 
         with warnings.catch_warnings():
-            warnings.filterwarnings("ignore")#, category=ConvergenceWarning)
+            warnings.filterwarnings("ignore")  # , category=ConvergenceWarning)
 
             model = cd_fast.sparse_enet_coordinate_descent(
                 w=coef_,

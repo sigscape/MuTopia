@@ -11,18 +11,20 @@ from ..gtensor import *
 from .optim import fit_model
 from .model_state import FactorModel
 from .latent_var_models.base import LocalsModel
-from functools import partial  
+from functools import partial
 from joblib import dump, delayed
 from collections import defaultdict
 from sklearn.base import BaseEstimator
 from abc import ABC, abstractmethod
 import typing
-   
-'''
+
+"""
 The Model class is a wrapper around a trained model state object, 
 and provides the high-level interface for interacting with the model.
 This is the entry point for the user to interact with and annotate data.
-'''
+"""
+
+
 class MuTopiaModel(ABC, BaseEstimator):
 
     @abstractmethod
@@ -34,60 +36,54 @@ class MuTopiaModel(ABC, BaseEstimator):
     ):
         pass
 
-
     @abstractmethod
     def _init_model(**params) -> tuple[FactorModel, LocalsModel]:
         pass
-
 
     def fit(
         self,
         *train_datasets,
         test_datasets=None,
     ):
-        
+
         self.modality_ = train_datasets[0].modality()
 
         if len(train_datasets) == 0:
-            raise ValueError('At least one dataset is required to fit the model.')
+            raise ValueError("At least one dataset is required to fit the model.")
 
         if test_datasets is None:
-            train_datasets, test_datasets = list(zip(*map(
-                lambda dataset : train_test_split(dataset, self.test_chroms), train_datasets
-            )))
+            train_datasets, test_datasets = list(
+                zip(
+                    *map(
+                        lambda dataset: train_test_split(dataset, self.test_chroms),
+                        train_datasets,
+                    )
+                )
+            )
 
         random_state = np.random.RandomState(self.seed)
-        
+
         models = self._init_model(
-            train_datasets,
-            test_datasets,
-            random_state,
-            **self.get_params()
+            train_datasets, test_datasets, random_state, **self.get_params()
         )
 
-        (self.factor_model_, self.locals_model_, self.test_scores_) = \
-            fit_model(
-                train_datasets,
-                test_datasets,
-                random_state,
-                *models,
-                **self.get_params()
-            )
-        
+        (self.factor_model_, self.locals_model_, self.test_scores_) = fit_model(
+            train_datasets, test_datasets, random_state, *models, **self.get_params()
+        )
+
         return self
 
     @property
     def n_components(self):
         return self.num_components
-    
+
     @property
     def component_names(self):
         try:
             return self._component_names
         except AttributeError:
-            return ['M{}'.format(i) for i in range(0, self.n_components)]
-        
-    
+            return ["M{}".format(i) for i in range(0, self.n_components)]
+
     def _get_k(self, component_name):
         if isinstance(component_name, int):
             return component_name
@@ -95,56 +91,53 @@ class MuTopiaModel(ABC, BaseEstimator):
         try:
             return self.component_names.index(component_name)
         except ValueError:
-            raise ValueError(f'Component {component_name} not found in model.')
-        
+            raise ValueError(f"Component {component_name} not found in model.")
 
-    def rename_components(self, corpus, names : typing.List[str]):
+    def rename_components(self, corpus, names: typing.List[str]):
         if not len(names) == self.n_components:
-            raise ValueError('The number of names must match the number of components')
-        
+            raise ValueError("The number of names must match the number of components")
+
         name_map = dict(zip(self.component_names, names))
-        new_coords = {'component' : names}
-        
-        if 'shap_component' in corpus.coords:
+        new_coords = {"component": names}
+
+        if "shap_component" in corpus.coords:
             try:
-                new_coords['shap_component'] = [name_map[c] for c in corpus.coords['shap_component'].data]
+                new_coords["shap_component"] = [
+                    name_map[c] for c in corpus.coords["shap_component"].data
+                ]
             except KeyError:
-                raise KeyError('Some components in corpus do not match the model components. Just delete the SHAP_values and try again.')
+                raise KeyError(
+                    "Some components in corpus do not match the model components. Just delete the SHAP_values and try again."
+                )
 
         corpus = corpus.assign_coords(new_coords)
         self._component_names = names
 
         return corpus
 
-
     def _check_corpus(self, corpus, enforce_sample=True):
         check_corpus(corpus, enforce_sample=enforce_sample)
         if enforce_sample:
             check_dims(corpus, self.model_state_)
 
-
     def setup_corpus(self, corpus):
-        
-        logger.info('Setting up dataset state ...')
 
-        corpus = CS.init_corpusstate(corpus, self.factor_model_, self.locals_model_)
-        
+        logger.info("Setting up dataset state ...")
+
+        corpus = CS.init_state(corpus, self.factor_model_, self.locals_model_)
+
         with ParContext(1) as par:
-            CS.update_corpusstate(
-                corpus, 
+            CS.update_state(
+                corpus,
                 self.factor_model_,
                 from_scratch=True,
                 par_context=par,
             )
-        
-        CS.update_normalizers(
-            corpus, 
-            self.factor_model_.get_normalizers(corpus)
-        )
 
-        logger.info('Done ...')
+        CS.update_normalizers(corpus, self.factor_model_.get_normalizers(corpus))
+
+        logger.info("Done ...")
         return corpus
-        
 
     def save(self, path):
 
@@ -152,72 +145,64 @@ class MuTopiaModel(ABC, BaseEstimator):
             model.prepare_to_save()
 
         dump(self, path)
-    
-    
-    def plot_signature(self, 
-        component, 
-        *select, 
-        normalization='global',
-        **kwargs
-    ):
+
+    def plot_signature(self, component, *select, normalization="global", **kwargs):
         if len(select) == 0:
-            select = ['Baseline']
+            select = ["Baseline"]
 
         component = self._get_k(component)
 
         return self.modality_.plot(
-            self.factor_model_.format_signature(component, normalization=normalization), 
+            self.factor_model_.format_signature(component, normalization=normalization),
             *select,
-            **kwargs
+            **kwargs,
         )
-    
 
     def signature_report(
-        self, 
-        component, 
-        normalization='global',
+        self,
+        component,
+        normalization="global",
         width=5.25,
-        height=2.,
+        height=2.0,
         show=True,
     ):
 
         component = self._get_k(component)
 
-        signatures = self.factor_model_.format_signature(component, normalization=normalization)
+        signatures = self.factor_model_.format_signature(
+            component, normalization=normalization
+        )
         n_rows = len(signatures.mesoscale_state)
 
         state_groups = defaultdict(list)
         for state in signatures.mesoscale_state.values:
-            state_groups[state.split(':')[0]].append(state)
+            state_groups[state.split(":")[0]].append(state)
 
         for k, v in state_groups.items():
-            if not k=='Baseline' and len(v)==1:
-                state_groups[k].append('Baseline')
+            if not k == "Baseline" and len(v) == 1:
+                state_groups[k].append("Baseline")
 
         max_n_states = max(map(len, state_groups.values()))
         n_sigs = len(state_groups)
-        fig = plt.figure(
-            figsize=(
-                max(width*max_n_states, 10),
-                height*n_sigs + 3
-            )
-        )
+        fig = plt.figure(figsize=(max(width * max_n_states, 10), height * n_sigs + 3))
 
         gs = fig.add_gridspec(
-            2, 1,
-            height_ratios=[height*n_sigs, 1+0.35*n_rows],
+            2,
+            1,
+            height_ratios=[height * n_sigs, 1 + 0.35 * n_rows],
             hspace=0.1,
         )
 
         gs0 = gs[0].subgridspec(
-            n_sigs + 1, max_n_states, 
-            hspace=0.75, 
+            n_sigs + 1,
+            max_n_states,
+            hspace=0.75,
             wspace=0.5,
-            width_ratios=[3] + [1]*(max_n_states-1),
+            width_ratios=[3] + [1] * (max_n_states - 1),
         )
 
         for i, states in enumerate(state_groups.values()):
-            ax = fig.add_subplot(gs0[i, :len(states)])
+            ax = fig.add_subplot(gs0[i, : len(states)])
             self.plot_signature(
                 component,
                 *states,
@@ -230,81 +215,78 @@ class MuTopiaModel(ABC, BaseEstimator):
             normalization=normalization,
         )
 
-        fig.suptitle(
-            f'Signature {component} report', 
-            fontsize=12,
-            y=0.95
-        )
+        fig.suptitle(f"Signature {component} report", fontsize=12, y=0.95)
 
         if show:
             plt.show()
 
         return fig
 
-
-    def plot_interaction_matrix(self, 
-            component,
-            palette=diverging_palette,
-            gridspec=None,
-            normalization='global',
-            **kw,
-        ):
+    def plot_interaction_matrix(
+        self,
+        component,
+        palette=diverging_palette,
+        gridspec=None,
+        normalization="global",
+        **kw,
+    ):
 
         component = self._get_k(component)
 
         flatten = partial(self.modality_._flatten_observations)
 
         interactions = self.factor_model_.format_interactions(component)
-        
-        shared_effects = interactions.sel(context='Shared effect').to_pandas()
-        interactions = flatten(interactions.drop_sel(context='Shared effect')).to_pandas()
+
+        shared_effects = interactions.sel(context="Shared effect").to_pandas()
+        interactions = flatten(
+            interactions.drop_sel(context="Shared effect")
+        ).to_pandas()
 
         signature = self.factor_model_.format_signature(
-            component, 
-            normalization=normalization
+            component, normalization=normalization
         )
 
         return _plot_interaction_matrix(
-            partial(self.modality_.plot, signature, 'Baseline'),
+            partial(self.modality_.plot, signature, "Baseline"),
             interactions,
-            shared_effects, #.iloc[:,0],
+            shared_effects,  # .iloc[:,0],
             palette=palette,
             gridspec=gridspec,
-            **kw
+            **kw,
         )
-    
+
     def signature_panel(
         self,
         ncols=3,
-        normalization='global',
+        normalization="global",
         width=3.5,
         height=1.25,
         show=True,
         **kwargs,
     ):
-        
+
         K = self.n_components
-        nrows = int(np.ceil(K/ncols))
+        nrows = int(np.ceil(K / ncols))
 
         fig, ax = plt.subplots(
-            nrows, ncols, 
-            figsize=(width*ncols,height*nrows), 
-            gridspec_kw={'hspace': 0.5, 'wspace': 0.25},
+            nrows,
+            ncols,
+            figsize=(width * ncols, height * nrows),
+            gridspec_kw={"hspace": 0.5, "wspace": 0.25},
         )
 
         for k in range(self.n_components):
-            _ax=np.ravel(ax)[k]
+            _ax = np.ravel(ax)[k]
             self.plot_signature(k, ax=_ax, normalization=normalization, **kwargs)
             _ax.set_ylabel(self.component_names[k], fontsize=8)
 
-        for _ax in np.ravel(ax)[self.n_components:]:
-            _ax.axis('off')
+        for _ax in np.ravel(ax)[self.n_components :]:
+            _ax.axis("off")
 
         if show:
             plt.show()
         else:
             return fig
-    
 
     def annot_contributions(
         self,
@@ -318,31 +300,26 @@ class MuTopiaModel(ABC, BaseEstimator):
             corpus = self.setup_corpus(corpus)
 
         with ParContext(threads, verbose=verbose) as par:
-            contributions = self.locals_model\
-                .predict(
-                    corpus,
-                    self.factor_model_,
-                    par_context=par
-                )
-        
+            contributions = self.locals_model.predict(
+                corpus, self.factor_model_, par_context=par
+            )
+
         corpus = CorpusInterface(corpus)
-        corpus.corpus = (
-            corpus
-            .assign_coords({
-                'component' : self.component_names,
-            })
-            .assign({
-                'contributions' : contributions,
-            })
+        corpus.corpus = corpus.assign_coords(
+            {
+                "component": self.component_names,
+            }
+        ).assign(
+            {
+                "contributions": contributions,
+            }
         )
 
         logger.info('Added key to dataset: "contributions"')
         return corpus
-    
-    
-    
+
     def annot_component_distributions(
-        self, 
+        self,
         corpus,
         threads=1,
     ):
@@ -358,18 +335,22 @@ class MuTopiaModel(ABC, BaseEstimator):
                 with_context=False,
             )
 
-        corpus['component_distributions'] =\
-            np.exp(lmrt - lmrt.max(skipna=True)).fillna(0.).astype(np.float32)
-        
-        corpus['component_locus_distributions'] = (
-            (corpus.component_distributions * corpus.regions.context_frequencies)\
-            .sum(dim=dims_except_for(corpus.component_distributions.dims, 'locus', 'component'))/corpus.regions.length
+        corpus["component_distributions"] = (
+            np.exp(lmrt - lmrt.max(skipna=True)).fillna(0.0).astype(np.float32)
+        )
+
+        corpus["component_locus_distributions"] = (
+            (corpus.component_distributions * corpus.regions.context_frequencies).sum(
+                dim=dims_except_for(
+                    corpus.component_distributions.dims, "locus", "component"
+                )
+            )
+            / corpus.regions.length
         ).astype(np.float32)
-            
+
         logger.info('Added key: "component_distributions"')
         logger.info('Added key: "component_locus_distributions"')
         return corpus
-        
 
     def annot_marginal_prediction(
         self,
@@ -383,39 +364,43 @@ class MuTopiaModel(ABC, BaseEstimator):
             corpus = self.setup_corpus(corpus)
 
         try:
-            corpus['component_distributions']
+            corpus["component_distributions"]
         except KeyError:
             corpus = self.annot_component_distributions(corpus, threads)
 
         if exposures is None:
             try:
-                corpus['contributions']
+                corpus["contributions"]
             except KeyError:
                 corpus = self.annot_contributions(corpus, threads)
-            marginal_exposures = corpus['contributions'].sum(dim='sample').data
+            marginal_exposures = corpus["contributions"].sum(dim="sample").data
         else:
             marginal_exposures = np.sum(
-                [exposures(corpus, sample_name) for sample_name in CS.list_samples(corpus)],
+                [
+                    exposures(corpus, sample_name)
+                    for sample_name in CS.list_samples(corpus)
+                ],
                 axis=0,
             )
-            
-        marginal = \
-            self.factor_model_._log_marginalize_mutrate(
-                np.log(corpus['component_distributions']),
-                marginal_exposures
+
+        marginal = self.factor_model_._log_marginalize_mutrate(
+            np.log(corpus["component_distributions"]), marginal_exposures
+        )
+
+        corpus["predicted_marginal"] = (
+            np.exp(marginal - marginal.max(skipna=True)).fillna(0.0).astype(np.float32)
+        )
+        corpus["predicted_locus_marginal"] = (
+            (np.exp(marginal) * corpus.regions.context_frequencies).sum(
+                dim=dims_except_for(marginal.dims, "locus")
             )
-        
-        corpus['predicted_marginal'] = np.exp(marginal - marginal.max(skipna=True)).fillna(0.).astype(np.float32)
-        corpus['predicted_locus_marginal'] = (
-            (np.exp(marginal) * corpus.regions.context_frequencies)\
-                .sum(dim=dims_except_for(marginal.dims, 'locus'))/corpus.regions.length
+            / corpus.regions.length
         ).astype(np.float32)
-        
+
         logger.info('Added key: "predicted_marginal"')
         logger.info('Added key: "predicted_locus_marginal"')
-        
-        return corpus
 
+        return corpus
 
     def annot_SHAP_values(
         self,
@@ -426,36 +411,35 @@ class MuTopiaModel(ABC, BaseEstimator):
         n_samples=2000,
         seed=42,
     ):
-        
+
         try:
             import shap
         except ImportError:
-            raise ImportError('SHAP is required to calculate SHAP values')
-        
+            raise ImportError("SHAP is required to calculate SHAP values")
+
         self._check_corpus(corpus, enforce_sample=False)
 
         if not CS.has_corpusstate(corpus):
             corpus = self.setup_corpus(corpus)
-        
+
         if not scan:
-            subset_loci = (
-                np.random.RandomState(seed)
-                .choice(corpus.locus.size, max(n_samples, 1500), replace=False)
+            subset_loci = np.random.RandomState(seed).choice(
+                corpus.locus.size, max(n_samples, 1500), replace=False
             )
             subset = corpus.isel(locus=subset_loci)
         else:
             subset = corpus
-        
-        locus_model = self.factor_model_.models['theta_model']
+
+        locus_model = self.factor_model_.models["theta_model"]
         X = locus_model._fetch_feature_matrix(subset)
 
         background_idx = np.random.RandomState(0).choice(
-            len(X), size = min(1000, len(X)), replace = False
+            len(X), size=min(1000, len(X)), replace=False
         )
-        
+
         def _component_shap(k):
-            
-            logger.info(f'Calculating SHAP values for {self.component_names[k]} ...')
+
+            logger.info(f"Calculating SHAP values for {self.component_names[k]} ...")
 
             shaps = shap.TreeExplainer(
                 locus_model.rate_models[k],
@@ -467,40 +451,40 @@ class MuTopiaModel(ABC, BaseEstimator):
             )
 
             return np.squeeze(shaps)
-        
 
-        use_components = list(map(
-            self._get_k,
-            components if not len(components)==0 else list(range(self.n_components))
-        ))
+        use_components = list(
+            map(
+                self._get_k,
+                (
+                    components
+                    if not len(components) == 0
+                    else list(range(self.n_components))
+                ),
+            )
+        )
 
         with ParContext(threads) as par:
-            shap_matrix = np.array(list(par(
-                delayed(_component_shap)(k) for k in use_components
-            )))
+            shap_matrix = np.array(
+                list(par(delayed(_component_shap)(k) for k in use_components))
+            )
 
-        features = corpus.state.coords['feature'].data
+        features = corpus.state.coords["feature"].data
         coords = {
-            'shap_features' : features,
-            'shap_component' : [self.component_names[k] for k in use_components],
+            "shap_features": features,
+            "shap_component": [self.component_names[k] for k in use_components],
         }
-        
-        if not scan:
-            coords['shap_locus'] = subset.locus.data
 
-        corpus['SHAP_values'] = xr.DataArray(
+        if not scan:
+            coords["shap_locus"] = subset.locus.data
+
+        corpus["SHAP_values"] = xr.DataArray(
             shap_matrix,
-            dims=(
-                'shap_component',
-                'locus' if scan else 'shap_locus',
-                'shap_features'
-            ),
+            dims=("shap_component", "locus" if scan else "shap_locus", "shap_features"),
             coords=coords,
         )
 
         logger.info('Added key: "SHAP_values"')
         return corpus
-
 
     def score(
         self,
@@ -517,10 +501,11 @@ class MuTopiaModel(ABC, BaseEstimator):
             return self.locals_model_.deviance(
                 self.factor_model_,
                 (corpus,),
-                exposures_fn=using_exposures_from(corpus) if exposures is None else exposures,
+                exposures_fn=(
+                    using_exposures_from(corpus) if exposures is None else exposures
+                ),
                 par_context=par,
             ).item()
-
 
     def marginal_ll(
         self,
@@ -529,13 +514,13 @@ class MuTopiaModel(ABC, BaseEstimator):
         alpha=None,
         steps=64000,
     ):
-        
+
         if isinstance(alpha, str):
-            if alpha == 'uniform':
+            if alpha == "uniform":
                 alpha = np.ones(self.n_components)
             else:
                 raise ValueError('Alpha must be a list of floats or "uniform"')
-        
+
         self._check_corpus(corpus)
 
         if not CS.has_corpusstate(corpus):
@@ -549,28 +534,25 @@ class MuTopiaModel(ABC, BaseEstimator):
         )
 
         bar = trange(
-            len(corpus.list_samples()), 
-            desc='Calculating marginal lls', 
-            leave=False
+            len(corpus.list_samples()), desc="Calculating marginal lls", leave=False
         )
 
-        ll=0.
+        ll = 0.0
         for sample_ll, *_ in parallel_gen(ll_fns, threads, ordered=False):
             ll += sample_ll
             bar.update(1)
 
         return ll
 
-    
     def annot_residuals(
         self,
         corpus,
         exposures=None,
         threads=1,
     ):
-        raise NotImplementedError('This method is not implemented yet.')
-    
-        '''self._check_corpus(corpus)
+        raise NotImplementedError("This method is not implemented yet.")
+
+        """self._check_corpus(corpus)
 
         if not CS.has_corpusstate(corpus):
             corpus = self.setup_corpus(corpus)
@@ -586,61 +568,54 @@ class MuTopiaModel(ABC, BaseEstimator):
         corpus['pearson_residuals'] = residuals.astype(np.float32)
         logger.info('Added key: "residuals"')
 
-        return corpus'''
-    
+        return corpus"""
 
-    def format_signature(self, component, normalization='global'):
-        
+    def format_signature(self, component, normalization="global"):
+
         component = self._get_k(component)
 
         return self.modality_._flatten_observations(
-            self.factor_model_.format_signature(
-                component,
-                normalization=normalization
-            )
+            self.factor_model_.format_signature(component, normalization=normalization)
         )
-    
+
     @property
     def alpha_(self):
         return self.locals_model_.alpha
-    
 
     def execel_report(self, corpus, output):
-        
+
         try:
             from pandas import ExcelWriter
         except ImportError:
-            raise ImportError('openpyxl is required to save excel reports, install with `pip install openpyxl`')
-        
-        renorm = lambda x : x/x.sum()*1000
+            raise ImportError(
+                "openpyxl is required to save excel reports, install with `pip install openpyxl`"
+            )
+
+        renorm = lambda x: x / x.sum() * 1000
 
         with ExcelWriter(output) as writer:
 
             for sig in self.component_names:
                 (
                     renorm(self.format_signature(sig))
-                    .to_pandas().T
-                    .to_excel(
-                        writer,
-                        sheet_name=f'Signature_{sig}',
-                    )
-                )
-
-
-            if hasattr(corpus, 'contributions'):
-                (
-                    corpus
-                    .contributions
                     .to_pandas()
-                    .to_excel(
+                    .T.to_excel(
                         writer,
-                        sheet_name='Sample_contributions',
+                        sheet_name=f"Signature_{sig}",
                     )
                 )
 
-            if hasattr(corpus, 'SHAP_values'):
-                
-                shap_components = corpus.SHAP_values.coords['shap_component'].values
+            if hasattr(corpus, "contributions"):
+                (
+                    corpus.contributions.to_pandas().to_excel(
+                        writer,
+                        sheet_name="Sample_contributions",
+                    )
+                )
+
+            if hasattr(corpus, "SHAP_values"):
+
+                shap_components = corpus.SHAP_values.coords["shap_component"].values
                 expl = get_explanation(corpus, shap_components[0])
 
                 DataFrame(
@@ -648,7 +623,7 @@ class MuTopiaModel(ABC, BaseEstimator):
                     columns=expl.feature_names,
                 ).to_excel(
                     writer,
-                    sheet_name='SHAP_transformed_features',
+                    sheet_name="SHAP_transformed_features",
                     index=False,
                 )
 
@@ -656,7 +631,7 @@ class MuTopiaModel(ABC, BaseEstimator):
                 display_data.columns = expl.feature_names
                 display_data.to_excel(
                     writer,
-                    sheet_name='SHAP_original_features',
+                    sheet_name="SHAP_original_features",
                     index=False,
                 )
 
@@ -669,6 +644,6 @@ class MuTopiaModel(ABC, BaseEstimator):
                         columns=expl.feature_names,
                     ).to_excel(
                         writer,
-                        sheet_name='SHAP_values_{}'.format(component),
+                        sheet_name="SHAP_values_{}".format(component),
                         index=False,
                     )

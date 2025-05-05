@@ -2,14 +2,13 @@ import sparse
 import xarray as xr
 import pickle
 import datatree
-from numpy import nan, array, float32, int32
+from numpy import array, float32, int32
 from functools import wraps
 import time
 import netCDF4 as nc
 import tqdm
 import os
 from ..utils import FeatureType, logger
-from .gtensor import *
 
 WRITE_KW = dict(
     format="NETCDF4",
@@ -206,9 +205,9 @@ def write_sample(
     sample,
     sample_name,
 ):
-    
+
     arr = sample.X
-    
+
     dset = (
         arr.sparse_to_coo()
         if isinstance(arr.data, sparse.SparseArray)
@@ -294,7 +293,9 @@ def write_dataset(dataset, filename, bar=False):
     for section_name, section in dataset.drop_vars(["X"]).sections:
 
         # check if any are sparse - if so error with a nice message
-        sparse_vars = [varname for varname, var in section.data_vars.items() if var.is_sparse()]
+        sparse_vars = [
+            varname for varname, var in section.data_vars.items() if var.is_sparse()
+        ]
 
         if len(sparse_vars) > 0:
             raise ValueError(
@@ -311,7 +312,7 @@ def write_dataset(dataset, filename, bar=False):
         )
 
     if len(dataset.list_samples()) > 0:
-        
+
         for sample_name in (
             dataset.list_samples()
             if not bar
@@ -322,6 +323,7 @@ def write_dataset(dataset, filename, bar=False):
                 dataset.fetch_sample(sample_name),
                 sample_name,
             )
+
 
 def _is_sparse_coo(group):
     return group.__dict__.get("format", "not coo") == "COO"
@@ -360,14 +362,11 @@ def _load_dense(filename, sample_name, **kwargs):
 
 
 def _backend_load_sample(dset, sample_name, coo=False):
-    
+
     X_group = dset.groups["raw"]["X"][sample_name]
     X = (_load_sparse if _is_sparse_coo(X_group) else _load_dense)(X_group, coo=coo)
-    
-    return (
-        xr.Dataset({"X": X})
-        .assign_coords({"sample": sample_name})
-    )
+
+    return xr.Dataset({"X": X}).assign_coords({"sample": sample_name})
 
 
 def load_sample(filename, sample_name, coo=False):
@@ -429,10 +428,10 @@ def _pack_samples(samples):
     samples = xr.concat(samples, dim="sample")
 
     if isinstance(samples.X.data, sparse.SparseArray):
-        samples.X.ascsr('sample','locus')
+        samples.X.ascsr("sample", "locus")
         X = samples.X.data
         X.coords = X.astype(int32, copy=False)
-    
+
     return samples
 
 
@@ -441,7 +440,6 @@ def load_dataset(filename, with_samples=True, with_state=True):
     def open_ds(**kw):
         with retry_until_write(xr.open_dataset)(filename, engine="netcdf4", **kw) as ds:
             return ds.load()
-        
 
     if filename.endswith(".pkl"):
         with open(filename, "rb") as f:
@@ -462,7 +460,9 @@ def load_dataset(filename, with_samples=True, with_state=True):
             continue
 
         section = open_ds(group=section_name)
-        section = section[[k for k,v in section.data_vars.items() if v.attrs.get("active", 1) == 1]]
+        section = section[
+            [k for k, v in section.data_vars.items() if v.attrs.get("active", 1) == 1]
+        ]
 
         # the "data" section is special - it contains everything not in another section
         if not section_name.title() == "Data":
@@ -481,7 +481,7 @@ def load_dataset(filename, with_samples=True, with_state=True):
         sample_names = _list_sample_names(filename)
         dataset = dataset.assign_coords({"sample": sample_names})
         samples = _pack_samples(list(yield_samples(filename, *sample_names, coo=True)))
-        
+
         dataset = dataset.merge(samples)
 
     except NoSamplesError:

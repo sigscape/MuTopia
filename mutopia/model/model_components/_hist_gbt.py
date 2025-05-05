@@ -11,16 +11,22 @@ from sklearn.utils.validation import (
     _check_monotonic_cst,
     _check_sample_weight,
     check_consistent_length,
-    _check_y
+    _check_y,
 )
-from sklearn.ensemble._hist_gradient_boosting._gradient_boosting import _update_raw_predictions
+from sklearn.ensemble._hist_gradient_boosting._gradient_boosting import (
+    _update_raw_predictions,
+)
 from sklearn.ensemble._hist_gradient_boosting.binning import _BinMapper
 from sklearn.ensemble._hist_gradient_boosting.common import G_H_DTYPE, X_DTYPE
-from sklearn.ensemble._hist_gradient_boosting.gradient_boosting import BaseHistGradientBoosting, _update_leaves_values
+from sklearn.ensemble._hist_gradient_boosting.gradient_boosting import (
+    BaseHistGradientBoosting,
+    _update_leaves_values,
+)
 from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.ensemble._hist_gradient_boosting.grower import TreeGrower
 from numba import njit
 import warnings
+
 
 class ShrunkTreePredictor:
 
@@ -42,20 +48,15 @@ class ShrunkTreePredictor:
 
     def compute_partial_dependence(self, *args):
         return self.tree_predictor.compute_partial_dependence(*args)
-    
+
     @property
     def nodes(self):
         return self.tree_predictor.nodes
-    
+
 
 @njit(nogil=True)
-def _fit_bias(*, 
-        y_train, 
-        raw_predictions, 
-        intercept_train, 
-        intercept_val
-    ):
-    '''
+def _fit_bias(*, y_train, raw_predictions, intercept_train, intercept_val):
+    """
     Parameters
     ----------
 
@@ -70,7 +71,7 @@ def _fit_bias(*,
     intercept_val : array-like of shape (n_samples,)
         A vector of int-encoded labels which indicate from which corpus
         a given observation is from.
-    '''
+    """
     n_train = len(y_train)
     n_corpuses = max(intercept_train) + 1
     mean_y = np.zeros(n_corpuses, dtype=y_train.dtype)
@@ -78,21 +79,20 @@ def _fit_bias(*,
 
     for i in range(n_train):
         mean_y[intercept_train[i]] += y_train[i]
-        mean_pred[intercept_train[i]] += np.exp(raw_predictions[i,0])
-    
+        mean_pred[intercept_train[i]] += np.exp(raw_predictions[i, 0])
+
     bias = np.log(mean_y) - np.log(mean_pred)
 
     return (
-        np.expand_dims(bias[intercept_train],-1), 
-        np.expand_dims(bias[intercept_val], -1)
+        np.expand_dims(bias[intercept_train], -1),
+        np.expand_dims(bias[intercept_val], -1),
     )
 
-    
 
 class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
     """Base class for histogram-based gradient boosting estimators."""
 
-    '''@staticmethod
+    """@staticmethod
     def get_log_weight(*, 
                        y_train, 
                        raw_predictions, 
@@ -110,16 +110,19 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
         bias_t_train = intercept_train.multiply(log_w_t).sum(1)
         bias_t_val = intercept_val.multiply(log_w_t).sum(1)
 
-        return bias_t_train, bias_t_val'''
+        return bias_t_train, bias_t_val"""
 
-
-    #@_fit_context(prefer_skip_nested_validation=True)
-    def fit(self, X, y,*,
-            raw_predictions, 
-            sample_weight, 
-            intercept_idx,
-            svi_shrinkage = 1.,
-            ):
+    # @_fit_context(prefer_skip_nested_validation=True)
+    def fit(
+        self,
+        X,
+        y,
+        *,
+        raw_predictions,
+        sample_weight,
+        intercept_idx,
+        svi_shrinkage=1.0,
+    ):
         """Fit the gradient boosting model.
 
         Parameters
@@ -156,7 +159,7 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
         acc_compute_hist_time = 0.0  # time spent computing histograms
         # time spent predicting X for gradient and hessians update
         acc_prediction_time = 0.0
-        #X, y = self._validate_data(X, y, dtype=[X_DTYPE], force_all_finite=False)
+        # X, y = self._validate_data(X, y, dtype=[X_DTYPE], force_all_finite=False)
         X = self._preprocess_X(X, reset=False)
         y = _check_y(y, estimator=self)
         y = self._encode_y(y)
@@ -174,7 +177,9 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
 
         raw_predictions = np.asarray(raw_predictions, dtype=X_DTYPE, order="F")
         if raw_predictions.shape != (X.shape[0], self.n_trees_per_iteration_):
-            raise ValueError("raw_predictions must have shape (n_samples, n_trees_per_iteration_)")
+            raise ValueError(
+                "raw_predictions must have shape (n_samples, n_trees_per_iteration_)"
+            )
 
         # When warm starting, we want to reuse the same seed that was used
         # the first time fit was called (e.g. for subsampling or for the
@@ -187,7 +192,7 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
             feature_subsample_seed = rng.randint(np.iinfo(np.uint32).max, dtype="u8")
             self._feature_subsample_rng = np.random.default_rng(feature_subsample_seed)
 
-        #self._validate_parameters()
+        # self._validate_parameters()
         monotonic_cst = _check_monotonic_cst(self, self.monotonic_cst)
 
         # used for validation in predict
@@ -256,9 +261,13 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
             X_train, y_train, sample_weight_train = X, y, sample_weight
             X_val = y_val = sample_weight_val = None
 
-        X_binned_train = self._bin_data(X_train, n_threads = n_threads, is_training_data=True)
+        X_binned_train = self._bin_data(
+            X_train, n_threads=n_threads, is_training_data=True
+        )
         if X_val is not None:
-            X_binned_val = self._bin_data(X_val, n_threads = n_threads, is_training_data=False)
+            X_binned_val = self._bin_data(
+                X_val, n_threads=n_threads, is_training_data=False
+            )
         else:
             X_binned_val = None
 
@@ -288,7 +297,7 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
             # else 1.
             # self._baseline_prediction has shape (1, n_trees_per_iteration)
 
-            #if not np.isclose(raw_predictions, 0.).all():
+            # if not np.isclose(raw_predictions, 0.).all():
             #    warnings.warn('Initial raw predictions are not set to 0. This will bias the predictions of the model.')
 
             self._baseline_prediction = np.zeros_like(raw_predictions[0])
@@ -299,7 +308,7 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
 
             # Initialize structures and attributes related to early stopping
             self._scorer = None  # set if scoring != loss
-            #raw_predictions_val = None  # set if scoring == loss and use val
+            # raw_predictions_val = None  # set if scoring == loss and use val
             self.train_score_ = []
             self.validation_score_ = []
 
@@ -319,17 +328,17 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
                     self._check_early_stopping_loss(
                         raw_predictions=raw_predictions,
                         y_train=y_train,
-                        #intercept_train=intercept_train,
+                        # intercept_train=intercept_train,
                         sample_weight_train=sample_weight_train,
                         raw_predictions_val=raw_predictions_val,
-                        #intercept_val=intercept_val,
+                        # intercept_val=intercept_val,
                         y_val=y_val,
                         sample_weight_val=sample_weight_val,
                         n_threads=n_threads,
                     )
                 else:
                     raise NotImplementedError()
-                
+
             begin_at_stage = 0
 
         # warm start: this is not the first time fit was called
@@ -346,7 +355,7 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
             self.train_score_ = self.train_score_.tolist()
             self.validation_score_ = self.validation_score_.tolist()
 
-            '''if self.do_early_stopping_ and self.scoring != "loss":
+            """if self.do_early_stopping_ and self.scoring != "loss":
                 # Compute the subsample set
                 (
                     X_binned_small_train,
@@ -354,7 +363,7 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
                     sample_weight_small_train,
                 ) = self._get_small_trainset(
                     X_binned_train, y_train, sample_weight_train, self._random_seed
-                )'''
+                )"""
 
             # Get the predictors from the previous fit
             predictors = self._predictors
@@ -377,8 +386,8 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
                     "[{}/{}] ".format(iteration + 1, self.max_iter), end="", flush=True
                 )
 
-            # 1: fit the bias term here 
-            # this code finds the mean y and prediction for each distribution according to the design matrix. 
+            # 1: fit the bias term here
+            # this code finds the mean y and prediction for each distribution according to the design matrix.
             bias_t_train, bias_t_val = _fit_bias(
                 y_train=y_train,
                 raw_predictions=raw_predictions,
@@ -394,7 +403,7 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
 
             # Update gradients and hessians, inplace
             # Note that self._loss expects shape (n_samples,) for
-            # n_trees_per_iteration = 1 else shape (n_samples, n_trees_per_iteration).                
+            # n_trees_per_iteration = 1 else shape (n_samples, n_trees_per_iteration).
             if self._loss.constant_hessian:
                 self._loss.gradient(
                     y_true=y_train,
@@ -424,7 +433,6 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
             else:
                 g_view = gradient
                 h_view = hessian
-            
 
             # Build `n_trees_per_iteration` trees.
             for k in range(self.n_trees_per_iteration_):
@@ -464,8 +472,8 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
                     )
 
                 predictor = grower.make_predictor(
-                        binning_thresholds=self._bin_mapper.bin_thresholds_
-                    )
+                    binning_thresholds=self._bin_mapper.bin_thresholds_
+                )
 
                 predictors[-1].append(predictor)
 
@@ -475,7 +483,6 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
                 _update_raw_predictions(raw_predictions[:, k], grower, n_threads)
                 toc_pred = time()
                 acc_prediction_time += toc_pred - tic_pred
-
 
             should_early_stop = False
             if self.do_early_stopping_:
@@ -492,11 +499,11 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
                     should_early_stop = self._check_early_stopping_loss(
                         raw_predictions=raw_predictions,
                         y_train=y_train,
-                        #intercept_train=intercept_train,
+                        # intercept_train=intercept_train,
                         sample_weight_train=sample_weight_train,
                         raw_predictions_val=raw_predictions_val,
                         y_val=y_val,
-                        #intercept_val=intercept_val,
+                        # intercept_val=intercept_val,
                         sample_weight_val=sample_weight_val,
                         n_threads=n_threads,
                     )
@@ -507,17 +514,17 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
             if self.verbose:
                 self._print_iteration_stats(iteration_start_time)
 
-            n_trees_fit+=1
+            n_trees_fit += 1
 
             # maybe we could also early stop if all the trees are stumps?
             ## DELETE THIS
-            #should_early_stop = False
+            # should_early_stop = False
 
             if should_early_stop:
                 break
-        
+
         # change most recently-added predictors to shrunk predictors
-        for i in range(1, n_trees_fit+1):
+        for i in range(1, n_trees_fit + 1):
             for k in range(self.n_trees_per_iteration_):
                 self._predictors[-i][k] = ShrunkTreePredictor(
                     self._predictors[-i][k], svi_shrinkage
@@ -561,9 +568,8 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
         self.train_score_ = np.asarray(self.train_score_)
         self.validation_score_ = np.asarray(self.validation_score_)
         del self._in_fit  # hard delete so we're sure it can't be used anymore
-        
+
         return self
-    
 
     def _preprocess_X(self, X, *, reset):
         """Preprocess and validate X.
@@ -587,18 +593,17 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
         # If there is a preprocessor, we let the preprocessor handle the validation.
         # Otherwise, we validate the data ourselves.
         check_X_kwargs = dict(dtype=[X_DTYPE], force_all_finite=False)
-        
+
         if reset:
             self.is_categorical_ = self._check_categorical_features(X)
             self.n_features_in_ = X.shape[1]
 
         return self._validate_data(X, reset=False, **check_X_kwargs)
-    
 
     def fit_binning(self, X, known_categories):
 
         n_threads = _openmp_effective_n_threads()
-        #self.is_categorical_, known_categories = self._check_categories(X)
+        # self.is_categorical_, known_categories = self._check_categories(X)
         X = self._preprocess_X(X, reset=True)
 
         known_categories = [
@@ -614,11 +619,10 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
             random_state=42,
             n_threads=n_threads,
         ).fit(X)
-        
+
         return self
 
-
-    def _bin_data(self, X, n_threads = 1, is_training_data = True):
+    def _bin_data(self, X, n_threads=1, is_training_data=True):
         """Bin data X.
 
         If is_training_data, then fit the _bin_mapper attribute.
@@ -649,27 +653,28 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
             )
         tic = time()
 
-        X_binned = self._bin_mapper.transform(X) 
+        X_binned = self._bin_mapper.transform(X)
 
         if not is_training_data:
             X_binned = np.ascontiguousarray(X_binned)
-    
+
         toc = time()
         if self.verbose:
             duration = toc - tic
             print("{:.3f} s".format(duration))
 
         return X_binned
-        
-    
-    def _raw_predict_from(self, 
-            X, raw_predictions, 
-            from_iteration = 0,
-            check_input = True,
-        ):
+
+    def _raw_predict_from(
+        self,
+        X,
+        raw_predictions,
+        from_iteration=0,
+        check_input=True,
+    ):
 
         is_binned = getattr(self, "_in_fit", False)
-        
+
         if check_input:
             X = self._preprocess_X(X, reset=False)
 
@@ -689,7 +694,9 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
             X, self._predictors[from_iteration:], raw_predictions, is_binned, n_threads
         )
         return raw_predictions
-    
-    
-class CustomHistGradientBooster(BaseCustomBinnedGradientBooster, HistGradientBoostingRegressor):
+
+
+class CustomHistGradientBooster(
+    BaseCustomBinnedGradientBooster, HistGradientBoostingRegressor
+):
     pass

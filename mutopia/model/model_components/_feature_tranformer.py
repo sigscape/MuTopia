@@ -153,14 +153,19 @@ class PasteTransformer(BaseEstimator, TransformerMixin, OneToOneFeatureMixin):
         return self.feature_names
 
     def transform(self, X, *, corpus):
-        missing_features = set(self.feature_names).difference(set(CS.get_features(X).keys()))
+        missing_features = set(self.feature_names).difference(
+            set(CS.get_features(X).keys())
+        )
         if len(missing_features) > 0:
             raise ValueError(
                 f"The following features are missing from the input data: {str_wrapped_list(missing_features)}"
             )
 
         df = pd.DataFrame(
-            {feature: CS.get_features(X)[feature].data for feature in self.feature_names}
+            {
+                feature: CS.get_features(X)[feature].data
+                for feature in self.feature_names
+            }
         )
 
         if self.add_corpus_intercepts:

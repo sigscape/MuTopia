@@ -36,22 +36,23 @@ MUTOPIA_TO_COSMIC_IDX = np.array(
     [MUTOPIA_ORDER.index(cosmic) for cosmic in COSMIC_SORT_ORDER]
 )
 
+
 @njit(
-    "Tuple((float32, float32[:,:],float32[:]))(int64, float32[:,::1], float32[::1], float32[::1], float32[:,:], int64[:,::1])", 
-    nogil=True
+    "Tuple((float32, float32[:,:],float32[:]))(int64, float32[:,::1], float32[::1], float32[::1], float32[:,:], int64[:,::1])",
+    nogil=True,
 )
 def _fast_exp_offsets(
     num_states,
-    context_freqs, # (L x C*D)
-    exposures, # L
-    locus_effects, # L
-    context_effects, # S x C
-    idx_selector, # L,D
+    context_freqs,  # (L x C*D)
+    exposures,  # L
+    locus_effects,  # L
+    context_effects,  # S x C
+    idx_selector,  # L,D
 ):
-    
+
     D = 2
     L, CD = context_freqs.shape
-    C = CD//D
+    C = CD // D
 
     assert exposures.shape[0] == L
     assert locus_effects.shape[0] == L
@@ -64,18 +65,17 @@ def _fast_exp_offsets(
     for l, (s_d0, s_d1) in enumerate(idx_selector):
 
         # (D, C)
-        o = exposures[l] * context_freqs[l,:].reshape(C, D).T
+        o = exposures[l] * context_freqs[l, :].reshape(C, D).T
 
-        context_offsets[s_d0, :] += o[0]*locus_effects[l]
-        context_offsets[s_d1, :] += o[1]*locus_effects[l]
+        context_offsets[s_d0, :] += o[0] * locus_effects[l]
+        context_offsets[s_d1, :] += o[1] * locus_effects[l]
 
-        locus_offsets[l] += (
-            (context_effects[s_d0, :] * o[0]).sum()
-            + (context_effects[s_d1, :] * o[1]).sum()
-        )
+        locus_offsets[l] += (context_effects[s_d0, :] * o[0]).sum() + (
+            context_effects[s_d1, :] * o[1]
+        ).sum()
 
-        normalizer += locus_offsets[l]*locus_effects[l]
-        
+        normalizer += locus_offsets[l] * locus_effects[l]
+
     return (
         -np.log(normalizer),
         context_offsets.T,
@@ -85,25 +85,32 @@ def _fast_exp_offsets(
 
 contig_f32 = partial(np.ascontiguousarray, dtype=np.float32)
 
+
 def _get_exp_offsets_k_c(k, corpus, num_states):
 
     args = (
         (
-            corpus.sections.regions
-            .context_frequencies
-            .transpose('locus','context', 'configuration')
-            .data
-            .reshape(-1, 192)
+            corpus.sections.regions.context_frequencies.transpose(
+                "locus", "context", "configuration"
+            ).data.reshape(-1, 192)
         ),
         corpus.sections.regions.exposures.data,
-        contig_f32( np.exp(corpus.sections.state.log_locus_distribution).sel(component=k).data ),
-        np.exp(corpus.sections.state.log_context_distribution).sel(component=k).transpose(..., 'context').data,
+        contig_f32(
+            np.exp(corpus.sections.state.log_locus_distribution).sel(component=k).data
+        ),
+        np.exp(corpus.sections.state.log_context_distribution)
+        .sel(component=k)
+        .transpose(..., "context")
+        .data,
         corpus.sections.state.mesoscale_idx.data.T,
     )
 
     (normalizer, context_offsets, locus_offsets) = _fast_exp_offsets(num_states, *args)
 
-    return (normalizer, {'context_model': context_offsets, 'theta_model': locus_offsets})
+    return (
+        normalizer,
+        {"context_model": context_offsets, "theta_model": locus_offsets},
+    )
 
 
 class SBSModel(MuTopiaModel):
@@ -127,7 +134,7 @@ class SBSModel(MuTopiaModel):
         max_trees_per_iter=25,
         max_leaf_nodes=31,
         min_samples_leaf=30,
-        max_features=1.,
+        max_features=1.0,
         n_iter_no_change=1,
         use_groups=True,
         add_corpus_intercepts=False,
@@ -137,21 +144,21 @@ class SBSModel(MuTopiaModel):
         init_variance_theta=0.03,
         init_variance_context=0.1,
         # optimization settings
-        empirical_bayes = True,
-        begin_prior_updates = 50,
+        empirical_bayes=True,
+        begin_prior_updates=50,
         stop_condition=50,
         # optimization settings
-        num_epochs = 2000,
-        locus_subsample = None,
-        batch_subsample = None,
-        threads = 1,
-        kappa = 0.5,
-        tau = 1.,
+        num_epochs=2000,
+        locus_subsample=None,
+        batch_subsample=None,
+        threads=1,
+        kappa=0.5,
+        tau=1.0,
         callback=None,
         eval_every=10,
         verbose=0,
         time_limit=None,
-        test_chroms=('chr1',),
+        test_chroms=("chr1",),
     ):
         self.num_components = num_components
         self.init_components = init_components
@@ -181,19 +188,19 @@ class SBSModel(MuTopiaModel):
         self.init_variance_context = init_variance_context
         # optimization settings
         self.test_chroms = test_chroms
-        self.empirical_bayes=empirical_bayes
-        self.begin_prior_updates=begin_prior_updates
-        self.stop_condition=stop_condition
-        self.num_epochs=num_epochs
-        self.locus_subsample=locus_subsample
-        self.batch_subsample=batch_subsample
-        self.threads=threads
-        self.kappa=kappa
-        self.tau=tau
-        self.callback=callback
-        self.eval_every=eval_every
-        self.verbose=verbose
-        self.time_limit=time_limit
+        self.empirical_bayes = empirical_bayes
+        self.begin_prior_updates = begin_prior_updates
+        self.stop_condition = stop_condition
+        self.num_epochs = num_epochs
+        self.locus_subsample = locus_subsample
+        self.batch_subsample = batch_subsample
+        self.threads = threads
+        self.kappa = kappa
+        self.tau = tau
+        self.callback = callback
+        self.eval_every = eval_every
+        self.verbose = verbose
+        self.time_limit = time_limit
 
     def sample_params(self, study, trial, extensive=0):
         return sample_params(study, trial, extensive=extensive)
@@ -232,7 +239,7 @@ class SBSModel(MuTopiaModel):
         init_variance_theta,
         **kw,
     ):
-        
+
         logger.info("Initializing model parameters and transformations...")
 
         context_model = StrandedContextModel(
@@ -250,7 +257,9 @@ class SBSModel(MuTopiaModel):
             max_iter=max_iter,
         )
 
-        theta_model = (GBTThetaModel if locus_model_type == "gbt" else LinearThetaModel)(
+        theta_model = (
+            GBTThetaModel if locus_model_type == "gbt" else LinearThetaModel
+        )(
             train_corpuses,
             init_variance=init_variance_theta,
             n_components=num_components,
@@ -268,13 +277,13 @@ class SBSModel(MuTopiaModel):
             l2_regularization=l2_regularization,
         )
 
-        '''sparse = train_corpuses[0].X.is_sparse()
+        """sparse = train_corpuses[0].X.is_sparse()
         if not all(
             corpus.X.is_sparse() == sparse for corpus in train_corpuses + test_corpuses
         ):
             raise ValueError(
                 "All corpuses must be either sparse or dense - mixtures are not allowed!"
-            )'''
+            )"""
 
         locals_model = LDAUpdateSparse(
             train_corpuses,
@@ -287,11 +296,12 @@ class SBSModel(MuTopiaModel):
             train_corpuses,
             context_model=context_model,
             theta_model=theta_model,
-            offsets_fn=partial(_get_exp_offsets_k_c, num_states=context_model.num_mesoscale_states),
+            offsets_fn=partial(
+                _get_exp_offsets_k_c, num_states=context_model.num_mesoscale_states
+            ),
         )
 
         return (factor_model, locals_model)
-
 
 
 class SBSMode(ModeConfig):
@@ -299,7 +309,7 @@ class SBSMode(ModeConfig):
     MODE_ID = "sbs"
     MUTOPIA_TO_COSMIC_IDX = MUTOPIA_TO_COSMIC_IDX
     PALETTE = MUTATION_PALETTE
-    X_LABELS = ['{}>{}'.format(*m) for m in _transition_palette.keys()]
+    X_LABELS = ["{}>{}".format(*m) for m in _transition_palette.keys()]
     DATABASE = "musical_sbs.json"
 
     @property
@@ -307,21 +317,18 @@ class SBSMode(ModeConfig):
         return {
             "clustered": ("clustered", ["no", "yes"]),
             "configuration": ("configuration", CONFIGURATIONS),
-            "context" : ("context", MUTOPIA_ORDER),
-            "mutation" : ("context", [s[2:5] for s in MUTOPIA_ORDER]),
+            "context": ("context", MUTOPIA_ORDER),
+            "mutation": ("context", [s[2:5] for s in MUTOPIA_ORDER]),
         }
 
     @property
-    def MuTopiaModel(self):
+    def TopographyModel(self):
         return SBSModel
-
 
     @classmethod
     def _flatten_observations(cls, signature):
         signature = (
-            super()
-            ._flatten_observations(signature)
-            .sel(context=COSMIC_SORT_ORDER)
+            super()._flatten_observations(signature).sel(context=COSMIC_SORT_ORDER)
         )
 
         return signature
@@ -378,7 +385,9 @@ class SBSMode(ModeConfig):
 
         # LxDxC => DxCxL
         trinuc_matrix = (
-            np.array(trinuc_matrix).transpose(((1, 2, 0))).astype(np.float32, copy=False)
+            np.array(trinuc_matrix)
+            .transpose(((1, 2, 0)))
+            .astype(np.float32, copy=False)
         )
         # DON'T (!) add a pseudocount
 
@@ -392,7 +401,6 @@ class SBSMode(ModeConfig):
             trinuc_matrix,
             dims=("configuration", "context", "locus"),
         )
-
 
     def ingest_observations(
         self,
@@ -436,8 +444,7 @@ class SBSMode(ModeConfig):
         )
 
         return sample_arr.isel(locus=locus_coords)
-    
-    
+
     def ingest_uncollaposed(
         self,
         vcf_file,
@@ -459,7 +466,8 @@ class SBSMode(ModeConfig):
         # create the sample array for inference
         sample_arr = xr.DataArray(
             COO(
-                coords, weights, 
+                coords,
+                weights,
                 shape=(2, 2, len(MUTOPIA_ORDER), locus_dim),
                 has_duplicates=False,
                 sorted=True,
@@ -470,12 +478,11 @@ class SBSMode(ModeConfig):
         )
 
         sample_arr = sample_arr.isel(locus=locus_coords)
-        
-        mut_id_mask = np.isin(coords[-1,:], locus_coords)
+
+        mut_id_mask = np.isin(coords[-1, :], locus_coords)
         mut_ids = [_id for _id, include in zip(mut_ids, mut_id_mask) if include]
 
         return (mut_ids, sample_arr)
-
 
     def annotate_mutations(
         self,
@@ -488,7 +495,7 @@ class SBSMode(ModeConfig):
         warmup=1000,
         **ingest_kw,
     ):
-        
+
         logger.info("Ingesting mutations ...")
         mut_ids, sample_arr = self.ingest_uncollaposed(
             vcf_file,
@@ -499,10 +506,7 @@ class SBSMode(ModeConfig):
         logger.info("Inferring source processes ...")
         # run the inference algorithm to find the process contributions
         posterior, contributions = (
-            model
-            .model_state_ 
-            .locals_model
-            .posterior_assign_sample(
+            model.model_state_.locals_model.posterior_assign_sample(
                 sample_arr,
                 dataset,
                 model.model_state_,
@@ -514,18 +518,15 @@ class SBSMode(ModeConfig):
         print(
             tabulate(
                 pd.DataFrame(
-                    contributions/contributions.sum(),
-                    index=model.component_names, 
-                    columns=['Fraction of\nmutations'],
-                ).sort_values(
-                    'Fraction of\nmutations', 
-                    ascending=False
-                ),
-                headers='keys',
-                tablefmt='simple',
-                floatfmt=(".3f", ".3f")
-            ), 
-            file=sys.stderr
+                    contributions / contributions.sum(),
+                    index=model.component_names,
+                    columns=["Fraction of\nmutations"],
+                ).sort_values("Fraction of\nmutations", ascending=False),
+                headers="keys",
+                tablefmt="simple",
+                floatfmt=(".3f", ".3f"),
+            ),
+            file=sys.stderr,
         )
 
         # create a dataframe to store the posterior distribution
@@ -533,11 +534,11 @@ class SBSMode(ModeConfig):
             np.log(posterior.T),
             index=pd.MultiIndex.from_tuples(
                 mut_ids,
-                names=["CHROM","POS"],
+                names=["CHROM", "POS"],
             ),
-            columns=['logp_' + str(k) for k in model.component_names],
+            columns=["logp_" + str(k) for k in model.component_names],
         ).reset_index()
-        
+
         logger.info("Annotating VCF ...")
         # transfer the annotations to the VCF file
         transfer_annotations_to_vcf(

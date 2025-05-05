@@ -124,9 +124,9 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         return ("locus",)
 
     def _init_log_locus_distribution(self, locus_features):
-        
+
         X = locus_features[:, self.n_categorical_features_ :]
-        
+
         return DataArray(
             np.asfortranarray(
                 (np.nan_to_num(X, nan=-3.0) @ self.init_projection_.T).T,

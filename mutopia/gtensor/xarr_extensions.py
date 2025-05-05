@@ -26,33 +26,10 @@ section_priorities = defaultdict(
 )
 
 
-def section_repr(ds) -> str:
-
-    obj_type = f"{type(ds).__name__}"
-
-    header_components = [f"<div class='xr-obj-type'>{escape(obj_type)}</div>"]
-
-    sections = defaultdict(dict)
-    for var_name, var in ds.data_vars.items():
-        sections[_get_section(var_name)][var_name] = var
-
-    sections = dict(sorted(sections.items(), key=lambda x: section_priorities[x[0]]))
-
-    sections = [
-        datavar_section(
-            section,
-            name=section_name,
-            max_items_collapse=1
-        )
-        for section_name, section in sections.items()
-    ]
-
-    return _obj_repr(ds, header_components, sections)
-
-
 def dataset_repr(ds) -> str:
 
-    header_components = [f"<div class='xr-obj-type'>G-Tensor</div>"]
+    obj_type = f"{ds.attrs.get('name', 'Data')}"
+    header_components = [f"<div class='xr-obj-type'>G-Tensor: {escape(obj_type)}</div>"]
 
     sections = defaultdict(dict)
     for var_name, var in ds.data_vars.items():
@@ -217,17 +194,17 @@ class IsSparse(BaseAccessor):
         return isinstance(self._xrds.data, sparse.SparseArray)
 
 
-@xr.register_dataset_accessor("fetch_sample")
-class FetchSample(BaseAccessor):
-    def __call__(self, sample_name):
-        sample_vars = [v for v,k in self._xrds.data_vars.items() if 'sample' in k.dims]
-        return self._xrds[sample_vars].sel(sample=sample_name)
-
-
 @xr.register_dataset_accessor("list_samples")
 class FetchSample(BaseAccessor):
     def __call__(self):
         return self._xrds.sample.values
+
+
+@xr.register_dataset_accessor("fetch_sample")
+class FetchSample(BaseAccessor):
+    def __call__(self, sample_name):
+        sample_vars = [v for v, k in self._xrds.data_vars.items() if "sample" in k.dims]
+        return self._xrds[sample_vars].sel(sample=sample_name)
 
 
 @xr.register_dataset_accessor("iter_samples")
@@ -235,19 +212,10 @@ class FetchSample(BaseAccessor):
     def __call__(self):
         for sample_name in self._xrds.list_samples():
             yield self._xrds.fetch_sample(sample_name)
-            
+
 
 @xr.register_dataset_accessor("sections")
 class Section(BaseAccessor):
-
-    def __repr__(self):
-        return "\n".join(
-            f"- {section_name}"
-            for section_name in self.groups.keys()
-        )
-    
-    def _repr_html_(self):
-        return section_repr(self._xrds)
 
     def __getitem__(self, section: str):
         section = section.title()
@@ -276,11 +244,11 @@ class Section(BaseAccessor):
         for k in self._xrds.data_vars.keys():
             sections[_get_section(k)].append(k)
         return dict(sections)
-    
+
     @property
     def names(self):
         return list(self.groups.keys())
-    
+
     def __iter__(self):
-        for section in self.groups.keys():
+        for section in self._groups.keys():
             yield section, self[section]

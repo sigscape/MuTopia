@@ -1,47 +1,5 @@
 import os
 import mutopia.gtensor.disk_interface as disk
-from .gtensor import train_test_split
-
-def load_dataset(corpus, with_samples=True, with_state=True):
-    """
-    Loads a dataset from disk. If the dataset is not present,
-    it will be created.
-    """
-    return (LazySampleLoader if not with_samples else CorpusInterface)(
-        disk.load_dataset(corpus, with_samples=with_samples, with_state=with_state)
-    )
-
-
-def lazy_load(corpus):
-    return load_dataset(corpus, with_samples=False, with_state=False)
-
-
-def eager_load(corpus):
-    return load_dataset(corpus, with_samples=True, with_state=False)
-
-
-def lazy_train_test_load(corpus, test_chroms):
-
-    corpus = lazy_load(corpus)
-
-    test_mask = corpus.regions.chrom.isin(test_chroms)
-    if test_mask.sum() == 0:
-        raise ValueError(
-            f'None of the chromosomes in {",".join(test_chroms)} are present in the corpus. '
-        )
-
-    train = LazySlicer(corpus, locus=~test_mask)
-    test = LazySlicer(corpus, locus=test_mask)
-
-    drop_vars = corpus.sections.groups['Features'] + corpus.sections.groups['Regions']
-    train._base_corpus.corpus = train._base_corpus.drop_vars(drop_vars)
-    test._base_corpus.corpus = test._base_corpus.drop_vars(drop_vars)
-
-    return train, test
-
-
-def eager_train_test_load(corpus, test_chroms):
-    return train_test_split(eager_load(corpus))
 
 
 class CorpusInterface:
@@ -88,12 +46,16 @@ class LazySampleLoader(CorpusInterface):
         corpus: CorpusInterface,
     ):
         self._corpus = corpus
-        self._sample_vars = self._corpus[[v for v,k in self._corpus.data_vars.items() if 'sample' in k.dims]]
-        self._X = self.fetch_sample(self.list_samples()[0]).X
 
     @property
     def X(self):
-        return self._X
+        return self.fetch_sample(self.list_samples()[0]).X
+
+    @property
+    def _sample_vars(self):
+        return self._corpus[
+            [k for k, v in self._corpus.data_vars.items() if "sample" in v.dims]
+        ]
 
     def _get_filename(self):
         filename = self._corpus.attrs["filename"]
@@ -104,23 +66,19 @@ class LazySampleLoader(CorpusInterface):
         return filename
 
     def fetch_sample(self, sample_name):
-        return (
-            self._sample_vars.sel(sample=sample_name)
-            .merge(
-                disk.load_sample(self._get_filename(), sample_name)
-            )
+        return self._sample_vars.sel(sample=sample_name).merge(
+            disk.load_sample(self._get_filename(), sample_name)
         )
 
     def iter_samples(self):
+
+        sample_vars = self._sample_vars
+
         for sample_name, data in zip(
             self.list_samples(),
-            disk.yield_samples(self._get_filename(), *self.list_samples())
+            disk.yield_samples(self._get_filename(), *self.list_samples()),
         ):
-            yield (
-                self._sample_vars
-                .sel(sample=sample_name)
-                .merge(data)
-            )
+            yield (sample_vars.sel(sample=sample_name).merge(data))
 
 
 class LazySlicer(CorpusInterface):
@@ -149,7 +107,7 @@ class LazySlicer(CorpusInterface):
             sliced = sliced.drop_vars("X", errors="ignore")
 
         if not keep_features:
-            sliced = sliced.drop_vars(corpus.sections.groups['Features'])
+            sliced = sliced.drop_vars(corpus.sections.groups["Features"])
 
         self._corpus = sliced.isel(**self._apply_slices)
 
@@ -166,7 +124,7 @@ class LazySlicer(CorpusInterface):
                 **self._apply_slices
             )
         else:
-            return self.X.isel(**self._apply_slices)
+            return self.isel(**self._apply_slices)
 
     def iter_samples(self):
         for sample in self._base_corpus.iter_samples():

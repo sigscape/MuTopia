@@ -2,11 +2,13 @@ import xarray as xr
 import numpy as np
 from typing import Union, List
 from numpy.typing import NDArray
-from pandas import MultiIndex, IntervalIndex, Index, Interval, DataFrame
+from pandas import IntervalIndex, Index, Interval, DataFrame
 from ..utils import FeatureType, logger, str_wrapped_list
 from collections import defaultdict
 from functools import reduce
 from tqdm import tqdm
+from .interfaces import *
+import mutopia.gtensor.disk_interface as disk
 
 
 def GTensor(
@@ -52,85 +54,46 @@ def GTensor(
     )
 
 
-def _add_feature(
-    dataset,
-    feature,
-    group: str = "default",
-    *,
-    name: str,
-    normalization: FeatureType,
-):
-
-    if not isinstance(feature, xr.DataArray):
-        raise ValueError("feature must be an xarray.DataArray")
-
-    check_structure(dataset)
-
-    try:
-        FeatureType(normalization)
-    except ValueError:
-        raise ValueError(
-            f"Normalization type {normalization} not recognized. "
-            f'Please use one of {", ".join(FeatureType.__members__)}'
-        )
-
-    allowed_types = FeatureType(normalization).allowed_dtypes
-
-    if not any(np.issubdtype(feature.data.dtype, t) for t in allowed_types):
-        raise ValueError(
-            f'The feature {name} has dtype {feature.data.dtype} but must be one of {", ".join(map(repr, allowed_types))}.'
-        )
-
-    dataset.features[name] = xr.DataArray(
-        data=np.array(arr),
-        dims=("locus"),
-        attrs={
-            "normalization": normalization,
-            "group": group,
-        },
-    )
-    logger.info(f'Added key to features: "{name}"')
-
-    return dataset
-
-
-def _add_sample(
-    dataset,
-    sample: xr.DataArray,
-    *,
-    name: str,
-):
-    check_structure(dataset)
-    ## input validation
-    if not isinstance(sample, xr.DataArray):
-        raise ValueError("sample must be an xarray.DataArray")
-
-    if "sample" in dataset.dims:
-        sample = sample.squeeze()
-
-    required_dims = set(dataset.modality().dims).union({"locus"})
-
-    if not set(sample.dims) == required_dims:
-        raise ValueError(f"sample dims must be {required_dims}")
-    ##
-
-    sample = sample.ascoo().expand_dims({"sample": [name]}).ascsr("sample", "locus")
-
-    root = xr.concat(
-        [
-            dataset.to_dataset(),
-            xr.Dataset({"X": sample}, coords={"sample": [name]}),
-        ],
-        dim="sample",
+def load_dataset(corpus, with_samples=True, with_state=True):
+    """
+    Loads a dataset from disk. If the dataset is not present,
+    it will be created.
+    """
+    return (LazySampleLoader if not with_samples else CorpusInterface)(
+        disk.load_dataset(corpus, with_samples=with_samples, with_state=with_state)
     )
 
-    root.X.ascsr("sample", "locus")
 
-    dataset = DataTree(data=root, children=dataset.children)
+def lazy_load(corpus):
+    return load_dataset(corpus, with_samples=False, with_state=False)
 
-    logger.info(f'Added sample to .X: "{name}"')
 
-    return dataset
+def eager_load(corpus):
+    return load_dataset(corpus, with_samples=True, with_state=False)
+
+
+def lazy_train_test_load(corpus, test_chroms):
+
+    corpus = lazy_load(corpus)
+
+    test_mask = corpus.regions.chrom.isin(test_chroms)
+    if test_mask.sum() == 0:
+        raise ValueError(
+            f'None of the chromosomes in {",".join(test_chroms)} are present in the corpus. '
+        )
+
+    train = LazySlicer(corpus, locus=~test_mask)
+    test = LazySlicer(corpus, locus=test_mask)
+
+    drop_vars = corpus.sections.groups["Features"] + corpus.sections.groups["Regions"]
+    train._base_corpus.corpus = train._base_corpus.drop_vars(drop_vars)
+    test._base_corpus.corpus = test._base_corpus.drop_vars(drop_vars)
+
+    return train, test
+
+
+def eager_train_test_load(corpus, test_chroms):
+    return train_test_split(eager_load(corpus))
 
 
 def train_test_split(dataset, test_chroms: Union[str, List[str]]):
@@ -191,9 +154,9 @@ def get_explanation(dataset, component):
         )
     ).values
 
-    display_features = dataset.sections.features.assign_coords(locus=dataset.locus.data).sel(
-        locus=shap_df.index
-    )
+    display_features = dataset.sections.features.assign_coords(
+        locus=dataset.locus.data
+    ).sel(locus=shap_df.index)
 
     display_data = DataFrame([display_features[s].data for s in shap_df.columns]).T
 
@@ -235,7 +198,7 @@ def equal_size_quantiles(dataset, var_name, n_bins=10):
     return dataset
 
 
-def slice_regions(dataset, chrom: str, start: int, end: int):
+def slice_regions(dataset, chrom: str, start: int, end: int, lazy=False):
 
     check_structure(dataset)
 
@@ -252,6 +215,9 @@ def slice_regions(dataset, chrom: str, start: int, end: int):
     logger.info(
         f"Found {np.sum(regions_mask)}/{len(regions_mask)} regions matching query."
     )
+
+    if lazy:
+        return LazySlicer(dataset, locus=regions_mask)
 
     return dataset.isel(locus=regions_mask)
 
@@ -450,18 +416,34 @@ def check_feature_consistency(*datasets):
 
 
 def prepare_data(dataset):
-    
-    dataset['Regions/context_frequencies'] = dataset['Regions/context_frequencies']\
-        .transpose(..., 'context', 'locus')
-    
-    dataset['Regions/context_frequencies'].data = np.asfortranarray(
-        dataset['Regions/context_frequencies'].data,
+
+    dataset["Regions/context_frequencies"] = dataset[
+        "Regions/context_frequencies"
+    ].transpose(..., "context", "locus")
+
+    dataset["Regions/context_frequencies"].data = np.asfortranarray(
+        dataset["Regions/context_frequencies"].data,
         dtype=np.float32,
     )
 
-    dataset['Regions/exposures'].data = np.ascontiguousarray(
-        dataset['Regions/exposures'],
+    dataset["Regions/exposures"].data = np.ascontiguousarray(
+        dataset["Regions/exposures"],
         dtype=np.float32,
     )
 
     return dataset
+
+
+def inplace(func):
+    """
+    Decorator function to modify a dataset in place - allows one to run mutations on the dataset
+    without messing up the interface chains.
+    """
+
+    def wrapper(dataset, *args, **kwargs):
+        original = CorpusInterface(dataset)
+        result = func(original.corpus, *args, **kwargs)
+        original.corpus = result
+        return original._corpus
+
+    return wrapper
