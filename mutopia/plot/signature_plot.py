@@ -68,7 +68,7 @@ def _plot_linear_signature(
     ax.xaxis.set_minor_locator(ticker.LinearLocator(2 * n_sections - 1))
     ax.xaxis.set_major_formatter(ticker.NullFormatter())
     ax.xaxis.set_minor_formatter(ticker.FuncFormatter(lambda x, pos: xlabels[pos]))
-    ax.tick_params(axis="x", which="minor", tick1On=False, tick2On=False, labelsize=8)
+    ax.tick_params(axis="x", which="minor", tick1On=False, tick2On=False, labelsize=7)
 
     if len(signatures) > 1:
         ax.legend(

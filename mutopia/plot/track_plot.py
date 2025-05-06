@@ -55,13 +55,13 @@ def feature_matrix(*feature_names):
             if len(feature_names) > 0
             else [
                 name
-                for name, arr in dataset.sections.features.items()
+                for name, arr in dataset.sections["Features"].items()
                 if np.issubdtype(arr.dtype, np.number)
             ]
         )
 
         feature_matrix = DataArray(
-            np.vstack([dataset.sections.features[name].values for name in fnames]),
+            np.vstack([dataset.sections["Features"][name].values for name in fnames]),
             dims=("feature", "locus"),
             coords={"feature": fnames, "locus": dataset.coords["locus"].values},
             name="Features",
@@ -181,7 +181,7 @@ class _GenomeView:
     def smooth(self, alpha=10):
         smooth_fn = partial(
             _moving_average,
-            self.dataset.sections.regions.length.values,
+            self.dataset.sections["Regions"].length.values,
             alpha=alpha,
         )
 

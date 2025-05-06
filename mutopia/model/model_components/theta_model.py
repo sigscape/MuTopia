@@ -195,17 +195,13 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
             .tocsc()
         )
 
+    def _make_model(self, **kw):
+        raise NotImplementedError
+    
     def _fetch_feature_matrix(self, *corpuses):
         return np.vstack(
             [CS.fetch_val(state, "locus_features").data for state in corpuses]
         )
-
-    def _make_model(self, **kw):
-        raise NotImplementedError
-
-    @staticmethod
-    def get_exp_offset(offsets, corpus):
-        return np.exp(offsets).sum(dim=dims_except_for(offsets.dims, "locus")).data
 
     def _get_targets(self, k, sstats, exp_offsets, corpuses):
 

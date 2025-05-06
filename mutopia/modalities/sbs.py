@@ -15,7 +15,7 @@ from ..tuning import sample_params
 from ..utils import logger
 from ..genome_utils.bed12_utils import stream_bed12
 from .mode_config import ModeConfig
-from ..model import MuTopiaModel
+from ..model import TopographyModel
 from ._sbs_nucdata import *
 from ._sbs_ingestion import featurize_mutations
 from ._sbs_clustering import transfer_annotations_to_vcf
@@ -70,9 +70,7 @@ def _fast_exp_offsets(
         context_offsets[s_d0, :] += o[0] * locus_effects[l]
         context_offsets[s_d1, :] += o[1] * locus_effects[l]
 
-        locus_offsets[l] += (context_effects[s_d0, :] * o[0]).sum() + (
-            context_effects[s_d1, :] * o[1]
-        ).sum()
+        locus_offsets[l] += (context_effects[s_d0, :] * o[0]).sum() + (context_effects[s_d1, :] * o[1]).sum()
 
         normalizer += locus_offsets[l] * locus_effects[l]
 
@@ -90,19 +88,19 @@ def _get_exp_offsets_k_c(k, corpus, num_states):
 
     args = (
         (
-            corpus.sections.regions.context_frequencies.transpose(
+            corpus.sections["Regions"].context_frequencies.transpose(
                 "locus", "context", "configuration"
             ).data.reshape(-1, 192)
         ),
-        corpus.sections.regions.exposures.data,
+        corpus.sections["Regions"].exposures.data,
         contig_f32(
-            np.exp(corpus.sections.state.log_locus_distribution).sel(component=k).data
+            np.exp(corpus.sections["State"].log_locus_distribution).sel(component=k).data
         ),
-        np.exp(corpus.sections.state.log_context_distribution)
+        np.exp(corpus.sections["State"].log_context_distribution)
         .sel(component=k)
         .transpose(..., "context")
         .data,
-        corpus.sections.state.mesoscale_idx.data.T,
+        corpus.sections["State"].mesoscale_idx.data.T,
     )
 
     (normalizer, context_offsets, locus_offsets) = _fast_exp_offsets(num_states, *args)
@@ -113,7 +111,7 @@ def _get_exp_offsets_k_c(k, corpus, num_states):
     )
 
 
-class SBSModel(MuTopiaModel):
+class SBSModel(TopographyModel):
 
     def __init__(
         self,
@@ -277,13 +275,10 @@ class SBSModel(MuTopiaModel):
             l2_regularization=l2_regularization,
         )
 
-        """sparse = train_corpuses[0].X.is_sparse()
-        if not all(
-            corpus.X.is_sparse() == sparse for corpus in train_corpuses + test_corpuses
-        ):
+        if not all(corpus.X.is_sparse() for corpus in train_corpuses + test_corpuses):
             raise ValueError(
-                "All corpuses must be either sparse or dense - mixtures are not allowed!"
-            )"""
+                "All corpuses must be sparse - dense corpuses are not allowed!"
+            )
 
         locals_model = LDAUpdateSparse(
             train_corpuses,

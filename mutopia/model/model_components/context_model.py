@@ -550,16 +550,3 @@ class UnstrandedContextModel(StrandedContextModel, SparseDataBase):
             dims=("context", "locus"),
         )
 
-    """@staticmethod
-    def get_exp_offset(offsets, corpus):
-
-        def aggregate_by_design(arr, design_matrix):
-            #       SxL @ (LxC) => (SxC) => (CxS) => (C*S)
-            return (design_matrix @ arr.T).T.ravel()
-
-        def get_design(state, key):
-            return CS.fetch_val(state, key).data.to_scipy_sparse().tocsc().T
-
-        exp_offsets = np.exp(offsets).transpose("context", "locus").data
-
-        return aggregate_by_design(exp_offsets, get_design(corpus, "mesoscale_design"))"""

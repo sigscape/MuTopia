@@ -147,13 +147,15 @@ def rm_feature(
         except IndexError:
             pass
 
+class NoFeaturesError(ValueError):
+    pass
 
 @retry_until_write
 def list_features(dataset):
 
     with nc.Dataset(dataset, "r") as dset:
         if not "features" in dset.groups:
-            raise ValueError(
+            raise NoFeaturesError(
                 "No `features` group found in dataset - are you sure this is a G-Tensor?"
             )
 
@@ -202,15 +204,15 @@ def edit_feature_attrs(
 @retry_until_write
 def write_sample(
     filename,
-    sample,
+    arr,
     sample_name,
 ):
 
-    arr = sample.X
-
+    is_sparse = isinstance(arr.data, sparse.SparseArray)
+    
     dset = (
         arr.sparse_to_coo()
-        if isinstance(arr.data, sparse.SparseArray)
+        if is_sparse
         else arr.to_dataset(name="data", promote_attrs=True)
     )
 
@@ -220,34 +222,38 @@ def write_sample(
         maxval = dset.data.max().item() + 1.0
 
     prec = float32(maxval / 65535)
-
     dset.attrs["active"] = 1
+
+    encoding = {
+        "data": {
+            "dtype": "uint16",
+            "scale_factor": prec,
+            "_FillValue": 0.0,
+            "add_offset": -prec,
+        },
+    }
+
+    if is_sparse:
+        encoding.update({"indices": {"dtype": "uint32",}})
 
     dset.to_netcdf(
         filename,
         group=f"/raw/X/{sample_name}",
         mode="a",
-        encoding={
-            "data": {
-                "dtype": "uint16",
-                "scale_factor": prec,
-                "_FillValue": 0.0,
-                "add_offset": -prec,
-            },
-            "indices": {
-                "dtype": "uint32",
-            },
-        },
+        encoding=encoding,
         **WRITE_KW,
     )
 
+
+class NoSamplesError(ValueError):
+    pass
 
 @retry_until_write
 def list_samples(dataset):
 
     with nc.Dataset(dataset, "r") as dset:
         if not "raw" in dset.groups:
-            raise ValueError(
+            raise NoSamplesError(
                 "No `raw` group found in dataset - are you sure this is a G-Tensor?"
             )
 
@@ -281,8 +287,6 @@ def rm_sample(
 
 def write_dataset(dataset, filename, bar=False):
 
-    section_names = dataset.sections.names
-
     # write base data (coords, index, attrs)
     (
         dataset.drop_vars(list(dataset.data_vars)).to_netcdf(
@@ -290,7 +294,7 @@ def write_dataset(dataset, filename, bar=False):
         )
     )
 
-    for section_name, section in dataset.drop_vars(["X"]).sections:
+    for section_name, section in (dataset.drop_vars(["X"]) if "X" in dataset.data_vars else dataset).sections:
 
         # check if any are sparse - if so error with a nice message
         sparse_vars = [
@@ -320,7 +324,7 @@ def write_dataset(dataset, filename, bar=False):
         ):
             write_sample(
                 filename,
-                dataset.fetch_sample(sample_name),
+                dataset.fetch_sample(sample_name).X,
                 sample_name,
             )
 
@@ -355,10 +359,12 @@ def _load_sparse(group, coo=False, fill_value=0.0, **kw):
     return arr
 
 
-def _load_dense(filename, sample_name, **kwargs):
-    raise NotImplementedError()
-    with xr.open_dataarray(filename, group=sample_name, engine="netcdf4") as dset:
-        return dset.load()
+def _load_dense(group, **kwargs):
+    return xr.DataArray(
+        group["data"][...].data.astype(float32, copy=False),
+        dims=group["data"].dimensions,
+        name="X",
+    )
 
 
 def _backend_load_sample(dset, sample_name, coo=False):
@@ -401,10 +407,6 @@ def yield_samples(filename, *sample_names, coo=False):
                 )
             except KeyError:
                 raise ValueError(f"Sample {sample_name} not found in dataset.")
-
-
-class NoSamplesError(ValueError):
-    pass
 
 
 def _list_sample_names(filename):

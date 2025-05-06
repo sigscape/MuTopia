@@ -4,7 +4,7 @@ from sparse import SparseArray, COO
 import os
 import json
 import numpy as np
-from ..model import MuTopiaModel
+from ..model import TopographyModel
 from ..plot.signature_plot import _plot_linear_signature
 from ..utils import categorical_palette
 
@@ -31,7 +31,7 @@ class ModeConfig(ABC):
 
     @property
     @abstractmethod
-    def TopographyModel(self) -> MuTopiaModel:
+    def TopographyModel(self) -> TopographyModel:
         raise NotImplementedError
 
     @classmethod

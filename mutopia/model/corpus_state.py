@@ -15,6 +15,8 @@ def expand_datasets(datasets):
     for dataset in datasets:
         yield get_name(dataset), dataset
 
+def observation_dims(dataset):
+    return tuple(d for d in dataset.X.dims if not d=='sample')
 
 @inplace
 def init_state(
@@ -32,7 +34,7 @@ def init_state(
 
     sample_names = dataset.list_samples()
     n_components = factor_model.n_components
-    genome_size = dataset.sections.regions.context_frequencies.sum().data.item()
+    genome_size = dataset.sections["Regions"].context_frequencies.sum().data.item()
 
     state_elements = {
         "normalizers": xr.DataArray(
@@ -81,11 +83,11 @@ def get_dims(dataset):
 
 
 def get_regions(dataset):
-    return dataset.sections.regions
+    return dataset.sections["Regions"]
 
 
 def get_features(dataset):
-    return dataset.sections.features
+    return dataset.sections["Features"]
 
 
 def list_samples(dataset):

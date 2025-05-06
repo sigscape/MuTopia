@@ -11,7 +11,35 @@ from .base import *
 class LDAUpdateDense(LocalsModel):
 
     def _convert_sample(self, sample):
-        return np.ascontiguousarray(sample.load().data, dtype=self.dtype)
+        return np.ascontiguousarray(sample.X.load().data, dtype=self.dtype)
+    
+    def _conditional_observation_likelihood(
+        self,
+        dataset,
+        factor_model,
+        logsafe=True,
+        *,
+        parallel_context,
+    ):
+
+        logsafe_exp_transform = lambda x: np.nan_to_num(
+            np.exp(x - np.nanmax(x)), nan=0.0, neginf=0.0
+        )
+        exp_transform = lambda x: np.nan_to_num(np.exp(x), nan=0.0, neginf=0.0)
+
+        lcol = (
+            factor_model._get_log_mutation_rate_tensor(
+                dataset,
+                parallel_context=parallel_context,
+                with_context=False,
+            )
+            .transpose("component", *CS.observation_dims(dataset))
+            .data
+        )
+
+        return np.ascontiguousarray(
+            (logsafe_exp_transform if logsafe else exp_transform)(lcol)
+        )
 
     @staticmethod
     def _calc_sstats(
@@ -32,7 +60,7 @@ class LDAUpdateDense(LocalsModel):
         )
 
         weighted_posterior = calc_local_variables(*args)
-        elbo = bound(*args, weighted_posterior)
+        #elbo = bound(*args, weighted_posterior)
 
         suffstats = {
             "weighted_posterior": DataArray(
@@ -42,36 +70,25 @@ class LDAUpdateDense(LocalsModel):
             "gamma": gamma,
         }
 
-        return (suffstats, gamma, elbo)
+        return (suffstats, gamma, 0.)
 
-    @staticmethod
-    def _apply_update(gamma, *, suffstat_fn, update_fn, learning_rate):
-        return suffstat_fn(_svi_update_fn(gamma, update_fn(gamma), learning_rate))
 
-    def _get_update_fn(
+    def _update_fn(
         self,
         gamma,
         learning_rate=1.0,
         locus_subsample=1.0,
         batch_subsample=1.0,
         *,
-        corpus,
+        dataset,
         sample,
         conditional_likelihood,
         dims,
     ):
-        """
-        Why am I doing it this way? - one could pass
-        the update function pointfree to some multiprocessing
-        generator.
-
-        I took pains to prevent the large corpus and model_state
-        objects from being pulled into the scope of the update function.
-        """
-
         # 1. get the information we need from the sample
         weights = self._convert_sample(sample) / locus_subsample
-        alpha = np.ascontiguousarray(self.alpha[CS.get_name(corpus)])
+        alpha = np.ascontiguousarray(self.alpha[CS.get_name(dataset)])
+        gamma = np.ascontiguousarray(gamma, dtype=self.dtype)
 
         args = (
             alpha,
@@ -79,65 +96,28 @@ class LDAUpdateDense(LocalsModel):
             weights,
         )
 
-        map_update = partial(
-            iterative_update,
+        map_estimate = iterative_update(
             *args,
             self.estep_iterations,
             self.difference_tol,
+            gamma,
         )
 
-        suffstat_fn = partial(
-            self._calc_sstats,
+        new_gamma = _svi_update_fn(gamma, map_estimate, learning_rate)
+
+        suffstats, elbo = self._calc_sstats(
             *args,
-            dims=dims,
+            new_gamma,
             batch_subsample=batch_subsample,
+            dims=dims,
         )
 
-        svi_update = partial(
-            self._apply_update,
-            np.ascontiguousarray(gamma),
-            update_fn=map_update,
-            learning_rate=learning_rate,
-            suffstat_fn=suffstat_fn,
-        )
-
-        return svi_update
-
-    def _conditional_observation_likelihood(
-        self,
-        corpus,
-        model_state,
-        logsafe=True,
-        *,
-        parallel_context,
-    ):
-
-        obs_dims = CS.observation_dims(corpus)
-        sample_dims = (*obs_dims, "locus")
-
-        logsafe_transform = lambda x: np.nan_to_num(
-            np.exp(x - np.nanmax(x)), nan=0.0, neginf=0.0
-        )
-        exp_transform = lambda x: np.nan_to_num(np.exp(x), nan=0.0, neginf=0.0)
-
-        lcol = (
-            model_state._get_log_mutation_rate_tensor(
-                corpus,
-                parallel_context=parallel_context,
-                with_context=False,
-            )
-            .transpose("component", *sample_dims)
-            .data
-        )
-
-        return np.ascontiguousarray(
-            (logsafe_transform if logsafe else exp_transform)(lcol)
-        )
+        return (suffstats, new_gamma, elbo)
 
     def _get_update_fns(
         self,
-        corpuses,
-        model_state,
+        dataset,
+        factor_model,
         learning_rate=1.0,
         locus_subsample=1.0,
         batch_subsample=1.0,
@@ -145,46 +125,36 @@ class LDAUpdateDense(LocalsModel):
         *,
         parallel_context,
     ):
-
-        samples = [
-            (corpus, sample_name)
-            for corpus in corpuses
-            for sample_name in CS.list_samples(corpus)
-        ]
-
-        likelihood_tensors = {
-            CS.get_name(corpus): (
-                self._conditional_observation_likelihood(
-                    corpus,
-                    model_state,
-                    parallel_context=parallel_context,
-                    logsafe=True,
-                )
-            )
-            for corpus in corpuses
-        }
+        
+        likelihoods = self._conditional_observation_likelihood(
+            dataset,
+            factor_model,
+            parallel_context=parallel_context,
+            logsafe=True,
+        )
 
         updates = (
-            self._get_update_fn(
-                exposures_fn(corpus, sample_name),
-                sample=CS.fetch_sample(corpus, sample_name),
-                corpus=corpus,
+            partial(
+                self._update_fn,
+                exposures_fn(dataset, sample_name),
+                sample=sample,
+                dataset=dataset,
+                factor_model=factor_model,
                 learning_rate=learning_rate,
                 locus_subsample=locus_subsample,
                 batch_subsample=batch_subsample,
-                conditional_likelihood=likelihood_tensors[CS.get_name(corpus)],
-                dims=(*CS.observation_dims(corpus), "locus"),
+                conditional_likelihood=likelihoods,
+                dims=CS.observation_dims(dataset),
             )
-            for (corpus, sample_name) in samples
+            for (sample_name, sample) in CS.iter_samples(dataset)
         )
 
-        return (samples, updates)
+        return updates
 
-    def _sample_deviance(
+    def _deviance_sample(
         self,
-        corpus,
         sample,
-        model_state,
+        factor_model,
         *,
         gamma,
         log_mutrate_tensor,
@@ -195,9 +165,7 @@ class LDAUpdateDense(LocalsModel):
         weights = self._convert_sample(sample)
         gamma = np.ascontiguousarray(gamma)
 
-        log_marginal_mutrate = model_state._log_marginalize_mutrate(
-            log_mutrate_tensor, gamma
-        )
+        log_marginal_mutrate = factor_model._log_marginalize_mutrate(log_mutrate_tensor, gamma)
 
         # saturated
         y_sum = np.sum(weights)
@@ -218,8 +186,8 @@ class LDAUpdateDense(LocalsModel):
 
     def _get_deviance_fns(
         self,
-        corpuses,
-        model_state,
+        dataset,
+        factor_model,
         exposures_fn=CS.fetch_topic_compositions,
         *,
         parallel_context,
@@ -227,59 +195,45 @@ class LDAUpdateDense(LocalsModel):
         """
         -> List[F() -> Tuple[float, float]]
         """
-        samples = [
-            (corpus, sample_name)
-            for corpus in corpuses
-            for sample_name in CS.list_samples(corpus)
-        ]
 
-        obs_dims = CS.observation_dims(corpuses[0])
-        sample_dims = (*obs_dims, "locus")
-
-        log_mutrate_tensors = {
-            CS.get_name(corpus): model_state._get_log_mutation_rate_tensor(
-                corpus, parallel_context=parallel_context, with_context=True
-            ).transpose("component", *sample_dims)
-            for corpus in corpuses
-        }
-
+        sample_dims = CS.observation_dims(dataset)
+    
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
 
-            context_effects = {
-                CS.get_name(corpus): match_dims(
-                    np.log(corpus.regions.context_frequencies)
-                    + np.log(corpus.regions.exposures),
-                    **{d: corpus.sizes[d] for d in sample_dims},
+            log_conditional_likelihood = (
+                factor_model._get_log_mutation_rate_tensor(
+                    dataset, 
+                    parallel_context=parallel_context, 
+                    with_context=True,
+                ).transpose("component", *sample_dims)
+            )
+
+            context_effects = (
+                match_dims(
+                    np.log(dataset.regions.context_frequencies)
+                    + np.log(dataset.regions.exposures),
+                    **{d: dataset.sizes[d] for d in sample_dims},
                 )
                 .transpose(*sample_dims)
                 .data
-                for corpus in corpuses
-            }
-
-            context_sums = {
-                CS.get_name(corpus): np.nansum(
-                    np.exp(context_effects[CS.get_name(corpus)].data)
-                )
-                for corpus in corpuses
-            }
-
-        deviance_fns = (
-            partial(
-                self._sample_deviance,
-                sample=CS.fetch_sample(corpus, sample_name),
-                corpus=corpus,
-                model_state=model_state,
-                gamma=exposures_fn(corpus, sample_name),
-                context_sum=context_sums[CS.get_name(corpus)],
-                log_mutrate_tensor=log_mutrate_tensors[CS.get_name(corpus)],
-                context_effects=context_effects[CS.get_name(corpus)],
             )
-            for (corpus, sample_name) in samples
-        )
 
-        return deviance_fns
+            context_sum = np.nansum(np.exp(context_effects.data))
+
+        for sample_name, sample in CS.iter_samples(dataset):
+            
+            yield partial(
+                self._deviance_sample,
+                sample=sample,
+                factor_model=factor_model,
+                gamma=exposures_fn(dataset, sample_name),
+                context_sum=context_sum,
+                log_mutrate_tensor=log_conditional_likelihood,
+                context_effects=context_effects,
+            )
+
 
     @staticmethod
-    def reduce_model_sstats(model, carry, corpus, **sample_sstats):
-        return model.reduce_dense_sstats(carry, corpus, **sample_sstats)
+    def reduce_model_sstats(model, carry, dataset, **sample_sstats):
+        return model.reduce_dense_sstats(carry, dataset, **sample_sstats)

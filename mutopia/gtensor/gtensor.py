@@ -20,9 +20,10 @@ def GTensor(
     end: List[int],
     context_frequencies: xr.DataArray,
     exposures: Union[None, NDArray[np.number]] = None,
+    dtype = None,
 ):
 
-    locus_coords = (Index(name),)
+    locus_coords = Index(np.arange(len(chrom)))
 
     shared_coords = {
         **modality.coords,
@@ -35,21 +36,21 @@ def GTensor(
     )
 
     if exposures is None:
-        exposures = np.ones(len(locus_coords), dtype=np.float64)
+        exposures = np.ones(len(locus_coords), dtype=np.float32)
 
     return xr.Dataset(
         {
             "Regions/context_frequencies": context_frequencies,
-            "Regions/length": xr.DataArray(region_lengths, dims=("locus")),
-            "Regions/exposures": xr.DataArray(np.squeeze(exposures), dims=("locus")),
-            "Regions/chrom": xr.DataArray(chrom, dims=("locus")),
-            "Regions/start": xr.DataArray(start, dims=("locus")),
-            "Regions/end": xr.DataArray(end, dims=("locus")),
+            "Regions/length": xr.DataArray(np.array(region_lengths), dims=("locus",)),
+            "Regions/exposures": xr.DataArray(np.squeeze(exposures), dims=("locus",)),
+            "Regions/chrom": xr.DataArray(np.array(chrom), dims=("locus",)),
+            "Regions/start": xr.DataArray(np.array(start), dims=("locus",)),
+            "Regions/end": xr.DataArray(np.array(end), dims=("locus",)),
         },
         coords=shared_coords,
         attrs={
             "name": name,
-            "dtype": modality.MODE_ID,
+            "dtype": dtype or modality.MODE_ID,
         },
     )
 
@@ -98,7 +99,7 @@ def eager_train_test_load(corpus, test_chroms):
 
 def train_test_split(dataset, test_chroms: Union[str, List[str]]):
 
-    test_mask = dataset.sections.regions.chrom.isin(test_chroms)
+    test_mask = dataset.sections["Regions"].chrom.isin(test_chroms)
     if test_mask.sum() == 0:
         raise ValueError(
             f'None of the chromosomes in {",".join(test_chroms)} are present in the dataset. '
@@ -154,7 +155,7 @@ def get_explanation(dataset, component):
         )
     ).values
 
-    display_features = dataset.sections.features.assign_coords(
+    display_features = dataset.sections["Features"].assign_coords(
         locus=dataset.locus.data
     ).sel(locus=shap_df.index)
 
@@ -175,7 +176,7 @@ def equal_size_quantiles(dataset, var_name, n_bins=10):
     bin_nums = np.arange(dataset.dims["locus"])
     sorted_vals = DataFrame(
         {
-            "length": dataset.sections.regions.length.values,
+            "length": dataset.sections["Regions"].length.values,
             "value": dataset[var_name].values,
         },
         index=bin_nums,
@@ -202,7 +203,7 @@ def slice_regions(dataset, chrom: str, start: int, end: int, lazy=False):
 
     check_structure(dataset)
 
-    regions = dataset.sections.regions
+    regions = dataset.sections["Regions"]
     regions_mask = (regions.chrom == chrom) & (
         IntervalIndex.from_arrays(regions.start, regions.end).overlaps(
             Interval(start, end)
@@ -226,30 +227,33 @@ def annot_empirical_marginal(dataset):
 
     check_structure(dataset)
 
+    todense = lambda x : x.asdense() if x.is_sparse() else x
+    coo_or_dense = lambda x : x.ascoo() if x.is_sparse() else x
+
     X_emp = reduce(
-        lambda x, y: x + y,
+        lambda x, y : x + y,
         (
-            dataset.fetch_sample(sample_name).ascoo()
+            coo_or_dense(dataset.fetch_sample(sample_name).X)
             for sample_name in tqdm(
                 dataset.list_samples()[1:],
                 desc="Reducing samples",
             )
         ),
-        dataset.fetch_sample(dataset.list_samples()[0]).asdense(),
+        todense(dataset.fetch_sample(dataset.list_samples()[0]).X),
     )
 
-    X_emp = X_emp.asdense() if X_emp.is_sparse() else X_emp
+    X_emp = todense(X_emp)
 
     logger.info('Added key: "empirical_marginal"')
     dataset["empirical_marginal"] = (
-        X_emp / dataset.sections.regions.context_frequencies
+        X_emp / dataset.sections["Regions"].context_frequencies
     ).fillna(0.0)
 
     logger.info('Added key: "empirical_locus_marginal"')
     dataset["empirical_locus_marginal"] = (
         (
             X_emp.sum(dim=dims_except_for(X_emp.dims, "locus"))
-            / dataset.sections.regions.length
+            / dataset.sections["Regions"].length
         )
         .fillna(0.0)
         .astype(np.float32)
@@ -310,7 +314,7 @@ def check_structure(dataset):
     if not "Regions" in sections:
         raise ValueError('The dataset is missing the "Regions" section.')
 
-    if not "Features" in sections or len(dataset.sections.features.data_vars) == 0:
+    if not "Features" in sections or len(dataset.sections["Features"].data_vars) == 0:
         raise ValueError(
             'The dataset is missing the "Features" section, or it is empty.'
         )
@@ -353,7 +357,7 @@ def check_corpus(dataset):
 
     check_structure(dataset)
 
-    for feature in dataset.sections.features.values():
+    for feature in dataset.sections["Features"].values():
         check_feature(feature)
 
 
@@ -363,7 +367,7 @@ def check_feature_consistency(*datasets):
     for feature_name, dtype in list(
         (feature_name, FeatureType(feature.attrs["normalization"]))
         for dataset in datasets
-        for feature_name, feature in dataset.sections.features.data_vars.items()
+        for feature_name, feature in dataset.sections["Features"].data_vars.items()
     ):
         type_dict[feature_name].add(dtype)
 
@@ -385,7 +389,7 @@ def check_feature_consistency(*datasets):
     for feature_name, classes in list(
         (feature_name, tuple(_get_classes(dataset, feature)))
         for dataset in datasets
-        for feature_name, feature in dataset.sections.features.data_vars.items()
+        for feature_name, feature in dataset.sections["Features"].data_vars.items()
         if FeatureType(feature.attrs["normalization"])
         in (FeatureType.CATEGORICAL, FeatureType.MESOSCALE)
     ):
@@ -400,7 +404,7 @@ def check_feature_consistency(*datasets):
 
     corpus_membership = {
         dataset.attrs["name"]: {
-            feature_name for feature_name in dataset.sections.features.data_vars.keys()
+            feature_name for feature_name in dataset.sections["Features"].data_vars.keys()
         }
         for dataset in datasets
     }

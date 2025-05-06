@@ -260,6 +260,7 @@ def create(
         start=start,
         end=end,
         context_frequencies=context_freqs,
+        dtype=dtype,
     )
 
     gtensor.attrs["regions_file"] = os.path.basename(regions_file)
@@ -269,7 +270,7 @@ def create(
     gtensor.attrs["region_size"] = region_size
 
     logger.info(
-        f"Wrote G-Tensor to {output}, and accompanying regions file to {regions_file}\n"
+        f"Writing G-Tensor to {output}, and accompanying regions file to {regions_file} ...\n"
         "Make sure not to leave the regions file behind if you move the G-Tensor!."
     )
 
@@ -335,6 +336,7 @@ def convert(
         end=end,
         context_frequencies=context_freqs,
         exposures=old_dataset.regions.exposures.values,
+        dtype=dtype,
     )
 
     for k, v in attrs.items():
@@ -382,11 +384,14 @@ def set_attrs(
 def info(dataset):
 
     attrs = disk.read_attrs(dataset)
-    n_features = len(disk.list_features(dataset))
+    try:
+        n_features = len(disk.list_features(dataset))
+    except disk.NoFeaturesError:
+        n_features = 0
 
     try:
         n_samples = len(disk.list_samples(dataset))
-    except ValueError:
+    except disk.NoSamplesError:
         n_samples = 0
 
     click.echo(f"Num features: {n_features}")
@@ -970,14 +975,6 @@ def samplecmds():
     help="Whether to skip sorting the VCF file. This will fail if the VCF is not in lexigraphical sorted order (chr1, chr10, ...).",
 )
 @click.option(
-    "-tags",
-    "--weight-tags",
-    type=str,
-    multiple=True,
-    default=[],
-    help="BAM only: Tags to use for weighting reads, multiple may be provided.",
-)
-@click.option(
     "-fa",
     "--fasta",
     type=click.Path(exists=True),
@@ -993,7 +990,6 @@ def ingest_sample(
     weight_col: Union[None, str] = None,
     mutation_rate_file: Union[None, str] = None,
     sample_weight: Union[None, float] = 1.0,
-    weight_tags: List[str] = [],
     skip_sort: bool = False,
     cluster: bool = True,
     fasta: Union[None, str] = None,
@@ -1027,7 +1023,6 @@ def ingest_sample(
         weight_col=weight_col,
         sample_weight=sample_weight,
         sample_name=sample_name,
-        weight_tags=weight_tags,
         #
         mutation_rate_file=mutation_rate_file,
         skip_sort=skip_sort,

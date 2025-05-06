@@ -25,8 +25,6 @@ If the tensors passed are C-contiguous, the reshaping operation is
 free, since only the stride is changed. If reshaping the array 
 requires copying the data, an error is raised.
 """
-
-
 def reshape_same_mem(arr, shape):
     out = arr.reshape(shape, order="C")
     if not np.shares_memory(arr, out):
@@ -211,162 +209,15 @@ def bound(
 
 
 """
-Mixture model inference functions
+Annealed importance sampling (AIS) for marginal likelihood estimation
 """
-
-
 @njit(nogil=True)
-def _categorical_draw(logits):
+def categorical_draw(logits):
     logits = np.exp(logits - logits.max())
     cdf = np.cumsum(logits)
     z = cdf[-1]
     u = np.random.uniform(0, 1)
     return np.searchsorted(cdf, u * z)
-
-
-@njit(nogil=True)
-def _parallel_categorical_draw(logits, u):
-    logits = np.exp(logits - logits.max())
-    cdf = np.cumsum(logits)
-    z = cdf[-1]
-    return np.searchsorted(cdf, u * z)
-
-
-@njit(nogil=True)
-def _gibbs_sample_mixture_step(
-    alpha,  # D*K
-    tau,  # D
-    fraction_map,  # Dx(D*K)
-    component_map,  # Kx(D*K)
-    log_conditional_likelihood,  # Ix(D*K)
-    weights,  # I
-    Nk,
-    z,
-    temperature,
-):
-    log_weight = 0.0
-    I = log_conditional_likelihood.shape[0]
-    sampling_order = np.random.permutation(I)
-
-    for i in sampling_order:
-        Nk[z[i]] -= weights[i]
-        logits = (
-            temperature * log_conditional_likelihood[i]
-            + np.log(alpha + (Nk @ component_map.T)) @ component_map
-            + np.log(tau + (Nk @ fraction_map.T)) @ fraction_map
-        )
-        z[i] = _categorical_draw(logits)
-        Nk[z[i]] += weights[i]
-        log_weight += weights[i] * log_conditional_likelihood[i, z[i]]
-
-    return Nk, z, log_weight
-
-
-@njit(
-    nogil=True,
-)
-def _gibbs_sample_mixture_step_implicit(
-    alpha,  # D*K
-    tau,  # D
-    fraction_map,  # Dx(D*K)
-    log_conditional_likelihood,  # Ix(D*K)
-    weights,  # I
-    Nk,
-    temperature,
-):
-    """
-    This function performs Gibbs sampling for a mixture of MuTopia models,
-    but with block sampling. The major advantage of block gibbs sampling is that
-    one needs not explicitly store the latent variable assignments (z) for each mutation.
-
-    For samples with large number of mutations, mutations are essientailly independent given the current
-    mixture contributions, and so this estimator is not much less efficient than the full Gibbs sampler.
-    """
-    log_weight = 0.0
-    I, _ = log_conditional_likelihood.shape
-    new_Nk = np.zeros_like(Nk)
-    u = np.random.uniform(0, 1, size=I)
-
-    logits = (
-        temperature * log_conditional_likelihood
-        + np.log(alpha + Nk)
-        - np.log((alpha + Nk) @ fraction_map.T) @ fraction_map
-        + np.log(tau + (Nk @ fraction_map.T)) @ fraction_map
-    )
-
-    for i in range(I):
-        k = _parallel_categorical_draw(logits[i], u[i])
-        log_weight += weights[i] * log_conditional_likelihood[i, k]
-        new_Nk[k] += weights[i]
-
-    return new_Nk, log_weight
-
-
-def _gibbs_sample_mixture(
-    alpha,
-    tau,
-    fraction_map,
-    component_map,
-    log_conditional_likelihood,
-    weights,
-    steps,
-    seed,
-):
-
-    contiguous = lambda x: np.ascontiguousarray(x, dtype=np.float32)
-
-    np.random.seed(seed)
-    I, Kd = log_conditional_likelihood.shape
-    D = tau.shape[0]
-
-    prop_prior = (tau @ fraction_map) * (alpha)
-
-    z = np.random.choice(Kd, size=I, p=prop_prior / np.sum(prop_prior))
-    Nk = np.array(
-        [weights[z == k].sum() for k in range(Kd)],
-        dtype=np.float32,
-    )
-    Nk = contiguous(Nk)
-    fraction_map = contiguous(fraction_map)
-    alpha = contiguous(alpha)
-    tau = contiguous(tau)
-
-    args = (
-        alpha,
-        tau,
-        fraction_map,
-        log_conditional_likelihood,
-        weights,
-    )
-
-    warmup = 100
-
-    for t in range(steps + warmup):
-        # Perform a Gibbs sampling step
-        Nk, ll = _gibbs_sample_mixture_step_implicit(
-            *args, Nk, min(1, t / warmup)  # warm up for 100 steps
-        )
-
-        if t > warmup:
-            yield (Nk, Nk @ fraction_map.T, ll)
-
-
-"""
-Annealed importance sampling (AIS) for marginal likelihood estimation
-"""
-
-
-@njit(nogil=True)
-def dirichlet_multinomial_logpmf(x, alpha):
-    alpha0 = np.sum(alpha)
-    n = np.sum(x)
-    return (
-        gammaln(alpha0)
-        + gammaln(n + 1)
-        - gammaln(n + alpha0)
-        + np.sum(gammalnvec(x + alpha) - gammalnvec(alpha) - gammalnvec(x + 1))
-    )
-
 
 @njit(
     "Tuple((float32[::1],int64[::1],float32))(float32[::1], float32[:,::1], float32[::1], float32[::1], int64[::1], float32)",
@@ -388,7 +239,7 @@ def _gibbs_sample_step(
     for i in sampling_order:
         Nk[z[i]] -= weights[i]
         logits = temperature * log_conditional_likelihood[i] + np.log(alpha + Nk)
-        z[i] = _categorical_draw(logits)
+        z[i] = categorical_draw(logits)
         Nk[z[i]] += weights[i]
         log_weight += weights[i] * log_conditional_likelihood[i, z[i]]
 
@@ -709,11 +560,16 @@ class LocalsModel(PrimitiveModel):
 
         factor_model.update_normalizers(datasets, par_context)
 
-        dev_fns = self._get_deviance_fns(
-            datasets,
-            factor_model,
+        kw = dict(
+            factor_model=factor_model,
             exposures_fn=exposures_fn,
             par_context=par_context,
+        )
+
+        dev_fns = (
+            fn
+            for _, dataset in CS.expand_datasets(datasets)
+            for fn in self._get_deviance_fns(dataset, **kw)
         )
 
         d_fit, d_null = list(zip(*parallel_map(dev_fns, par_context)))
@@ -723,7 +579,7 @@ class LocalsModel(PrimitiveModel):
     @abstractmethod
     def _get_update_fns(
         self,
-        datasets,
+        dataset,
         factor_model,
         learning_rate=1.0,
         subsample_rate=1.0,
@@ -736,70 +592,13 @@ class LocalsModel(PrimitiveModel):
     @abstractmethod
     def _get_deviance_fns(
         self,
-        datasets,
+        dataset,
         factor_model,
         exposures_fn=None,
         par_context=None,
     ):
         raise NotImplementedError
 
-    def pearson_residuals(
-        factor_model,
-        datasets,
-        exposures_fn=CS.fetch_topic_compositions,
-        *,
-        par_context,
-    ):
-        raise NotImplementedError()
-
-        """
-        def _reduce_sum(g):
-            return reduce(lambda x,y : x+y, g)
-        
-        _update_normalizers(
-            factor_model, 
-            datasets, 
-            par_context=par_context
-        )
-
-        # () -> F(dataset) -> F(exposures) -> y_hat
-        get_log_mutation_rate_fn = lambda dataset : partial(
-            factor_model._log_marginalize_mutrate,
-            factor_model._get_log_mutation_rate_tensor(
-                dataset, 
-                par_context=par_context,
-                with_context=True,
-            )
-        )
-
-        def _sample_squared_residuals(obs, log_marginal_mutrate_fn, exposures):
-
-            log_mutrate = log_marginal_mutrate_fn(exposures)
-            
-            ysum = obs.data.sum()
-            
-            y_hat = np.exp(log_mutrate + np.log(ysum))
-
-            return (obs - y_hat)/np.sqrt(y_hat)
-
-
-        def _corpus_squared_residuals(dataset):
-            
-            log_marginal_mutrate_fn = get_log_mutation_rate_fn(dataset)
-            
-            return _reduce_sum(par_context(
-                delayed(_sample_squared_residuals)(
-                    CS.fetch_sample(dataset, sample_name),
-                    log_marginal_mutrate_fn,
-                    exposures_fn(dataset, sample_name)
-                )
-                for sample_name in CS.list_samples(dataset)
-            ))
-        
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", category=RuntimeWarning)
-            
-            return _reduce_sum(map(_corpus_squared_residuals, datasets))"""
 
     @staticmethod
     def reduce_model_sstats(

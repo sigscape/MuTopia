@@ -235,9 +235,6 @@ class Section(BaseAccessor):
             )
         )
 
-    def __getattr__(self, section: str):
-        return self.__getitem__(section)
-
     @property
     def groups(self):
         sections = defaultdict(list)
@@ -250,5 +247,5 @@ class Section(BaseAccessor):
         return list(self.groups.keys())
 
     def __iter__(self):
-        for section in self._groups.keys():
+        for section in self.groups.keys():
             yield section, self[section]

@@ -25,7 +25,7 @@ This is the entry point for the user to interact with and annotate data.
 """
 
 
-class MuTopiaModel(ABC, BaseEstimator):
+class TopographyModel(ABC, BaseEstimator):
 
     @abstractmethod
     def sample_params(

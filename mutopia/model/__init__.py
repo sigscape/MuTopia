@@ -1,4 +1,4 @@
-from .model import MuTopiaModel
+from .model import TopographyModel
 from .model_components import *
 from .latent_var_models import *
 from .model_state import FactorModel

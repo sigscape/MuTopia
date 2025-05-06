@@ -7,7 +7,6 @@ from .. import corpus_state as CS
 from ...gtensor import dims_except_for
 from math import prod
 from .base import *
-from ...utils import parallel_map
 import warnings
 
 
@@ -155,15 +154,6 @@ class LDAUpdateSparse(LocalsModel):
         sample,
         factor_model,
     ):
-        """
-        Why am I doing it this way? - one could pass
-        the update function pointfree to some multiprocessing
-        generator.
-
-        I took pains to prevent the large dataset and factor_model
-        objects from being pulled into the scope of the update function.
-        """
-
         # 1. get the information we need from the sample
         sample_dict = self._convert_sample(sample, dtype=self.dtype)
         weights = sample_dict["weights"] / locus_subsample
@@ -231,6 +221,87 @@ class LDAUpdateSparse(LocalsModel):
 
         return updates
 
+    def _deviance_sample(
+        self,
+        dataset,
+        sample,
+        factor_model,
+        *,
+        gamma,
+        context_sum,
+        **kw,
+    ):
+        
+        sample_dict = self._convert_sample(sample, dtype=self.dtype)
+
+        conditional_likelihood = self._conditional_observation_likelihood(
+            dataset,
+            factor_model,
+            logsafe=False,  # we want the actual likelihood, don't remove the max for numerical stability
+            **sample_dict,
+        ).astype(self.dtype, copy=False)
+        weights = sample_dict["weights"]
+
+        # the context frequencies are missing dimensions that the observations have ...
+        log_context_effect = self._get_log_context_effect(dataset, **sample_dict)
+
+        contributions = np.ascontiguousarray(gamma / np.sum(gamma))
+
+        # 1. figure out the missing dimensions
+        missing_dims = dims_except_for(
+            sample.X.dims, *CS.get_regions(dataset).context_frequencies.dims
+        )
+        # 2. figure out the number of possible types of observations missing
+        n_types = prod(dataset.sizes[dim] for dim in missing_dims)
+        # 3. penalize the log context effect for the missing dimensions
+
+        # saturated
+        y_sum = np.sum(weights)
+        d_sat = weights @ np.log(weights) - y_sum * np.log(y_sum)
+        # model
+        d_fit = weights @ (
+            np.log(conditional_likelihood.T.dot(contributions)) - log_context_effect
+        )
+        # null
+        d_null = -y_sum * np.log(context_sum) - y_sum * np.log(n_types)
+
+        return (
+            d_sat - d_fit,
+            d_sat - d_null,
+        )
+
+    def _get_deviance_fns(
+        self,
+        dataset,
+        factor_model,
+        exposures_fn=CS.fetch_topic_compositions,
+        par_context=None,
+    ):
+
+        context_sum = np.sum(CS.get_regions(dataset).context_frequencies.data)
+
+        deviance_fns = (
+            partial(
+                self._deviance_sample,
+                dataset=dataset,
+                factor_model=factor_model,
+                sample=sample,
+                gamma=exposures_fn(dataset, sample_name),
+                context_sum=context_sum,
+            )
+            for (sample_name, sample) in CS.iter_samples(dataset)
+        )
+
+        return deviance_fns
+
+    @staticmethod
+    def reduce_model_sstats(model, carry, dataset, **sample_sstats):
+        return model.reduce_sparse_sstats(carry, dataset, **sample_sstats)
+
+    ##
+    # The modeling functionality to satisfy the LocalModel interface is completed.
+    # The below functions extend functionality for Gibb's sampling.
+    ##
     def posterior_assign_sample(
         self,
         sample,
@@ -300,184 +371,26 @@ class LDAUpdateSparse(LocalsModel):
 
     def _get_marginal_ll_fns(
         self,
-        datasets,
+        dataset,
         factor_model,
         alpha=None,
         steps=100000,
         seed=42,
     ):
 
+        alpha = self.alpha[CS.get_name(dataset)] if alpha is None else alpha
+        
         marginal_ll_fns = (
             partial(
                 self.marginal_ll_sample,
                 dataset,
                 sample,
                 factor_model,
-                alpha=self.alpha[name] if alpha is None else alpha,
+                alpha=alpha,
                 steps=steps,
                 seed=seed,
             )
-            for name, dataset in CS.expand_datasets(datasets)
             for (_, sample) in CS.iter_samples(dataset)
         )
 
         return marginal_ll_fns
-
-    def _apply_per_sample(
-        self,
-        fn,
-        *,
-        dataset,
-        sample,
-        factor_model,
-        gamma,
-        **kw,
-    ):
-
-        sample_dict = self._convert_sample(sample, dtype=self.dtype)
-
-        conditional_likelihood = self._conditional_observation_likelihood(
-            dataset,
-            factor_model,
-            logsafe=False,  # we want the actual likelihood, don't remove the max for numerical stability
-            **sample_dict,
-        ).astype(self.dtype, copy=False)
-
-        weights = sample_dict["weights"]
-
-        # the context frequencies are missing dimensions that the observations have ...
-        log_context_effect = self._get_log_context_effect(dataset, **sample_dict)
-
-        return fn(
-            dataset,
-            sample,
-            factor_model,
-            gamma=gamma,
-            conditional_likelihood=conditional_likelihood,
-            weights=weights,
-            log_context_effect=log_context_effect,
-            sample_dict=sample_dict,
-            **kw,
-        )
-
-    def _deviance_sample(
-        self,
-        dataset,
-        sample,
-        factor_model,
-        *,
-        gamma,
-        conditional_likelihood,
-        weights,
-        log_context_effect,
-        context_sum,
-        **kw,
-    ):
-
-        contributions = np.ascontiguousarray(gamma / np.sum(gamma))
-
-        # 1. figure out the missing dimensions
-        missing_dims = dims_except_for(
-            sample.X.dims, *CS.get_regions(dataset).context_frequencies.dims
-        )
-        # 2. figure out the number of possible types of observations missing
-        n_types = prod(dataset.sizes[dim] for dim in missing_dims)
-        # 3. penalize the log context effect for the missing dimensions
-
-        # saturated
-        y_sum = np.sum(weights)
-        d_sat = weights @ np.log(weights) - y_sum * np.log(y_sum)
-        # model
-        d_fit = weights @ (
-            np.log(conditional_likelihood.T.dot(contributions)) - log_context_effect
-        )
-        # null
-        d_null = -y_sum * np.log(context_sum) - y_sum * np.log(n_types)
-
-        return (
-            d_sat - d_fit,
-            d_sat - d_null,
-        )
-
-    def _get_deviance_fns(
-        self,
-        datasets,
-        factor_model,
-        exposures_fn=CS.fetch_topic_compositions,
-        par_context=None,
-    ):
-
-        context_sums = {
-            name: np.sum(
-                CS.get_regions(dataset).context_frequencies.data,
-            )
-            for name, dataset in CS.expand_datasets(datasets)
-        }
-
-        deviance_fns = (
-            partial(
-                self._apply_per_sample,
-                self._deviance_sample,
-                dataset=dataset,
-                factor_model=factor_model,
-                sample=sample,
-                gamma=exposures_fn(dataset, sample_name),
-                context_sum=context_sums[name],
-            )
-            for name, dataset in CS.expand_datasets(datasets)
-            for (sample_name, sample) in CS.iter_samples(dataset)
-        )
-
-        return deviance_fns
-
-    def _deviance_residuals(
-        self,
-        dataset,
-        sample,
-        factor_model,
-        *,
-        gamma,
-        conditional_likelihood,
-        weights,
-        log_context_effect,
-        sample_dict,
-    ):
-
-        contributions = np.ascontiguousarray(gamma / np.sum(gamma))
-        y_sum = np.sum(weights)
-
-        log_y = np.log(weights)
-        log_pi_hat = np.log(conditional_likelihood.T.dot(contributions)) + np.log(y_sum)
-        pi_hat = np.exp(log_pi_hat)
-
-        resid = np.sqrt(
-            2 * (weights * (log_y - log_pi_hat) - weights + pi_hat)
-        ) * np.sign(weights - pi_hat)
-
-        return self._unconvert_sample(sample, sample_dict, resid)
-
-    def _get_residual_fns(
-        self,
-        datasets,
-        factor_model,
-        exposures_fn=CS.fetch_topic_compositions,
-        par_context=None,
-    ):
-        residuals_fns = (
-            partial(
-                self._apply_per_sample,
-                self._deviance_residuals,
-                dataset=dataset,
-                factor_model=factor_model,
-                sample=sample,
-                gamma=exposures_fn(dataset, sample_name),
-            )
-            for name, dataset in CS.expand_datasets(datasets)
-            for (sample_name, sample) in CS.iter_samples(dataset)
-        )
-
-        return residuals_fns
-
-    @staticmethod
-    def reduce_model_sstats(model, carry, dataset, **sample_sstats):
-        return model.reduce_sparse_sstats(carry, dataset, **sample_sstats)

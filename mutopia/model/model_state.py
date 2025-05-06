@@ -310,6 +310,8 @@ class FactorModel:
                 sstats["locals_sstats"], learning_rate=learning_rate
             )
 
+        datasets = CS.expand_datasets(datasets)
+
         update_fns = chain.from_iterable(
             (
                 model.partial_fit(
