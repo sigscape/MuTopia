@@ -19,7 +19,7 @@ class LDAUpdateDense(LocalsModel):
         factor_model,
         logsafe=True,
         *,
-        parallel_context,
+        par_context,
     ):
 
         logsafe_exp_transform = lambda x: np.nan_to_num(
@@ -30,7 +30,7 @@ class LDAUpdateDense(LocalsModel):
         lcol = (
             factor_model._get_log_mutation_rate_tensor(
                 dataset,
-                parallel_context=parallel_context,
+                par_context=par_context,
                 with_context=False,
             )
             .transpose("component", *CS.observation_dims(dataset))
@@ -70,7 +70,7 @@ class LDAUpdateDense(LocalsModel):
             "gamma": gamma,
         }
 
-        return (suffstats, gamma, 0.)
+        return (suffstats, 0.)
 
 
     def _update_fn(
@@ -123,13 +123,13 @@ class LDAUpdateDense(LocalsModel):
         batch_subsample=1.0,
         exposures_fn=CS.fetch_topic_compositions,
         *,
-        parallel_context,
+        par_context,
     ):
         
         likelihoods = self._conditional_observation_likelihood(
             dataset,
             factor_model,
-            parallel_context=parallel_context,
+            par_context=par_context,
             logsafe=True,
         )
 
@@ -139,7 +139,6 @@ class LDAUpdateDense(LocalsModel):
                 exposures_fn(dataset, sample_name),
                 sample=sample,
                 dataset=dataset,
-                factor_model=factor_model,
                 learning_rate=learning_rate,
                 locus_subsample=locus_subsample,
                 batch_subsample=batch_subsample,
@@ -190,7 +189,7 @@ class LDAUpdateDense(LocalsModel):
         factor_model,
         exposures_fn=CS.fetch_topic_compositions,
         *,
-        parallel_context,
+        par_context,
     ):
         """
         -> List[F() -> Tuple[float, float]]
@@ -204,15 +203,14 @@ class LDAUpdateDense(LocalsModel):
             log_conditional_likelihood = (
                 factor_model._get_log_mutation_rate_tensor(
                     dataset, 
-                    parallel_context=parallel_context, 
                     with_context=True,
                 ).transpose("component", *sample_dims)
             )
 
             context_effects = (
                 match_dims(
-                    np.log(dataset.regions.context_frequencies)
-                    + np.log(dataset.regions.exposures),
+                    np.log(CS.get_regions(dataset).context_frequencies)
+                    + np.log(CS.get_regions(dataset).exposures),
                     **{d: dataset.sizes[d] for d in sample_dims},
                 )
                 .transpose(*sample_dims)

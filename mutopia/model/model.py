@@ -52,6 +52,7 @@ class TopographyModel(ABC, BaseEstimator):
             raise ValueError("At least one dataset is required to fit the model.")
 
         if test_datasets is None:
+            logger.info("Splitting train/test partitions...")
             train_datasets, test_datasets = list(
                 zip(
                     *map(

@@ -120,10 +120,11 @@ class FactorModel:
                         k,
                         dataset,
                         with_context=with_context,
-                        par_context=par_context,
                     )
                     for k in range(self.n_components)
-                )
+                ),
+                par_context,
+                ordered=True,
             ),
             dim="component",
         )
@@ -310,7 +311,7 @@ class FactorModel:
                 sstats["locals_sstats"], learning_rate=learning_rate
             )
 
-        datasets = CS.expand_datasets(datasets)
+        datasets = list(zip(*CS.expand_datasets(datasets)))[1]
 
         update_fns = chain.from_iterable(
             (

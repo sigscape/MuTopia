@@ -275,12 +275,13 @@ class SBSModel(TopographyModel):
             l2_regularization=l2_regularization,
         )
 
-        if not all(corpus.X.is_sparse() for corpus in train_corpuses + test_corpuses):
+        is_sparse = train_corpuses[0].X.is_sparse()
+        if not all(corpus.X.is_sparse()==is_sparse for corpus in train_corpuses + test_corpuses):
             raise ValueError(
                 "All corpuses must be sparse - dense corpuses are not allowed!"
             )
 
-        locals_model = LDAUpdateSparse(
+        locals_model = (LDAUpdateSparse if is_sparse else LDAUpdateDense)(
             train_corpuses,
             n_components=num_components,
             random_state=random_state,
