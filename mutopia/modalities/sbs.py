@@ -70,7 +70,9 @@ def _fast_exp_offsets(
         context_offsets[s_d0, :] += o[0] * locus_effects[l]
         context_offsets[s_d1, :] += o[1] * locus_effects[l]
 
-        locus_offsets[l] += (context_effects[s_d0, :] * o[0]).sum() + (context_effects[s_d1, :] * o[1]).sum()
+        locus_offsets[l] += (context_effects[s_d0, :] * o[0]).sum() + (
+            context_effects[s_d1, :] * o[1]
+        ).sum()
 
         normalizer += locus_offsets[l] * locus_effects[l]
 
@@ -88,13 +90,15 @@ def _get_exp_offsets_k_c(k, corpus, num_states):
 
     args = (
         (
-            corpus.sections["Regions"].context_frequencies.transpose(
-                "locus", "context", "configuration"
-            ).data.reshape(-1, 192)
+            corpus.sections["Regions"]
+            .context_frequencies.transpose("locus", "context", "configuration")
+            .data.reshape(-1, 192)
         ),
         corpus.sections["Regions"].exposures.data,
         contig_f32(
-            np.exp(corpus.sections["State"].log_locus_distribution).sel(component=k).data
+            np.exp(corpus.sections["State"].log_locus_distribution)
+            .sel(component=k)
+            .data
         ),
         np.exp(corpus.sections["State"].log_context_distribution)
         .sel(component=k)
@@ -276,7 +280,10 @@ class SBSModel(TopographyModel):
         )
 
         is_sparse = train_corpuses[0].X.is_sparse()
-        if not all(corpus.X.is_sparse()==is_sparse for corpus in train_corpuses + test_corpuses):
+        if not all(
+            corpus.X.is_sparse() == is_sparse
+            for corpus in train_corpuses + test_corpuses
+        ):
             raise ValueError(
                 "All corpuses must be sparse - dense corpuses are not allowed!"
             )

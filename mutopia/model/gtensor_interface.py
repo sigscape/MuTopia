@@ -15,8 +15,10 @@ def expand_datasets(datasets):
     for dataset in datasets:
         yield get_name(dataset), dataset
 
+
 def observation_dims(dataset):
-    return tuple(d for d in dataset.X.dims if not d=='sample')
+    return tuple(d for d in dataset.X.dims if not d == "sample")
+
 
 @inplace
 def init_state(

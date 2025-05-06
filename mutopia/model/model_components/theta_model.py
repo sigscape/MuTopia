@@ -10,7 +10,7 @@ from .base import (
 )
 from ...utils import str_wrapped_list
 from ...gtensor import dims_except_for
-from .. import corpus_state as CS
+from .. import gtensor_interface as CS
 from ._hist_gbt import CustomHistGradientBooster
 from ._feature_tranformer import (
     get_feature_transformer,
@@ -197,7 +197,7 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
 
     def _make_model(self, **kw):
         raise NotImplementedError
-    
+
     def _fetch_feature_matrix(self, *corpuses):
         return np.vstack(
             [CS.fetch_val(state, "locus_features").data for state in corpuses]

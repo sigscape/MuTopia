@@ -147,8 +147,10 @@ def rm_feature(
         except IndexError:
             pass
 
+
 class NoFeaturesError(ValueError):
     pass
+
 
 @retry_until_write
 def list_features(dataset):
@@ -209,7 +211,7 @@ def write_sample(
 ):
 
     is_sparse = isinstance(arr.data, sparse.SparseArray)
-    
+
     dset = (
         arr.sparse_to_coo()
         if is_sparse
@@ -234,7 +236,13 @@ def write_sample(
     }
 
     if is_sparse:
-        encoding.update({"indices": {"dtype": "uint32",}})
+        encoding.update(
+            {
+                "indices": {
+                    "dtype": "uint32",
+                }
+            }
+        )
 
     dset.to_netcdf(
         filename,
@@ -247,6 +255,7 @@ def write_sample(
 
 class NoSamplesError(ValueError):
     pass
+
 
 @retry_until_write
 def list_samples(dataset):
@@ -294,7 +303,9 @@ def write_dataset(dataset, filename, bar=False):
         )
     )
 
-    for section_name, section in (dataset.drop_vars(["X"]) if "X" in dataset.data_vars else dataset).sections:
+    for section_name, section in (
+        dataset.drop_vars(["X"]) if "X" in dataset.data_vars else dataset
+    ).sections:
 
         # check if any are sparse - if so error with a nice message
         sparse_vars = [

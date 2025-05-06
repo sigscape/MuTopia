@@ -3,7 +3,7 @@ from sparse import COO, GCXS
 from abc import ABC, abstractmethod
 from numba import njit
 import sys
-from .. import corpus_state as CS
+from .. import gtensor_interface as CS
 
 
 class PrimitiveModel(ABC):

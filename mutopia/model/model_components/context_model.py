@@ -9,7 +9,7 @@ from ._glm_compiled import (
     partial_ls_solver,
 )
 from ._fast_eln import get_eln_solver
-from .. import corpus_state as CS
+from .. import gtensor_interface as CS
 from .base import (
     get_reg_params,
     get_poisson_targets_weights,
@@ -549,4 +549,3 @@ class UnstrandedContextModel(StrandedContextModel, SparseDataBase):
             conditional_mutation_rates[:, idx],
             dims=("context", "locus"),
         )
-

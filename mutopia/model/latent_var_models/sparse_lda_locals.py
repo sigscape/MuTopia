@@ -3,7 +3,7 @@ import numpy as np
 from functools import partial, reduce
 import sparse
 from ..model_components.base import _svi_update_fn
-from .. import corpus_state as CS
+from .. import gtensor_interface as CS
 from ...gtensor import dims_except_for
 from math import prod
 from .base import *
@@ -133,7 +133,6 @@ class LDAUpdateSparse(LocalsModel):
         )
 
         weighted_posterior = calc_local_variables(*args)
-        elbo = bound(*args, weighted_posterior)
 
         suffstats = {
             **sample_dict,
@@ -141,7 +140,7 @@ class LDAUpdateSparse(LocalsModel):
             "gamma": gamma,
         }
 
-        return suffstats, elbo
+        return suffstats, 0.0
 
     def _update_fn(
         self,
@@ -231,7 +230,7 @@ class LDAUpdateSparse(LocalsModel):
         context_sum,
         **kw,
     ):
-        
+
         sample_dict = self._convert_sample(sample, dtype=self.dtype)
 
         conditional_likelihood = self._conditional_observation_likelihood(
@@ -379,7 +378,7 @@ class LDAUpdateSparse(LocalsModel):
     ):
 
         alpha = self.alpha[CS.get_name(dataset)] if alpha is None else alpha
-        
+
         marginal_ll_fns = (
             partial(
                 self.marginal_ll_sample,

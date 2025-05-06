@@ -20,7 +20,7 @@ def GTensor(
     end: List[int],
     context_frequencies: xr.DataArray,
     exposures: Union[None, NDArray[np.number]] = None,
-    dtype = None,
+    dtype=None,
 ):
 
     locus_coords = Index(np.arange(len(chrom)))
@@ -155,9 +155,11 @@ def get_explanation(dataset, component):
         )
     ).values
 
-    display_features = dataset.sections["Features"].assign_coords(
-        locus=dataset.locus.data
-    ).sel(locus=shap_df.index)
+    display_features = (
+        dataset.sections["Features"]
+        .assign_coords(locus=dataset.locus.data)
+        .sel(locus=shap_df.index)
+    )
 
     display_data = DataFrame([display_features[s].data for s in shap_df.columns]).T
 
@@ -227,11 +229,11 @@ def annot_empirical_marginal(dataset):
 
     check_structure(dataset)
 
-    todense = lambda x : x.asdense() if x.is_sparse() else x
-    coo_or_dense = lambda x : x.ascoo() if x.is_sparse() else x
+    todense = lambda x: x.asdense() if x.is_sparse() else x
+    coo_or_dense = lambda x: x.ascoo() if x.is_sparse() else x
 
     X_emp = reduce(
-        lambda x, y : x + y,
+        lambda x, y: x + y,
         (
             coo_or_dense(dataset.fetch_sample(sample_name).X)
             for sample_name in tqdm(
@@ -404,7 +406,8 @@ def check_feature_consistency(*datasets):
 
     corpus_membership = {
         dataset.attrs["name"]: {
-            feature_name for feature_name in dataset.sections["Features"].data_vars.keys()
+            feature_name
+            for feature_name in dataset.sections["Features"].data_vars.keys()
         }
         for dataset in datasets
     }
@@ -423,7 +426,7 @@ def prepare_data(dataset):
 
     dataset["Regions/context_frequencies"] = dataset[
         "Regions/context_frequencies"
-    ].transpose(..., "context", "locus")
+    ].transpose(..., "locus")
 
     dataset["Regions/context_frequencies"].data = np.asfortranarray(
         dataset["Regions/context_frequencies"].data,

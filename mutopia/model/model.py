@@ -1,4 +1,4 @@
-from . import corpus_state as CS
+from . import gtensor_interface as CS
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
@@ -9,7 +9,7 @@ from .latent_var_models import *
 from ..plot.coef_matrix_plot import _plot_interaction_matrix
 from ..gtensor import *
 from .optim import fit_model
-from .model_state import FactorModel
+from .factor_model import FactorModel
 from .latent_var_models.base import LocalsModel
 from functools import partial
 from joblib import dump, delayed

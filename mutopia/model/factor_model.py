@@ -2,7 +2,7 @@ from .model_components import *
 from .model_components.base import _svi_update_fn
 from .latent_var_models import *
 from ..utils import parallel_map, parallel_gen
-from . import corpus_state as CS
+from . import gtensor_interface as CS
 import numpy as np
 import warnings
 from functools import partial
@@ -20,10 +20,13 @@ class FactorModel:
         self,
         datasets,
         offsets_fn=None,
+        predict_fn=None,
         **models,
     ):
 
         self.offsets_fn = offsets_fn
+        self.predict_fn = predict_fn
+
         self._models = {}
 
         for model_name, model in models.items():
@@ -62,7 +65,7 @@ class FactorModel:
     def get_genome_size(self, dataset):
         return self._genome_size[CS.get_name(dataset)]
 
-    def _get_propto_log_mutation_rate(self, k, dataset):
+    '''def _get_propto_log_mutation_rate(self, k, dataset):
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -80,7 +83,7 @@ class FactorModel:
                 ),  # start with the background rates
             )
 
-        return un_normalized
+        return un_normalized'''
 
     def predict(self, k, dataset, with_context=True):
         """
@@ -88,7 +91,6 @@ class FactorModel:
         is that this method returns the log mutation rate for all
         models, not just those that require normalization.
         """
-
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
 
@@ -116,7 +118,7 @@ class FactorModel:
             parallel_map(
                 (
                     partial(
-                        self.predict,
+                        self.predict if self.predict_fn is None else self.predict_fn,
                         k,
                         dataset,
                         with_context=with_context,

@@ -3,7 +3,7 @@ import numpy as np
 from functools import partial
 import warnings
 from ..model_components.base import _svi_update_fn
-from .. import corpus_state as CS
+from .. import gtensor_interface as CS
 from ...gtensor import match_dims
 from .base import *
 
@@ -12,7 +12,7 @@ class LDAUpdateDense(LocalsModel):
 
     def _convert_sample(self, sample):
         return np.ascontiguousarray(sample.X.load().data, dtype=self.dtype)
-    
+
     def _conditional_observation_likelihood(
         self,
         dataset,
@@ -60,7 +60,7 @@ class LDAUpdateDense(LocalsModel):
         )
 
         weighted_posterior = calc_local_variables(*args)
-        #elbo = bound(*args, weighted_posterior)
+        # elbo = bound(*args, weighted_posterior)
 
         suffstats = {
             "weighted_posterior": DataArray(
@@ -70,8 +70,7 @@ class LDAUpdateDense(LocalsModel):
             "gamma": gamma,
         }
 
-        return (suffstats, 0.)
-
+        return (suffstats, 0.0)
 
     def _update_fn(
         self,
@@ -125,7 +124,7 @@ class LDAUpdateDense(LocalsModel):
         *,
         par_context,
     ):
-        
+
         likelihoods = self._conditional_observation_likelihood(
             dataset,
             factor_model,
@@ -164,7 +163,9 @@ class LDAUpdateDense(LocalsModel):
         weights = self._convert_sample(sample)
         gamma = np.ascontiguousarray(gamma)
 
-        log_marginal_mutrate = factor_model._log_marginalize_mutrate(log_mutrate_tensor, gamma)
+        log_marginal_mutrate = factor_model._log_marginalize_mutrate(
+            log_mutrate_tensor, gamma
+        )
 
         # saturated
         y_sum = np.sum(weights)
@@ -196,16 +197,14 @@ class LDAUpdateDense(LocalsModel):
         """
 
         sample_dims = CS.observation_dims(dataset)
-    
+
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
 
-            log_conditional_likelihood = (
-                factor_model._get_log_mutation_rate_tensor(
-                    dataset, 
-                    with_context=True,
-                ).transpose("component", *sample_dims)
-            )
+            log_conditional_likelihood = factor_model._get_log_mutation_rate_tensor(
+                dataset,
+                with_context=True,
+            ).transpose("component", *sample_dims)
 
             context_effects = (
                 match_dims(
@@ -220,7 +219,7 @@ class LDAUpdateDense(LocalsModel):
             context_sum = np.nansum(np.exp(context_effects.data))
 
         for sample_name, sample in CS.iter_samples(dataset):
-            
+
             yield partial(
                 self._deviance_sample,
                 sample=sample,
@@ -230,7 +229,6 @@ class LDAUpdateDense(LocalsModel):
                 log_mutrate_tensor=log_conditional_likelihood,
                 context_effects=context_effects,
             )
-
 
     @staticmethod
     def reduce_model_sstats(model, carry, dataset, **sample_sstats):

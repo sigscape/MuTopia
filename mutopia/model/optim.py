@@ -1,9 +1,9 @@
-from . import corpus_state as CS
+from . import gtensor_interface as CS
 from ..utils import *
 from ..gtensor import *
 from tqdm import trange
 from functools import partial
-from .model_state import FactorModel
+from .factor_model import FactorModel
 from .latent_var_models.base import LocalsModel
 
 

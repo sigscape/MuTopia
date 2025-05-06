@@ -10,7 +10,7 @@ import ctypes
 from functools import wraps
 from ...gtensor.interfaces import *
 from ._dirichlet_update import update_alpha
-from .. import corpus_state as CS
+from .. import gtensor_interface as CS
 from ..model_components.base import _svi_update_fn, PrimitiveModel
 
 
@@ -25,6 +25,8 @@ If the tensors passed are C-contiguous, the reshaping operation is
 free, since only the stride is changed. If reshaping the array 
 requires copying the data, an error is raised.
 """
+
+
 def reshape_same_mem(arr, shape):
     out = arr.reshape(shape, order="C")
     if not np.shares_memory(arr, out):
@@ -98,24 +100,14 @@ Helper functions for the dirichlet log likelihood and bound
 """
 
 
-@njit("double[:](double[:])", nogil=True)
-def log_dirichlet_expectation(alpha):
-    return psivec(alpha) - psi(np.sum(alpha))
+@njit("float32[::1](float32[::1])", nogil=True)
+def exp_log_dirichlet_expectation(alpha):
+    return np.exp(psivec(alpha) - psi(np.sum(alpha))).astype(np.float32)
 
 
-@njit("double(double[:], double[:])", nogil=True)
-def dirichlet_bound(alpha, gamma):
-
-    logE_gamma = log_dirichlet_expectation(gamma)
-
-    return (
-        gammaln(np.sum(alpha))
-        - gammaln(np.sum(gamma))
-        + np.sum(gammalnvec(gamma) - gammalnvec(alpha) + (alpha - gamma) * logE_gamma)
-    )
-
-
-@njit("double[::1](double[::1], double[:,::1], double[::1], double[::1])", nogil=True)
+@njit(
+    "float32[::1](float32[::1], float32[:,::1], float32[::1], float32[::1])", nogil=True
+)
 def _update_step(
     alpha,
     conditional_likelihood,
@@ -123,10 +115,12 @@ def _update_step(
     gamma,
 ):
 
-    exp_Elog_gamma = np.exp(log_dirichlet_expectation(gamma))
+    exp_Elog_gamma = exp_log_dirichlet_expectation(gamma)
 
     X_div_X_tild = np.where(
-        weights > 0.0, weights / (exp_Elog_gamma @ conditional_likelihood), 0.0
+        weights > 0.0,
+        weights / (exp_Elog_gamma @ conditional_likelihood),
+        np.float32(0.0),
     )
     gamma_sstats = exp_Elog_gamma * (conditional_likelihood @ X_div_X_tild)
 
@@ -135,7 +129,7 @@ def _update_step(
 
 @flatten_tensor_for_update
 @njit(
-    "double[::1](double[::1], double[:,::1], double[::1], int64, double, double[::1])",
+    "float32[::1](float32[::1], float32[:,::1], float32[::1], int64, double, float32[::1])",
     nogil=True,
 )
 def iterative_update(
@@ -164,14 +158,17 @@ def iterative_update(
 
 @reshape_output
 @flatten_tensor_for_update
-@njit("double[:,::1](double[::1], double[:,::1], double[::1], double[::1])", nogil=True)
+@njit(
+    "float32[:,::1](float32[::1], float32[:,::1], float32[::1], float32[::1])",
+    nogil=True,
+)
 def calc_local_variables(
     alpha,
     conditional_likelihood,
     weights,
     gamma,
 ):
-    exp_Elog_gamma = np.exp(log_dirichlet_expectation(gamma))
+    exp_Elog_gamma = exp_log_dirichlet_expectation(gamma)
 
     X_tild = exp_Elog_gamma @ conditional_likelihood
 
@@ -180,6 +177,18 @@ def calc_local_variables(
     return phi_matrix
 
 
+"""
+@njit("double(double[:], double[:])", nogil=True)
+def dirichlet_bound(alpha, gamma):
+
+    logE_gamma = log_dirichlet_expectation(gamma).astype(np.float64)
+
+    return (
+        gammaln(np.sum(alpha))
+        - gammaln(np.sum(gamma))
+        + np.sum(gammalnvec(gamma) - gammalnvec(alpha) + (alpha - gamma) * logE_gamma)
+    )
+    
 @flatten_tensor_for_update
 @flatten_last_arg
 @njit(
@@ -206,11 +215,13 @@ def bound(
         np.sum(weighted_posterior * np.nan_to_num(flattened_logweight, nan=0.0))
         + entropy_sstats
     )
-
+"""
 
 """
 Annealed importance sampling (AIS) for marginal likelihood estimation
 """
+
+
 @njit(nogil=True)
 def categorical_draw(logits):
     logits = np.exp(logits - logits.max())
@@ -218,6 +229,7 @@ def categorical_draw(logits):
     z = cdf[-1]
     u = np.random.uniform(0, 1)
     return np.searchsorted(cdf, u * z)
+
 
 @njit(
     "Tuple((float32[::1],int64[::1],float32))(float32[::1], float32[:,::1], float32[::1], float32[::1], int64[::1], float32)",
@@ -413,7 +425,7 @@ class LocalsModel(PrimitiveModel):
         prior_alpha=1.0,
         estep_iterations=1000,
         difference_tol=5e-5,
-        dtype=float,
+        dtype=np.float32,
         *,
         random_state,
     ):
@@ -598,7 +610,6 @@ class LocalsModel(PrimitiveModel):
         par_context=None,
     ):
         raise NotImplementedError
-
 
     @staticmethod
     def reduce_model_sstats(
