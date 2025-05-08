@@ -11,9 +11,13 @@ import numpy as np
 from functools import partial
 
 
-def expand_datasets(datasets):
+def expand_datasets(*datasets):
     for dataset in datasets:
         yield get_name(dataset), dataset
+
+
+def to_datasets(*datasets):
+    return [ds for _, ds in expand_datasets(*datasets)]
 
 
 def observation_dims(dataset):
@@ -27,7 +31,7 @@ def init_state(
     locals_model,
 ):
 
-    if "State" in dataset.sections.names:
+    if has_corpusstate(dataset):
         dataset = dataset.drop_vars(dataset.sections.groups["State"])
         if "component" in dataset.dims:
             dataset = dataset.drop_dims("component")
@@ -46,10 +50,11 @@ def init_state(
         ),
     }
 
+    state_elements.update(locals_model.prepare_corpusstate(dataset))
+
     for model in factor_model.models.values():
         state_elements.update(model.prepare_corpusstate(dataset))
 
-    state_elements.update(locals_model.prepare_corpusstate(dataset))
     state_elements = {"State/" + k: v for k, v in state_elements.items()}
 
     dataset = (

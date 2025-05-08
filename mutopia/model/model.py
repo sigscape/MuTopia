@@ -1,8 +1,13 @@
-from . import gtensor_interface as CS
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
 from tqdm import trange
+from functools import partial
+from joblib import dump, delayed
+from collections import defaultdict
+from sklearn.base import BaseEstimator
+from abc import ABC, abstractmethod
+import typing
 from ..utils import *
 from .model_components import *
 from .latent_var_models import *
@@ -11,12 +16,10 @@ from ..gtensor import *
 from .optim import fit_model
 from .factor_model import FactorModel
 from .latent_var_models.base import LocalsModel
-from functools import partial
-from joblib import dump, delayed
-from collections import defaultdict
-from sklearn.base import BaseEstimator
-from abc import ABC, abstractmethod
-import typing
+from ..mixture_model.mixture_locals import SparseMixtureModel
+# interfaces
+from . import gtensor_interface as CS
+from ..mixture_model import mixture_interface as MIX
 
 """
 The Model class is a wrapper around a trained model state object, 
@@ -35,10 +38,80 @@ class TopographyModel(ABC, BaseEstimator):
         extensive=0,
     ):
         pass
-
+    
     @abstractmethod
-    def _init_model(**params) -> tuple[FactorModel, LocalsModel]:
-        pass
+    def _init_factor_model(
+        self,
+        train_corpuses,
+        random_state,
+        GT,
+        **kw,
+    ) -> FactorModel:
+        raise NotImplementedError()
+    
+
+    def _choose_locals_model(
+        self,
+        is_mixture=True,
+        is_sparse=True,
+    ):
+        if is_mixture and is_sparse:
+            return SparseMixtureModel
+        elif is_mixture and not is_sparse:
+            raise NotImplementedError()
+        elif not is_mixture and is_sparse:
+            return LDAUpdateSparse
+        else:
+            return LDAUpdateDense
+
+
+    def _init_locals_model(
+        self,
+        train_datasets,
+        test_datasets,
+        random_state,
+    ):
+
+        is_sparse = train_datasets[0].X.is_sparse()
+        if not all(
+            corpus.X.is_sparse() == is_sparse
+            for corpus in train_datasets + test_datasets
+        ):
+            raise ValueError("All corpuses must be either sparse or dense - mixing is not allowed!")
+        
+        is_mixture = MIX.is_mixture_corpus(train_datasets[0])
+        if not all(
+            MIX.is_mixture_corpus(corpus) == is_mixture
+            for corpus in train_datasets + test_datasets
+        ):
+            raise ValueError("All corpuses must be either multi-source or single-source - mixing is not allowed!")
+        
+        if is_mixture:
+            logger.warning("** Inferring mixture of epigenomes model **")
+
+        locals_model = self._choose_locals_model(
+            is_mixture=is_mixture, 
+            is_sparse=is_sparse
+        )(
+            (MIX if is_mixture else CS),
+            train_datasets,
+            n_components=self.num_components,
+            random_state=random_state,
+            prior_alpha=self.pi_prior,
+            prior_tau=self.tau_prior,
+        )
+    
+        return locals_model
+
+    def _train_test_split(self, datasets):
+        return list(
+            zip(
+                *map(
+                    lambda dataset: train_test_split(dataset, self.test_chroms),
+                    datasets,
+                )
+            )
+        )
 
     def fit(
         self,
@@ -53,23 +126,33 @@ class TopographyModel(ABC, BaseEstimator):
 
         if test_datasets is None:
             logger.info("Splitting train/test partitions...")
-            train_datasets, test_datasets = list(
-                zip(
-                    *map(
-                        lambda dataset: train_test_split(dataset, self.test_chroms),
-                        train_datasets,
-                    )
-                )
-            )
+            train_datasets, test_datasets = self._train_test_split(train_datasets)
 
         random_state = np.random.RandomState(self.seed)
 
-        models = self._init_model(
-            train_datasets, test_datasets, random_state, **self.get_params()
+        locals_model = self._init_locals_model(
+            train_datasets,
+            test_datasets,
+            random_state,
+        )
+        # borrow the GT from the locals model
+        self.GT = locals_model.GT
+
+        factor_model = self._init_factor_model(
+            train_datasets,
+            random_state,
+            self.GT,
+            **self.get_params(),
         )
 
         (self.factor_model_, self.locals_model_, self.test_scores_) = fit_model(
-            train_datasets, test_datasets, random_state, *models, **self.get_params()
+            self.GT, 
+            train_datasets,
+            test_datasets,
+            random_state,
+            factor_model,
+            locals_model,
+            **self.get_params(),
         )
 
         return self
@@ -94,51 +177,52 @@ class TopographyModel(ABC, BaseEstimator):
         except ValueError:
             raise ValueError(f"Component {component_name} not found in model.")
 
-    def rename_components(self, corpus, names: typing.List[str]):
+    def rename_components(self, dataset, names: typing.List[str]):
         if not len(names) == self.n_components:
             raise ValueError("The number of names must match the number of components")
 
         name_map = dict(zip(self.component_names, names))
         new_coords = {"component": names}
 
-        if "shap_component" in corpus.coords:
+        if "shap_component" in dataset.coords:
             try:
                 new_coords["shap_component"] = [
-                    name_map[c] for c in corpus.coords["shap_component"].data
+                    name_map[c] for c in dataset.coords["shap_component"].data
                 ]
             except KeyError:
                 raise KeyError(
-                    "Some components in corpus do not match the model components. Just delete the SHAP_values and try again."
+                    "Some components in dataset do not match the model components. Just delete the SHAP_values and try again."
                 )
 
-        corpus = corpus.assign_coords(new_coords)
+        dataset = dataset.assign_coords(new_coords)
         self._component_names = names
 
-        return corpus
+        return dataset
 
-    def _check_corpus(self, corpus, enforce_sample=True):
-        check_corpus(corpus, enforce_sample=enforce_sample)
+    def _check_corpus(self, dataset, enforce_sample=True):
+        check_corpus(dataset, enforce_sample=enforce_sample)
         if enforce_sample:
-            check_dims(corpus, self.model_state_)
+            check_dims(dataset, self.model_state_)
 
-    def setup_corpus(self, corpus):
+    def setup_corpus(self, dataset):
 
         logger.info("Setting up dataset state ...")
 
-        corpus = CS.init_state(corpus, self.factor_model_, self.locals_model_)
+        dataset = self.GT.init_state(dataset, self.factor_model_, self.locals_model_)
 
         with ParContext(1) as par:
-            CS.update_state(
-                corpus,
+            self.GT.update_state(
+                dataset,
                 self.factor_model_,
                 from_scratch=True,
                 par_context=par,
             )
 
-        CS.update_normalizers(corpus, self.factor_model_.get_normalizers(corpus))
+        for ds in self.GT.expand_datasets(dataset):
+            self.GT.update_normalizers(ds, self.factor_model_.get_normalizers(ds))
 
         logger.info("Done ...")
-        return corpus
+        return dataset
 
     def save(self, path):
 
@@ -291,22 +375,22 @@ class TopographyModel(ABC, BaseEstimator):
 
     def annot_contributions(
         self,
-        corpus,
+        dataset,
         threads=1,
         verbose=0,
     ):
-        self._check_corpus(corpus)
+        self._check_corpus(dataset)
 
-        if not CS.has_corpusstate(corpus):
-            corpus = self.setup_corpus(corpus)
+        if not self.GT.has_corpusstate(dataset):
+            dataset = self.setup_corpus(dataset)
 
         with ParContext(threads, verbose=verbose) as par:
             contributions = self.locals_model.predict(
-                corpus, self.factor_model_, par_context=par
+                dataset, self.factor_model_, par_context=par
             )
 
-        corpus = CorpusInterface(corpus)
-        corpus.corpus = corpus.assign_coords(
+        dataset = CorpusInterface(dataset)
+        dataset.dataset = dataset.assign_coords(
             {
                 "component": self.component_names,
             }
@@ -317,95 +401,95 @@ class TopographyModel(ABC, BaseEstimator):
         )
 
         logger.info('Added key to dataset: "contributions"')
-        return corpus
+        return dataset
 
     def annot_component_distributions(
         self,
-        corpus,
+        dataset,
         threads=1,
     ):
-        self._check_corpus(corpus, enforce_sample=False)
+        self._check_corpus(dataset, enforce_sample=False)
 
-        if not CS.has_corpusstate(corpus):
-            corpus = self.setup_corpus(corpus)
+        if not self.GT.has_corpusstate(dataset):
+            dataset = self.setup_corpus(dataset)
 
         with ParContext(threads) as par:
             lmrt = self.factor_model_._get_log_mutation_rate_tensor(
-                corpus,
+                dataset,
                 par_context=par,
                 with_context=False,
             )
 
-        corpus["component_distributions"] = (
+        dataset["component_distributions"] = (
             np.exp(lmrt - lmrt.max(skipna=True)).fillna(0.0).astype(np.float32)
         )
 
-        corpus["component_locus_distributions"] = (
-            (corpus.component_distributions * corpus.regions.context_frequencies).sum(
+        dataset["component_locus_distributions"] = (
+            (dataset.component_distributions * dataset.regions.context_frequencies).sum(
                 dim=dims_except_for(
-                    corpus.component_distributions.dims, "locus", "component"
+                    dataset.component_distributions.dims, "locus", "component"
                 )
             )
-            / corpus.regions.length
+            / dataset.regions.length
         ).astype(np.float32)
 
         logger.info('Added key: "component_distributions"')
         logger.info('Added key: "component_locus_distributions"')
-        return corpus
+        return dataset
 
     def annot_marginal_prediction(
         self,
-        corpus,
+        dataset,
         exposures=None,
         threads=1,
     ):
-        self._check_corpus(corpus, enforce_sample=False)
+        self._check_corpus(dataset, enforce_sample=False)
 
-        if not CS.has_corpusstate(corpus):
-            corpus = self.setup_corpus(corpus)
+        if not self.GT.has_corpusstate(dataset):
+            dataset = self.setup_corpus(dataset)
 
         try:
-            corpus["component_distributions"]
+            dataset["component_distributions"]
         except KeyError:
-            corpus = self.annot_component_distributions(corpus, threads)
+            dataset = self.annot_component_distributions(dataset, threads)
 
         if exposures is None:
             try:
-                corpus["contributions"]
+                dataset["contributions"]
             except KeyError:
-                corpus = self.annot_contributions(corpus, threads)
-            marginal_exposures = corpus["contributions"].sum(dim="sample").data
+                dataset = self.annot_contributions(dataset, threads)
+            marginal_exposures = dataset["contributions"].sum(dim="sample").data
         else:
             marginal_exposures = np.sum(
                 [
-                    exposures(corpus, sample_name)
-                    for sample_name in CS.list_samples(corpus)
+                    exposures(dataset, sample_name)
+                    for sample_name in self.GT.list_samples(dataset)
                 ],
                 axis=0,
             )
 
         marginal = self.factor_model_._log_marginalize_mutrate(
-            np.log(corpus["component_distributions"]), marginal_exposures
+            np.log(dataset["component_distributions"]), marginal_exposures
         )
 
-        corpus["predicted_marginal"] = (
+        dataset["predicted_marginal"] = (
             np.exp(marginal - marginal.max(skipna=True)).fillna(0.0).astype(np.float32)
         )
-        corpus["predicted_locus_marginal"] = (
-            (np.exp(marginal) * corpus.regions.context_frequencies).sum(
+        dataset["predicted_locus_marginal"] = (
+            (np.exp(marginal) * dataset.regions.context_frequencies).sum(
                 dim=dims_except_for(marginal.dims, "locus")
             )
-            / corpus.regions.length
+            / dataset.regions.length
         ).astype(np.float32)
 
         logger.info('Added key: "predicted_marginal"')
         logger.info('Added key: "predicted_locus_marginal"')
 
-        return corpus
+        return dataset
 
     def annot_SHAP_values(
         self,
-        corpus,
+        dataset,
         *components,
         threads=1,
         scan=False,
@@ -418,18 +502,18 @@ class TopographyModel(ABC, BaseEstimator):
         except ImportError:
             raise ImportError("SHAP is required to calculate SHAP values")
 
-        self._check_corpus(corpus, enforce_sample=False)
+        self._check_corpus(dataset, enforce_sample=False)
 
-        if not CS.has_corpusstate(corpus):
-            corpus = self.setup_corpus(corpus)
+        if not self.GT.has_corpusstate(dataset):
+            dataset = self.setup_corpus(dataset)
 
         if not scan:
             subset_loci = np.random.RandomState(seed).choice(
-                corpus.locus.size, max(n_samples, 1500), replace=False
+                dataset.locus.size, max(n_samples, 1500), replace=False
             )
-            subset = corpus.isel(locus=subset_loci)
+            subset = dataset.isel(locus=subset_loci)
         else:
-            subset = corpus
+            subset = dataset
 
         locus_model = self.factor_model_.models["theta_model"]
         X = locus_model._fetch_feature_matrix(subset)
@@ -469,7 +553,7 @@ class TopographyModel(ABC, BaseEstimator):
                 list(par(delayed(_component_shap)(k) for k in use_components))
             )
 
-        features = corpus.state.coords["feature"].data
+        features = dataset.state.coords["feature"].data
         coords = {
             "shap_features": features,
             "shap_component": [self.component_names[k] for k in use_components],
@@ -478,39 +562,39 @@ class TopographyModel(ABC, BaseEstimator):
         if not scan:
             coords["shap_locus"] = subset.locus.data
 
-        corpus["SHAP_values"] = xr.DataArray(
+        dataset["SHAP_values"] = xr.DataArray(
             shap_matrix,
             dims=("shap_component", "locus" if scan else "shap_locus", "shap_features"),
             coords=coords,
         )
 
         logger.info('Added key: "SHAP_values"')
-        return corpus
+        return dataset
 
     def score(
         self,
-        corpus,
+        dataset,
         exposures=None,
         threads=1,
     ):
-        self._check_corpus(corpus)
+        self._check_corpus(dataset)
 
-        if not CS.has_corpusstate(corpus):
-            corpus = self.setup_corpus(corpus)
+        if not self.GT.has_corpusstate(dataset):
+            dataset = self.setup_corpus(dataset)
 
         with ParContext(threads) as par:
             return self.locals_model_.deviance(
                 self.factor_model_,
-                (corpus,),
+                (dataset,),
                 exposures_fn=(
-                    using_exposures_from(corpus) if exposures is None else exposures
+                    using_exposures_from(dataset) if exposures is None else exposures
                 ),
                 par_context=par,
             ).item()
 
     def marginal_ll(
         self,
-        corpus,
+        dataset,
         threads=1,
         alpha=None,
         steps=64000,
@@ -522,20 +606,20 @@ class TopographyModel(ABC, BaseEstimator):
             else:
                 raise ValueError('Alpha must be a list of floats or "uniform"')
 
-        self._check_corpus(corpus)
+        self._check_corpus(dataset)
 
-        if not CS.has_corpusstate(corpus):
-            corpus = self.setup_corpus(corpus)
+        if not self.GT.has_corpusstate(dataset):
+            dataset = self.setup_corpus(dataset)
 
         ll_fns = self.locals_model.get_marginal_ll_fns(
-            (corpus,),
+            (dataset,),
             self.factor_model_,
             alpha=alpha,
             steps=steps,
         )
 
         bar = trange(
-            len(corpus.list_samples()), desc="Calculating marginal lls", leave=False
+            len(dataset.list_samples()), desc="Calculating marginal lls", leave=False
         )
 
         ll = 0.0
@@ -544,32 +628,6 @@ class TopographyModel(ABC, BaseEstimator):
             bar.update(1)
 
         return ll
-
-    def annot_residuals(
-        self,
-        corpus,
-        exposures=None,
-        threads=1,
-    ):
-        raise NotImplementedError("This method is not implemented yet.")
-
-        """self._check_corpus(corpus)
-
-        if not CS.has_corpusstate(corpus):
-            corpus = self.setup_corpus(corpus)
-        
-        with ParContext(threads) as par:
-            residuals = pearson_residuals(
-                self.factor_model_,
-                (corpus,),
-                exposures_fn=using_exposures_from(corpus) if exposures is None else exposures,
-                par_context=par,
-            )
-        
-        corpus['pearson_residuals'] = residuals.astype(np.float32)
-        logger.info('Added key: "residuals"')
-
-        return corpus"""
 
     def format_signature(self, component, normalization="global"):
 
@@ -583,7 +641,7 @@ class TopographyModel(ABC, BaseEstimator):
     def alpha_(self):
         return self.locals_model_.alpha
 
-    def execel_report(self, corpus, output):
+    def execel_report(self, dataset, output):
 
         try:
             from pandas import ExcelWriter
@@ -606,18 +664,18 @@ class TopographyModel(ABC, BaseEstimator):
                     )
                 )
 
-            if hasattr(corpus, "contributions"):
+            if hasattr(dataset, "contributions"):
                 (
-                    corpus.contributions.to_pandas().to_excel(
+                    dataset.contributions.to_pandas().to_excel(
                         writer,
                         sheet_name="Sample_contributions",
                     )
                 )
 
-            if hasattr(corpus, "SHAP_values"):
+            if hasattr(dataset, "SHAP_values"):
 
-                shap_components = corpus.SHAP_values.coords["shap_component"].values
-                expl = get_explanation(corpus, shap_components[0])
+                shap_components = dataset.SHAP_values.coords["shap_component"].values
+                expl = get_explanation(dataset, shap_components[0])
 
                 DataFrame(
                     expl.data,
@@ -638,7 +696,7 @@ class TopographyModel(ABC, BaseEstimator):
 
                 for component in shap_components:
 
-                    expl = get_explanation(corpus, component)
+                    expl = get_explanation(dataset, component)
 
                     DataFrame(
                         expl.values,

@@ -1,6 +1,20 @@
 import os
 import mutopia.gtensor.disk_interface as disk
 
+def inplace(func):
+    """
+    Decorator function to modify a dataset in place - allows one to run mutations on the dataset
+    without messing up the interface chains.
+    """
+
+    def wrapper(dataset, *args, **kwargs):
+        original = CorpusInterface(dataset)
+        result = func(original.corpus, *args, **kwargs)
+        original.corpus = result
+        return original._corpus
+
+    return wrapper
+
 
 class CorpusInterface:
     """

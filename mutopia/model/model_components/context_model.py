@@ -50,11 +50,14 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
 
         self.n_components = n_components
         self.n_fixed_components = len(fix_components)
-        self.context_dim = CS.get_dims(corpuses[0])["context"]
-        self.context_names = list(corpuses[0].coords["context"].data)
+        
+        corpus = corpuses[0] 
+        
+        self.context_dim = CS.get_dims(corpus)["context"]
+        self.context_names = list(corpus.coords["context"].data)
         self.dtype = dtype
 
-        corpus = corpuses[0]  # just grab the first one to use for initialization
+        # just grab the first one to use for initialization
         self._context_distribution = (
             CS.get_regions(corpus)
             .context_frequencies.sum(
@@ -68,7 +71,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         self._context_distribution /= self._context_distribution.sum()
 
         self.context_transformer = context_encoder.fit(self.context_names)
-        self.mesoscale_transformer = MesoscaleEncoder().fit(corpuses)
+        self.mesoscale_transformer = MesoscaleEncoder().fit(corpus)
 
         self.encoding_matrix_ = DesignMatrixHelper.compose_encoding_matrix(
             self.context_transformer.encoding_matrix,
@@ -91,7 +94,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
 
         if len(fix_components) > 0 or len(init_components) > 0:
             self.init_from_signatures(
-                corpuses[0]
+                corpus
                 .modality()
                 .load_components(*fix_components, *init_components)
             )
@@ -172,9 +175,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
     def num_mesoscale_states(self):
         return self.mesoscale_transformer.n_states
 
-    def post_fit(self, corpuses):
-
-        corpus = corpuses[0]
+    def post_fit(self, corpus):
 
         locus_effects = (
             CS.fetch_val(corpus, "log_locus_distribution").transpose("locus", ...).data

@@ -1,8 +1,8 @@
-from . import gtensor_interface as CS
-from ..utils import *
-from ..gtensor import *
 from tqdm import trange
 from functools import partial
+from itertools import chain
+from ..utils import *
+from ..gtensor import *
 from .factor_model import FactorModel
 from .latent_var_models.base import LocalsModel
 
@@ -11,6 +11,7 @@ def VI_step(
     factor_model: FactorModel,
     locals_model: LocalsModel,
     datasets,
+    GT,
     update_prior=True,
     learning_rate=1.0,
     *,
@@ -26,18 +27,10 @@ def VI_step(
     offsets, normalizers = factor_model.get_exp_offsets_dict(**args)
 
     """
-    In the previous "offsets" step, the normalizers were updated
-    on a subset of the data. Now we need to update the normalizers
-    on the full data set.
+    In the previous "offsets" step, new normalizers were calculated. 
+    Now we need to transer the normalizers to the full data set.
     """
-    for dataset in datasets:
-        factor_model._set_model_normalizers(
-            dataset,
-            normalizers[CS.get_name(dataset)],
-        )
-
-    for dataset in datasets:
-        CS.update_normalizers(dataset, factor_model.get_normalizers(dataset))
+    factor_model.set_model_normalizers(datasets, normalizers)
 
     """
     The normalizers are updated in the previous function
@@ -47,13 +40,13 @@ def VI_step(
     Therefore, this is the best time to evaluate the loss functions.
     The elbo is calculated during the E-step because it's convenient.
     """
-    stats, elbo = locals_model.Estep(**args, factor_model=factor_model)
+    stats = locals_model.Estep(**args, factor_model=factor_model)
     """
     We're agnostic to the form of the test set evaluation function,
     but it should be a function of the model state that returns the
     test set score.
     """
-    test_elbo = test_score_fn(par_context=par_context)
+    test_score = test_score_fn(par_context=par_context)
 
     factor_model.Mstep(
         offsets=offsets,
@@ -63,20 +56,21 @@ def VI_step(
     )
 
     for dataset in datasets:
-        CS.update_state(
+        GT.update_state(
             dataset,
             factor_model,
             from_scratch=False,
             par_context=par_context,
         )
 
-    return elbo, test_elbo
+    return 0., test_score
 
 
 def SVI_step(
     factor_model: FactorModel,
     locals_model: LocalsModel,
     datasets,
+    GT,
     update_prior=True,
     *,
     test_score_fn,
@@ -101,26 +95,20 @@ def SVI_step(
     """
     offsets, normalizers = timer_wrapper(factor_model.get_exp_offsets_dict)(**args)
 
-    for dataset in datasets:
-        factor_model._set_model_normalizers(
-            dataset,
-            normalizers[CS.get_name(dataset)],
-            learning_rate=learning_rate,
-            subsample_rate=locus_subsample or 1.0,
-        )
+    factor_model.set_model_normalizers(
+        slices,
+        normalizers,
+        learning_rate=learning_rate,
+        subsample_rate=locus_subsample or 1.0,
+    )
 
-    """
-    In the previous "offsets" step, the normalizers were updated
-    on a subset of the data. Now we need to transfer this information
-    to the full data set (this is just a copying step, no computation).
-    """
-    for dataset in list(datasets) + list(slices):
-        CS.update_normalizers(dataset, factor_model.get_normalizers(dataset))
+    for _slice, _dataset in zip(GT.to_datasets(*slices), GT.to_datasets(*datasets)):
+        GT.update_normalizers(_dataset, GT.fetch_normalizers(_slice))
 
     """
     Okay, now we can calculate the sufficient statistics.
     """
-    sstats, elbo = timer_wrapper(locals_model.Estep)(
+    sstats = timer_wrapper(locals_model.Estep)(
         **args,
         factor_model=factor_model,
         learning_rate=learning_rate,
@@ -153,14 +141,14 @@ def SVI_step(
     the normalizers on the subset data during the offset calculation.
     """
     for dataset in datasets:
-        timer_wrapper(CS.update_state)(
+        timer_wrapper(GT.update_state)(
             dataset,
             factor_model,
             from_scratch=False,
             par_context=par_context,
         )
 
-    return elbo, test_score
+    return 0., test_score
 
 
 def learning_rate_schedule(tau, kappa, epoch):
@@ -168,6 +156,7 @@ def learning_rate_schedule(tau, kappa, epoch):
 
 
 def slice_generator(
+    GT,
     random_state,
     *datasets,
     locus_subsample=None,
@@ -178,7 +167,7 @@ def slice_generator(
 
         if not batch_subsample is None:
 
-            sample_names = CS.list_samples(dataset)
+            sample_names = GT.list_samples(dataset)
 
             new_samples = list(
                 random_state.choice(
@@ -199,8 +188,8 @@ def slice_generator(
                 dataset,
                 keep_features=False,
                 locus=random_state.choice(
-                    CS.get_dims(dataset)["locus"],
-                    int(locus_subsample * CS.get_dims(dataset)["locus"]),
+                    GT.get_dims(dataset)["locus"],
+                    int(locus_subsample * GT.get_dims(dataset)["locus"]),
                     replace=False,
                 ),
             )
@@ -217,6 +206,7 @@ def _should_stop(stop_condition, scores):
 
 
 def fit_model(
+    GT, # gtensor interface
     train_datasets,
     test_datasets,
     random_state,
@@ -252,12 +242,12 @@ def fit_model(
         check_corpus(dataset)
 
     # Ensure all train datasets have different names
-    corpus_names = [name for name, _ in CS.expand_datasets(train_datasets)]
+    corpus_names = [name for name, _ in GT.expand_datasets(*train_datasets)]
     if len(corpus_names) != len(set(corpus_names)):
         raise ValueError("All train datasets must have different names.")
 
     num_training_samples = sum(
-        len(CS.list_samples(dataset)) for dataset in train_datasets
+        len(GT.list_samples(dataset)) for dataset in train_datasets
     )
     logger.info(
         f"Found n={num_training_samples} training samples across {len(train_datasets)} datasets."
@@ -267,19 +257,19 @@ def fit_model(
 
     logger.info("Preprocessing training datasets...")
     train_datasets = [
-        CS.init_state(prepare_data(dataset), *models) for dataset in train_datasets
+        GT.init_state(prepare_data(dataset), *models) for dataset in train_datasets
     ]
 
     logger.info("Preprocessing testing datasets...")
     test_datasets = [
-        CS.init_state(prepare_data(dataset), *models) for dataset in test_datasets
+        GT.init_state(prepare_data(dataset), *models) for dataset in test_datasets
     ]
 
     test_score_fn = partial(
         locals_model.deviance,
         factor_model,
         test_datasets,
-        exposures_fn=CS.using_exposures_from(*train_datasets),
+        exposures_fn=GT.using_exposures_from(*train_datasets),
     )
 
     """
@@ -298,6 +288,7 @@ def fit_model(
             VI_step,
             *models,
             train_datasets,
+            GT,
         )
     else:
 
@@ -307,12 +298,13 @@ def fit_model(
         )
 
         logger.info(f"Using SVI.")
-        subsampler = partial(slice_generator, random_state, **subsample_rates)
+        subsampler = partial(slice_generator, GT, random_state, **subsample_rates)
 
         step_fn = partial(
             SVI_step,
             *models,
             train_datasets,
+            GT,
             batch_generator=subsampler,
             **subsample_rates,
         )
@@ -351,7 +343,7 @@ def fit_model(
                     epoch >= begin_prior_updates
                     and empirical_bayes
                     and not any(
-                        CS.is_marginal_corpus(dataset) for dataset in train_datasets
+                        GT.is_marginal_corpus(dataset) for dataset in train_datasets
                     )
                 )
 
@@ -381,7 +373,7 @@ def fit_model(
                     )
 
                 for test_corpus in test_datasets:
-                    CS.update_state(
+                    GT.update_state(
                         test_corpus,
                         factor_model,
                         from_scratch=False,
@@ -425,7 +417,7 @@ def fit_model(
         logger.info("Finalizing models ...")
 
         for model in factor_model.models.values():
-            model.post_fit(train_datasets)
+            model.post_fit(GT.to_datasets(*train_datasets)[0])
 
         # if not empirical_bayes:
         #    logger.info('Updating priors ...')

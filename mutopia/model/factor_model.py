@@ -5,7 +5,7 @@ from ..utils import parallel_map, parallel_gen
 from . import gtensor_interface as CS
 import numpy as np
 import warnings
-from functools import partial
+from functools import partial, wraps
 from joblib import delayed
 from itertools import chain
 from scipy.special import logsumexp
@@ -13,11 +13,23 @@ from functools import reduce
 from collections import defaultdict
 import xarray as xr
 
+def overrided_by(default_fn):
+    def inner(fn):
+        def wrapped_fn(self, *args, **kwargs):
+            if getattr(self, default_fn) is None:
+                return fn(self, *args, **kwargs)
+            else:
+                return getattr(self, default_fn)(*args, **kwargs)
+
+        return wrapped_fn
+    return inner
+
 
 class FactorModel:
 
     def __init__(
         self,
+        GT, # Gtensor interface
         datasets,
         offsets_fn=None,
         predict_fn=None,
@@ -26,6 +38,7 @@ class FactorModel:
 
         self.offsets_fn = offsets_fn
         self.predict_fn = predict_fn
+        self.GT = GT
 
         self._models = {}
 
@@ -34,14 +47,55 @@ class FactorModel:
 
         self._normalizers = {
             name: np.zeros(self.n_components)
-            for name, dataset in CS.expand_datasets(datasets)
+            for name, dataset in self.GT.expand_datasets(*datasets)
         }
 
         self._genome_size = {
-            name: CS.get_regions(dataset).context_frequencies.sum().item()
-            for name, dataset in CS.expand_datasets(datasets)
+            name: self.GT.get_regions(dataset).context_frequencies.sum().item()
+            for name, dataset in self.GT.expand_datasets(*datasets)
         }
 
+    def Mstep(
+        self,
+        datasets,
+        sstats,
+        offsets,
+        par_context=None,
+        learning_rate=1.0,
+        update_prior=True,
+        use_parallel=True,
+    ):
+
+        if update_prior:
+            self.locals_model.partial_fit(
+                sstats["locals_sstats"], learning_rate=learning_rate
+            )
+
+        datasets = self.GT.to_datasets(*datasets)
+
+        update_fns = chain.from_iterable(
+            (
+                model.partial_fit(
+                    k,
+                    sstats[model_name + "_sstats"],
+                    offsets[model_name + "_offsets"],
+                    datasets,
+                    learning_rate=learning_rate,
+                )
+                for k in range(self.n_components)
+                for model_name, model in self.models.items()
+            )
+        )
+
+        it = (
+            parallel_gen(update_fns, par_context, ordered=False)
+            if use_parallel
+            else (fn() for fn in update_fns)
+        )
+
+        for _ in it:
+            pass
+        
     @property
     def n_components(self):
         return next(iter(self._models.values())).n_components
@@ -60,31 +114,12 @@ class FactorModel:
         )
 
     def get_normalizers(self, dataset):
-        return self._normalizers[CS.get_name(dataset)]
+        return self._normalizers[self.GT.get_name(dataset)]
 
     def get_genome_size(self, dataset):
-        return self._genome_size[CS.get_name(dataset)]
+        return self._genome_size[self.GT.get_name(dataset)]
 
-    '''def _get_propto_log_mutation_rate(self, k, dataset):
-
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-
-            un_normalized = reduce(
-                lambda x, y: x + y,
-                (
-                    model.predict(k, dataset)
-                    for model in self.models.values()
-                    if model.requires_normalization
-                ),  # sum over models
-                np.log(CS.get_regions(dataset).exposures)
-                + np.log(
-                    CS.get_regions(dataset).context_frequencies
-                ),  # start with the background rates
-            )
-
-        return un_normalized'''
-
+    @overrided_by("predict_fn")
     def predict(self, k, dataset, with_context=True):
         """
         The difference between this method and the _get_propto_log_mutation_rate
@@ -99,11 +134,11 @@ class FactorModel:
                 (
                     model.predict(k, dataset) for model in self.models.values()
                 ),  # sum over models
-                np.log(CS.get_regions(dataset).exposures)
-                + CS.fetch_normalizers(dataset)[k],
+                np.log(self.GT.get_regions(dataset).exposures)
+                + self.GT.fetch_normalizers(dataset)[k],
             )
             if with_context:
-                y_hat += np.log(CS.get_regions(dataset).context_frequencies)
+                y_hat += np.log(self.GT.get_regions(dataset).context_frequencies)
 
         return y_hat
 
@@ -118,7 +153,7 @@ class FactorModel:
             parallel_map(
                 (
                     partial(
-                        self.predict if self.predict_fn is None else self.predict_fn,
+                        self.predict,
                         k,
                         dataset,
                         with_context=with_context,
@@ -160,7 +195,7 @@ class FactorModel:
             model_name
             + "_sstats": {
                 name: model.spawn_sstats(dataset)
-                for name, dataset in CS.expand_datasets(datasets)
+                for name, dataset in self.GT.expand_datasets(*datasets)
             }
             for model_name, model in self.models.items()
         }
@@ -177,13 +212,13 @@ class FactorModel:
         all_offsets = defaultdict(lambda: defaultdict(dict))
         normalizers = {
             name: np.zeros_like(self.get_normalizers(dataset))
-            for name, dataset in CS.expand_datasets(datasets)
+            for name, dataset in self.GT.expand_datasets(*datasets)
         }
 
         args = [
             (k, dataset)
             for k in range(self.n_components)
-            for _, dataset in CS.expand_datasets(datasets)
+            for _, dataset in self.GT.expand_datasets(*datasets)
         ]
 
         offset_fns = (
@@ -196,12 +231,13 @@ class FactorModel:
         ):
             for model_name, _offsets in exp_offsets.items():
 
-                all_offsets[model_name + "_offsets"][CS.get_name(dataset)][k] = _offsets
+                all_offsets[model_name + "_offsets"][self.GT.get_name(dataset)][k] = _offsets
 
-                normalizers[CS.get_name(dataset)][k] = norm
+                normalizers[self.GT.get_name(dataset)][k] = norm
 
         return all_offsets, normalizers
 
+    @overrided_by("offsets_fn")
     def _get_exp_offsets_k_c(self, k, dataset):
 
         model_predictions = {
@@ -216,9 +252,9 @@ class FactorModel:
             log_mutation_rate = reduce(
                 lambda x, y: x + y,
                 model_predictions.values(),  # sum over models
-                np.log(CS.get_regions(dataset).exposures)
+                np.log(self.GT.get_regions(dataset).exposures)
                 + np.log(
-                    CS.get_regions(dataset).context_frequencies
+                    self.GT.get_regions(dataset).context_frequencies
                 ),  # start with the background rates
             )
 
@@ -244,14 +280,33 @@ class FactorModel:
 
             return (-logsumexp(log_mutation_rate.data), exp_offsets)
 
-    def _set_model_normalizers(
-        self, dataset, normalizers, learning_rate=1.0, subsample_rate=1.0
-    ):
-        curr = self._normalizers[CS.get_name(dataset)]
 
-        self._normalizers[CS.get_name(dataset)][:] = _svi_update_fn(
-            curr, np.log(subsample_rate or 1.0) + normalizers, learning_rate
-        )
+    def set_model_normalizers(
+        self, 
+        datasets, 
+        normalizers, 
+        learning_rate=1.0, 
+        subsample_rate=1.0
+    ):
+        
+        for name, dataset in self.GT.expand_datasets(*datasets):
+            
+            curr = self._normalizers[name]
+
+            self._normalizers[name][:] = _svi_update_fn(
+                curr, 
+                np.log(subsample_rate or 1.0) + normalizers[name], 
+                learning_rate
+            )
+
+            self.GT.update_normalizers(
+                dataset,
+                self._normalizers[name],
+            )
+
+    def update_normalizers(self, datasets, par_context=None):
+        for name, dataset in self.GT.expand_datasets(*datasets):
+            self.GT.update_normalizers(dataset, self._calc_normalizers(dataset, par_context))
 
     def _calc_normalizers(
         self,
@@ -271,10 +326,6 @@ class FactorModel:
                 (partial(norm_fn, k) for k in range(self.n_components)), par_context
             )
         )
-
-    def update_normalizers(self, datasets, par_context=None):
-        for name, dataset in CS.expand_datasets(datasets):
-            CS.update_normalizers(dataset, self._calc_normalizers(dataset, par_context))
 
     def format_signature(self, k, normalization="global"):
         return np.exp(
@@ -296,44 +347,3 @@ class FactorModel:
                 if hasattr(model, "get_interaction_summary")
             ),
         )
-
-    def Mstep(
-        self,
-        datasets,
-        sstats,
-        offsets,
-        par_context=None,
-        learning_rate=1.0,
-        update_prior=True,
-        use_parallel=True,
-    ):
-
-        if update_prior:
-            self.locals_model.partial_fit(
-                sstats["locals_sstats"], learning_rate=learning_rate
-            )
-
-        datasets = list(zip(*CS.expand_datasets(datasets)))[1]
-
-        update_fns = chain.from_iterable(
-            (
-                model.partial_fit(
-                    k,
-                    sstats[model_name + "_sstats"],
-                    offsets[model_name + "_offsets"],
-                    datasets,
-                    learning_rate=learning_rate,
-                )
-                for k in range(self.n_components)
-                for model_name, model in self.models.items()
-            )
-        )
-
-        it = (
-            parallel_gen(update_fns, par_context, ordered=False)
-            if use_parallel
-            else (fn() for fn in update_fns)
-        )
-
-        for _ in it:
-            pass

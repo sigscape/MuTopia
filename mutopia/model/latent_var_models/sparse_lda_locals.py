@@ -12,29 +12,23 @@ import warnings
 
 class LDAUpdateSparse(LocalsModel):
 
-    ##
-    # E-step functionality to satisfy the LocalUpdate interface
-    ##
+    def _get_weights(self, sample):
+        return np.ascontiguousarray(sample.X.data.data, dtype=self.dtype)
+
     @classmethod
-    def _convert_sample(cls, sample, dtype=float):
-
+    def _convert_sample(cls, sample):
         sample = sample.X.sparse_to_coo()
-
-        weights = np.ascontiguousarray(sample.data.data.astype(dtype, copy=False))
 
         idx_dict = dict(
             zip(
                 tuple(sample.coords["obs_indices"].data),
                 sample.indices.data,
             )
-        )
+        )       
 
-        return dict(
-            **idx_dict,
-            weights=weights,
-        )
+        return idx_dict
 
-    @classmethod
+    '''@classmethod
     def _unconvert_sample(cls, sample, sample_dict, data):
 
         dims = tuple(sample.dims)
@@ -56,9 +50,8 @@ class LDAUpdateSparse(LocalsModel):
             attrs={
                 k: v for k, v in sample.attrs.items() if not k in ("shape", "format")
             },
-        )
+        )'''
 
-    @classmethod
     def _get_log_context_effect(
         self,
         dataset,
@@ -67,7 +60,7 @@ class LDAUpdateSparse(LocalsModel):
         **idx_dict,
     ):
 
-        freqs = CS.get_regions(dataset).context_frequencies.transpose(..., "locus")
+        freqs = self.GT.get_regions(dataset).context_frequencies.transpose(..., "locus")
 
         idx_arrs = [idx_dict[dim] for dim in freqs.dims[:-1]]
 
@@ -75,27 +68,24 @@ class LDAUpdateSparse(LocalsModel):
             warnings.simplefilter("ignore")
 
             return np.log(freqs.data[*idx_arrs, locus]) + np.log(
-                CS.get_regions(dataset).exposures.data[locus]
+                self.GT.get_regions(dataset).exposures.data[locus]
             )
 
-    @classmethod
     def _conditional_observation_likelihood(
-        cls,
+        self,
         dataset,
         factor_model,
         logsafe=True,
         *,
-        weights,
-        **idx_dict,
+        sample_dict,
     ):
-
         ##
         # What's going on here: we have the normalized log mutation rate for each signature, configuration, context, locus.
         # For the mutations in this sample, we select over these axes.
         ##
-        logp_normalizer = CS.fetch_normalizers(dataset)[:, None]
+        logp_normalizer = self.GT.fetch_normalizers(dataset)[:, None]
 
-        offset = cls._get_log_context_effect(dataset, **idx_dict)
+        offset = self._get_log_context_effect(dataset, **sample_dict)
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -103,7 +93,7 @@ class LDAUpdateSparse(LocalsModel):
             logp_X = reduce(
                 lambda x, y: x + y,
                 (
-                    model.predict_sparse(dataset, **idx_dict)
+                    model.predict_sparse(dataset, **sample_dict)
                     for model in factor_model.models.values()
                 ),
                 logp_normalizer + offset,
@@ -112,7 +102,7 @@ class LDAUpdateSparse(LocalsModel):
         if logsafe:
             logp_X - logp_X.max()
 
-        return np.ascontiguousarray(np.nan_to_num(np.exp(logp_X), nan=0.0))
+        return np.ascontiguousarray(np.nan_to_num(np.exp(logp_X), nan=0.0), dtype=self.dtype)
 
     @staticmethod
     def _calc_sstats(
@@ -140,7 +130,7 @@ class LDAUpdateSparse(LocalsModel):
             "gamma": gamma,
         }
 
-        return suffstats, 0.0
+        return suffstats
 
     def _update_fn(
         self,
@@ -154,14 +144,17 @@ class LDAUpdateSparse(LocalsModel):
         factor_model,
     ):
         # 1. get the information we need from the sample
-        sample_dict = self._convert_sample(sample, dtype=self.dtype)
-        weights = sample_dict["weights"] / locus_subsample
-        alpha = np.ascontiguousarray(self.alpha[CS.get_name(dataset)])
-        gamma = np.ascontiguousarray(gamma, dtype=self.dtype)
+        weights = self._get_weights(sample) / locus_subsample
+        sample_dict = self._convert_sample(sample)
 
         conditional_likelihood = self._conditional_observation_likelihood(
-            dataset, factor_model, **sample_dict
-        ).astype(self.dtype, copy=False)
+            dataset, 
+            factor_model, 
+            sample_dict=sample_dict,
+        )
+        
+        alpha = np.ascontiguousarray(self.alpha[self.GT.get_name(dataset)])
+        gamma = np.ascontiguousarray(gamma, dtype=self.dtype)
 
         args = (
             alpha,
@@ -178,14 +171,14 @@ class LDAUpdateSparse(LocalsModel):
 
         new_gamma = _svi_update_fn(gamma, map_estimate, learning_rate)
 
-        suffstats, elbo = self._calc_sstats(
+        suffstats = self._calc_sstats(
             *args,
             new_gamma,
             sample_dict=sample_dict,
             batch_subsample=batch_subsample,
         )
 
-        return (suffstats, new_gamma, elbo)
+        return suffstats
 
     def _get_update_fns(
         self,
@@ -194,7 +187,7 @@ class LDAUpdateSparse(LocalsModel):
         learning_rate=1.0,
         locus_subsample=1.0,
         batch_subsample=1.0,
-        exposures_fn=CS.fetch_topic_compositions,
+        exposures_fn=None,
         par_context=None,
     ):
         """
@@ -203,11 +196,10 @@ class LDAUpdateSparse(LocalsModel):
         I added "get_update_fns" to the API for the locals model because
         some update functions may depend on something computed ahead of time.
         """
-
         updates = (
             partial(
                 self._update_fn,
-                exposures_fn(dataset, sample_name),
+                (exposures_fn or self.GT.fetch_topic_compositions)(dataset, sample_name),
                 sample=sample,
                 dataset=dataset,
                 factor_model=factor_model,
@@ -215,7 +207,7 @@ class LDAUpdateSparse(LocalsModel):
                 locus_subsample=locus_subsample,
                 batch_subsample=batch_subsample,
             )
-            for (sample_name, sample) in CS.iter_samples(dataset)
+            for (sample_name, sample) in self.GT.iter_samples(dataset)
         )
 
         return updates
@@ -231,15 +223,15 @@ class LDAUpdateSparse(LocalsModel):
         **kw,
     ):
 
-        sample_dict = self._convert_sample(sample, dtype=self.dtype)
+        weights = self._get_weights(sample)
+        sample_dict = self._convert_sample(sample)
 
         conditional_likelihood = self._conditional_observation_likelihood(
             dataset,
             factor_model,
             logsafe=False,  # we want the actual likelihood, don't remove the max for numerical stability
-            **sample_dict,
-        ).astype(self.dtype, copy=False)
-        weights = sample_dict["weights"]
+            sample_dict=sample_dict,
+        )
 
         # the context frequencies are missing dimensions that the observations have ...
         log_context_effect = self._get_log_context_effect(dataset, **sample_dict)
@@ -248,7 +240,7 @@ class LDAUpdateSparse(LocalsModel):
 
         # 1. figure out the missing dimensions
         missing_dims = dims_except_for(
-            sample.X.dims, *CS.get_regions(dataset).context_frequencies.dims
+            sample.X.dims, *self.GT.get_regions(dataset).context_frequencies.dims
         )
         # 2. figure out the number of possible types of observations missing
         n_types = prod(dataset.sizes[dim] for dim in missing_dims)
@@ -273,11 +265,11 @@ class LDAUpdateSparse(LocalsModel):
         self,
         dataset,
         factor_model,
-        exposures_fn=CS.fetch_topic_compositions,
+        exposures_fn=None,
         par_context=None,
     ):
 
-        context_sum = np.sum(CS.get_regions(dataset).context_frequencies.data)
+        context_sum = np.sum(self.GT.get_regions(dataset).context_frequencies.data)
 
         deviance_fns = (
             partial(
@@ -285,17 +277,21 @@ class LDAUpdateSparse(LocalsModel):
                 dataset=dataset,
                 factor_model=factor_model,
                 sample=sample,
-                gamma=exposures_fn(dataset, sample_name),
+                gamma=(exposures_fn or self.GT.fetch_topic_compositions)(dataset, sample_name).ravel(),
                 context_sum=context_sum,
             )
-            for (sample_name, sample) in CS.iter_samples(dataset)
+            for (sample_name, sample) in self.GT.iter_samples(dataset)
         )
 
         return deviance_fns
 
-    @staticmethod
-    def reduce_model_sstats(model, carry, dataset, **sample_sstats):
-        return model.reduce_sparse_sstats(carry, dataset, **sample_sstats)
+
+    def reduce_model_sstats(self, model, carry, dataset, **sample_sstats):
+        model.reduce_sparse_sstats(
+            carry[self.GT.get_name(dataset)], 
+            dataset, 
+            **sample_sstats
+        )
 
     ##
     # The modeling functionality to satisfy the LocalModel interface is completed.
@@ -313,18 +309,17 @@ class LDAUpdateSparse(LocalsModel):
     ):
 
         if alpha is None:
-            alpha = self.alpha[CS.get_name(dataset)]
+            alpha = self.alpha[self.GT.get_name(dataset)]
 
-        sample_dict = self._convert_sample(sample, dtype=self.dtype)
+        sample_dict = self._convert_sample(sample)
+        weights = self._get_weights(sample)
 
         conditional_likelihood = self._conditional_observation_likelihood(
             dataset,
             factor_model,
             logsafe=False,  # we want the actual likelihood, don't remove the max for numerical stability
-            **sample_dict,
-        ).astype(self.dtype, copy=False)
-
-        weights = sample_dict["weights"]
+            sample_dict=sample_dict,
+        )
 
         p_z, gammas = gibbs_sample_posterior(
             alpha,
@@ -351,13 +346,14 @@ class LDAUpdateSparse(LocalsModel):
         # For panel and exome data, there may be too few mutations to
         # infer anything useful from gamma. We'll lower the variance of estimation
         # instead and just marginalize it out.
-        sample_dict = self._convert_sample(sample, dtype=self.dtype)
-        # KxI - I=number of mutations, K=number of signatures
+        sample_dict = self._convert_sample(sample)
+        weights = self._get_weights(sample)
+
         conditional_likelihood = self._conditional_observation_likelihood(
             dataset,
             factor_model,
-            **sample_dict,
-            logsafe=False,
+            logsafe=False,  # we want the actual likelihood, don't remove the max for numerical stability
+            sample_dict=sample_dict,
         )
 
         return AIS_marginal_ll(
@@ -377,7 +373,7 @@ class LDAUpdateSparse(LocalsModel):
         seed=42,
     ):
 
-        alpha = self.alpha[CS.get_name(dataset)] if alpha is None else alpha
+        alpha = self.alpha[self.GT.get_name(dataset)] if alpha is None else alpha
 
         marginal_ll_fns = (
             partial(
@@ -389,7 +385,7 @@ class LDAUpdateSparse(LocalsModel):
                 steps=steps,
                 seed=seed,
             )
-            for (_, sample) in CS.iter_samples(dataset)
+            for (_, sample) in self.GT.iter_samples(dataset)
         )
 
         return marginal_ll_fns

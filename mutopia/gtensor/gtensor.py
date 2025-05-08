@@ -264,6 +264,35 @@ def annot_empirical_marginal(dataset):
     return dataset
 
 
+def make_mixture_dataset(**datasets):
+
+    merge_dsets = []
+    for source_name, dataset in datasets.items():
+        
+        rename_map = {
+            old_name : f'{level}/{source_name}/{os.path.basename(old_name)}'
+            for level in ["Features", "State"]
+            for old_name in dataset.sections.groups[level]
+        }
+
+        merge_dsets.append(dataset[rename_map.keys()].rename(rename_map))
+
+    first_dataset = list(datasets.values())[0]
+
+    transfer_vars = [
+        var_name
+        for level, vars in first_dataset.sections.groups.items()
+        if not level in ["Features", "State"]
+        for var_name in vars
+    ]
+    merge_dsets.append(first_dataset[transfer_vars])
+
+    merged = xr.merge(merge_dsets)
+    merged.attrs['sources'] = list(datasets.keys())
+
+    return merged
+
+
 def dims_except_for(dims, *keepdims):
     return tuple({*dims}.difference({*keepdims}))
 
@@ -439,18 +468,3 @@ def prepare_data(dataset):
     )
 
     return dataset
-
-
-def inplace(func):
-    """
-    Decorator function to modify a dataset in place - allows one to run mutations on the dataset
-    without messing up the interface chains.
-    """
-
-    def wrapper(dataset, *args, **kwargs):
-        original = CorpusInterface(dataset)
-        result = func(original.corpus, *args, **kwargs)
-        original.corpus = result
-        return original._corpus
-
-    return wrapper

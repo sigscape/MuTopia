@@ -33,7 +33,7 @@ class LDAUpdateDense(LocalsModel):
                 par_context=par_context,
                 with_context=False,
             )
-            .transpose("component", *CS.observation_dims(dataset))
+            .transpose("component", *self.GT.observation_dims(dataset))
             .data
         )
 
@@ -70,7 +70,7 @@ class LDAUpdateDense(LocalsModel):
             "gamma": gamma,
         }
 
-        return (suffstats, 0.0)
+        return suffstats
 
     def _update_fn(
         self,
@@ -86,7 +86,7 @@ class LDAUpdateDense(LocalsModel):
     ):
         # 1. get the information we need from the sample
         weights = self._convert_sample(sample) / locus_subsample
-        alpha = np.ascontiguousarray(self.alpha[CS.get_name(dataset)])
+        alpha = np.ascontiguousarray(self.alpha[self.GT.get_name(dataset)])
         gamma = np.ascontiguousarray(gamma, dtype=self.dtype)
 
         args = (
@@ -104,14 +104,14 @@ class LDAUpdateDense(LocalsModel):
 
         new_gamma = _svi_update_fn(gamma, map_estimate, learning_rate)
 
-        suffstats, elbo = self._calc_sstats(
+        suffstats = self._calc_sstats(
             *args,
             new_gamma,
             batch_subsample=batch_subsample,
             dims=dims,
         )
 
-        return (suffstats, new_gamma, elbo)
+        return suffstats
 
     def _get_update_fns(
         self,
@@ -120,7 +120,7 @@ class LDAUpdateDense(LocalsModel):
         learning_rate=1.0,
         locus_subsample=1.0,
         batch_subsample=1.0,
-        exposures_fn=CS.fetch_topic_compositions,
+        exposures_fn=None,
         *,
         par_context,
     ):
@@ -135,16 +135,16 @@ class LDAUpdateDense(LocalsModel):
         updates = (
             partial(
                 self._update_fn,
-                exposures_fn(dataset, sample_name),
+                (exposures_fn or self.GT.fetch_topic_compositions)(dataset, sample_name),
                 sample=sample,
                 dataset=dataset,
                 learning_rate=learning_rate,
                 locus_subsample=locus_subsample,
                 batch_subsample=batch_subsample,
                 conditional_likelihood=likelihoods,
-                dims=CS.observation_dims(dataset),
+                dims=self.GT.observation_dims(dataset),
             )
-            for (sample_name, sample) in CS.iter_samples(dataset)
+            for (sample_name, sample) in self.GT.iter_samples(dataset)
         )
 
         return updates
@@ -188,7 +188,7 @@ class LDAUpdateDense(LocalsModel):
         self,
         dataset,
         factor_model,
-        exposures_fn=CS.fetch_topic_compositions,
+        exposures_fn=None,
         *,
         par_context,
     ):
@@ -196,7 +196,7 @@ class LDAUpdateDense(LocalsModel):
         -> List[F() -> Tuple[float, float]]
         """
 
-        sample_dims = CS.observation_dims(dataset)
+        sample_dims = self.GT.observation_dims(dataset)
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -208,8 +208,8 @@ class LDAUpdateDense(LocalsModel):
 
             context_effects = (
                 match_dims(
-                    np.log(CS.get_regions(dataset).context_frequencies)
-                    + np.log(CS.get_regions(dataset).exposures),
+                    np.log(self.GT.get_regions(dataset).context_frequencies)
+                    + np.log(self.GT.get_regions(dataset).exposures),
                     **{d: dataset.sizes[d] for d in sample_dims},
                 )
                 .transpose(*sample_dims)
@@ -218,18 +218,21 @@ class LDAUpdateDense(LocalsModel):
 
             context_sum = np.nansum(np.exp(context_effects.data))
 
-        for sample_name, sample in CS.iter_samples(dataset):
+        for sample_name, sample in self.GT.iter_samples(dataset):
 
             yield partial(
                 self._deviance_sample,
                 sample=sample,
                 factor_model=factor_model,
-                gamma=exposures_fn(dataset, sample_name),
+                gamma=(exposures_fn or self.GT.fetch_topic_compositions)(dataset, sample_name),
                 context_sum=context_sum,
                 log_mutrate_tensor=log_conditional_likelihood,
                 context_effects=context_effects,
             )
 
-    @staticmethod
-    def reduce_model_sstats(model, carry, dataset, **sample_sstats):
-        return model.reduce_dense_sstats(carry, dataset, **sample_sstats)
+    def reduce_model_sstats(self, model, carry, dataset, **sample_sstats):
+        return model.reduce_dense_sstats(
+            carry[self.GT.get_name(dataset)], 
+            dataset, 
+            **sample_sstats
+        )

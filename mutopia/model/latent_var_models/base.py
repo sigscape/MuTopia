@@ -10,7 +10,7 @@ import ctypes
 from functools import wraps
 from ...gtensor.interfaces import *
 from ._dirichlet_update import update_alpha
-from .. import gtensor_interface as CS
+from .. import gtensor_interface as GT
 from ..model_components.base import _svi_update_fn, PrimitiveModel
 
 
@@ -25,8 +25,6 @@ If the tensors passed are C-contiguous, the reshaping operation is
 free, since only the stride is changed. If reshaping the array 
 requires copying the data, an error is raised.
 """
-
-
 def reshape_same_mem(arr, shape):
     out = arr.reshape(shape, order="C")
     if not np.shares_memory(arr, out):
@@ -420,34 +418,37 @@ class LocalsModel(PrimitiveModel):
 
     def __init__(
         self,
+        GT, # gtensor_interface
         datasets,
-        n_components,
         prior_alpha=1.0,
         estep_iterations=1000,
         difference_tol=5e-5,
         dtype=np.float32,
         *,
+        n_components,
         random_state,
+        **kw,
     ):
         self.estep_iterations = estep_iterations
         self.difference_tol = difference_tol
         self.random_state = random_state
         self.n_components = n_components
         self.dtype = dtype
+        self.GT = GT
 
         self.alpha = {
             name: np.ones(n_components, dtype=dtype) * prior_alpha
-            for name, _ in CS.expand_datasets(datasets)
+            for name, _ in self.GT.expand_datasets(*datasets)
         }
 
     def update_prior(self, datasets):
 
         sstats = {
             name: [
-                CS.fetch_topic_compositions(dataset, sname)
-                for sname in CS.list_samples(dataset)
+                self.GT.fetch_topic_compositions(dataset, sname)
+                for sname in self.GT.list_samples(dataset)
             ]
-            for name, dataset in CS.expand_datasets(datasets)
+            for name, dataset in self.GT.expand_datasets(*datasets)
         }
 
         self.partial_fit(sstats, learning_rate=1.0)
@@ -483,22 +484,20 @@ class LocalsModel(PrimitiveModel):
             par_context=par_context,
         )
 
-        for name, dataset in CS.expand_datasets(datasets):
-
+        for dataset in datasets:
+            
             update_fns = parallel_gen(
                 self._get_update_fns(dataset, factor_model, **kw),
                 par_context=par_context,
                 ordered=True,
             )
 
-            for sample_name, (sample_suffstats, gamma_new, bound) in zip(
-                CS.list_samples(dataset),
+            for sample_name, sample_suffstats in zip(
+                self.GT.list_samples(dataset),
                 update_fns,
             ):
-
-                elbo += bound
                 # Update the topic compositions for the sample
-                CS.update_topic_compositions(dataset, sample_name, gamma_new)
+                self.GT.update_topic_compositions(dataset, sample_name, sample_suffstats["gamma"])
 
                 for model_name, model in factor_model.models.items():
                     """
@@ -509,14 +508,14 @@ class LocalsModel(PrimitiveModel):
                     """
                     self.reduce_model_sstats(
                         model,
-                        sstats[model_name + "_sstats"][name],
+                        sstats[model_name + "_sstats"],
                         dataset,
                         **sample_suffstats,
                     )
 
-        return sstats, elbo
+        return sstats
 
-    def predict(self, dataset, factor_model, *, par_context):
+    def predict(self, dataset, factor_model, par_context=None):
         self.estep_iterations = 10000
         self.difference_tol = 5e-5
 
@@ -566,7 +565,7 @@ class LocalsModel(PrimitiveModel):
         self,
         factor_model,
         datasets,
-        exposures_fn=CS.fetch_topic_compositions,
+        exposures_fn=None,
         par_context=None,
     ):
 
@@ -580,11 +579,11 @@ class LocalsModel(PrimitiveModel):
 
         dev_fns = (
             fn
-            for _, dataset in CS.expand_datasets(datasets)
+            for dataset in datasets
             for fn in self._get_deviance_fns(dataset, **kw)
         )
 
-        d_fit, d_null = list(zip(*parallel_map(dev_fns, par_context)))
+        d_fit, d_null = list(zip(*parallel_gen(dev_fns, par_context, ordered=False)))
 
         return 1 - sum(d_fit) / sum(d_null)
 
@@ -595,7 +594,7 @@ class LocalsModel(PrimitiveModel):
         factor_model,
         learning_rate=1.0,
         subsample_rate=1.0,
-        exposures_fn=CS.fetch_topic_compositions,
+        exposures_fn=None,
         *,
         par_context,
     ):
@@ -633,7 +632,7 @@ class LocalsModel(PrimitiveModel):
     def prepare_corpusstate(self, dataset):
         return dict(
             topic_compositions=DataArray(
-                self.init_locals(len(CS.list_samples(dataset))),
+                self.init_locals(len(self.GT.list_samples(dataset))),
                 dims=("component", "sample"),
             )
         )

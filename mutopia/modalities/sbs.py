@@ -36,59 +36,11 @@ MUTOPIA_TO_COSMIC_IDX = np.array(
     [MUTOPIA_ORDER.index(cosmic) for cosmic in COSMIC_SORT_ORDER]
 )
 
-
-@njit(
-    "Tuple((float32, float32[:,:],float32[:]))(int64, float32[:,::1], float32[::1], float32[::1], float32[:,:], int64[:,::1])",
-    nogil=True,
-)
-def _fast_exp_offsets(
-    num_states,
-    context_freqs,  # (L x C*D)
-    exposures,  # L
-    locus_effects,  # L
-    context_effects,  # S x C
-    idx_selector,  # L,D
-):
-
-    D = 2
-    L, CD = context_freqs.shape
-    C = CD // D
-
-    assert exposures.shape[0] == L
-    assert locus_effects.shape[0] == L
-    assert idx_selector.shape == (L, D)
-
-    context_offsets = np.zeros((num_states, C), dtype=context_freqs.dtype)
-    locus_offsets = np.zeros(L, dtype=context_freqs.dtype)
-    normalizer = 0
-
-    for l, (s_d0, s_d1) in enumerate(idx_selector):
-
-        # (D, C)
-        o = exposures[l] * context_freqs[l, :].reshape(C, D).T
-
-        context_offsets[s_d0, :] += o[0] * locus_effects[l]
-        context_offsets[s_d1, :] += o[1] * locus_effects[l]
-
-        locus_offsets[l] += (context_effects[s_d0, :] * o[0]).sum() + (
-            context_effects[s_d1, :] * o[1]
-        ).sum()
-
-        normalizer += locus_offsets[l] * locus_effects[l]
-
-    return (
-        -np.log(normalizer),
-        context_offsets.T,
-        locus_offsets,
-    )
-
-
 contig_f32 = partial(np.ascontiguousarray, dtype=np.float32)
 
+def _get_args(k, corpus):
 
-def _get_exp_offsets_k_c(k, corpus, num_states):
-
-    args = (
+    return (
         (
             corpus.sections["Regions"]
             .context_frequencies.transpose("locus", "context", "configuration")
@@ -107,11 +59,113 @@ def _get_exp_offsets_k_c(k, corpus, num_states):
         corpus.sections["State"].mesoscale_idx.data.T,
     )
 
-    (normalizer, context_offsets, locus_offsets) = _fast_exp_offsets(num_states, *args)
+
+@njit(
+    "Tuple((float32, float32[:,:],float32[:]))(float32[:,::1], float32[::1], float32[::1], float32[:,:], int64[:,::1])",
+    nogil=True,
+)
+def _fast_exp_offsets(
+    context_freqs,  # (L x C*D)
+    exposures,  # L
+    locus_effects,  # L
+    context_effects,  # S x C
+    idx_selector,  # L,D
+):
+
+    D = 2
+    L, CD = context_freqs.shape
+    C = CD // D
+    S, _ = context_effects.shape
+
+    assert exposures.shape == (L,)
+    assert locus_effects.shape == (L,)
+    assert idx_selector.shape == (L, D)
+    assert context_effects.shape == (S, C)
+
+    context_offsets = np.zeros((S, C), dtype=context_freqs.dtype)
+    locus_offsets = np.zeros(L, dtype=context_freqs.dtype)
+    normalizer = 0
+
+    for l, (s_d0, s_d1) in enumerate(idx_selector):
+
+        # (D, C)
+        o = exposures[l] * context_freqs[l, :].reshape(C, D).T
+
+        context_offsets[s_d0, :] += o[0] * locus_effects[l]
+        context_offsets[s_d1, :] += o[1] * locus_effects[l]
+
+        locus_offsets[l] += (context_effects[s_d0, :] * o[0]).sum() + (context_effects[s_d1, :] * o[1]).sum()
+
+        normalizer += locus_offsets[l] * locus_effects[l]
+
+    return (
+        -np.log(normalizer),
+        context_offsets.T,
+        locus_offsets,
+    )
+
+def _get_exp_offsets_k_c(k, corpus):
+
+    (normalizer, context_offsets, locus_offsets) = _fast_exp_offsets(*_get_args(k, corpus))
 
     return (
         normalizer,
         {"context_model": context_offsets, "theta_model": locus_offsets},
+    )
+
+
+@njit(
+    "float32[:,:](float32[:,::1], float32[::1], float32[::1], float32[:,:], int64[:,::1], float32, bool)",        
+    nogil=True
+)
+def _fast_component_predict(
+    context_freqs,  # (L x C*D)
+    exposures,  # L
+    locus_effects,  # L
+    context_effects,  # S x C
+    idx_selector,  # L,D
+    normalizer, # float32
+    with_context,
+):
+    D = 2
+    L, CD = context_freqs.shape
+    C = CD // D
+    S, _ = context_effects.shape
+
+    assert exposures.shape == (L,)
+    assert locus_effects.shape == (L,)
+    assert idx_selector.shape == (L, D)
+    assert context_effects.shape == (S, C)
+    
+    out = np.zeros_like(context_freqs)
+    ones = np.ones((D, C), dtype=context_freqs.dtype)
+
+    for l, s in enumerate(idx_selector):
+        
+        # (DxC)
+        exp_offsets = (
+            exposures[l] * context_freqs[l, :].reshape(C, D).T
+            if with_context else 
+            ones
+        )
+        
+        # (DxC) * (DxC) * (1,) ==> (DxC).T ==> ravel(CxD) ==> C*D
+        out[l,:] = (context_effects[s, :] * exp_offsets * locus_effects[l]).T.ravel()
+
+    return np.log(out) + normalizer
+
+
+def _predict(k, corpus, with_context=True):
+    
+    out = _fast_component_predict(
+        *_get_args(k, corpus), 
+        np.float32(CS.fetch_normalizers(corpus)[k]),
+        with_context=with_context
+    )
+    
+    return xr.DataArray(
+        out.reshape(-1, 96, 2).T,
+        dims=("configuration", "context", "locus"),
     )
 
 
@@ -129,6 +183,7 @@ class SBSModel(TopographyModel):
         conditioning_alpha=1e-9,
         # locals model
         pi_prior=1.0,
+        tau_prior=1.0,
         # locus model
         locus_model_type="gbt",
         tree_learning_rate=0.15,
@@ -172,6 +227,7 @@ class SBSModel(TopographyModel):
         self.conditioning_alpha = conditioning_alpha
         # locals model
         self.pi_prior = pi_prior
+        self.tau_prior = tau_prior
         # locus model
         self.locus_model_type = locus_model_type
         self.tree_learning_rate = tree_learning_rate
@@ -207,24 +263,21 @@ class SBSModel(TopographyModel):
     def sample_params(self, study, trial, extensive=0):
         return sample_params(study, trial, extensive=extensive)
 
-    def _init_model(
+    def _init_factor_model(
         self,
         train_corpuses,
-        test_corpuses,
         random_state,
+        GT, # gtensor interface
         *,
         num_components,
         init_components,
         fix_components,
-        seed,
         # context model
         context_reg,
         context_conditioning,
         conditioning_alpha,
         init_variance_context,
         max_iter,
-        # locals model
-        pi_prior,
         # locus model
         locus_model_type,
         tree_learning_rate,
@@ -245,7 +298,7 @@ class SBSModel(TopographyModel):
         logger.info("Initializing model parameters and transformations...")
 
         context_model = StrandedContextModel(
-            train_corpuses,
+            GT.to_datasets(*train_corpuses),
             DiagonalEncoder(),
             n_components=num_components,
             random_state=random_state,
@@ -262,7 +315,7 @@ class SBSModel(TopographyModel):
         theta_model = (
             GBTThetaModel if locus_model_type == "gbt" else LinearThetaModel
         )(
-            train_corpuses,
+            GT.to_datasets(*train_corpuses),
             init_variance=init_variance_theta,
             n_components=num_components,
             tree_learning_rate=tree_learning_rate,
@@ -279,32 +332,16 @@ class SBSModel(TopographyModel):
             l2_regularization=l2_regularization,
         )
 
-        is_sparse = train_corpuses[0].X.is_sparse()
-        if not all(
-            corpus.X.is_sparse() == is_sparse
-            for corpus in train_corpuses + test_corpuses
-        ):
-            raise ValueError(
-                "All corpuses must be sparse - dense corpuses are not allowed!"
-            )
-
-        locals_model = (LDAUpdateSparse if is_sparse else LDAUpdateDense)(
-            train_corpuses,
-            n_components=num_components,
-            random_state=random_state,
-            prior_alpha=pi_prior,
-        )
-
         factor_model = FactorModel(
+            GT,
             train_corpuses,
             context_model=context_model,
             theta_model=theta_model,
-            offsets_fn=partial(
-                _get_exp_offsets_k_c, num_states=context_model.num_mesoscale_states
-            ),
+            predict_fn=_predict,
+            offsets_fn=_get_exp_offsets_k_c,
         )
 
-        return (factor_model, locals_model)
+        return factor_model
 
 
 class SBSMode(ModeConfig):

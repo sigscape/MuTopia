@@ -136,9 +136,9 @@ class MesoscaleEncoder:
 
     uselog = True
 
-    def fit(self, corpuses):
+    def fit(self, corpus):
 
-        example_features = CS.get_features(corpuses[0]).data_vars
+        example_features = CS.get_features(corpus).data_vars
 
         filter_features_by_type = lambda dtype: list(
             [
@@ -170,7 +170,7 @@ class MesoscaleEncoder:
         self.feature_names_ = strand_features + cat_features
 
         n_strand_features = len(strand_features)
-        categories = [get_feature_classes(corpuses[0], fname) for fname in cat_features]
+        categories = [get_feature_classes(corpus, fname) for fname in cat_features]
 
         design_args = (n_strand_features, *categories)
 
@@ -246,8 +246,8 @@ class MesoscaleEncoder:
         mapper = self.minus_encoder_ if invert else self.plus_encoder_
         return mapper(self.paste(corpus))
 
-    def transform(self, corpuses, invert=False):
-        return idx_array_to_design(self.encode(corpuses, invert=invert), self.n_states_)
+    def transform(self, corpus, invert=False):
+        return idx_array_to_design(self.encode(corpus, invert=invert), self.n_states_)
 
     def independent_effects_encoding(self):
         return np.vstack(
