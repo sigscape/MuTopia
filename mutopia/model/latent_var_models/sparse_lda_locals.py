@@ -9,6 +9,34 @@ from math import prod
 from .base import *
 import warnings
 
+@njit(
+    "Tuple((float32, float32))(float32[::1], float32[::1,:], float32[::1], float32, float32[::1], int64)",
+    nogil=True
+)
+def _sample_deviance(
+    weights, # I
+    conditional_likelihood, # K x I
+    Nk, # K
+    context_sum,
+    log_context_effect,
+    n_types,
+):
+    # saturated
+    y_sum = np.sum(weights)
+    d_sat = weights @ np.log(weights) - y_sum * np.log(y_sum)
+
+    # model
+    contributions = Nk/np.sum(Nk)    
+    d_fit = weights @ (np.log(contributions @ conditional_likelihood) - log_context_effect)
+
+    # null
+    d_null = -y_sum * np.log(context_sum) - y_sum * np.log(n_types)
+
+    return (
+        d_sat - d_fit,
+        d_sat - d_null,
+    )
+
 
 class LDAUpdateSparse(LocalsModel):
 
@@ -109,7 +137,7 @@ class LDAUpdateSparse(LocalsModel):
         alpha,
         conditional_likelihood,
         weights,
-        gamma,
+        Nk,
         batch_subsample=1.0,
         *,
         sample_dict,
@@ -119,7 +147,7 @@ class LDAUpdateSparse(LocalsModel):
             alpha,
             conditional_likelihood,
             weights,
-            gamma,
+            Nk,
         )
 
         weighted_posterior = calc_local_variables(*args)
@@ -127,14 +155,14 @@ class LDAUpdateSparse(LocalsModel):
         suffstats = {
             **sample_dict,
             "weighted_posterior": weighted_posterior / batch_subsample,
-            "gamma": gamma,
+            "Nk": Nk,
         }
 
         return suffstats
 
     def _update_fn(
         self,
-        gamma,
+        Nk,
         learning_rate=1.0,
         locus_subsample=1.0,
         batch_subsample=1.0,
@@ -154,7 +182,7 @@ class LDAUpdateSparse(LocalsModel):
         )
         
         alpha = np.ascontiguousarray(self.alpha[self.GT.get_name(dataset)])
-        gamma = np.ascontiguousarray(gamma, dtype=self.dtype)
+        Nk = np.ascontiguousarray(Nk, dtype=self.dtype)
 
         args = (
             alpha,
@@ -166,14 +194,14 @@ class LDAUpdateSparse(LocalsModel):
             *args,
             self.estep_iterations,
             self.difference_tol,
-            gamma,
+            Nk,
         )
 
-        new_gamma = _svi_update_fn(gamma, map_estimate, learning_rate)
+        new_Nk = _svi_update_fn(Nk, map_estimate, learning_rate)
 
         suffstats = self._calc_sstats(
             *args,
-            new_gamma,
+            new_Nk,
             sample_dict=sample_dict,
             batch_subsample=batch_subsample,
         )
@@ -218,14 +246,15 @@ class LDAUpdateSparse(LocalsModel):
         sample,
         factor_model,
         *,
-        gamma,
+        Nk,
         context_sum,
+        n_types,
         **kw,
     ):
-
         weights = self._get_weights(sample)
         sample_dict = self._convert_sample(sample)
 
+        # K x I::
         conditional_likelihood = self._conditional_observation_likelihood(
             dataset,
             factor_model,
@@ -234,32 +263,19 @@ class LDAUpdateSparse(LocalsModel):
         )
 
         # the context frequencies are missing dimensions that the observations have ...
-        log_context_effect = self._get_log_context_effect(dataset, **sample_dict)
+        log_context_effect = self.to_contig( self._get_log_context_effect(dataset, **sample_dict) )
+        Nk = self.to_contig(Nk)
 
-        contributions = np.ascontiguousarray(gamma / np.sum(gamma))
-
-        # 1. figure out the missing dimensions
-        missing_dims = dims_except_for(
-            sample.X.dims, *self.GT.get_regions(dataset).context_frequencies.dims
-        )
-        # 2. figure out the number of possible types of observations missing
-        n_types = prod(dataset.sizes[dim] for dim in missing_dims)
         # 3. penalize the log context effect for the missing dimensions
-
-        # saturated
-        y_sum = np.sum(weights)
-        d_sat = weights @ np.log(weights) - y_sum * np.log(y_sum)
-        # model
-        d_fit = weights @ (
-            np.log(conditional_likelihood.T.dot(contributions)) - log_context_effect
+        return _sample_deviance(
+            weights,
+            np.asfortranarray(conditional_likelihood),
+            Nk,
+            context_sum,
+            log_context_effect,
+            n_types,
         )
-        # null
-        d_null = -y_sum * np.log(context_sum) - y_sum * np.log(n_types)
 
-        return (
-            d_sat - d_fit,
-            d_sat - d_null,
-        )
 
     def _get_deviance_fns(
         self,
@@ -271,14 +287,23 @@ class LDAUpdateSparse(LocalsModel):
 
         context_sum = np.sum(self.GT.get_regions(dataset).context_frequencies.data)
 
+        # 1. figure out the missing dimensions
+        missing_dims = dims_except_for(
+            self.GT.observation_dims(dataset), 
+            *self.GT.get_regions(dataset).context_frequencies.dims
+        )
+        # 2. figure out the number of possible types of observations missing
+        n_types = prod(dataset.sizes[dim] for dim in missing_dims)
+
         deviance_fns = (
             partial(
                 self._deviance_sample,
                 dataset=dataset,
                 factor_model=factor_model,
                 sample=sample,
-                gamma=(exposures_fn or self.GT.fetch_topic_compositions)(dataset, sample_name).ravel(),
+                Nk=(exposures_fn or self.GT.fetch_topic_compositions)(dataset, sample_name).ravel(),
                 context_sum=context_sum,
+                n_types=n_types,
             )
             for (sample_name, sample) in self.GT.iter_samples(dataset)
         )
@@ -321,7 +346,7 @@ class LDAUpdateSparse(LocalsModel):
             sample_dict=sample_dict,
         )
 
-        p_z, gammas = gibbs_sample_posterior(
+        p_z, Nks = gibbs_sample_posterior(
             alpha,
             conditional_likelihood,
             weights,
@@ -331,7 +356,7 @@ class LDAUpdateSparse(LocalsModel):
             quiet=True,
         )
 
-        return p_z, gammas
+        return p_z, Nks
 
     def marginal_ll_sample(
         self,
@@ -342,9 +367,9 @@ class LDAUpdateSparse(LocalsModel):
         steps=100000,
         seed=42,
     ):
-        # marginalize out gamma, and just return the mutation annotations.
+        # marginalize out Nk, and just return the mutation annotations.
         # For panel and exome data, there may be too few mutations to
-        # infer anything useful from gamma. We'll lower the variance of estimation
+        # infer anything useful from Nk. We'll lower the variance of estimation
         # instead and just marginalize it out.
         sample_dict = self._convert_sample(sample)
         weights = self._get_weights(sample)

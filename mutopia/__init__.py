@@ -7,5 +7,6 @@ from joblib import load as load_model
 from .modalities import get_mode, SBS
 from .utils import FeatureType, diverging_palette, categorical_palette
 from mutopia.utils import using_exposures_from
+import mutopia.mixture_model as mm
 
 __version__ = "1.0.0a5"

@@ -46,8 +46,9 @@ def flatten_tensor_for_update(fn):
     @wraps(fn)
     def wrapper(alpha, conditional_likelihood, weights, *args):
         K = conditional_likelihood.shape[0]
+        remainder_shape = conditional_likelihood.shape[1:]
         assert (
-            conditional_likelihood.shape[1:] == weights.shape
+            remainder_shape == weights.shape
         ), "conditional_likelihood and weights must have the same trailing shape"
         return fn(
             alpha,
@@ -92,11 +93,9 @@ gammaln = functype(
 def gammalnvec(x):
     return gammaln(x)
 
-
-"""
-Helper functions for the dirichlet log likelihood and bound
-"""
-
+@njit("float32[:](float32[:])", nogil=True)
+def psivec32(x):
+    return psivec(x).astype(np.float32)
 
 @njit("float32[::1](float32[::1])", nogil=True)
 def exp_log_dirichlet_expectation(alpha):
@@ -104,25 +103,27 @@ def exp_log_dirichlet_expectation(alpha):
 
 
 @njit(
-    "float32[::1](float32[::1], float32[:,::1], float32[::1], float32[::1])", nogil=True
+    "float32[::1](float32[::1], float32[:,::1], float32[::1], float32[::1])", 
+    nogil=True
 )
 def _update_step(
     alpha,
     conditional_likelihood,
     weights,
-    gamma,
+    Nk,
 ):
 
-    exp_Elog_gamma = exp_log_dirichlet_expectation(gamma)
+    exp_Elog_prior = np.exp( psivec32(alpha + Nk) )
 
     X_div_X_tild = np.where(
         weights > 0.0,
-        weights / (exp_Elog_gamma @ conditional_likelihood),
+        weights / (exp_Elog_prior @ conditional_likelihood),
         np.float32(0.0),
     )
-    gamma_sstats = exp_Elog_gamma * (conditional_likelihood @ X_div_X_tild)
 
-    return alpha + gamma_sstats
+    Nk = exp_Elog_prior * (conditional_likelihood @ X_div_X_tild)
+
+    return Nk
 
 
 @flatten_tensor_for_update
@@ -136,22 +137,22 @@ def iterative_update(
     weights,
     iters,
     tol,
-    gamma,  # move gamma to the end so we can curry the function
+    Nk,  # move Nk to the end so we can curry the function
 ):
     for _ in range(iters):  # inner e-step loop
 
-        old_gamma = gamma.copy()
-        gamma = _update_step(
+        old_Nk = Nk.copy()
+        Nk = _update_step(
             alpha,
             conditional_likelihood,
             weights,
-            gamma,
+            Nk,
         )
 
-        if (np.abs(gamma - old_gamma) / np.sum(old_gamma)).sum() < tol:
+        if (np.abs(Nk - old_Nk) / np.sum(old_Nk)).sum() < tol:
             break
 
-    return gamma
+    return Nk
 
 
 @reshape_output
@@ -164,27 +165,31 @@ def calc_local_variables(
     alpha,
     conditional_likelihood,
     weights,
-    gamma,
+    Nk,
 ):
-    exp_Elog_gamma = exp_log_dirichlet_expectation(gamma)
+    exp_Elog_prior = np.exp( psivec32(alpha + Nk) )
 
-    X_tild = exp_Elog_gamma @ conditional_likelihood
+    X_div_X_tild = np.where(
+        weights > 0.0,
+        weights / (exp_Elog_prior @ conditional_likelihood),
+        np.float32(0.0),
+    )
 
-    phi_matrix = np.outer(exp_Elog_gamma, weights / X_tild) * conditional_likelihood
+    phi_matrix = np.outer(exp_Elog_prior, X_div_X_tild) * conditional_likelihood
 
     return phi_matrix
 
 
 """
 @njit("double(double[:], double[:])", nogil=True)
-def dirichlet_bound(alpha, gamma):
+def dirichlet_bound(alpha, Nk):
 
-    logE_gamma = log_dirichlet_expectation(gamma).astype(np.float64)
+    logE_Nk = log_dirichlet_expectation(Nk).astype(np.float64)
 
     return (
-        gammaln(np.sum(alpha))
-        - gammaln(np.sum(gamma))
-        + np.sum(gammalnvec(gamma) - gammalnvec(alpha) + (alpha - gamma) * logE_gamma)
+        Nkln(np.sum(alpha))
+        - Nkln(np.sum(Nk))
+        + np.sum(Nklnvec(Nk) - Nklnvec(alpha) + (alpha - Nk) * logE_Nk)
     )
     
 @flatten_tensor_for_update
@@ -197,15 +202,15 @@ def bound(
     alpha,
     conditional_likelihood,
     weights,
-    gamma,
+    Nk,
     weighted_posterior,
 ):
 
     phi = weighted_posterior / weights[None, :]
     entropy_sstats = -np.sum(weighted_posterior * np.where(phi > 0, np.log(phi), 0.0))
-    entropy_sstats += dirichlet_bound(alpha, gamma)
+    entropy_sstats += dirichlet_bound(alpha, Nk)
 
-    flattened_logweight = log_dirichlet_expectation(gamma)[:, None] + np.log(
+    flattened_logweight = log_dirichlet_expectation(Nk)[:, None] + np.log(
         conditional_likelihood
     )
 
@@ -269,7 +274,7 @@ def _gibbs_sample_posterior(
 ):
 
     posterior = np.zeros_like(log_conditional_likelihood)
-    gammas = np.zeros((steps, Nk.shape[0]), dtype=np.float32)
+    Nks = np.zeros((steps, Nk.shape[0]), dtype=np.float32)
 
     for t in range(steps + warmup):
         Nk, z, _ = _gibbs_sample_step(
@@ -280,8 +285,8 @@ def _gibbs_sample_posterior(
             for i in range(len(z)):
                 posterior[i, z[i]] += 1 / steps
 
-            # gamma += Nk/steps
-            gammas[t - warmup] = Nk
+            # Nk += Nk/steps
+            Nks[t - warmup] = Nk
 
         if not quiet and (t % 500 == 0) and t > warmup:
             with objmode():
@@ -293,7 +298,7 @@ def _gibbs_sample_posterior(
                     + " Gibb's sampling steps."
                 )
 
-    return (posterior, gammas)
+    return (posterior, Nks)
 
 
 def gibbs_sample_posterior(
@@ -324,7 +329,7 @@ def gibbs_sample_posterior(
     )
     Nk = np.ascontiguousarray(Nk, dtype=np.float32)
 
-    posterior, gamma = _gibbs_sample_posterior(
+    posterior, Nk = _gibbs_sample_posterior(
         alpha,
         log_conditional_likelihood,
         weights,
@@ -335,7 +340,7 @@ def gibbs_sample_posterior(
         quiet,
     )
 
-    return posterior.T, gamma
+    return posterior.T, Nk
 
 
 @njit(nogil=True)
@@ -472,7 +477,7 @@ class LocalsModel(PrimitiveModel):
 
         """
         Construct the update function for each sample from the dataset
-        in a generator fashion. Curry the initial gamma value for the 
+        in a generator fashion. Curry the initial Nk value for the 
         update, but don't call the update function yet - we want to
         pass this expression to the multiprocessing pool.
         """
@@ -497,12 +502,12 @@ class LocalsModel(PrimitiveModel):
                 update_fns,
             ):
                 # Update the topic compositions for the sample
-                self.GT.update_topic_compositions(dataset, sample_name, sample_suffstats["gamma"])
+                self.GT.update_topic_compositions(dataset, sample_name, sample_suffstats["Nk"])
 
                 for model_name, model in factor_model.models.items():
                     """
                     The latent variables model handle the observation data format
-                    and the gamma updates. Here, the model state just delegates the
+                    and the Nk updates. Here, the model state just delegates the
                     suffstat reduction back to the latent variables model, which
                     calls the model's reduce_sstats method depending on the data type.
                     """
@@ -532,16 +537,16 @@ class LocalsModel(PrimitiveModel):
             locus_subsample=subsample_rate,
         )
 
-        gammas = []
+        Nks = []
         for s in tqdm(
             parallel_map(update_fns, par_context),
             ncols=100,
             desc="Estimating contributions",
         ):
-            gammas.append(s[1])
+            Nks.append(s[1])
 
         return DataArray(
-            np.array(gammas),
+            np.array(Nks),
             dims=("sample", "component"),
         )
 
@@ -629,7 +634,14 @@ class LocalsModel(PrimitiveModel):
             size=(self.n_components, n_samples),
         ).astype(self.dtype)
 
+    
     def prepare_corpusstate(self, dataset):
+
+        '''nz = [
+            sample.sum().item()
+            for sname, sample in self.GT.iter_samples(dataset)
+        ]'''
+
         return dict(
             topic_compositions=DataArray(
                 self.init_locals(len(self.GT.list_samples(dataset))),
@@ -645,10 +657,10 @@ class LocalsModel(PrimitiveModel):
         sstats,
         dataset,
         *,
-        gamma,
+        Nk,
         **kw,
     ):
-        sstats.append(gamma)
+        sstats.append(Nk)
         return sstats
 
     @staticmethod
@@ -656,15 +668,18 @@ class LocalsModel(PrimitiveModel):
         sstats,
         dataset,
         *,
-        gamma,
+        Nk,
         **kw,
     ):
-        sstats.append(gamma)
+        sstats.append(Nk)
         return sstats
 
     def partial_fit(self, sstats, learning_rate):
-        for corpus_name, gammas in sstats.items():
+        for corpus_name, Nks in sstats.items():
             alpha0 = self.alpha[corpus_name]
             self.alpha[corpus_name] = _svi_update_fn(
-                alpha0, update_alpha(alpha0, np.array(gammas)), learning_rate
+                alpha0, update_alpha(alpha0, np.array(Nks)), learning_rate
             )
+
+    def to_contig(self, x):
+        return np.ascontiguousarray(x, dtype=self.dtype)

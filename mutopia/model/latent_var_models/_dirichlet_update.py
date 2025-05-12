@@ -157,7 +157,6 @@ def update_tau(mu, nu):
 
 
 def update_alpha(alpha0, gamma):
-
     N = gamma.shape[0]
-    log_phat = log_dirichlet_expectation(gamma).mean(-2)
+    log_phat = log_dirichlet_expectation(alpha0 + gamma).mean(-2)
     return update_dir_prior(alpha0, N, log_phat)

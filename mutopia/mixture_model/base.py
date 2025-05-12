@@ -3,12 +3,60 @@ from numba.core.errors import NumbaPerformanceWarning
 import warnings
 warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
 import numpy as np
+from ..model.model_components.base import idx_array_to_design
 from ..model.latent_var_models.base import *
 
+class MixtureModel(LocalsModel):
 
-@njit("float32[:](float32[:])", nogil=True)
-def psivec32(x):
-    return psivec(x).astype(np.float32)
+    def __init__(
+        self,
+        GT, # gtensor_interface
+        datasets,
+        prior_alpha=1.0,
+        prior_tau=1.0,
+        estep_iterations=1000,
+        difference_tol=5e-5,
+        dtype=np.float32,
+        *,
+        random_state,
+        n_components,
+        **kw,
+    ):
+        self.estep_iterations = estep_iterations
+        self.difference_tol = difference_tol
+        self.random_state = random_state
+        self.n_components = n_components
+        self.dtype = dtype
+        self.GT = GT
+
+        self.alpha = {
+            name: np.ones(n_components, dtype=dtype) * prior_alpha
+            for name, _ in self.GT.expand_datasets(*datasets)
+        }
+
+        self.tau = np.ones(len(self.GT.to_datasets(*datasets)), dtype=dtype) * prior_tau
+
+
+    def _get_mixture_kw(self, dataset):
+
+        alpha = np.concatenate([self.alpha[name] for name, _ in self.GT.expand_datasets(dataset)])
+        alpha = np.ascontiguousarray(alpha, dtype=self.dtype)
+        tau = np.ascontiguousarray(self.tau, dtype=self.dtype)
+
+        n_sources = len(self.GT.list_sources(dataset))
+
+        fraction_map = (
+            idx_array_to_design(np.repeat(np.arange(n_sources), self.n_components), n_sources)
+            .todense()
+            .T
+        )
+        fraction_map = np.ascontiguousarray(fraction_map, dtype=self.dtype)
+
+        return {
+            "alpha": alpha,
+            "tau": tau,
+            "fraction_map": fraction_map,
+        }
 
 """
 Mixture model inference functions
@@ -87,8 +135,11 @@ def calc_local_variables(
         + psivec32(tau + (Nk @ fraction_map.T)) @ fraction_map
     )
 
-    #X_tild = exp_Elog_gamma @ conditional_likelihood
-    X_div_X_tild = weights / (exp_Elog_prior @ conditional_likelihood)
+    X_div_X_tild = np.where(
+        weights > 0.0, 
+        weights / (exp_Elog_prior @ conditional_likelihood), 
+        np.float32(0.0)
+    )
 
     phi_matrix = np.outer(exp_Elog_prior, X_div_X_tild) * conditional_likelihood
 

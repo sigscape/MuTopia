@@ -231,3 +231,21 @@ def sp2tup(X):
     "Sparse to tuple" - converts a scipy.sparse matrix to a tuple of arrays
     """
     return (X.indptr, X.indices, X.data)
+
+
+@njit(
+    "float32[::1](float32[::1], float32[::1,:])", 
+    nogil=True,
+)
+def logsafe_vector_matmul(y, log_x):
+    alpha = log_x.max()
+    return alpha + np.log(y @ np.exp(log_x - alpha))
+
+
+@njit(nogil=True)
+def logsumexp(x):
+    """
+    Computes the log-sum-exp of a 1D array.
+    """
+    alpha = x.max()
+    return alpha + np.log(np.sum(np.exp(x - alpha)))
