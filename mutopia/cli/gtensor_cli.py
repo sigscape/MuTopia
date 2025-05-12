@@ -240,7 +240,7 @@ def create(
 
     logger.info("Calculating context frequencies ...")
 
-    modality = load_mode_config(dtype)
+    modality = get_config(dtype)
 
     context_freqs = modality.get_context_frequencies(
         regions_file=regions_file,
@@ -315,7 +315,7 @@ def convert(
     output_regions_file = output + ".regions.bed"
     copyfile(input_regions_file, output_regions_file)
 
-    modality = load_mode_config(dtype)
+    modality = get_config(dtype)
 
     context_freqs = modality.get_context_frequencies(
         regions_file=output_regions_file,
@@ -528,6 +528,8 @@ def continuous_feature(
     feature_name: str,
 ):
 
+    logger.info(f"Ingesting data from {ingest_file} ...")
+    
     read_file = partial(
         _read_continuous_file,
         dataset,
@@ -552,6 +554,8 @@ def continuous_feature(
         name=feature_name,
         normalization=FeatureType(normalization),
     )
+
+    logger.info(f"Added feature: {feature_name}")
 
 
 @add_feature.command("discrete")
@@ -617,6 +621,8 @@ def add_discrete_feature(
 
     if not ingest.FileType.from_extension(ingest_file) == ingest.FileType.BED:
         raise ValueError("Discrete features must be ingested from Bed files.")
+    
+    logger.info(f"Ingesting data from {ingest_file} ...")
 
     feature_vals, classes = ingest.make_discrete_features(
         ingest_file,
@@ -634,6 +640,8 @@ def add_discrete_feature(
         normalization=FeatureType.MESOSCALE if mesoscale else FeatureType.CATEGORICAL,
         classes=classes,
     )
+
+    logger.info(f"Added feature: {feature_name}")
 
 
 @add_feature.command("distance")

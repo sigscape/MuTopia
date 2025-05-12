@@ -5,7 +5,7 @@ from numpy.typing import NDArray
 from pandas import IntervalIndex, Index, Interval, DataFrame
 from ..utils import FeatureType, logger, str_wrapped_list
 from collections import defaultdict
-from functools import reduce
+from functools import reduce, partial
 from tqdm import tqdm
 from .interfaces import *
 import mutopia.gtensor.disk_interface as disk
@@ -54,47 +54,77 @@ def GTensor(
         },
     )
 
+def apply_to_samples(data, func, bar=True):
 
-def load_dataset(corpus, with_samples=True, with_state=True):
+    if not hasattr(data, "X"):
+        data = LazySampleLoader(data)
+
+    pbar = partial(tqdm, data.list_samples(), desc="Processing samples")
+
+    return xr.concat(
+        [
+            func(data.fetch_sample(sample_name))
+            for sample_name in (data.list_samples() if not bar else pbar)
+        ],
+        dim="sample",
+    )
+
+
+def inplace(func):
+    """
+    Decorator function to modify a dataset in place - allows one to run mutations on the dataset
+    without messing up the interface chains.
+    """
+
+    def wrapper(dataset, *args, **kwargs):
+        original = CorpusInterface(dataset)
+        result = func(original.corpus, *args, **kwargs)
+        original.corpus = result
+        return original._corpus
+
+    return wrapper
+
+
+def load_dataset(dataset, with_samples=True, with_state=True):
     """
     Loads a dataset from disk. If the dataset is not present,
     it will be created.
     """
     return (LazySampleLoader if not with_samples else CorpusInterface)(
-        disk.load_dataset(corpus, with_samples=with_samples, with_state=with_state)
+        disk.load_dataset(dataset, with_samples=with_samples, with_state=with_state)
     )
 
 
-def lazy_load(corpus):
-    return load_dataset(corpus, with_samples=False, with_state=False)
+def lazy_load(dataset):
+    return load_dataset(dataset, with_samples=False, with_state=False)
 
 
-def eager_load(corpus):
-    return load_dataset(corpus, with_samples=True, with_state=False)
+def eager_load(dataset):
+    return load_dataset(dataset, with_samples=True, with_state=False)
 
 
-def lazy_train_test_load(corpus, test_chroms):
+def lazy_train_test_load(dataset, test_chroms):
 
-    corpus = lazy_load(corpus)
+    dataset = lazy_load(dataset)
 
-    test_mask = corpus.regions.chrom.isin(test_chroms)
+    test_mask = dataset.regions.chrom.isin(test_chroms)
     if test_mask.sum() == 0:
         raise ValueError(
-            f'None of the chromosomes in {",".join(test_chroms)} are present in the corpus. '
+            f'None of the chromosomes in {",".join(test_chroms)} are present in the dataset. '
         )
 
-    train = LazySlicer(corpus, locus=~test_mask)
-    test = LazySlicer(corpus, locus=test_mask)
+    train = LazySlicer(dataset, locus=~test_mask)
+    test = LazySlicer(dataset, locus=test_mask)
 
-    drop_vars = corpus.sections.groups["Features"] + corpus.sections.groups["Regions"]
+    drop_vars = dataset.sections.groups["Features"] + dataset.sections.groups["Regions"]
     train._base_corpus.corpus = train._base_corpus.drop_vars(drop_vars)
     test._base_corpus.corpus = test._base_corpus.drop_vars(drop_vars)
 
     return train, test
 
 
-def eager_train_test_load(corpus, test_chroms):
-    return train_test_split(eager_load(corpus))
+def eager_train_test_load(dataset, test_chroms):
+    return train_test_split(eager_load(dataset))
 
 
 def train_test_split(dataset, test_chroms: Union[str, List[str]]):
@@ -175,7 +205,7 @@ def get_explanation(dataset, component):
 
 def equal_size_quantiles(dataset, var_name, n_bins=10):
 
-    bin_nums = np.arange(dataset.dims["locus"])
+    bin_nums = np.arange(dataset.sizes["locus"])
     sorted_vals = DataFrame(
         {
             "length": dataset.sections["Regions"].length.values,
@@ -206,8 +236,8 @@ def slice_regions(dataset, chrom: str, start: int, end: int, lazy=False):
     check_structure(dataset)
 
     regions = dataset.sections["Regions"]
-    regions_mask = (regions.chrom == chrom) & (
-        IntervalIndex.from_arrays(regions.start, regions.end).overlaps(
+    regions_mask = (regions.chrom.values == chrom) & (
+        IntervalIndex.from_arrays(regions.start.values, regions.end.values).overlaps(
             Interval(start, end)
         )
     )
@@ -290,7 +320,7 @@ def make_mixture_dataset(**datasets):
     merged = xr.merge(merge_dsets)
     merged.attrs['sources'] = list(datasets.keys())
 
-    return merged
+    return CorpusInterface(merged)
 
 
 def dims_except_for(dims, *keepdims):

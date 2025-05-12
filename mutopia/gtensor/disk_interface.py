@@ -1,7 +1,6 @@
 import sparse
 import xarray as xr
 import pickle
-import datatree
 from numpy import array, float32, int32
 from functools import wraps
 import time
@@ -501,4 +500,6 @@ def load_dataset(filename, with_samples=True, with_state=True):
         pass
 
     dataset.attrs["filename"] = filename
+    #dataset = dataset.assign_coords(dataset.modality().coords)
+    
     return dataset
