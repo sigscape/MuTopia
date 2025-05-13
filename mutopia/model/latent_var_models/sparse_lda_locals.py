@@ -88,7 +88,7 @@ class LDAUpdateSparse(LocalsModel):
         **idx_dict,
     ):
 
-        freqs = self.GT.get_regions(dataset).context_frequencies.transpose(..., "locus")
+        freqs = self.GT.get_freqs(dataset).transpose(..., "locus")
 
         idx_arrs = [idx_dict[dim] for dim in freqs.dims[:-1]]
 
@@ -96,7 +96,7 @@ class LDAUpdateSparse(LocalsModel):
             warnings.simplefilter("ignore")
 
             return np.log(freqs.data[*idx_arrs, locus]) + np.log(
-                self.GT.get_regions(dataset).exposures.data[locus]
+                self.GT.get_exposures(dataset).data[locus]
             )
 
     def _conditional_observation_likelihood(
@@ -285,12 +285,12 @@ class LDAUpdateSparse(LocalsModel):
         par_context=None,
     ):
 
-        context_sum = np.sum(self.GT.get_regions(dataset).context_frequencies.data)
+        context_sum = np.sum(self.GT.get_freqs(dataset).data)
 
         # 1. figure out the missing dimensions
         missing_dims = dims_except_for(
             self.GT.observation_dims(dataset), 
-            *self.GT.get_regions(dataset).context_frequencies.dims
+            *self.GT.get_freqs(dataset).dims
         )
         # 2. figure out the number of possible types of observations missing
         n_types = prod(dataset.sizes[dim] for dim in missing_dims)

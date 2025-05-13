@@ -296,6 +296,7 @@ def annot_empirical_marginal(dataset):
 
 def make_mixture_dataset(**datasets):
 
+    source_names = list(datasets.keys())
     merge_dsets = []
     for source_name, dataset in datasets.items():
         
@@ -318,7 +319,10 @@ def make_mixture_dataset(**datasets):
     merge_dsets.append(first_dataset[transfer_vars])
 
     merged = xr.merge(merge_dsets)
-    merged.attrs['sources'] = list(datasets.keys())
+    merged["source"] = xr.DataArray(
+        source_names,
+        dims=("source",),
+    )
 
     return CorpusInterface(merged)
 

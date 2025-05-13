@@ -173,3 +173,24 @@ class DifferentSamples(CorpusInterface):
 
     def list_samples(self):
         return self._samples
+
+
+class TransformerInterface(CorpusInterface):
+    """
+    This interface is used to transform the corpus into a different
+    representation. For example, we might want to transform the corpus
+    into a different space, or apply a different transformation to the
+    data.
+    """
+
+    def __init__(self, corpus, func):
+        self._corpus = corpus
+        self._func = func
+
+    def fetch_sample(self, sample_name):
+        return self._func(self._corpus.fetch_sample(sample_name))
+    
+    def iter_samples(self):
+        for sample_name, data in self._corpus.iter_samples():
+            yield sample_name, self._func(data)
+        

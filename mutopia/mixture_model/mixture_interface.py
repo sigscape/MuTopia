@@ -32,19 +32,21 @@ def get_name(dataset):
 
 
 def is_mixture_corpus(dataset):
-    return "sources" in dataset.attrs and len(dataset.attrs["sources"]) > 1
+    return len(list_sources(dataset)) > 1
 
 
-def list_sources(corpus):
-    return corpus.attrs["sources"]
+def list_sources(dataset):
+    if "source" in dataset.coords:
+        return dataset.coords["source"].values.tolist()
+    return []
 
 
-def fetch_source(corpus, source):
+def fetch_source(dataset, source):
 
-    if not source in list_sources(corpus):
-        raise ValueError(f"Source {source} not found in corpus")
+    if not source in list_sources(dataset):
+        raise ValueError(f"Source {source} not found in dataset")
 
-    groups = corpus.sections.groups
+    groups = dataset.sections.groups
     state = groups.pop("State", [])
     features = groups.pop("Features", [])
 
@@ -61,16 +63,18 @@ def fetch_source(corpus, source):
 
     other_features = [v for g in groups.values() for v in g]
 
-    source_corpus = corpus[list(rename_map.keys()) + other_features].rename(rename_map)
-    source_corpus.attrs["sources"] = [source]
-    source_corpus.attrs["name"] = get_name(corpus) + "/" + source
+    source_corpus = dataset[list(rename_map.keys()) + other_features].rename(rename_map)
+    source_corpus.attrs["name"] = get_name(dataset) + "/" + source
+
+    if "source" in source_corpus.dims:
+        source_corpus = source_corpus.sel(source=source, drop=True)
 
     return source_corpus
 
 
-def sources(corpus):
-    for source in list_sources(corpus):
-        ds = fetch_source(corpus, source)
+def sources(dataset):
+    for source in list_sources(dataset):
+        ds = fetch_source(dataset, source)
         yield source, ds
 
 @inplace
@@ -185,6 +189,14 @@ def get_regions(dataset):
 
 def get_features(dataset):
     return dataset.sections["Features"]
+
+
+def get_exposures(dataset):
+    return dataset["Regions/exposures"]
+
+
+def get_freqs(dataset):
+    return dataset["Regions/context_frequencies"]
 
 
 def list_samples(dataset):

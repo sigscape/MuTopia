@@ -93,6 +93,14 @@ def get_regions(dataset):
     return dataset.sections["Regions"]
 
 
+def get_exposures(dataset):
+    return dataset["Regions/exposures"]
+
+
+def get_freqs(dataset):
+    return dataset["Regions/context_frequencies"]
+
+
 def get_features(dataset):
     return dataset.sections["Features"]
 

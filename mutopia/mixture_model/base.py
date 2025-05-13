@@ -6,71 +6,55 @@ import numpy as np
 from ..model.model_components.base import idx_array_to_design
 from ..model.latent_var_models.base import *
 
-class MixtureModel(LocalsModel):
 
-    def __init__(
-        self,
-        GT, # gtensor_interface
-        datasets,
-        prior_alpha=1.0,
-        prior_tau=1.0,
-        estep_iterations=1000,
-        difference_tol=5e-5,
-        dtype=np.float32,
-        *,
-        random_state,
-        n_components,
-        **kw,
-    ):
-        self.estep_iterations = estep_iterations
-        self.difference_tol = difference_tol
-        self.random_state = random_state
-        self.n_components = n_components
-        self.dtype = dtype
-        self.GT = GT
+def reshape_output(fn):
+    @wraps(fn)
+    def wrapper(alpha, tau, fraction_map, conditional_likelihood, weights, *args):
+        tensor_dim = conditional_likelihood.shape
+        out = fn(alpha, tau, fraction_map, conditional_likelihood, weights, *args)
+        return reshape_same_mem(out, tensor_dim)
 
-        self.alpha = {
-            name: np.ones(n_components, dtype=dtype) * prior_alpha
-            for name, _ in self.GT.expand_datasets(*datasets)
-        }
-
-        self.tau = np.ones(len(self.GT.to_datasets(*datasets)), dtype=dtype) * prior_tau
+    return wrapper
 
 
-    def _get_mixture_kw(self, dataset):
-
-        alpha = np.concatenate([self.alpha[name] for name, _ in self.GT.expand_datasets(dataset)])
-        alpha = np.ascontiguousarray(alpha, dtype=self.dtype)
-        tau = np.ascontiguousarray(self.tau, dtype=self.dtype)
-
-        n_sources = len(self.GT.list_sources(dataset))
-
-        fraction_map = (
-            idx_array_to_design(np.repeat(np.arange(n_sources), self.n_components), n_sources)
-            .todense()
-            .T
+def flatten_tensor_for_update(fn):
+    @wraps(fn)
+    def wrapper(alpha, tau, fraction_map, conditional_likelihood, weights, *args):
+        K = conditional_likelihood.shape[0]
+        remainder_shape = conditional_likelihood.shape[1:]
+        assert (
+            remainder_shape == weights.shape
+        ), "conditional_likelihood and weights must have the same trailing shape"
+        return fn(
+            alpha,
+            tau,
+            fraction_map,
+            reshape_same_mem(conditional_likelihood, (K, -1)),
+            reshape_same_mem(weights, (-1,)),
+            *args,
         )
-        fraction_map = np.ascontiguousarray(fraction_map, dtype=self.dtype)
 
-        return {
-            "alpha": alpha,
-            "tau": tau,
-            "fraction_map": fraction_map,
-        }
+    return wrapper
+
 
 """
 Mixture model inference functions
 """
-@njit(nogil=True)
+
+@njit(
+    "float32[::1](float32[::1], float32[::1], float32[:,:], float32[:,::1], float32[::1], float32[::1])",
+    nogil=True
+)
 def _update_step(
     alpha,  # D*K
     tau,  # D
     fraction_map,  # Dx(D*K)
-    conditional_likelihood,
-    weights,
+    conditional_likelihood, # D*K x I
+    weights, # I,
     Nk,
 ):
 
+    # D*K
     exp_Elog_prior = np.exp(
         psivec32(alpha + Nk)
         - psivec32((alpha + Nk) @ fraction_map.T) @ fraction_map
@@ -88,8 +72,11 @@ def _update_step(
     return Nk
 
 
-#@flatten_tensor_for_update
-@njit(nogil=True)
+@flatten_tensor_for_update
+@njit(
+    "float32[::1](float32[::1], float32[::1], float32[:,:], float32[:,::1], float32[::1], int64, float32, float32[::1])",
+    nogil=True
+)
 def iterative_update(
     alpha,  # D*K
     tau,  # D
@@ -118,9 +105,12 @@ def iterative_update(
     return Nk
 
 
-#@reshape_output
-#@flatten_tensor_for_update
-@njit(nogil=True)
+@reshape_output
+@flatten_tensor_for_update
+@njit(
+    "float32[:,::1](float32[::1], float32[::1], float32[:,:], float32[:,::1], float32[::1], float32[::1])",    
+    nogil=True
+)
 def calc_local_variables(
     alpha,  # D*K
     tau,  # D
@@ -144,34 +134,6 @@ def calc_local_variables(
     phi_matrix = np.outer(exp_Elog_prior, X_div_X_tild) * conditional_likelihood
 
     return phi_matrix
-
-
-'''@flatten_tensor_for_update
-@flatten_last_arg
-@njit(
-    "double(double[::1], double[:,::1], double[::1], double[::1], double[:,::1])",
-    nogil=True,
-)
-def bound(
-    alpha,
-    conditional_likelihood,
-    weights,
-    gamma,
-    weighted_posterior,
-):
-
-    phi = weighted_posterior / weights[None, :]
-    entropy_sstats = -np.sum(weighted_posterior * np.where(phi > 0, np.log(phi), 0.0))
-    entropy_sstats += dirichlet_bound(alpha, gamma)
-
-    flattened_logweight = log_dirichlet_expectation(gamma)[:, None] + np.log(
-        conditional_likelihood
-    )
-
-    return (
-        np.sum(weighted_posterior * np.nan_to_num(flattened_logweight, nan=0.0))
-        + entropy_sstats
-    )'''
 
 
 """
@@ -317,3 +279,75 @@ def iterative_update_gibbs(
     )
 
     return Nks[:,-1]
+
+
+class MixtureModel(LocalsModel):
+
+    def __init__(
+        self,
+        GT, # gtensor_interface
+        datasets,
+        prior_alpha=1.0,
+        prior_tau=1.0,
+        estep_iterations=1000,
+        difference_tol=5e-5,
+        dtype=np.float32,
+        *,
+        random_state,
+        n_components,
+        **kw,
+    ):
+        self.estep_iterations = estep_iterations
+        self.difference_tol = difference_tol
+        self.random_state = random_state
+        self.n_components = n_components
+        self.dtype = dtype
+        self.GT = GT
+
+        self.alpha = {
+            name: np.ones(n_components, dtype=dtype) * prior_alpha
+            for name, _ in self.GT.expand_datasets(*datasets)
+        }
+
+        self.tau = np.ones(len(self.GT.to_datasets(*datasets)), dtype=dtype) * prior_tau
+
+
+    def prepare_corpusstate(self, dataset):
+
+        n_observations = np.array([
+            sample.X.sum().data.item()
+            for _, sample in self.GT.iter_samples(dataset)
+        ])
+
+        return dict(
+            topic_compositions=DataArray(
+                self.init_locals(len(n_observations)),
+                dims=("component", "sample"),
+            ),
+            n_observations=DataArray(
+                n_observations,
+                dims=("sample",),
+            ),
+        )
+
+
+    def _get_mixture_kw(self, dataset):
+
+        alpha = np.concatenate([self.alpha[name] for name, _ in self.GT.expand_datasets(dataset)])
+        alpha = np.ascontiguousarray(alpha, dtype=self.dtype)
+        tau = np.ascontiguousarray(self.tau, dtype=self.dtype)
+
+        n_sources = len(self.GT.list_sources(dataset))
+
+        fraction_map = (
+            idx_array_to_design(np.repeat(np.arange(n_sources), self.n_components), n_sources)
+            .todense()
+            .T
+        )
+        fraction_map = np.ascontiguousarray(fraction_map, dtype=self.dtype)
+
+        return {
+            "alpha": alpha,
+            "tau": tau,
+            "fraction_map": fraction_map,
+        }

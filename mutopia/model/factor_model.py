@@ -51,7 +51,7 @@ class FactorModel:
         }
 
         self._genome_size = {
-            name: self.GT.get_regions(dataset).context_frequencies.sum().item()
+            name: self.GT.get_freqs(dataset).sum().item()
             for name, dataset in self.GT.expand_datasets(*datasets)
         }
 
@@ -134,11 +134,11 @@ class FactorModel:
                 (
                     model.predict(k, dataset) for model in self.models.values()
                 ),  # sum over models
-                np.log(self.GT.get_regions(dataset).exposures)
+                np.log(self.GT.get_exposures(dataset))
                 + self.GT.fetch_normalizers(dataset)[k],
             )
             if with_context:
-                y_hat += np.log(self.GT.get_regions(dataset).context_frequencies)
+                y_hat += np.log(self.GT.get_freqs(dataset))
 
         return y_hat
 
@@ -252,9 +252,9 @@ class FactorModel:
             log_mutation_rate = reduce(
                 lambda x, y: x + y,
                 model_predictions.values(),  # sum over models
-                np.log(self.GT.get_regions(dataset).exposures)
+                np.log(self.GT.get_exposures(dataset))
                 + np.log(
-                    self.GT.get_regions(dataset).context_frequencies
+                    self.GT.get_freqs(dataset)
                 ),  # start with the background rates
             )
 

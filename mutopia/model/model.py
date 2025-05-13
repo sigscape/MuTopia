@@ -16,7 +16,7 @@ from ..gtensor import *
 from .optim import fit_model
 from .factor_model import FactorModel
 from .latent_var_models.base import LocalsModel
-from ..mixture_model.sparse_mixture_locals import SparseMixtureModel
+from ..mixture_model import SparseMixtureModel, DenseMixtureModel
 # interfaces
 from . import gtensor_interface as CS
 from ..mixture_model import mixture_interface as MIX

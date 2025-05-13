@@ -1,3 +1,3 @@
-from dense_mixture_locals import DenseMixtureModel
-from sparse_mixture_locals import SparseMixtureModel
-import mixture_interface as MIX
+from .dense_mixture_locals import DenseMixtureModel
+from .sparse_mixture_locals import SparseMixtureModel
+import mutopia.mixture_model.mixture_interface as MIX

@@ -637,16 +637,29 @@ class LocalsModel(PrimitiveModel):
     
     def prepare_corpusstate(self, dataset):
 
-        '''nz = [
-            sample.sum().item()
-            for sname, sample in self.GT.iter_samples(dataset)
-        ]'''
+        n_observations = np.array([
+            sample.X.sum().data.item()
+            for _, sample in self.GT.iter_samples(dataset)
+        ])
+
+        if "ploidy" in dataset:
+            weighted_ploidy = (n_observations/n_observations.sum()) @ dataset["ploidy"].tranpose("sample", "locus").data
+        else:
+            weighted_ploidy = np.ones(dataset.sizes["locus"], dtype=self.dtype)
 
         return dict(
             topic_compositions=DataArray(
-                self.init_locals(len(self.GT.list_samples(dataset))),
+                self.init_locals(len(n_observations)),
                 dims=("component", "sample"),
-            )
+            ),
+            n_observations=DataArray(
+                n_observations,
+                dims=("sample",),
+            ),
+            weighted_ploidy=DataArray(
+                weighted_ploidy,
+                dims=("locus",),
+            ),
         )
 
     def spawn_sstats(self, dataset):

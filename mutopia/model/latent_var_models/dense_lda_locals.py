@@ -13,26 +13,7 @@ logsafe_exp_transform = lambda x: np.nan_to_num(
 
 exp_transform = lambda x: np.nan_to_num(np.exp(x), nan=0.0, neginf=0.0)
 
-def flatten_tensor_for_dev(fn):
-    @wraps(fn)
-    def wrapper(conditional_likelihood, weights, Nk, context_sum, context_effects, *args):
-        K = conditional_likelihood.shape[0]
-        remainder_shape = conditional_likelihood.shape[1:]
-        assert (
-            remainder_shape == weights.shape
-        ), "conditional_likelihood and weights must have the same trailing shape"
-        return fn(
-            np.asfortranarray(reshape_same_mem(conditional_likelihood, (K, -1))),
-            reshape_same_mem(weights, (-1,)),
-            Nk,
-            context_sum,
-            reshape_same_mem(context_effects, (-1,)),
-            *args,
-        )
 
-    return wrapper
-
-@flatten_tensor_for_dev
 @njit(
     "Tuple((float32, float32))(float32[::1,:], float32[::1], float32[::1], float32, float32[::1])",
     nogil=True
@@ -110,7 +91,6 @@ class LDAUpdateDense(LocalsModel):
         )
 
         weighted_posterior = calc_local_variables(*args)
-        # elbo = bound(*args, weighted_posterior)
 
         suffstats = {
             "weighted_posterior": DataArray(
@@ -136,8 +116,8 @@ class LDAUpdateDense(LocalsModel):
     ):
         # 1. get the information we need from the sample
         weights = self._get_weights(sample) / locus_subsample
-        alpha = np.ascontiguousarray(self.alpha[self.GT.get_name(dataset)])
-        Nk = np.ascontiguousarray(Nk, dtype=self.dtype)
+        alpha = self.to_contig(self.alpha[self.GT.get_name(dataset)])
+        Nk = self.to_contig(Nk)
 
         args = (
             alpha,
@@ -227,8 +207,8 @@ class LDAUpdateDense(LocalsModel):
 
             LOG_context_effects = (
                 match_dims(
-                    np.log(self.GT.get_regions(dataset).context_frequencies)
-                    + np.log(self.GT.get_regions(dataset).exposures),
+                    np.log(self.GT.get_freqs(dataset))
+                    + np.log(self.GT.get_exposures(dataset)),
                     **{d: dataset.sizes[d] for d in sample_dims},
                 )
                 .transpose(*sample_dims)
@@ -237,15 +217,21 @@ class LDAUpdateDense(LocalsModel):
 
             context_sum = np.nansum(np.exp(LOG_context_effects.data)).astype(self.dtype)
 
-        alpha = self.to_contig(self.alpha[self.GT.get_name(dataset)])
-        LOG_context_effects = self.to_contig(LOG_context_effects)
+        
+        K = conditional_likelihood.shape[0]
+        conditional_likelihood = np.asfortranarray(
+            conditional_likelihood.reshape(K, -1),
+            dtype=self.dtype,
+        )
+
+        LOG_context_effects = self.to_contig(LOG_context_effects.reshape(-1))
 
         for sample_name, sample in self.GT.iter_samples(dataset):
 
             yield partial(
                 _deviance_sample,
                 conditional_likelihood,
-                self.to_contig(self._get_weights(sample)),
+                self.to_contig(self._get_weights(sample).reshape(-1)),
                 self.to_contig((exposures_fn or self.GT.fetch_topic_compositions)(dataset, sample_name)),
                 context_sum,
                 LOG_context_effects,
