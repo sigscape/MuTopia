@@ -193,11 +193,25 @@ def edit_feature_attrs(
         if normalization is not None:
             feature.normalization = normalization.value
 
-
 ##
 #
 ##
 
+@retry_until_write
+def write_locus_offsets(
+    dataset,
+    locus_offsets,
+):
+    locus_offsets = xr.DataArray(
+        locus_offsets,
+        dims=("locus",),
+        name="exposures",
+    ).to_netcdf(
+        dataset,
+        group="Regions",
+        mode="a",
+        **WRITE_KW,
+    )
 
 ##
 # Sample write, remove, and list
@@ -205,16 +219,16 @@ def edit_feature_attrs(
 @retry_until_write
 def write_sample(
     filename,
-    arr,
+    sample,
     sample_name,
 ):
 
-    is_sparse = isinstance(arr.data, sparse.SparseArray)
+    is_sparse = isinstance(sample.X.data, sparse.SparseArray)
 
     dset = (
-        arr.sparse_to_coo()
+        sample.X.sparse_to_coo()
         if is_sparse
-        else arr.to_dataset(name="data", promote_attrs=True)
+        else sample.X.to_dataset(name="data", promote_attrs=True)
     )
 
     if len(dset.data) == 0:
@@ -250,6 +264,24 @@ def write_sample(
         encoding=encoding,
         **WRITE_KW,
     )
+
+    if hasattr(sample, "ploidy"):
+
+        (
+            sample
+            .ploidy
+            .sparse_to_coo()
+            .to_netcdf
+        )(
+            filename,
+            group=f"/raw/ploidy/{sample_name}",
+            mode="a",
+            encoding={
+                **encoding,
+                "indices": {"dtype": "uint32"},
+            },
+            **WRITE_KW,
+        )
 
 
 class NoSamplesError(ValueError):
@@ -295,6 +327,8 @@ def rm_sample(
 
 def write_dataset(dataset, filename, bar=False):
 
+    special_vars = [v for v in ["X", "ploidy"] if hasattr(dataset, v)]
+
     # write base data (coords, index, attrs)
     (
         dataset.drop_vars(list(dataset.data_vars)).to_netcdf(
@@ -302,9 +336,7 @@ def write_dataset(dataset, filename, bar=False):
         )
     )
 
-    for section_name, section in (
-        dataset.drop_vars(["X"]) if "X" in dataset.data_vars else dataset
-    ).sections:
+    for section_name, section in (dataset.drop_vars(special_vars)).sections:
 
         # check if any are sparse - if so error with a nice message
         sparse_vars = [
@@ -334,7 +366,7 @@ def write_dataset(dataset, filename, bar=False):
         ):
             write_sample(
                 filename,
-                dataset.fetch_sample(sample_name).X,
+                dataset.fetch_sample(sample_name),
                 sample_name,
             )
 
@@ -343,7 +375,7 @@ def _is_sparse_coo(group):
     return group.__dict__.get("format", "not coo") == "COO"
 
 
-def _load_sparse(group, coo=False, fill_value=0.0, **kw):
+def _load_sparse(group, coo=False, fill_value=0.0, name="X", **kw):
 
     weights = group["data"][...].data
     coords = group["indices"][...].data.astype(int32, copy=False)
@@ -360,7 +392,7 @@ def _load_sparse(group, coo=False, fill_value=0.0, **kw):
     arr = xr.DataArray(
         arr,
         dims=dims,
-        name="X",
+        name=name,
     )
 
     if not coo:
@@ -382,7 +414,21 @@ def _backend_load_sample(dset, sample_name, coo=False):
     X_group = dset.groups["raw"]["X"][sample_name]
     X = (_load_sparse if _is_sparse_coo(X_group) else _load_dense)(X_group, coo=coo)
 
-    return xr.Dataset({"X": X}).assign_coords({"sample": sample_name})
+    try:
+        ploidy_group = dset.groups["raw"]["ploidy"][sample_name]
+    except IndexError:
+        ploidy = xr.DataArray(
+            sparse.COO(coords=[], data=[], shape=(X.sizes["locus"],)),
+            dims=("locus",),
+            name="ploidy",
+        )
+    else:
+        ploidy = _load_sparse(ploidy_group, coo=coo, name="ploidy")
+
+    return xr.Dataset({
+        "X": X,
+        "ploidy": ploidy,
+    }).assign_coords({"sample": sample_name})
 
 
 def load_sample(filename, sample_name, coo=False):
@@ -444,6 +490,7 @@ def _pack_samples(samples):
         X = samples.X.data
         X.coords = X.astype(int32, copy=False)
 
+    samples.ploidy.ascsr("locus")
     return samples
 
 

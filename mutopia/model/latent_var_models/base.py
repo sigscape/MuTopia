@@ -643,7 +643,10 @@ class LocalsModel(PrimitiveModel):
         ])
 
         if "ploidy" in dataset:
-            weighted_ploidy = (n_observations/n_observations.sum()) @ dataset["ploidy"].tranpose("sample", "locus").data
+            weighted_ploidy = (
+                (n_observations/n_observations.sum()) @ 
+                dataset["ploidy"].transpose("sample", "locus").data
+            ) + 1
         else:
             weighted_ploidy = np.ones(dataset.sizes["locus"], dtype=self.dtype)
 

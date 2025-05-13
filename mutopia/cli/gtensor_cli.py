@@ -3,13 +3,14 @@ from typing import *
 from functools import partial
 import os
 import numpy as np
+from sparse import COO
 import mutopia.ingestion as ingest
 from mutopia.gtensor import *
 import netCDF4 as nc
 from shutil import copyfile
-import pickle
 from ..gtensor.interfaces import *
 import mutopia.gtensor.disk_interface as disk
+from ..ingestion import make_continuous_features_bed
 from ..modalities import *
 from ..genome_utils.bed12_utils import stream_bed12
 from ..utils import FeatureType, logger
@@ -413,13 +414,7 @@ def info(dataset):
 def offsets():
     pass
 
-
-@offsets.group("locus")
-def offsets_locus():
-    pass
-
-
-@offsets_locus.command("add")
+@offsets.command("add")
 @click.argument(
     "dataset",
     type=click.Path(exists=True),
@@ -453,7 +448,7 @@ def add_locus_offsets(
     )
 
 
-@offsets_locus.command("rm")
+@offsets.command("rm")
 @click.argument(
     "dataset",
     type=click.Path(exists=True),
@@ -989,6 +984,13 @@ def samplecmds():
     default=None,
     help="Fasta file to use for calculating context frequencies",
 )
+@click.option(
+    "-cn",
+    "--copy-number",
+    type=click.Path(exists=True),
+    default=None,
+    help="Bed file containing copy number information for the sample.",
+)
 def ingest_sample(
     dataset: str,
     sample_file: str,
@@ -1001,6 +1003,7 @@ def ingest_sample(
     skip_sort: bool = False,
     cluster: bool = True,
     fasta: Union[None, str] = None,
+    copy_number: Union[None, str] = None,
     *,
     sample_id: str,
 ):
@@ -1018,7 +1021,7 @@ def ingest_sample(
             f"No such file exists: {fasta}, provide a valid fasta file using the `--fasta/-fa` argument."
         )
 
-    sample_arr = modality.ingest_observations(
+    X = modality.ingest_observations(
         sample_file,
         #
         regions_file=regions_file,
@@ -1037,10 +1040,24 @@ def ingest_sample(
         cluster=cluster,
     )
 
+    if not copy_number is None:
+        ploidy = make_continuous_features_bed(
+            copy_number,
+            regions_file,
+            null=2.,
+        )
+        ploidy = ploidy/2 - 1 # normalize for diploid and center around 0
+        ploidy = COO(ploidy)
+
+        sample = xr.Dataset({
+            "X": X,
+            "ploidy": ploidy,
+        })
+
     disk.write_sample(
         dataset,
-        sample_arr,
-        sample_name=f"X/{sample_id}",
+        sample,
+        sample_name=sample_id,
     )
 
 
