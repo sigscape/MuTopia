@@ -5,7 +5,7 @@ from functools import partial
 from optuna.storages import JournalStorage
 from optuna.storages.journal import JournalFileBackend
 from numpy import isfinite
-from .gtensor.interfaces import *
+from .gtensor import *
 from .utils import logger
 
 
@@ -216,10 +216,10 @@ def load_study(study_name, storage=None, prune=True):
     )
 
 
-def _model_report_callback(trial, model_state, train_scores, test_scores):
+def _model_report_callback(trial, factor_model, epoch, test_scores):
 
     if isfinite(test_scores[-1]):
-        trial.report(test_scores[-1], len(train_scores))
+        trial.report(test_scores[-1], epoch)
         if trial.should_prune():
             raise optuna.TrialPruned()
 
@@ -246,19 +246,34 @@ def _get_save_model_fn(
 
 def _objective(
     trial,
-    model_fn,
+    *,
+    model_kw,
+    train,
+    test,
     param_sampling_fn,
     model_save_fn,
 ):
     params = param_sampling_fn(trial)
-
+    model_kw.update(params)
     callback = partial(_model_report_callback, trial)
 
-    (model, _, test_scores) = model_fn(**params, callback=callback, seed=trial.number)
+    model = (
+        train[0]
+        .modality()
+        .TopographyModel(
+            **model_kw,
+            callback=callback, 
+            seed=trial.number
+        )
+        .fit(
+            *train,
+            test_datasets=test,
+        )
+    )
 
     model_save_fn(trial, model)
 
-    return test_scores[-1]
+    return model.test_scores_[-1]
 
 
 def _sample_params(study, extra_param_fn, trial):
@@ -308,14 +323,6 @@ def run_trial(
     if "eval_every" in model_kw:
         model_kw.pop("eval_every")
 
-    model_fn = partial(
-        example_corpus.modality().make_model,
-        train,
-        test,
-        eval_every=5,
-        **model_kw,
-    )
-
     if not study_attrs["save_model"]:
         model_save_fn = lambda *args: None
     else:
@@ -328,13 +335,16 @@ def run_trial(
         _sample_params,
         study,
         partial(
-            example_corpus.modality().sample_params, extensive=study_attrs["extensive"]
+            example_corpus.modality().sample_params, 
+            extensive=study_attrs["extensive"]
         ),
     )
 
     obj_fn = partial(
         _objective,
-        model_fn=model_fn,
+        model_kw=model_kw,
+        train=train,
+        test=test,
         param_sampling_fn=param_sampling_fn,
         model_save_fn=model_save_fn,
     )
@@ -373,7 +383,7 @@ def retrain(
         zip(
             *[
                 (lazy_train_test_load if lazy else eager_train_test_load)(
-                    corpus, study_attrs["test_chroms"]
+                    corpus, *study_attrs["test_chroms"]
                 )
                 for corpus in study_attrs["train_corpuses"]
             ]
@@ -381,12 +391,12 @@ def retrain(
     )
     example_corpus = train[0]
 
-    model, *_ = example_corpus.modality().make_model(
-        train,
-        test,
-        eval_every=5,
-        seed=seed or trial_number,
+    model = example_corpus.modality().TopographyModel(
         **model_kw,
+        seed=seed,
+    ).fit(
+        *train,
+        test_datasets=test,
     )
 
     model.save(save_name)

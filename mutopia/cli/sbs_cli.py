@@ -6,8 +6,7 @@ import click
 from functools import partial
 from typing import *
 
-SBS = mu.Modality.SBS.get_config()
-
+SBS = mu.SBS
 
 @click.group("SBS commands")
 def sbs():

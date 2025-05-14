@@ -11,7 +11,6 @@ import pandas as pd
 import sys
 from tabulate import tabulate
 from ..model import *
-from ..tuning import sample_params
 from ..utils import logger
 from ..genome_utils.bed12_utils import stream_bed12
 from .mode_config import ModeConfig
@@ -170,98 +169,6 @@ def _predict(k, corpus, with_context=True):
 
 
 class SBSModel(TopographyModel):
-
-    def __init__(
-        self,
-        num_components=15,
-        init_components=[],
-        fix_components=[],
-        seed=0,
-        # context model
-        context_reg=0.0001,
-        context_conditioning=1e-9,
-        conditioning_alpha=1e-9,
-        # locals model
-        pi_prior=1.0,
-        tau_prior=1.0,
-        # locus model
-        locus_model_type="gbt",
-        tree_learning_rate=0.15,
-        max_depth=5,
-        max_trees_per_iter=25,
-        max_leaf_nodes=31,
-        min_samples_leaf=30,
-        max_features=1.0,
-        n_iter_no_change=1,
-        use_groups=True,
-        add_corpus_intercepts=False,
-        convolution_width=0,
-        l2_regularization=1,
-        max_iter=25,
-        init_variance_theta=0.03,
-        init_variance_context=0.1,
-        # optimization settings
-        empirical_bayes=True,
-        begin_prior_updates=50,
-        stop_condition=50,
-        # optimization settings
-        num_epochs=2000,
-        locus_subsample=None,
-        batch_subsample=None,
-        threads=1,
-        kappa=0.5,
-        tau=1.0,
-        callback=None,
-        eval_every=10,
-        verbose=0,
-        time_limit=None,
-        test_chroms=("chr1",),
-    ):
-        self.num_components = num_components
-        self.init_components = init_components
-        self.fix_components = fix_components
-        self.seed = seed
-        # context model
-        self.context_reg = context_reg
-        self.context_conditioning = context_conditioning
-        self.conditioning_alpha = conditioning_alpha
-        # locals model
-        self.pi_prior = pi_prior
-        self.tau_prior = tau_prior
-        # locus model
-        self.locus_model_type = locus_model_type
-        self.tree_learning_rate = tree_learning_rate
-        self.max_depth = max_depth
-        self.max_trees_per_iter = max_trees_per_iter
-        self.max_leaf_nodes = max_leaf_nodes
-        self.min_samples_leaf = min_samples_leaf
-        self.max_features = max_features
-        self.n_iter_no_change = n_iter_no_change
-        self.use_groups = use_groups
-        self.add_corpus_intercepts = add_corpus_intercepts
-        self.convolution_width = convolution_width
-        self.l2_regularization = l2_regularization
-        self.max_iter = max_iter
-        self.init_variance_theta = init_variance_theta
-        self.init_variance_context = init_variance_context
-        # optimization settings
-        self.test_chroms = test_chroms
-        self.empirical_bayes = empirical_bayes
-        self.begin_prior_updates = begin_prior_updates
-        self.stop_condition = stop_condition
-        self.num_epochs = num_epochs
-        self.locus_subsample = locus_subsample
-        self.batch_subsample = batch_subsample
-        self.threads = threads
-        self.kappa = kappa
-        self.tau = tau
-        self.callback = callback
-        self.eval_every = eval_every
-        self.verbose = verbose
-        self.time_limit = time_limit
-
-    def sample_params(self, study, trial, extensive=0):
-        return sample_params(study, trial, extensive=extensive)
 
     def _init_factor_model(
         self,

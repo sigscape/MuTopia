@@ -207,8 +207,7 @@ class LDAUpdateDense(LocalsModel):
 
             LOG_context_effects = (
                 match_dims(
-                    np.log(self.GT.get_freqs(dataset))
-                    + np.log(self.GT.get_exposures(dataset)),
+                    np.log(self.GT.get_freqs(dataset)),
                     **{d: dataset.sizes[d] for d in sample_dims},
                 )
                 .transpose(*sample_dims)

@@ -38,6 +38,9 @@ class CorpusInterface:
         return self._corpus[key]
 
 
+class NoVars(ValueError):
+    pass
+
 class LazySampleLoader(CorpusInterface):
 
     def __init__(
@@ -50,11 +53,16 @@ class LazySampleLoader(CorpusInterface):
     def X(self):
         return self.fetch_sample(self.list_samples()[0]).X
 
-    @property
-    def _sample_vars(self):
-        return self._corpus[
-            [k for k, v in self._corpus.data_vars.items() if "sample" in v.dims]
-        ]
+    
+    def _get_sample_vars(self, sample_name):
+        sample_vars = [k for k, v in self._corpus.data_vars.items() if "sample" in v.dims]
+        if len(sample_vars) == 0:
+            raise NoVars(
+                "No sample variables found in the corpus. "
+                "Please check the corpus structure."
+            )
+        
+        return self._corpus[sample_vars].sel(sample=sample_name)
 
     def _get_filename(self):
         filename = self._corpus.attrs["filename"]
@@ -65,19 +73,26 @@ class LazySampleLoader(CorpusInterface):
         return filename
 
     def fetch_sample(self, sample_name):
-        return self._sample_vars.sel(sample=sample_name).merge(
-            disk.load_sample(self._get_filename(), sample_name)
-        )
+        try:
+            return self._get_sample_vars(sample_name).merge(
+                disk.load_sample(self._get_filename(), sample_name)
+            )
+        except NoVars:
+            return disk.load_sample(self._get_filename(), sample_name)
 
     def iter_samples(self):
 
-        sample_vars = self._sample_vars
+        sample_vars = [k for k, v in self._corpus.data_vars.items() if "sample" in v.dims]
+        has_sample_vars = len(sample_vars) > 0
 
         for sample_name, data in zip(
             self.list_samples(),
             disk.yield_samples(self._get_filename(), *self.list_samples()),
         ):
-            yield (sample_vars.sel(sample=sample_name).merge(data))
+            if has_sample_vars:
+                yield self._corpus[sample_vars].sel(sample=sample_name).merge(data)
+            else:
+                yield data
 
 
 class LazySlicer(CorpusInterface):

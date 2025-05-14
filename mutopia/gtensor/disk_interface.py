@@ -414,21 +414,35 @@ def _backend_load_sample(dset, sample_name, coo=False):
     X_group = dset.groups["raw"]["X"][sample_name]
     X = (_load_sparse if _is_sparse_coo(X_group) else _load_dense)(X_group, coo=coo)
 
+    return xr.Dataset({"X": X}).assign_coords({"sample": sample_name})
+
+
+def _load_sample_ploidy(dset, sample_name, n_loci):
     try:
         ploidy_group = dset.groups["raw"]["ploidy"][sample_name]
     except IndexError:
         ploidy = xr.DataArray(
-            sparse.COO(coords=[], data=[], shape=(X.sizes["locus"],)),
+            sparse.COO(coords=[], data=[], shape=(n_loci,)),
             dims=("locus",),
             name="ploidy",
         )
     else:
-        ploidy = _load_sparse(ploidy_group, coo=coo, name="ploidy")
+        ploidy = _load_sparse(ploidy_group, coo=True, name="ploidy")
 
-    return xr.Dataset({
-        "X": X,
-        "ploidy": ploidy,
-    }).assign_coords({"sample": sample_name})
+    return ploidy
+
+
+def _load_ploidy_matrix(filename, sample_names):
+
+    with retry_until_write(nc.Dataset)(filename, "r") as dset:
+        ploidy = [
+            _load_sample_ploidy(dset, sample_name, n_loci=dset.dimensions["locus"].size)
+            for sample_name in sample_names
+        ]
+
+    ploidy = xr.concat(ploidy, dim="sample")
+    ploidy = ploidy.assign_coords({"sample": sample_names})
+    return ploidy.ascsr("locus")
 
 
 def load_sample(filename, sample_name, coo=False):
@@ -490,7 +504,6 @@ def _pack_samples(samples):
         X = samples.X.data
         X.coords = X.astype(int32, copy=False)
 
-    samples.ploidy.ascsr("locus")
     return samples
 
 
@@ -533,15 +546,15 @@ def load_dataset(filename, with_samples=True, with_state=True):
 
     ## load the samples
     try:
-
-        if not with_samples:  # just jump out if we don't want samples
-            raise NoSamplesError
-
         sample_names = _list_sample_names(filename)
         dataset = dataset.assign_coords({"sample": sample_names})
-        samples = _pack_samples(list(yield_samples(filename, *sample_names, coo=True)))
 
-        dataset = dataset.merge(samples)
+        ploidy = _load_ploidy_matrix(filename, sample_names)
+        dataset = dataset.merge(ploidy)
+
+        if with_samples:
+            samples = _pack_samples(list(yield_samples(filename, *sample_names, coo=True)))
+            dataset = dataset.merge(samples)
 
     except NoSamplesError:
         pass

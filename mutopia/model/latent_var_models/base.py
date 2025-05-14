@@ -636,13 +636,17 @@ class LocalsModel(PrimitiveModel):
 
     
     def prepare_corpusstate(self, dataset):
-
+        
         n_observations = np.array([
             sample.X.sum().data.item()
-            for _, sample in self.GT.iter_samples(dataset)
+            for _, sample in tqdm(
+                self.GT.iter_samples(dataset),
+                total=len(dataset.list_samples()),
+                desc="Collecting sample information",
+            )
         ])
 
-        if "ploidy" in dataset:
+        if hasattr(dataset, "ploidy"):
             weighted_ploidy = (
                 (n_observations/n_observations.sum()) @ 
                 dataset["ploidy"].transpose("sample", "locus").data

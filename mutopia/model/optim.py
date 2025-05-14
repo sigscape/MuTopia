@@ -391,7 +391,7 @@ def fit_model(
                 )
 
                 if not callback is None:
-                    callback(factor_model, test_scores)
+                    callback(factor_model, epoch, test_scores)
 
                 if stop_fn(test_scores):
                     logger.info(
@@ -419,7 +419,7 @@ def fit_model(
         for model in factor_model.models.values():
             model.post_fit(GT.to_datasets(*train_datasets)[0])
 
-        # if not empirical_bayes:
+        #if not empirical_bayes:
         #    logger.info('Updating priors ...')
         #    locals_model.optim_prior(train_datasets)
 

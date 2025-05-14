@@ -24,19 +24,19 @@ def observation_dims(dataset):
     return tuple(d for d in dataset.X.dims if not d == "sample")
 
 
-@inplace
 def init_state(
     dataset,
     factor_model,
     locals_model,
 ):
+    dataset = CorpusInterface(dataset)
 
     if has_corpusstate(dataset):
-        dataset = dataset.drop_vars(dataset.sections.groups["State"])
+        dataset.corpus = dataset.corpus.drop_vars(dataset.sections.groups["State"])
         if "component" in dataset.dims:
-            dataset = dataset.drop_dims("component")
+            dataset.corpus = dataset.corpus.drop_dims("component")
         if "feature" in dataset.dims:
-            dataset = dataset.drop_dims("feature")
+            dataset.corpus = dataset.corpus.drop_dims("feature")
 
     sample_names = dataset.list_samples()
     n_components = factor_model.n_components
@@ -57,8 +57,8 @@ def init_state(
 
     state_elements = {"State/" + k: v for k, v in state_elements.items()}
 
-    dataset = (
-        dataset.drop_dims("component", errors="ignore")
+    dataset.corpus = (
+        dataset.corpus.drop_dims("component", errors="ignore")
         .assign_coords(sample=sample_names)
         .assign(**state_elements)
     )

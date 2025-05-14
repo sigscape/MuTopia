@@ -293,7 +293,7 @@ def train(
         zip(
             *[
                 (lazy_train_test_load if lazy else eager_train_test_load)(
-                    corpus, test_chroms
+                    corpus, *test_chroms
                 )
                 for corpus in train_corpuses
             ]
@@ -309,7 +309,7 @@ def train(
         logger.setLevel("DEBUG")
 
     model = get_mode(train[0]).TopographyModel(**model_kw)
-    model = model.fit(train, test_datasets=test)
+    model = model.fit(*train, test_datasets=test)
 
     click.echo("Best test score:\t{:.5f}".format(max(model.test_scores_)))
 

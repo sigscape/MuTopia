@@ -442,6 +442,8 @@ def add_locus_offsets(
         column=column,
     ).astype(np.float32)
 
+    exp_offsets/=exp_offsets.mean()
+
     disk.write_locus_offsets(
         dataset,
         exp_offsets,

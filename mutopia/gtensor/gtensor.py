@@ -85,6 +85,12 @@ def inplace(func):
     return wrapper
 
 
+def mutate(dataset, func):
+    inner = CorpusInterface(dataset)
+    inner.corpus = CorpusInterface(func(dataset)).corpus
+    return inner._corpus
+
+
 def load_dataset(dataset, with_samples=True, with_state=True):
     """
     Loads a dataset from disk. If the dataset is not present,
@@ -95,52 +101,52 @@ def load_dataset(dataset, with_samples=True, with_state=True):
     )
 
 
-def lazy_load(dataset):
-    return load_dataset(dataset, with_samples=False, with_state=False)
+def train_test_split(dataset, *test_chroms: Union[str, List[str]], lazy=False):
 
-
-def eager_load(dataset):
-    return load_dataset(dataset, with_samples=True, with_state=False)
-
-
-def lazy_train_test_load(dataset, test_chroms):
-
-    dataset = lazy_load(dataset)
-
-    test_mask = dataset.regions.chrom.isin(test_chroms)
-    if test_mask.sum() == 0:
-        raise ValueError(
-            f'None of the chromosomes in {",".join(test_chroms)} are present in the dataset. '
-        )
-
-    train = LazySlicer(dataset, locus=~test_mask)
-    test = LazySlicer(dataset, locus=test_mask)
-
-    drop_vars = dataset.sections.groups["Features"] + dataset.sections.groups["Regions"]
-    train._base_corpus.corpus = train._base_corpus.drop_vars(drop_vars)
-    test._base_corpus.corpus = test._base_corpus.drop_vars(drop_vars)
-
-    return train, test
-
-
-def eager_train_test_load(dataset, test_chroms):
-    return train_test_split(eager_load(dataset))
-
-
-def train_test_split(dataset, test_chroms: Union[str, List[str]]):
-
+    if not len(test_chroms) > 0:
+        raise ValueError("No test chromosomes provided.")
+    
     test_mask = dataset.sections["Regions"].chrom.isin(test_chroms)
     if test_mask.sum() == 0:
         raise ValueError(
             f'None of the chromosomes in {",".join(test_chroms)} are present in the dataset. '
         )
+    
+    lazy = lazy or not "X" in dataset.data_vars
 
-    train = dataset.isel(locus=~test_mask)
-    test = dataset.isel(locus=test_mask)
+    if lazy:
+        logger.warning(
+            "The dataset is lazy, so the train/test split will be lazy as well. "
+            "This may cause latency issues on systems with slow file IO."
+        )
+        train = LazySlicer(dataset, locus=~test_mask)
+        test = LazySlicer(dataset, locus=test_mask)
 
-    del dataset
+        drop_vars = dataset.sections.groups["Features"] + dataset.sections.groups["Regions"]
+        train._base_corpus.corpus = train._base_corpus.drop_vars(drop_vars)
+        #test._base_corpus.corpus = test._base_corpus.drop_vars(drop_vars)
+
+        return train, test
+    
+    else:
+        train = dataset.isel(locus=~test_mask)
+        test = dataset.isel(locus=test_mask)
 
     return train, test
+
+
+def lazy_load(dataset):
+    return load_dataset(dataset, with_samples=False, with_state=False)
+
+def eager_load(dataset):
+    return load_dataset(dataset, with_samples=True, with_state=False)
+
+def lazy_train_test_load(dataset, *test_chroms):
+    return train_test_split(lazy_load(dataset), *test_chroms, lazy=True)
+    
+def eager_train_test_load(dataset, *test_chroms):
+    return train_test_split(eager_load(dataset), *test_chroms, lazy=False)
+
 
 
 def get_explanation(dataset, component):
