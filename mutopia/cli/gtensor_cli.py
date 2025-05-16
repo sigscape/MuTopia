@@ -8,9 +8,12 @@ import mutopia.ingestion as ingest
 from mutopia.gtensor import *
 import netCDF4 as nc
 from shutil import copyfile
+import tempfile
 from ..gtensor.interfaces import *
 import mutopia.gtensor.disk_interface as disk
 from ..ingestion import make_continuous_features_bed
+from ..ingestion.gtf_parsing import query_gtf
+from ..ingestion import gene_features
 from ..modalities import *
 from ..genome_utils.bed12_utils import stream_bed12
 from ..utils import FeatureType, logger
@@ -57,27 +60,6 @@ def _read_continuous_file(
 @click.group("G-tensor commands")
 def gtensor_cli():
     pass
-
-
-@gtensor_cli.group("utils")
-def utils():
-    pass
-
-
-@utils.command("linearize-beds")
-@click.argument(
-    "bed_files",
-    type=click.Path(exists=True),
-    nargs=-1,
-)
-def linearize_beds(
-    bed_files: List[str],
-    max_region_size=25000,
-):
-    ingest.linearize_beds(
-        *bed_files,
-        max_region_size=max_region_size,
-    )
 
 
 @gtensor_cli.command("split")
@@ -1103,3 +1085,125 @@ def list_samples(dataset: str):
         return
 
     print(*samples, sep="\n")
+
+
+
+@gtensor_cli.group("utils")
+def utils():
+    pass
+
+
+@utils.command("linearize-beds")
+@click.argument(
+    "bed_files",
+    type=click.Path(exists=True),
+    nargs=-1,
+)
+def linearize_beds(
+    bed_files: List[str],
+    max_region_size=25000,
+):
+    ingest.linearize_beds(
+        *bed_files,
+        max_region_size=max_region_size,
+    )
+
+
+@utils.command("query-gtf")
+@click.option(
+    "--input", "-i", type=click.File("r"), default="-", help="Input GTF or GFF file"
+)
+@click.option("--output", "-o", type=click.File("w"), default="-", help="Output file")
+@click.option("--type-filter", "-type", help="Only include records of this type")
+@click.option(
+    "--attribute-key", "-attr", help="Only include records with this attribute key"
+)
+@click.option(
+    "--attribute-values",
+    "-vals",
+    multiple=True,
+    default=None,
+    help="Only include records with these attribute values under the specified key.",
+)
+@click.option(
+    "--is-gff/--is-gtf",
+    default=False,
+    help="Input file is in GFF format (default: GTF)",
+)
+@click.option(
+    "--header/--no-header",
+    default=False,
+    help="Print a header line with the column names.",
+)
+@click.option(
+    "--format-str",
+    "-f",
+    default=None,
+    help="Format string for output. Use {column_name} to insert values from the GFF record. Use {attributes[key]} to insert values from the attributes dictionary.",
+)
+@click.option(
+    '--as-regions',
+    is_flag=True,
+    help='Output in regions format. Default format is "{chrom}:{start}-{end}\n"',
+)
+@click.option(
+    '--as-gtf',
+    is_flag=True,
+)
+def _query_gtf(*args, **kwargs):
+    query_gtf(*args, **kwargs)
+
+
+@utils.command("make-expression-bedfile")
+@click.argument(
+    "output",
+    type=click.Path(writable=True),
+)
+@click.argument(
+    "quantitation_files",
+    type=click.Path(exists=True),
+    nargs=-1,
+)
+@click.option(
+    "--join-on",
+    type=click.Choice(["gene_id", "gene_name"]),
+    default="gene_id",
+    help="Column to join on. Default is 'gene_id'.",
+)
+@click.option(
+    "--gtf-file",
+    type=click.Path(exists=True),
+    default=None,
+    help="GTF file to use for annotation. If not provided, will download the latest GTF file.",
+)
+def make_quant_file(
+    output,
+    quantitation_files : List[str],
+    gtf_file: str = None,
+    join_on="gene_id",
+):      
+    
+    gtf_file = gtf_file or "MANE.GRCh38.v1.3.ensembl_genomic.gtf.gz"
+
+    if not os.path.exists(gtf_file):
+        logger.info(f"Downloading GTF file: {gtf_file} ...")
+        gene_features.download_gtf(gtf_file)
+
+    annotation_file="MANE.GRCh38.annotation.bed"
+    logger.info(f"Creating annotation file: {annotation_file} ...")
+    gene_features.make_annotation(gtf_file, annotation_file)
+
+    quant = gene_features.join_quantitation(
+        annotation_file,
+        *quantitation_files,
+        join_on=join_on,
+    )
+
+    logger.info(f"Writing quantitation file: {output} ...")
+    quant.to_csv(
+        output,
+        sep="\t",
+        compression="gzip",
+        header=None,
+        index=False,
+    )
