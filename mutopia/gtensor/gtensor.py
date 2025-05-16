@@ -54,6 +54,7 @@ def GTensor(
         },
     )
 
+
 def apply_to_samples(data, func, bar=True):
 
     if not hasattr(data, "X"):
@@ -105,13 +106,13 @@ def train_test_split(dataset, *test_chroms: Union[str, List[str]], lazy=False):
 
     if not len(test_chroms) > 0:
         raise ValueError("No test chromosomes provided.")
-    
+
     test_mask = dataset.sections["Regions"].chrom.isin(test_chroms)
     if test_mask.sum() == 0:
         raise ValueError(
             f'None of the chromosomes in {",".join(test_chroms)} are present in the dataset. '
         )
-    
+
     lazy = lazy or not "X" in dataset.data_vars
 
     if lazy:
@@ -122,12 +123,14 @@ def train_test_split(dataset, *test_chroms: Union[str, List[str]], lazy=False):
         train = LazySlicer(dataset, locus=~test_mask)
         test = LazySlicer(dataset, locus=test_mask)
 
-        drop_vars = dataset.sections.groups["Features"] + dataset.sections.groups["Regions"]
+        drop_vars = (
+            dataset.sections.groups["Features"] + dataset.sections.groups["Regions"]
+        )
         train._base_corpus.corpus = train._base_corpus.drop_vars(drop_vars)
-        #test._base_corpus.corpus = test._base_corpus.drop_vars(drop_vars)
+        # test._base_corpus.corpus = test._base_corpus.drop_vars(drop_vars)
 
         return train, test
-    
+
     else:
         train = dataset.isel(locus=~test_mask)
         test = dataset.isel(locus=test_mask)
@@ -138,15 +141,17 @@ def train_test_split(dataset, *test_chroms: Union[str, List[str]], lazy=False):
 def lazy_load(dataset):
     return load_dataset(dataset, with_samples=False, with_state=False)
 
+
 def eager_load(dataset):
     return load_dataset(dataset, with_samples=True, with_state=False)
 
+
 def lazy_train_test_load(dataset, *test_chroms):
     return train_test_split(lazy_load(dataset), *test_chroms, lazy=True)
-    
+
+
 def eager_train_test_load(dataset, *test_chroms):
     return train_test_split(eager_load(dataset), *test_chroms, lazy=False)
-
 
 
 def get_explanation(dataset, component):
@@ -305,9 +310,9 @@ def make_mixture_dataset(**datasets):
     source_names = list(datasets.keys())
     merge_dsets = []
     for source_name, dataset in datasets.items():
-        
+
         rename_map = {
-            old_name : f'{level}/{source_name}/{os.path.basename(old_name)}'
+            old_name: f"{level}/{source_name}/{os.path.basename(old_name)}"
             for level in ["Features", "State"]
             for old_name in dataset.sections.groups[level]
         }

@@ -1,6 +1,7 @@
 import os
 import mutopia.gtensor.disk_interface as disk
 
+
 class CorpusInterface:
     """
     Sometimes, we'd like to drop something else into the EM step
@@ -41,6 +42,7 @@ class CorpusInterface:
 class NoVars(ValueError):
     pass
 
+
 class LazySampleLoader(CorpusInterface):
 
     def __init__(
@@ -53,15 +55,16 @@ class LazySampleLoader(CorpusInterface):
     def X(self):
         return self.fetch_sample(self.list_samples()[0]).X
 
-    
     def _get_sample_vars(self, sample_name):
-        sample_vars = [k for k, v in self._corpus.data_vars.items() if "sample" in v.dims]
+        sample_vars = [
+            k for k, v in self._corpus.data_vars.items() if "sample" in v.dims
+        ]
         if len(sample_vars) == 0:
             raise NoVars(
                 "No sample variables found in the corpus. "
                 "Please check the corpus structure."
             )
-        
+
         return self._corpus[sample_vars].sel(sample=sample_name)
 
     def _get_filename(self):
@@ -82,7 +85,9 @@ class LazySampleLoader(CorpusInterface):
 
     def iter_samples(self):
 
-        sample_vars = [k for k, v in self._corpus.data_vars.items() if "sample" in v.dims]
+        sample_vars = [
+            k for k, v in self._corpus.data_vars.items() if "sample" in v.dims
+        ]
         has_sample_vars = len(sample_vars) > 0
 
         for sample_name, data in zip(
@@ -204,8 +209,7 @@ class TransformerInterface(CorpusInterface):
 
     def fetch_sample(self, sample_name):
         return self._func(self._corpus.fetch_sample(sample_name))
-    
+
     def iter_samples(self):
         for sample_name, data in self._corpus.iter_samples():
             yield sample_name, self._func(data)
-        

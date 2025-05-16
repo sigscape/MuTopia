@@ -9,7 +9,7 @@ from ._glm_compiled import (
     partial_ls_solver,
 )
 from ._fast_eln import get_eln_solver
-from .. import gtensor_interface as CS
+from ..gtensor_interface import GtensorInterface as CS
 from .base import (
     get_reg_params,
     get_poisson_targets_weights,
@@ -50,9 +50,9 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
 
         self.n_components = n_components
         self.n_fixed_components = len(fix_components)
-        
-        corpus = corpuses[0] 
-        
+
+        corpus = corpuses[0]
+
         self.context_dim = CS.get_dims(corpus)["context"]
         self.context_names = list(corpus.coords["context"].data)
         self.dtype = dtype
@@ -94,9 +94,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
 
         if len(fix_components) > 0 or len(init_components) > 0:
             self.init_from_signatures(
-                corpus
-                .modality()
-                .load_components(*fix_components, *init_components)
+                corpus.modality().load_components(*fix_components, *init_components)
             )
 
         optim_kw = dict(

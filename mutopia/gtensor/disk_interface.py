@@ -113,7 +113,7 @@ def write_feature(
     xr.DataArray(
         array(vals).astype(normalization.save_dtype),
         dims=("locus",),
-        name=name,
+        name=name.replace("/", "."),
         attrs={
             "normalization": normalization.value,
             "group": group,
@@ -142,7 +142,7 @@ def rm_feature(
 
         features = dset.groups["features"]
         try:
-            features[name].active = 0
+            features[name.replace("/", ".")].active = 0
         except IndexError:
             pass
 
@@ -183,7 +183,7 @@ def edit_feature_attrs(
 
         features = dset.groups["features"]
         try:
-            feature = features[name]
+            feature = features[name.replace("/", ".")]
         except IndexError:
             raise ValueError(f"Feature {name} not found in dataset.")
 
@@ -193,9 +193,11 @@ def edit_feature_attrs(
         if normalization is not None:
             feature.normalization = normalization.value
 
+
 ##
 #
 ##
+
 
 @retry_until_write
 def write_locus_offsets(
@@ -212,6 +214,7 @@ def write_locus_offsets(
         mode="a",
         **WRITE_KW,
     )
+
 
 ##
 # Sample write, remove, and list
@@ -267,12 +270,7 @@ def write_sample(
 
     if hasattr(sample, "ploidy"):
 
-        (
-            sample
-            .ploidy
-            .sparse_to_coo()
-            .to_netcdf
-        )(
+        (sample.ploidy.sparse_to_coo().to_netcdf)(
             filename,
             group=f"/raw/ploidy/{sample_name}",
             mode="a",
@@ -349,9 +347,11 @@ def write_dataset(dataset, filename, bar=False):
                 "Please convert to dense before writing."
             )
 
+        section = section.rename({k: k.replace("/", ".") for k in section.data_vars})
+
         section.to_netcdf(
             filename,
-            group="/" + section_name,
+            group="/" + section_name.lower(),
             mode="a",
             encoding={k: {"dtype": v.dtype} for k, v in section.data_vars.items()},
             **WRITE_KW,
@@ -539,7 +539,10 @@ def load_dataset(filename, with_samples=True, with_state=True):
         # the "data" section is special - it contains everything not in another section
         if not section_name.title() == "Data":
             section = section.rename(
-                {k: f"{section_name.title()}/{k}" for k in section.data_vars}
+                {
+                    k: f'{section_name.title()}/{k.replace(".","/")}'
+                    for k in section.data_vars
+                }
             )
 
         dataset = dataset.merge(section)
@@ -553,13 +556,15 @@ def load_dataset(filename, with_samples=True, with_state=True):
         dataset = dataset.merge(ploidy)
 
         if with_samples:
-            samples = _pack_samples(list(yield_samples(filename, *sample_names, coo=True)))
+            samples = _pack_samples(
+                list(yield_samples(filename, *sample_names, coo=True))
+            )
             dataset = dataset.merge(samples)
 
     except NoSamplesError:
         pass
 
     dataset.attrs["filename"] = filename
-    #dataset = dataset.assign_coords(dataset.modality().coords)
-    
+    # dataset = dataset.assign_coords(dataset.modality().coords)
+
     return dataset

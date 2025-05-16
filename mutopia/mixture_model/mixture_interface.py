@@ -7,229 +7,185 @@ structure of the datasets.
 import xarray as xr
 from mutopia.gtensor import *
 from mutopia.utils import parallel_gen
+from ..model.gtensor_interface import GtensorInterface
 import numpy as np
 from functools import partial
 from os import path
 
 
-def to_datasets(*datasets):
-    return [ds for _, ds in expand_datasets(*datasets)]
+class MixtureInterface(GtensorInterface):
 
+    @classmethod
+    def to_datasets(cls, *datasets):
+        return [ds for _, ds in cls.expand_datasets(*datasets)]
 
-def expand_datasets(*datasets):
-    for dataset in datasets:
-        for source in list_sources(dataset):
-            ds = fetch_source(dataset, source)
-            yield get_name(ds), ds
+    @classmethod
+    def expand_datasets(cls, *datasets):
+        for dataset in datasets:
+            for source in cls.list_sources(dataset):
+                ds = cls.fetch_source(dataset, source)
+                yield cls.get_name(ds), ds
 
+    @classmethod
+    def observation_dims(cls, dataset):
+        return tuple(d for d in dataset.X.dims if not d == "sample")
 
-def observation_dims(dataset):
-    return tuple(d for d in dataset.X.dims if not d == "sample")
+    @classmethod
+    def get_name(cls, dataset):
+        return dataset.attrs["name"]
 
+    @classmethod
+    def is_mixture_corpus(cls, dataset):
+        return len(cls.list_sources(dataset)) > 1
 
-def get_name(dataset):
-    return dataset.attrs["name"]
+    @classmethod
+    def list_sources(cls, dataset):
+        if "source" in dataset.coords:
+            return dataset.coords["source"].values.tolist()
+        return []
 
+    @classmethod
+    def fetch_source(cls, dataset, source):
+        if not source in cls.list_sources(dataset):
+            raise ValueError(f"Source {source} not found in dataset")
 
-def is_mixture_corpus(dataset):
-    return len(list_sources(dataset)) > 1
+        groups = dataset.sections.groups
+        state = groups.pop("State", [])
+        features = groups.pop("Features", [])
 
+        use_features = [
+            path.basename(v) for v in features if v.startswith("Features/" + source)
+        ]
+        use_state = [path.basename(v) for v in state if v.startswith("State/" + source)]
 
-def list_sources(dataset):
-    if "source" in dataset.coords:
-        return dataset.coords["source"].values.tolist()
-    return []
-
-
-def fetch_source(dataset, source):
-
-    if not source in list_sources(dataset):
-        raise ValueError(f"Source {source} not found in dataset")
-
-    groups = dataset.sections.groups
-    state = groups.pop("State", [])
-    features = groups.pop("Features", [])
-
-    use_features = [path.basename(v) for v in features if v.startswith("Features/" + source)]
-    use_state = [path.basename(v) for v in state if v.startswith("State/" + source)]
-
-    rename_map = {
-        os.path.join("Features", source, v): os.path.join("Features", v)
-        for v in use_features
-    }
-    rename_map.update(
-        {os.path.join("State", source, v): os.path.join("State", v) for v in use_state}
-    )
-
-    other_features = [v for g in groups.values() for v in g]
-
-    source_corpus = dataset[list(rename_map.keys()) + other_features].rename(rename_map)
-    source_corpus.attrs["name"] = get_name(dataset) + "/" + source
-
-    if "source" in source_corpus.dims:
-        source_corpus = source_corpus.sel(source=source, drop=True)
-
-    return source_corpus
-
-
-def sources(dataset):
-    for source in list_sources(dataset):
-        ds = fetch_source(dataset, source)
-        yield source, ds
-
-@inplace
-def init_state(
-    dataset,
-    factor_model,
-    locals_model,
-):
-
-    if has_corpusstate(dataset):
-        dataset = dataset.drop_vars(dataset.sections.groups["State"])
-        if "component" in dataset.dims:
-            dataset = dataset.drop_dims("component")
-        if "feature" in dataset.dims:
-            dataset = dataset.drop_dims("feature")
-
-    sample_names = dataset.list_samples()
-    n_components = factor_model.n_components
-    genome_size = dataset.sections["Regions"].context_frequencies.sum().data.item()
-
-    dataset = (
-        dataset.drop_dims("component", errors="ignore")
-        .assign_coords(sample=sample_names)
-    )
-
-    for source, data in sources(dataset):
-
-        state_elements = {
-            "normalizers": xr.DataArray(
-                np.zeros(n_components, dtype=float),
-                dims=("component",),
-                attrs={"genome_size": genome_size},
-            ),
+        rename_map = {
+            os.path.join("Features", source, v): os.path.join("Features", v)
+            for v in use_features
         }
+        rename_map.update(
+            {
+                os.path.join("State", source, v): os.path.join("State", v)
+                for v in use_state
+            }
+        )
 
-        state_elements.update(locals_model.prepare_corpusstate(data))
+        other_features = [v for g in groups.values() for v in g]
 
-        for model in factor_model.models.values():
-            state_elements.update(model.prepare_corpusstate(data))
+        source_corpus = dataset[list(rename_map.keys()) + other_features].rename(
+            rename_map
+        )
+        source_corpus.attrs["name"] = cls.get_name(dataset) + "/" + source
 
-        state_elements = {f"State/{source}/{k}": v for k, v in state_elements.items()}
+        if "source" in source_corpus.dims:
+            source_corpus = source_corpus.sel(source=source, drop=True)
 
-        dataset = dataset.assign(**state_elements)
+        return source_corpus
 
-    return dataset
+    @classmethod
+    def sources(cls, dataset):
+        for source in cls.list_sources(dataset):
+            ds = cls.fetch_source(dataset, source)
+            yield source, ds
 
-
-def update_state(
-    dataset,
-    model_state,
-    from_scratch=False,
-    par_context=None,
-):
-    for _ in parallel_gen(
-        (
-            partial(model.update_corpusstate, ds, from_scratch=from_scratch)
-            for model in model_state.models.values()
-            for _, ds in sources(dataset)
-        ),
-        par_context,
-        ordered=False,
+    @classmethod
+    def init_state(
+        cls,
+        dataset,
+        factor_model,
+        locals_model,
     ):
-        pass
+        dataset = CorpusInterface(dataset)
 
-    return dataset
+        if cls.has_corpusstate(dataset):
+            dataset.corpus = dataset.corpus.drop_vars(dataset.sections.groups["State"])
+            if "component" in dataset.dims:
+                dataset.corpus = dataset.corpus.drop_dims("component")
+            if "feature" in dataset.dims:
+                dataset.corpus = dataset.corpus.drop_dims("feature")
 
+        sample_names = dataset.list_samples()
+        n_components = factor_model.n_components
+        genome_size = dataset.sections["Regions"].context_frequencies.sum().data.item()
 
-def _fetch_topic_compositions(dataset, sample_name):
-    gamma = (
-        fetch_val(dataset, "topic_compositions")
-        .sel(sample=sample_name)
-        .transpose("component", ...)
-        .data
-    )
+        dataset.corpus = dataset.corpus.drop_dims(
+            "component", errors="ignore"
+        ).assign_coords(sample=sample_names)
 
-    if len(gamma.shape) > 1:
-        gamma = gamma[:, 0]
+        for source, data in cls.sources(dataset):
+            state_elements = {
+                "normalizers": xr.DataArray(
+                    np.zeros(n_components, dtype=float),
+                    dims=("component",),
+                    attrs={"genome_size": genome_size},
+                ),
+            }
 
-    return gamma
+            state_elements.update(locals_model.prepare_corpusstate(data))
 
+            for model in factor_model.models.values():
+                state_elements.update(model.prepare_corpusstate(data))
 
-def fetch_topic_compositions(dataset, sample_name):
-    return np.array([
-        _fetch_topic_compositions(ds, sample_name)
-        for name, ds in sources(dataset)
-    ])
+            state_elements = {
+                f"State/{source}/{k}": v for k, v in state_elements.items()
+            }
 
+            dataset.corpus = dataset.corpus.assign(**state_elements)
 
-def update_topic_compositions(dataset, sample_name, gamma):
-    for (_, ds), gamma_d in zip(sources(dataset), gamma):
-        _fetch_topic_compositions(ds, sample_name)[:] = gamma_d
+        return dataset
 
+    @classmethod
+    def update_state(
+        cls,
+        dataset,
+        model_state,
+        from_scratch=False,
+        par_context=None,
+    ):
+        for _ in parallel_gen(
+            (
+                partial(model.update_corpusstate, ds, from_scratch=from_scratch)
+                for model in model_state.models.values()
+                for _, ds in cls.sources(dataset)
+            ),
+            par_context,
+            ordered=False,
+        ):
+            pass
 
-def using_exposures_from(*corpuses):
+        return dataset
 
-    corpus_dict = {get_name(dataset): dataset for dataset in corpuses}
+    @classmethod
+    def _fetch_topic_compositions(cls, dataset, sample_name):
+        gamma = (
+            cls.fetch_val(dataset, "topic_compositions")
+            .sel(sample=sample_name)
+            .transpose("component", ...)
+            .data
+        )
 
-    return lambda dataset, sample_name: fetch_topic_compositions(
-        corpus_dict[get_name(dataset)], sample_name
-    )
+        if len(gamma.shape) > 1:
+            gamma = gamma[:, 0]
 
-##
-# These are the same as the normal gtensor functions.
-##
-def get_dims(dataset):
-    return dataset.sizes
+        return gamma
 
+    @classmethod
+    def fetch_topic_compositions(cls, dataset, sample_name):
+        return np.array(
+            [
+                cls._fetch_topic_compositions(ds, sample_name)
+                for name, ds in cls.sources(dataset)
+            ]
+        )
 
-def get_regions(dataset):
-    return dataset.sections["Regions"]
+    @classmethod
+    def update_topic_compositions(cls, dataset, sample_name, gamma):
+        for (_, ds), gamma_d in zip(cls.sources(dataset), gamma):
+            cls._fetch_topic_compositions(ds, sample_name)[:] = gamma_d
 
+    @classmethod
+    def using_exposures_from(cls, *corpuses):
+        corpus_dict = {cls.get_name(dataset): dataset for dataset in corpuses}
 
-def get_features(dataset):
-    return dataset.sections["Features"]
-
-
-def get_exposures(dataset):
-    return dataset["Regions/exposures"]
-
-
-def get_freqs(dataset):
-    return dataset["Regions/context_frequencies"]
-
-
-def list_samples(dataset):
-    return list(dataset.list_samples())
-
-
-def iter_samples(dataset):
-    return zip(list_samples(dataset), dataset.iter_samples())
-
-
-def has_corpusstate(dataset):
-    return "State" in dataset.sections
-
-
-def is_marginal_corpus(dataset):
-    return len(list_samples(dataset)) <= 1
-
-def fetch_val(dataset, key):
-    return dataset["State/" + key]
-
-
-def fetch_normalizers(dataset):
-    return fetch_val(dataset, "normalizers").data
-
-
-def update_normalizers(dataset, normalizers):
-    fetch_normalizers(dataset)[:] = normalizers
-    return dataset
-
-
-def genome_size(dataset):
-    return fetch_val(dataset, "normalizers").attrs["genome_size"]
-
-
-def get_name(dataset):
-    return dataset.attrs["name"]
+        return lambda dataset, sample_name: cls.fetch_topic_compositions(
+            corpus_dict[cls.get_name(dataset)], sample_name
+        )

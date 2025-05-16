@@ -10,6 +10,7 @@ logsafe_exp_transform = lambda x: np.nan_to_num(
 
 exp_transform = lambda x: np.nan_to_num(np.exp(x), nan=0.0, neginf=0.0)
 
+
 class DenseMixtureModel(MixtureModel, LDAUpdateDense):
 
     def _source_log_likelihood(
@@ -28,7 +29,7 @@ class DenseMixtureModel(MixtureModel, LDAUpdateDense):
             .transpose("component", *self.GT.observation_dims(dataset))
             .data
         )
-    
+
     def _conditional_observation_likelihood(
         self,
         dataset,
@@ -37,16 +38,18 @@ class DenseMixtureModel(MixtureModel, LDAUpdateDense):
         par_context=None,
         with_context=True,
     ):
-        
-        X = np.array([
-            self._source_log_likelihood(
-                ds,
-                factor_model,
-                par_context=par_context,
-                with_context=with_context,
-            )
-            for _, ds in self.GT.sources(dataset)
-        ])
+
+        X = np.array(
+            [
+                self._source_log_likelihood(
+                    ds,
+                    factor_model,
+                    par_context=par_context,
+                    with_context=with_context,
+                )
+                for _, ds in self.GT.sources(dataset)
+            ]
+        )
 
         X = (logsafe_exp_transform if logsafe else exp_transform)(X)
         n_sources = len(self.GT.list_sources(dataset))
@@ -56,7 +59,6 @@ class DenseMixtureModel(MixtureModel, LDAUpdateDense):
             X.reshape(n_sources * self.n_components, *trailing_shap),
             dtype=self.dtype,
         )
-        
 
     def _calc_sstats(
         self,
@@ -79,10 +81,12 @@ class DenseMixtureModel(MixtureModel, LDAUpdateDense):
             weights,
         )
 
-        weighted_posterior = calc_local_variables(*args, Nk) # (D*K, I)
+        weighted_posterior = calc_local_variables(*args, Nk)  # (D*K, I)
 
         n_sources = len(tau)
-        weighted_posterior = weighted_posterior.reshape(n_sources, self.n_components, -1) 
+        weighted_posterior = weighted_posterior.reshape(
+            n_sources, self.n_components, -1
+        )
         Nk = Nk.reshape(n_sources, self.n_components)
 
         suffstats = {
@@ -114,7 +118,7 @@ class DenseMixtureModel(MixtureModel, LDAUpdateDense):
     ):
         # 1. get the information we need from the sample
         weights = self._get_weights(sample) / locus_subsample
-        
+
         args = (
             alpha,  # D*K
             tau,  # D
@@ -155,7 +159,7 @@ class DenseMixtureModel(MixtureModel, LDAUpdateDense):
     ):
 
         conditional_likelihood = self._conditional_observation_likelihood(
-            dataset, 
+            dataset,
             factor_model,
             logsafe=True,
             with_context=False,
@@ -174,7 +178,9 @@ class DenseMixtureModel(MixtureModel, LDAUpdateDense):
         updates = (
             partial(
                 self._update_fn,
-                (exposures_fn or self.GT.fetch_topic_compositions)(dataset, sample_name),
+                (exposures_fn or self.GT.fetch_topic_compositions)(
+                    dataset, sample_name
+                ),
                 sample=sample,
                 dataset=dataset,
                 conditional_likelihood=conditional_likelihood,
@@ -187,26 +193,16 @@ class DenseMixtureModel(MixtureModel, LDAUpdateDense):
 
         return updates
 
-
     def reduce_model_sstats(
-        self,
-        model, carry, dataset, 
-        *,
-        weighted_posterior, 
-        Nk, 
-        **sample_sstats
+        self, model, carry, dataset, *, weighted_posterior, Nk, **sample_sstats
     ):
-        
+
         for (name, ds), Nk_d, w_d in zip(
             self.GT.expand_datasets(dataset),
             Nk,
             weighted_posterior,
         ):
-            
+
             model.reduce_dense_sstats(
-                carry[name],
-                ds,
-                weighted_posterior=w_d,
-                Nk=Nk_d,
-                **sample_sstats
+                carry[name], ds, weighted_posterior=w_d, Nk=Nk_d, **sample_sstats
             )

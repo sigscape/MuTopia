@@ -11,161 +11,164 @@ import numpy as np
 from functools import partial
 
 
-def expand_datasets(*datasets):
-    for dataset in datasets:
-        yield get_name(dataset), dataset
+class GtensorInterface:
 
+    @classmethod
+    def expand_datasets(cls, *datasets):
+        for dataset in datasets:
+            yield cls.get_name(dataset), dataset
 
-def to_datasets(*datasets):
-    return [ds for _, ds in expand_datasets(*datasets)]
+    @classmethod
+    def to_datasets(cls, *datasets):
+        return [ds for _, ds in cls.expand_datasets(*datasets)]
 
+    @classmethod
+    def observation_dims(cls, dataset):
+        return tuple(d for d in dataset.X.dims if not d == "sample")
 
-def observation_dims(dataset):
-    return tuple(d for d in dataset.X.dims if not d == "sample")
-
-
-def init_state(
-    dataset,
-    factor_model,
-    locals_model,
-):
-    dataset = CorpusInterface(dataset)
-
-    if has_corpusstate(dataset):
-        dataset.corpus = dataset.corpus.drop_vars(dataset.sections.groups["State"])
-        if "component" in dataset.dims:
-            dataset.corpus = dataset.corpus.drop_dims("component")
-        if "feature" in dataset.dims:
-            dataset.corpus = dataset.corpus.drop_dims("feature")
-
-    sample_names = dataset.list_samples()
-    n_components = factor_model.n_components
-    genome_size = dataset.sections["Regions"].context_frequencies.sum().data.item()
-
-    state_elements = {
-        "normalizers": xr.DataArray(
-            np.zeros(n_components, dtype=float),
-            dims=("component",),
-            attrs={"genome_size": genome_size},
-        ),
-    }
-
-    state_elements.update(locals_model.prepare_corpusstate(dataset))
-
-    for model in factor_model.models.values():
-        state_elements.update(model.prepare_corpusstate(dataset))
-
-    state_elements = {"State/" + k: v for k, v in state_elements.items()}
-
-    dataset.corpus = (
-        dataset.corpus.drop_dims("component", errors="ignore")
-        .assign_coords(sample=sample_names)
-        .assign(**state_elements)
-    )
-
-    return dataset
-
-
-def update_state(
-    dataset,
-    model_state,
-    from_scratch=False,
-    par_context=None,
-):
-    for _ in parallel_gen(
-        (
-            partial(model.update_corpusstate, dataset, from_scratch=from_scratch)
-            for model in model_state.models.values()
-        ),
-        par_context,
-        ordered=False,
+    @classmethod
+    def init_state(
+        cls,
+        dataset,
+        factor_model,
+        locals_model,
     ):
-        pass
+        dataset = CorpusInterface(dataset)
 
-    return dataset
+        if cls.has_corpusstate(dataset):
+            dataset.corpus = dataset.corpus.drop_vars(dataset.sections.groups["State"])
+            if "component" in dataset.dims:
+                dataset.corpus = dataset.corpus.drop_dims("component")
+            if "feature" in dataset.dims:
+                dataset.corpus = dataset.corpus.drop_dims("feature")
 
+        sample_names = dataset.list_samples()
+        n_components = factor_model.n_components
+        genome_size = dataset.sections["Regions"].context_frequencies.sum().data.item()
 
-def get_dims(dataset):
-    return dataset.sizes
+        state_elements = {
+            "normalizers": xr.DataArray(
+                np.zeros(n_components, dtype=float),
+                dims=("component",),
+                attrs={"genome_size": genome_size},
+            ),
+        }
 
+        state_elements.update(locals_model.prepare_corpusstate(dataset))
 
-def get_regions(dataset):
-    return dataset.sections["Regions"]
+        for model in factor_model.models.values():
+            state_elements.update(model.prepare_corpusstate(dataset))
 
+        state_elements = {"State/" + k: v for k, v in state_elements.items()}
 
-def get_exposures(dataset):
-    return dataset["Regions/exposures"]
+        dataset.corpus = (
+            dataset.corpus.drop_dims("component", errors="ignore")
+            .assign_coords(sample=sample_names)
+            .assign(**state_elements)
+        )
 
+        return dataset
 
-def get_freqs(dataset):
-    return dataset["Regions/context_frequencies"]
+    @classmethod
+    def update_state(
+        cls,
+        dataset,
+        model_state,
+        from_scratch=False,
+        par_context=None,
+    ):
+        for _ in parallel_gen(
+            (
+                partial(model.update_corpusstate, dataset, from_scratch=from_scratch)
+                for model in model_state.models.values()
+            ),
+            par_context,
+            ordered=False,
+        ):
+            pass
 
+        return dataset
 
-def get_features(dataset):
-    return dataset.sections["Features"]
+    @classmethod
+    def get_dims(cls, dataset):
+        return dataset.sizes
 
+    @classmethod
+    def get_regions(cls, dataset):
+        return dataset.sections["Regions"]
 
-def list_samples(dataset):
-    return list(dataset.list_samples())
+    @classmethod
+    def get_exposures(cls, dataset):
+        return dataset["Regions/exposures"]
 
+    @classmethod
+    def get_freqs(cls, dataset):
+        return dataset["Regions/context_frequencies"]
 
-def iter_samples(dataset):
-    return zip(list_samples(dataset), dataset.iter_samples())
+    @classmethod
+    def get_features(cls, dataset):
+        return dataset.sections["Features"]
 
+    @classmethod
+    def list_samples(cls, dataset):
+        return list(dataset.list_samples())
 
-def has_corpusstate(dataset):
-    return "State" in dataset.sections
+    @classmethod
+    def iter_samples(cls, dataset):
+        return zip(cls.list_samples(dataset), dataset.iter_samples())
 
+    @classmethod
+    def has_corpusstate(cls, dataset):
+        return "State" in dataset.sections
 
-def is_marginal_corpus(dataset):
-    return len(list_samples(dataset)) <= 1
+    @classmethod
+    def is_marginal_corpus(cls, dataset):
+        return len(cls.list_samples(dataset)) <= 1
 
+    @classmethod
+    def fetch_val(cls, dataset, key):
+        return dataset["State/" + key]
 
-def fetch_val(dataset, key):
-    return dataset["State/" + key]
+    @classmethod
+    def fetch_normalizers(cls, dataset):
+        return cls.fetch_val(dataset, "normalizers").data
 
+    @classmethod
+    def update_normalizers(cls, dataset, normalizers):
+        cls.fetch_normalizers(dataset)[:] = normalizers
+        return dataset
 
-def fetch_normalizers(dataset):
-    return fetch_val(dataset, "normalizers").data
+    @classmethod
+    def genome_size(cls, dataset):
+        return cls.fetch_val(dataset, "normalizers").attrs["genome_size"]
 
+    @classmethod
+    def get_name(cls, dataset):
+        return dataset.attrs["name"]
 
-def update_normalizers(dataset, normalizers):
-    fetch_normalizers(dataset)[:] = normalizers
-    return dataset
+    @classmethod
+    def fetch_topic_compositions(cls, dataset, sample_name):
+        gamma = (
+            cls.fetch_val(dataset, "topic_compositions")
+            .sel(sample=sample_name)
+            .transpose("component", ...)
+            .data
+        )
 
+        if len(gamma.shape) > 1:
+            gamma = gamma[:, 0]
 
-def genome_size(dataset):
-    return fetch_val(dataset, "normalizers").attrs["genome_size"]
+        return gamma
 
+    @classmethod
+    def update_topic_compositions(cls, dataset, sample_name, gamma):
+        cls.fetch_topic_compositions(dataset, sample_name)[:] = gamma
+        return dataset
 
-def get_name(dataset):
-    return dataset.attrs["name"]
+    @classmethod
+    def using_exposures_from(cls, *corpuses):
+        corpus_dict = {cls.get_name(dataset): dataset for dataset in corpuses}
 
-
-def fetch_topic_compositions(dataset, sample_name):
-
-    gamma = (
-        fetch_val(dataset, "topic_compositions")
-        .sel(sample=sample_name)
-        .transpose("component", ...)
-        .data
-    )
-
-    if len(gamma.shape) > 1:
-        gamma = gamma[:, 0]
-
-    return gamma
-
-
-def update_topic_compositions(dataset, sample_name, gamma):
-    fetch_topic_compositions(dataset, sample_name)[:] = gamma
-    return dataset
-
-
-def using_exposures_from(*corpuses):
-
-    corpus_dict = {get_name(dataset): dataset for dataset in corpuses}
-
-    return lambda dataset, sample_name: fetch_topic_compositions(
-        corpus_dict[get_name(dataset)], sample_name
-    )
+        return lambda dataset, sample_name: cls.fetch_topic_compositions(
+            corpus_dict[cls.get_name(dataset)], sample_name
+        )

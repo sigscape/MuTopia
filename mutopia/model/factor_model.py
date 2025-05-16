@@ -2,16 +2,16 @@ from .model_components import *
 from .model_components.base import _svi_update_fn
 from .latent_var_models import *
 from ..utils import parallel_map, parallel_gen
-from . import gtensor_interface as CS
 import numpy as np
 import warnings
-from functools import partial, wraps
-from joblib import delayed
+from functools import partial
 from itertools import chain
 from scipy.special import logsumexp
 from functools import reduce
 from collections import defaultdict
 import xarray as xr
+from .gtensor_interface import GtensorInterface
+
 
 def overrided_by(default_fn):
     def inner(fn):
@@ -22,6 +22,7 @@ def overrided_by(default_fn):
                 return getattr(self, default_fn)(*args, **kwargs)
 
         return wrapped_fn
+
     return inner
 
 
@@ -29,7 +30,7 @@ class FactorModel:
 
     def __init__(
         self,
-        GT, # Gtensor interface
+        GT: GtensorInterface,
         datasets,
         offsets_fn=None,
         predict_fn=None,
@@ -47,7 +48,7 @@ class FactorModel:
 
         self._normalizers = {
             name: np.zeros(self.n_components)
-            for name, dataset in self.GT.expand_datasets(*datasets)
+            for name, _ in self.GT.expand_datasets(*datasets)
         }
 
         self._genome_size = {
@@ -62,15 +63,8 @@ class FactorModel:
         offsets,
         par_context=None,
         learning_rate=1.0,
-        update_prior=True,
         use_parallel=True,
     ):
-
-        if update_prior:
-            self.locals_model.partial_fit(
-                sstats["locals_sstats"], learning_rate=learning_rate
-            )
-
         datasets = self.GT.to_datasets(*datasets)
 
         update_fns = chain.from_iterable(
@@ -95,7 +89,7 @@ class FactorModel:
 
         for _ in it:
             pass
-        
+
     @property
     def n_components(self):
         return next(iter(self._models.values())).n_components
@@ -231,7 +225,9 @@ class FactorModel:
         ):
             for model_name, _offsets in exp_offsets.items():
 
-                all_offsets[model_name + "_offsets"][self.GT.get_name(dataset)][k] = _offsets
+                all_offsets[model_name + "_offsets"][self.GT.get_name(dataset)][
+                    k
+                ] = _offsets
 
                 normalizers[self.GT.get_name(dataset)][k] = norm
 
@@ -253,9 +249,7 @@ class FactorModel:
                 lambda x, y: x + y,
                 model_predictions.values(),  # sum over models
                 np.log(self.GT.get_exposures(dataset))
-                + np.log(
-                    self.GT.get_freqs(dataset)
-                ),  # start with the background rates
+                + np.log(self.GT.get_freqs(dataset)),  # start with the background rates
             )
 
             """
@@ -280,23 +274,16 @@ class FactorModel:
 
             return (-logsumexp(log_mutation_rate.data), exp_offsets)
 
-
     def set_model_normalizers(
-        self, 
-        datasets, 
-        normalizers, 
-        learning_rate=1.0, 
-        subsample_rate=1.0
+        self, datasets, normalizers, learning_rate=1.0, subsample_rate=1.0
     ):
-        
+
         for name, dataset in self.GT.expand_datasets(*datasets):
-            
+
             curr = self._normalizers[name]
 
             self._normalizers[name][:] = _svi_update_fn(
-                curr, 
-                np.log(subsample_rate or 1.0) + normalizers[name], 
-                learning_rate
+                curr, np.log(subsample_rate or 1.0) + normalizers[name], learning_rate
             )
 
             self.GT.update_normalizers(
@@ -306,7 +293,9 @@ class FactorModel:
 
     def update_normalizers(self, datasets, par_context=None):
         for name, dataset in self.GT.expand_datasets(*datasets):
-            self.GT.update_normalizers(dataset, self._calc_normalizers(dataset, par_context))
+            self.GT.update_normalizers(
+                dataset, self._calc_normalizers(dataset, par_context)
+            )
 
     def _calc_normalizers(
         self,

@@ -1,17 +1,17 @@
 from abc import abstractmethod
-from joblib import delayed
 from xarray import DataArray
 from tqdm import tqdm
-from ...utils import logger, ParContext, parallel_map, parallel_gen
 from numba import njit, vectorize, objmode
 import numpy as np
 from numba.extending import get_cython_function_address
 import ctypes
 from functools import wraps
-from ...gtensor.interfaces import *
+
+from ...utils import logger, ParContext, parallel_map, parallel_gen
 from ._dirichlet_update import update_alpha
-from .. import gtensor_interface as GT
 from ..model_components.base import _svi_update_fn, PrimitiveModel
+from ..gtensor_interface import GtensorInterface
+from ...gtensor import CorpusInterface, SampleCorpusFusion
 
 
 """
@@ -25,6 +25,8 @@ If the tensors passed are C-contiguous, the reshaping operation is
 free, since only the stride is changed. If reshaping the array 
 requires copying the data, an error is raised.
 """
+
+
 def reshape_same_mem(arr, shape):
     out = arr.reshape(shape, order="C")
     if not np.shares_memory(arr, out):
@@ -93,9 +95,11 @@ gammaln = functype(
 def gammalnvec(x):
     return gammaln(x)
 
+
 @njit("float32[:](float32[:])", nogil=True)
 def psivec32(x):
     return psivec(x).astype(np.float32)
+
 
 @njit("float32[::1](float32[::1])", nogil=True)
 def exp_log_dirichlet_expectation(alpha):
@@ -103,8 +107,7 @@ def exp_log_dirichlet_expectation(alpha):
 
 
 @njit(
-    "float32[::1](float32[::1], float32[:,::1], float32[::1], float32[::1])", 
-    nogil=True
+    "float32[::1](float32[::1], float32[:,::1], float32[::1], float32[::1])", nogil=True
 )
 def _update_step(
     alpha,
@@ -113,7 +116,7 @@ def _update_step(
     Nk,
 ):
 
-    exp_Elog_prior = np.exp( psivec32(alpha + Nk) )
+    exp_Elog_prior = np.exp(psivec32(alpha + Nk))
 
     X_div_X_tild = np.where(
         weights > 0.0,
@@ -167,7 +170,7 @@ def calc_local_variables(
     weights,
     Nk,
 ):
-    exp_Elog_prior = np.exp( psivec32(alpha + Nk) )
+    exp_Elog_prior = np.exp(psivec32(alpha + Nk))
 
     X_div_X_tild = np.where(
         weights > 0.0,
@@ -419,11 +422,11 @@ def random_locals(random_state, n_components):
     return init_locals
 
 
-class LocalsModel(PrimitiveModel):
+class LocalsModel:
 
     def __init__(
         self,
-        GT, # gtensor_interface
+        GT: GtensorInterface,  # gtensor_interface
         datasets,
         prior_alpha=1.0,
         estep_iterations=1000,
@@ -456,7 +459,7 @@ class LocalsModel(PrimitiveModel):
             for name, dataset in self.GT.expand_datasets(*datasets)
         }
 
-        self.partial_fit(sstats, learning_rate=1.0)
+        self.Mstep(sstats, learning_rate=1.0)
 
     def Estep(
         self,
@@ -473,7 +476,6 @@ class LocalsModel(PrimitiveModel):
         sstats[parameter_name][corpus_name] <- suffstats
         """
         sstats = factor_model.get_sstats_dict(datasets)
-        elbo = 0.0
 
         """
         Construct the update function for each sample from the dataset
@@ -490,7 +492,7 @@ class LocalsModel(PrimitiveModel):
         )
 
         for dataset in datasets:
-            
+
             update_fns = parallel_gen(
                 self._get_update_fns(dataset, factor_model, **kw),
                 par_context=par_context,
@@ -502,7 +504,9 @@ class LocalsModel(PrimitiveModel):
                 update_fns,
             ):
                 # Update the topic compositions for the sample
-                self.GT.update_topic_compositions(dataset, sample_name, sample_suffstats["Nk"])
+                self.GT.update_topic_compositions(
+                    dataset, sample_name, sample_suffstats["Nk"]
+                )
 
                 for model_name, model in factor_model.models.items():
                     """
@@ -583,9 +587,7 @@ class LocalsModel(PrimitiveModel):
         )
 
         dev_fns = (
-            fn
-            for dataset in datasets
-            for fn in self._get_deviance_fns(dataset, **kw)
+            fn for dataset in datasets for fn in self._get_deviance_fns(dataset, **kw)
         )
 
         d_fit, d_null = list(zip(*parallel_gen(dev_fns, par_context, ordered=False)))
@@ -634,22 +636,23 @@ class LocalsModel(PrimitiveModel):
             size=(self.n_components, n_samples),
         ).astype(self.dtype)
 
-    
     def prepare_corpusstate(self, dataset):
-        
-        n_observations = np.array([
-            sample.X.sum().data.item()
-            for _, sample in tqdm(
-                self.GT.iter_samples(dataset),
-                total=len(dataset.list_samples()),
-                desc="Collecting sample information",
-            )
-        ])
+
+        n_observations = np.array(
+            [
+                sample.X.sum().data.item()
+                for _, sample in tqdm(
+                    self.GT.iter_samples(dataset),
+                    total=len(dataset.list_samples()),
+                    desc="Collecting sample information",
+                )
+            ]
+        )
 
         if hasattr(dataset, "ploidy"):
             weighted_ploidy = (
-                (n_observations/n_observations.sum()) @ 
-                dataset["ploidy"].transpose("sample", "locus").data
+                (n_observations / n_observations.sum())
+                @ dataset["ploidy"].transpose("sample", "locus").data
             ) + 1
         else:
             weighted_ploidy = np.ones(dataset.sizes["locus"], dtype=self.dtype)
@@ -668,9 +671,6 @@ class LocalsModel(PrimitiveModel):
                 dims=("locus",),
             ),
         )
-
-    def spawn_sstats(self, dataset):
-        return []
 
     @staticmethod
     def reduce_sparse_sstats(
@@ -694,12 +694,23 @@ class LocalsModel(PrimitiveModel):
         sstats.append(Nk)
         return sstats
 
-    def partial_fit(self, sstats, learning_rate):
-        for corpus_name, Nks in sstats.items():
-            alpha0 = self.alpha[corpus_name]
-            self.alpha[corpus_name] = _svi_update_fn(
+    def Mstep(self, datasets, learning_rate=1.0):
+
+        for name, dataset in self.GT.expand_datasets(*datasets):
+
+            Nks = (
+                self.GT.fetch_val(dataset, "topic_compositions")
+                .transpose("sample", ...)
+                .data
+            )
+
+            alpha0 = self.alpha[name]
+
+            self.alpha[name] = _svi_update_fn(
                 alpha0, update_alpha(alpha0, np.array(Nks)), learning_rate
             )
+
+        return self
 
     def to_contig(self, x):
         return np.ascontiguousarray(x, dtype=self.dtype)

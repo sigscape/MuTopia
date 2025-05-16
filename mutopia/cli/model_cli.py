@@ -1,7 +1,7 @@
 import mutopia as mu
 from mutopia.gtensor import *
 from mutopia.modalities import get_mode
-from mutopia.model import corpus_state as CS
+from mutopia.model import GtensorInterface as CS
 import mutopia.gtensor.disk_interface as disk
 from ..utils import logger
 

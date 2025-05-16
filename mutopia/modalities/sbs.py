@@ -37,6 +37,7 @@ MUTOPIA_TO_COSMIC_IDX = np.array(
 
 contig_f32 = partial(np.ascontiguousarray, dtype=np.float32)
 
+
 def _get_args(k, corpus):
 
     return (
@@ -93,7 +94,9 @@ def _fast_exp_offsets(
         context_offsets[s_d0, :] += o[0] * locus_effects[l]
         context_offsets[s_d1, :] += o[1] * locus_effects[l]
 
-        locus_offsets[l] += (context_effects[s_d0, :] * o[0]).sum() + (context_effects[s_d1, :] * o[1]).sum()
+        locus_offsets[l] += (context_effects[s_d0, :] * o[0]).sum() + (
+            context_effects[s_d1, :] * o[1]
+        ).sum()
 
         normalizer += locus_offsets[l] * locus_effects[l]
 
@@ -103,9 +106,12 @@ def _fast_exp_offsets(
         locus_offsets,
     )
 
+
 def _get_exp_offsets_k_c(k, corpus):
 
-    (normalizer, context_offsets, locus_offsets) = _fast_exp_offsets(*_get_args(k, corpus))
+    (normalizer, context_offsets, locus_offsets) = _fast_exp_offsets(
+        *_get_args(k, corpus)
+    )
 
     return (
         normalizer,
@@ -114,8 +120,8 @@ def _get_exp_offsets_k_c(k, corpus):
 
 
 @njit(
-    "float32[:,:](float32[:,::1], float32[::1], float32[::1], float32[:,:], int64[:,::1], float32, bool)",        
-    nogil=True
+    "float32[:,:](float32[:,::1], float32[::1], float32[::1], float32[:,:], int64[:,::1], float32, bool)",
+    nogil=True,
 )
 def _fast_component_predict(
     context_freqs,  # (L x C*D)
@@ -123,7 +129,7 @@ def _fast_component_predict(
     locus_effects,  # L
     context_effects,  # S x C
     idx_selector,  # L,D
-    normalizer, # float32
+    normalizer,  # float32
     with_context,
 ):
     D = 2
@@ -135,33 +141,31 @@ def _fast_component_predict(
     assert locus_effects.shape == (L,)
     assert idx_selector.shape == (L, D)
     assert context_effects.shape == (S, C)
-    
+
     out = np.zeros_like(context_freqs)
     ones = np.ones((D, C), dtype=context_freqs.dtype)
 
     for l, s in enumerate(idx_selector):
-        
+
         # (DxC)
         exp_offsets = (
-            exposures[l] * context_freqs[l, :].reshape(C, D).T
-            if with_context else 
-            ones
+            exposures[l] * context_freqs[l, :].reshape(C, D).T if with_context else ones
         )
-        
+
         # (DxC) * (DxC) * (1,) ==> (DxC).T ==> ravel(CxD) ==> C*D
-        out[l,:] = (context_effects[s, :] * exp_offsets * locus_effects[l]).T.ravel()
+        out[l, :] = (context_effects[s, :] * exp_offsets * locus_effects[l]).T.ravel()
 
     return np.log(out) + normalizer
 
 
 def _predict(k, corpus, with_context=True):
-    
+
     out = _fast_component_predict(
-        *_get_args(k, corpus), 
+        *_get_args(k, corpus),
         np.float32(CS.fetch_normalizers(corpus)[k]),
-        with_context=with_context
+        with_context=with_context,
     )
-    
+
     return xr.DataArray(
         out.reshape(-1, 96, 2).T,
         dims=("configuration", "context", "locus"),
@@ -174,7 +178,7 @@ class SBSModel(TopographyModel):
         self,
         train_corpuses,
         random_state,
-        GT, # gtensor interface
+        GT,  # gtensor interface
         *,
         num_components,
         init_components,

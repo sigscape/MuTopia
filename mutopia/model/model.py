@@ -18,9 +18,10 @@ from .optim import fit_model
 from .factor_model import FactorModel
 from .latent_var_models.base import LocalsModel
 from ..mixture_model import SparseMixtureModel, DenseMixtureModel
+
 # interfaces
-from . import gtensor_interface as CS
-from ..mixture_model import mixture_interface as MIX
+from .gtensor_interface import GtensorInterface as CS
+from ..mixture_model.mixture_interface import MixtureInterface as MIX
 
 """
 The Model class is a wrapper around a trained model state object, 
@@ -77,6 +78,105 @@ class TopographyModel(ABC, BaseEstimator):
         time_limit=None,
         test_chroms=("chr1",),
     ):
+        """Initialize the signature model.
+
+        This constructor sets up a signature model with specified parameters for components, regularization,
+        conditioning, and optimization settings.
+
+        Parameters
+        ----------
+        num_components : int, default=15
+            Number of components in the signature model.
+        init_components : list, default=[]
+            List of initial components to use.
+        fix_components : list, default=[]
+            List of components to keep fixed during optimization.
+        seed : int, default=0
+            Random seed for reproducibility.
+        context_reg : float, default=0.0001
+            Regularization parameter for context model.
+        context_conditioning : float, default=1e-9
+            Conditioning parameter for context model.
+        conditioning_alpha : float, default=1e-9
+            Alpha parameter for conditioning.
+        pi_prior : float, default=1.0
+            Prior parameter for pi in the locals model.
+        tau_prior : float, default=1.0
+            Prior parameter for tau in the locals model.
+        locus_model_type : str, default="gbt"
+            Type of model for locus. Gradient Boosted Trees by default.
+        tree_learning_rate : float, default=0.15
+            Learning rate for tree-based models.
+        max_depth : int, default=5
+            Maximum depth of trees in the locus model.
+        max_trees_per_iter : int, default=25
+            Maximum number of trees per iteration.
+        max_leaf_nodes : int, default=31
+            Maximum number of leaf nodes in each tree.
+        min_samples_leaf : int, default=30
+            Minimum number of samples required at a leaf node.
+        max_features : float, default=1.0
+            Fraction of features to consider when looking for best split.
+        n_iter_no_change : int, default=1
+            Number of iterations with no improvement to wait before early stopping.
+        use_groups : bool, default=True
+            Whether to use groups in the model.
+        add_corpus_intercepts : bool, default=False
+            Whether to add corpus-specific intercepts.
+        convolution_width : int, default=0
+            Width of convolution window.
+        l2_regularization : float, default=1
+            L2 regularization strength.
+        max_iter : int, default=25
+            Maximum number of iterations for the optimization.
+        init_variance_theta : float, default=0.03
+            Initial variance for theta parameters.
+        init_variance_context : float, default=0.1
+            Initial variance for context parameters.
+        empirical_bayes : bool, default=True
+            Whether to use empirical Bayes for parameter estimation.
+        begin_prior_updates : int, default=50
+            Iteration to begin prior updates.
+        stop_condition : int, default=50
+            Stopping condition for optimization.
+        num_epochs : int, default=2000
+            Number of epochs for training.
+        locus_subsample : float or None, default=None
+            Fraction of loci to subsample in each iteration.
+        batch_subsample : float or None, default=None
+            Fraction of batches to subsample in each iteration.
+        threads : int, default=1
+            Number of threads for parallel execution.
+        kappa : float, default=0.5
+            Kappa parameter for optimization.
+        tau : float, default=1.0
+            Tau parameter for optimization.
+        callback : callable or None, default=None
+            Callback function to be called during optimization.
+        eval_every : int, default=10
+            Evaluate model every N iterations.
+        verbose : int, default=0
+            Verbosity level (0: quiet, >0: increasingly verbose).
+        time_limit : float or None, default=None
+            Time limit for optimization in seconds.
+        test_chroms : tuple, default=("chr1",)
+            Chromosomes to use for testing.
+
+        Examples
+        --------
+        >>> import mutopia as mu
+        >>> data = mu.gt.load_dataset("example_data.nc")
+        >>> # Create and fit a model with subsampling and 15 components
+        >>> model = TopographyModel(locus_subsample=0.125, num_components=15)
+        >>> model.fit(train_data)
+        >>>
+        >>> # Annotate contributions of each component to the data
+        >>> annotated_data = model.annot_contributions(train_data)
+        >>>
+        >>> # Visualize the first signature
+        >>> model.plot_signature(0)
+        """
+
         self.num_components = num_components
         self.init_components = init_components
         self.fix_components = fix_components
@@ -122,7 +222,7 @@ class TopographyModel(ABC, BaseEstimator):
 
     def sample_params(self, study, trial, extensive=0):
         return sample_params(study, trial, extensive=extensive)
-    
+
     @abstractmethod
     def _init_factor_model(
         self,
@@ -132,21 +232,6 @@ class TopographyModel(ABC, BaseEstimator):
         **kw,
     ) -> FactorModel:
         raise NotImplementedError()
-
-    def _choose_locals_model(
-        self,
-        is_mixture=True,
-        is_sparse=True,
-    ):
-        if is_mixture and is_sparse:
-            return SparseMixtureModel
-        elif is_mixture and not is_sparse:
-            raise NotImplementedError()
-        elif not is_mixture and is_sparse:
-            return LDAUpdateSparse
-        else:
-            return LDAUpdateDense
-
 
     def _init_locals_model(
         self,
@@ -160,22 +245,29 @@ class TopographyModel(ABC, BaseEstimator):
             corpus.X.is_sparse() == is_sparse
             for corpus in train_datasets + test_datasets
         ):
-            raise ValueError("All corpuses must be either sparse or dense - mixing is not allowed!")
-        
+            raise ValueError(
+                "All corpuses must be either sparse or dense - mixing is not allowed!"
+            )
+
         is_mixture = MIX.is_mixture_corpus(train_datasets[0])
         if not all(
             MIX.is_mixture_corpus(corpus) == is_mixture
             for corpus in train_datasets + test_datasets
         ):
-            raise ValueError("All corpuses must be either multi-source or single-source - mixing is not allowed!")
-        
+            raise ValueError(
+                "All corpuses must be either multi-source or single-source - mixing is not allowed!"
+            )
+
         if is_mixture:
             logger.warning("** Inferring mixture of epigenomes model **")
 
-        locals_model = self._choose_locals_model(
-            is_mixture=is_mixture, 
-            is_sparse=is_sparse
-        )(
+        if is_mixture:
+            locals_model = SparseMixtureModel if is_sparse else DenseMixtureModel
+        else:
+            locals_model = LDAUpdateSparse if is_sparse else LDAUpdateDense
+
+        # instantiate the locals model
+        locals_model = locals_model(
             (MIX if is_mixture else CS),
             train_datasets,
             n_components=self.num_components,
@@ -183,7 +275,7 @@ class TopographyModel(ABC, BaseEstimator):
             prior_alpha=self.pi_prior,
             prior_tau=self.tau_prior,
         )
-    
+
         return locals_model
 
     def _train_test_split(self, datasets):
@@ -201,6 +293,39 @@ class TopographyModel(ABC, BaseEstimator):
         *train_datasets,
         test_datasets=None,
     ):
+        """
+        Fit the model to the provided training datasets.
+
+        This method fits the model using a combination of local and factor models.
+        If test datasets are not provided, it automatically splits the training
+        data into train and test partitions.
+
+        Parameters
+        ----------
+        *train_datasets : list of Dataset
+            One or more datasets to use for training the model.
+        test_datasets : list of Dataset, optional
+            Datasets to use for testing the model. If None, a portion of the
+            training datasets will be used for testing.
+
+        Returns
+        -------
+        self : object
+            The fitted estimator.
+
+        Raises
+        ------
+        ValueError
+            If no training datasets are provided.
+
+        Notes
+        -----
+        This method sets the following attributes:
+        - modality_ : The modality of the training datasets
+        - factor_model_ : The fitted factor model
+        - locals_model_ : The fitted locals model
+        - test_scores_ : Performance metrics on test datasets
+        """
 
         self.modality_ = train_datasets[0].modality()
 
@@ -229,7 +354,7 @@ class TopographyModel(ABC, BaseEstimator):
         )
 
         (self.factor_model_, self.locals_model_, self.test_scores_) = fit_model(
-            self.GT, 
+            self.GT,
             train_datasets,
             test_datasets,
             random_state,
@@ -261,6 +386,32 @@ class TopographyModel(ABC, BaseEstimator):
             raise ValueError(f"Component {component_name} not found in model.")
 
     def rename_components(self, dataset, names: typing.List[str]):
+        """
+        Rename the components of the model and update the dataset coordinates accordingly.
+
+        Parameters
+        ----------
+        dataset : xarray.Dataset
+            The dataset containing model components to be renamed.
+        names : typing.List[str]
+            New names for the components. Must have the same length as the number of components in the model.
+
+        Returns
+        -------
+        xarray.Dataset
+            The dataset with updated component names in coordinates.
+
+        Raises
+        ------
+        ValueError
+            If the number of provided names doesn't match the number of components.
+        KeyError
+            If some components in the dataset's "shap_component" coordinate don't match the model components.
+
+        Notes
+        -----
+        This method also updates the internal _component_names attribute of the model.
+        """
         if not len(names) == self.n_components:
             raise ValueError("The number of names must match the number of components")
 
@@ -288,6 +439,22 @@ class TopographyModel(ABC, BaseEstimator):
             check_dims(dataset, self.model_state_)
 
     def setup_corpus(self, dataset):
+        """
+        Set up the corpus dataset with initial state and update normalization factors.
+
+        This method initializes the dataset state using the factor and locals models,
+        updates the state from scratch, and then applies normalizers to all expanded datasets.
+
+        Parameters
+        ----------
+        dataset : Dataset
+            The dataset to be set up for modeling
+
+        Returns
+        -------
+        Dataset
+            The initialized and normalized dataset
+        """
 
         logger.info("Setting up dataset state ...")
 
@@ -308,6 +475,18 @@ class TopographyModel(ABC, BaseEstimator):
         return dataset
 
     def save(self, path):
+        """
+        Save the model to a file.
+
+        Parameters
+        ----------
+        path : str
+            The file path where the model should be saved.
+
+        Examples
+        --------
+        >>> model.save("my_model.pkl")
+        """
 
         for model in self.factor_model_.models.values():
             model.prepare_to_save()
@@ -315,6 +494,28 @@ class TopographyModel(ABC, BaseEstimator):
         dump(self, path)
 
     def plot_signature(self, component, *select, normalization="global", **kwargs):
+        """
+        Plots the signature for a given component.
+        Parameters
+        ----------
+        component : int or str
+            The component index or name to plot.
+        *select : str, optional
+            Mesoscale selection strings to plot. If none are provided, defaults to ["Baseline"].
+        normalization : {global, weighted, none}, default="global"
+            The normalization method to use for the signature.
+        **kwargs : dict
+            Additional keyword arguments to pass to the underlying plot method.
+        Returns
+        -------
+        matplotlib.figure.Figure or other plot object
+            The resulting plot object returned by the modality's plot method.
+        Notes
+        -----
+        This method retrieves the component by name or index, formats the signature using the factor model,
+        and delegates the actual plotting to the modality's plot method.
+        """
+
         if len(select) == 0:
             select = ["Baseline"]
 
@@ -334,6 +535,36 @@ class TopographyModel(ABC, BaseEstimator):
         height=2.0,
         show=True,
     ):
+        """
+        Generate a comprehensive report for a specific signature component.
+
+        This method creates a figure with signature plots for mesoscale states and an interaction matrix
+        for the specified component, providing a visual representation of the signature's characteristics.
+
+        Parameters
+        ----------
+        component : int or str
+            The signature component to visualize. Can be an integer index or a string identifier.
+        normalization : str, default="global"
+            The normalization method to use for the signatures.
+        width : float, default=5.25
+            The base width of the figure in inches. The actual figure width may be adjusted based on the number of states.
+        height : float, default=2.0
+            The base height per signature group in inches.
+        show : bool, default=True
+            Whether to display the figure immediately.
+
+        Returns
+        -------
+        matplotlib.figure.Figure
+            The generated figure containing signature plots and interaction matrix.
+
+        Notes
+        -----
+        The report organizes mesoscale states into groups based on their prefix (before the colon),
+        and displays them in separate rows. For singleton state groups (except Baseline),
+        the Baseline state is automatically added as a reference.
+        """
 
         component = self._get_k(component)
 
@@ -398,6 +629,33 @@ class TopographyModel(ABC, BaseEstimator):
         normalization="global",
         **kw,
     ):
+        """
+        Generate a visualization of component interactions.
+
+        This method creates a plot showing the interaction matrix for a specified component.
+        It displays shared effects and context-specific interactions for genomic signatures.
+
+        Parameters
+        ----------
+        component : int or str
+            The component index or identifier to visualize.
+        palette : function, optional
+            A color palette function to use for visualization, defaults to diverging_palette.
+        normalization : str, optional
+            Method for normalizing the signature values.
+        **kw : dict
+            Additional keyword arguments passed to the underlying plotting function.
+
+        Returns
+        -------
+        matplotlib.figure.Figure
+            The figure object containing the visualization of the interaction matrix.
+
+        Notes
+        -----
+        The interaction matrix shows how the component behaves across different contexts,
+        highlighting both shared effects and context-specific variations.
+        """
 
         component = self._get_k(component)
 
@@ -425,13 +683,42 @@ class TopographyModel(ABC, BaseEstimator):
 
     def signature_panel(
         self,
-        ncols=3,
+        ncols=4,
         normalization="global",
         width=3.5,
         height=1.25,
         show=True,
         **kwargs,
     ):
+        """
+        Create a panel of signature plots for all components in the model.
+
+        Parameters
+        ----------
+        ncols : int, default=3
+            Number of columns in the panel.
+        normalization : str, default="global"
+            Normalization method for the signatures.
+        width : float, default=3.5
+            Width of each subplot in inches.
+        height : float, default=1.25
+            Height of each subplot in inches.
+        show : bool, default=True
+            If True, displays the figure. If False, returns the figure object.
+        **kwargs
+            Additional keyword arguments passed to plot_signature method.
+
+        Returns
+        -------
+        fig : matplotlib.figure.Figure, optional
+            The figure object containing the panel of signatures. Only returned if show=False.
+
+        Notes
+        -----
+        This method creates a grid of subplots, each displaying one signature component.
+        The number of rows is calculated based on ncols and the number of components.
+        Component names are displayed as y-axis labels.
+        """
 
         K = self.n_components
         nrows = int(np.ceil(K / ncols))
@@ -462,6 +749,28 @@ class TopographyModel(ABC, BaseEstimator):
         threads=1,
         verbose=0,
     ):
+        """
+        Calculate and add component contributions to a dataset.
+
+        This method computes the contributions of each component to the dataset using the locals model
+        and adds them as a new variable to the dataset.
+
+        Parameters
+        ----------
+        dataset : xarray.Dataset or str
+            Dataset or name of dataset to analyze
+        threads : int, default=1
+            Number of parallel threads to use for computation
+        verbose : int, default=0
+            Verbosity level for parallel computation
+
+        Returns
+        -------
+        xarray.Dataset
+            The input dataset with the calculated contributions added as a new variable
+            with dimensions ('sample', 'component')
+        """
+
         self._check_corpus(dataset)
 
         if not self.GT.has_corpusstate(dataset):

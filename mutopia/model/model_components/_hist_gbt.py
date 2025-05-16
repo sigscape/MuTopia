@@ -3,7 +3,6 @@ from timeit import default_timer as time
 from sklearn.base import check_is_fitted
 import numpy as np
 from sklearn._loss.loss import BaseLoss
-from sklearn.metrics import check_scoring
 from sklearn.model_selection import train_test_split
 from sklearn.utils import check_random_state
 from sklearn.utils._openmp_helpers import _openmp_effective_n_threads
@@ -25,7 +24,6 @@ from sklearn.ensemble._hist_gradient_boosting.gradient_boosting import (
 from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.ensemble._hist_gradient_boosting.grower import TreeGrower
 from numba import njit
-import warnings
 
 
 class ShrunkTreePredictor:

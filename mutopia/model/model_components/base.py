@@ -3,7 +3,7 @@ from sparse import COO, GCXS
 from abc import ABC, abstractmethod
 from numba import njit
 import sys
-from .. import gtensor_interface as CS
+from ..gtensor_interface import GtensorInterface as CS
 
 
 class PrimitiveModel(ABC):
@@ -234,7 +234,7 @@ def sp2tup(X):
 
 
 @njit(
-    "float32[::1](float32[::1], float32[::1,:])", 
+    "float32[::1](float32[::1], float32[::1,:])",
     nogil=True,
 )
 def logsafe_vector_matmul(y, log_x):

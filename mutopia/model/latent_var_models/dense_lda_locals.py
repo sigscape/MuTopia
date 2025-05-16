@@ -2,8 +2,7 @@ from xarray import DataArray
 import numpy as np
 from functools import partial
 import warnings
-from ..model_components.base import _svi_update_fn, logsafe_vector_matmul, logsumexp
-from .. import gtensor_interface as CS
+from ..model_components.base import _svi_update_fn
 from ...gtensor import match_dims
 from .base import *
 
@@ -16,10 +15,10 @@ exp_transform = lambda x: np.nan_to_num(np.exp(x), nan=0.0, neginf=0.0)
 
 @njit(
     "Tuple((float32, float32))(float32[::1,:], float32[::1], float32[::1], float32, float32[::1])",
-    nogil=True
+    nogil=True,
 )
 def _deviance_sample(
-    conditional_likelihood, # K:: x I
+    conditional_likelihood,  # K:: x I
     weights,
     Nk,
     context_sum,
@@ -158,13 +157,16 @@ class LDAUpdateDense(LocalsModel):
             dataset,
             factor_model,
             par_context=None,
+            with_context=False,
             logsafe=True,
         )
 
         updates = (
             partial(
                 self._update_fn,
-                (exposures_fn or self.GT.fetch_topic_compositions)(dataset, sample_name),
+                (exposures_fn or self.GT.fetch_topic_compositions)(
+                    dataset, sample_name
+                ),
                 sample=sample,
                 dataset=dataset,
                 learning_rate=learning_rate,
@@ -178,7 +180,6 @@ class LDAUpdateDense(LocalsModel):
 
         return updates
 
-    
     def _get_deviance_fns(
         self,
         dataset,
@@ -195,14 +196,12 @@ class LDAUpdateDense(LocalsModel):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
 
-            conditional_likelihood = (
-                self._conditional_observation_likelihood(
-                    dataset,
-                    factor_model,
-                    logsafe=False,
-                    with_context=True,
-                    par_context=None,
-                )
+            conditional_likelihood = self._conditional_observation_likelihood(
+                dataset,
+                factor_model,
+                logsafe=False,
+                with_context=True,
+                par_context=None,
             )
 
             LOG_context_effects = (
@@ -216,7 +215,6 @@ class LDAUpdateDense(LocalsModel):
 
             context_sum = np.nansum(np.exp(LOG_context_effects.data)).astype(self.dtype)
 
-        
         K = conditional_likelihood.shape[0]
         conditional_likelihood = np.asfortranarray(
             conditional_likelihood.reshape(K, -1),
@@ -231,15 +229,16 @@ class LDAUpdateDense(LocalsModel):
                 _deviance_sample,
                 conditional_likelihood,
                 self.to_contig(self._get_weights(sample).reshape(-1)),
-                self.to_contig((exposures_fn or self.GT.fetch_topic_compositions)(dataset, sample_name)),
+                self.to_contig(
+                    (exposures_fn or self.GT.fetch_topic_compositions)(
+                        dataset, sample_name
+                    )
+                ),
                 context_sum,
                 LOG_context_effects,
             )
 
-
     def reduce_model_sstats(self, model, carry, dataset, **sample_sstats):
         return model.reduce_dense_sstats(
-            carry[self.GT.get_name(dataset)], 
-            dataset, 
-            **sample_sstats
+            carry[self.GT.get_name(dataset)], dataset, **sample_sstats
         )

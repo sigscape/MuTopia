@@ -1,4 +1,4 @@
-from .model import gtensor_interface as CS
+from mutopia.model import GtensorInterface as CS
 from .model.model_components.base import idx_array_to_design
 from .utils import logger, ParContext
 from .gtensor import check_structure, dims_except_for
@@ -30,72 +30,6 @@ def _fetch_contributions(corpus, exposures=None):
 
 def _get_state(model):
     return model.model_state_
-
-
-def setup_mixture_model(
-    sample,
-    model,
-    *corpuses,
-    alpha=None,
-    tau=None,
-    steps=64000,
-    seed=None,
-):
-
-    # extract sample dictionary using the first model
-    sample_dict = _get_state(model).locals_model._convert_sample(sample)
-    weights = sample_dict["weights"]
-
-    likelihoods = []
-    for corpus in corpuses:
-
-        if not CS.has_corpusstate(corpus):
-            state = _get_state(model)
-            locals_model = state.locals_model
-            corpus = model.setup_corpus(corpus)
-            model.renormalize_model(corpus)
-
-        likelihoods.append(
-            locals_model._conditional_observation_likelihood(
-                corpus,
-                state,
-                **sample_dict,
-                logsafe=False,
-            )
-        )
-
-    conditional_likelihood = np.vstack(likelihoods)
-    del likelihoods
-
-    fraction_map = (
-        idx_array_to_design(
-            np.array(
-                [j for j, _ in enumerate(corpuses) for _ in range(model.n_components)]
-            ),
-            len(corpuses),
-        )
-        .todense()
-        .T
-    )
-
-    component_map = np.vstack([np.eye(model.n_components) for _ in corpuses]).T
-
-    log_conditional_likelihood = np.ascontiguousarray(np.log(conditional_likelihood).T)
-
-    weights = np.ascontiguousarray(weights)
-
-    args = (
-        alpha,
-        tau,
-        fraction_map,
-        component_map,
-        log_conditional_likelihood,
-        weights,
-        steps,
-        seed or 42,
-    )
-
-    pass
 
 
 def simulate_from_model(

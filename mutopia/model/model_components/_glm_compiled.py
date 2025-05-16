@@ -11,7 +11,6 @@ from .base import (
     csr_matmul,
     design_csr,
 )
-from sklearn.linear_model import ElasticNet
 from sklearn import set_config
 
 set_config(skip_parameter_validation=True)

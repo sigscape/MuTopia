@@ -10,7 +10,7 @@ from .base import (
 )
 from ...utils import str_wrapped_list
 from ...gtensor import dims_except_for
-from .. import gtensor_interface as CS
+from ..gtensor_interface import GtensorInterface as CS
 from ._hist_gbt import CustomHistGradientBooster
 from ._feature_tranformer import (
     get_feature_transformer,

@@ -1,17 +1,17 @@
 from tqdm import trange
 from functools import partial
-from itertools import chain
 from ..utils import *
 from ..gtensor import *
 from .factor_model import FactorModel
 from .latent_var_models.base import LocalsModel
+from .gtensor_interface import GtensorInterface
 
 
 def VI_step(
     factor_model: FactorModel,
     locals_model: LocalsModel,
     datasets,
-    GT,
+    GT: GtensorInterface,
     update_prior=True,
     learning_rate=1.0,
     *,
@@ -51,9 +51,11 @@ def VI_step(
     factor_model.Mstep(
         offsets=offsets,
         sstats=stats,
-        update_prior=update_prior,
         **args,
     )
+
+    if update_prior:
+        locals_model.Mstep(datasets)
 
     for dataset in datasets:
         GT.update_state(
@@ -63,14 +65,14 @@ def VI_step(
             par_context=par_context,
         )
 
-    return 0., test_score
+    return 0.0, test_score
 
 
 def SVI_step(
     factor_model: FactorModel,
     locals_model: LocalsModel,
     datasets,
-    GT,
+    GT: GtensorInterface,
     update_prior=True,
     *,
     test_score_fn,
@@ -128,10 +130,12 @@ def SVI_step(
     timer_wrapper(factor_model.Mstep)(
         offsets=offsets,
         sstats=sstats,
-        update_prior=update_prior,
         learning_rate=learning_rate,
         **args,
     )
+
+    if update_prior:
+        locals_model.Mstep(datasets)
 
     """
     Update the state of the original datasets,
@@ -148,7 +152,7 @@ def SVI_step(
             par_context=par_context,
         )
 
-    return 0., test_score
+    return 0.0, test_score
 
 
 def learning_rate_schedule(tau, kappa, epoch):
@@ -156,7 +160,7 @@ def learning_rate_schedule(tau, kappa, epoch):
 
 
 def slice_generator(
-    GT,
+    GT: GtensorInterface,
     random_state,
     *datasets,
     locus_subsample=None,
@@ -206,7 +210,7 @@ def _should_stop(stop_condition, scores):
 
 
 def fit_model(
-    GT, # gtensor interface
+    GT: GtensorInterface,  # gtensor interface
     train_datasets,
     test_datasets,
     random_state,
@@ -419,9 +423,9 @@ def fit_model(
         for model in factor_model.models.values():
             model.post_fit(GT.to_datasets(*train_datasets)[0])
 
-        #if not empirical_bayes:
-        #    logger.info('Updating priors ...')
-        #    locals_model.optim_prior(train_datasets)
+        if not empirical_bayes:
+            logger.info("Updating priors ...")
+            locals_model.Mstep(train_datasets)
 
     return (
         factor_model,

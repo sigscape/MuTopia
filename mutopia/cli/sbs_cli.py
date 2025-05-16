@@ -8,6 +8,7 @@ from typing import *
 
 SBS = mu.SBS
 
+
 @click.group("SBS commands")
 def sbs():
     pass

@@ -1,10 +1,14 @@
 from numba import njit
 from numba.core.errors import NumbaPerformanceWarning
 import warnings
+
 warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
 import numpy as np
-from ..model.model_components.base import idx_array_to_design
+from collections import defaultdict
+from ..model.model_components.base import idx_array_to_design, _svi_update_fn
 from ..model.latent_var_models.base import *
+from .mixture_interface import MixtureInterface
+from os.path import basename
 
 
 def reshape_output(fn):
@@ -41,16 +45,17 @@ def flatten_tensor_for_update(fn):
 Mixture model inference functions
 """
 
+
 @njit(
     "float32[::1](float32[::1], float32[::1], float32[:,:], float32[:,::1], float32[::1], float32[::1])",
-    nogil=True
+    nogil=True,
 )
 def _update_step(
     alpha,  # D*K
     tau,  # D
     fraction_map,  # Dx(D*K)
-    conditional_likelihood, # D*K x I
-    weights, # I,
+    conditional_likelihood,  # D*K x I
+    weights,  # I,
     Nk,
 ):
 
@@ -62,11 +67,11 @@ def _update_step(
     )
 
     X_div_X_tild = np.where(
-        weights > 0.0, 
-        weights / (exp_Elog_prior @ conditional_likelihood), 
-        np.float32(0.0)
+        weights > 0.0,
+        weights / (exp_Elog_prior @ conditional_likelihood),
+        np.float32(0.0),
     )
-    
+
     Nk = exp_Elog_prior * (conditional_likelihood @ X_div_X_tild)
 
     return Nk
@@ -75,7 +80,7 @@ def _update_step(
 @flatten_tensor_for_update
 @njit(
     "float32[::1](float32[::1], float32[::1], float32[:,:], float32[:,::1], float32[::1], int64, float32, float32[::1])",
-    nogil=True
+    nogil=True,
 )
 def iterative_update(
     alpha,  # D*K
@@ -108,8 +113,8 @@ def iterative_update(
 @reshape_output
 @flatten_tensor_for_update
 @njit(
-    "float32[:,::1](float32[::1], float32[::1], float32[:,:], float32[:,::1], float32[::1], float32[::1])",    
-    nogil=True
+    "float32[:,::1](float32[::1], float32[::1], float32[:,:], float32[:,::1], float32[::1], float32[::1])",
+    nogil=True,
 )
 def calc_local_variables(
     alpha,  # D*K
@@ -126,9 +131,9 @@ def calc_local_variables(
     )
 
     X_div_X_tild = np.where(
-        weights > 0.0, 
-        weights / (exp_Elog_prior @ conditional_likelihood), 
-        np.float32(0.0)
+        weights > 0.0,
+        weights / (exp_Elog_prior @ conditional_likelihood),
+        np.float32(0.0),
     )
 
     phi_matrix = np.outer(exp_Elog_prior, X_div_X_tild) * conditional_likelihood
@@ -139,6 +144,8 @@ def calc_local_variables(
 """
 Gibb's sampling for mixture models
 """
+
+
 @njit(nogil=True)
 def _parallel_categorical_draw(logits, u):
     logits = np.exp(logits - logits.max())
@@ -238,12 +245,12 @@ def gibbs_sample(
             fraction_map,
             log_conditional_likelihood,
             weights,
-            Nk, 
-            min(1, t / warmup)  # warm up for 100 steps
+            Nk,
+            min(1, t / warmup),  # warm up for 100 steps
         )
 
         lls[t] = ll
-        
+
         if t >= warmup:
             out[:, t - warmup] = Nk
 
@@ -269,7 +276,7 @@ def iterative_update_gibbs(
     )
 
     # renormalize Nk to match the weights
-    Nk = Nk/np.sum(Nk) * np.sum(weights)
+    Nk = Nk / np.sum(Nk) * np.sum(weights)
 
     Nks, _ = gibbs_sample(
         *args,
@@ -278,14 +285,14 @@ def iterative_update_gibbs(
         steps=iters,
     )
 
-    return Nks[:,-1]
+    return Nks[:, -1]
 
 
 class MixtureModel(LocalsModel):
 
     def __init__(
         self,
-        GT, # gtensor_interface
+        GT: MixtureInterface,
         datasets,
         prior_alpha=1.0,
         prior_tau=1.0,
@@ -305,19 +312,23 @@ class MixtureModel(LocalsModel):
         self.GT = GT
 
         self.alpha = {
-            name: np.ones(n_components, dtype=dtype) * prior_alpha
+            basename(name): np.ones(n_components, dtype=dtype) * prior_alpha
             for name, _ in self.GT.expand_datasets(*datasets)
         }
 
-        self.tau = np.ones(len(self.GT.to_datasets(*datasets)), dtype=dtype) * prior_tau
-
+        self.tau = {
+            self.GT.get_name(dataset): np.ones(
+                len(self.GT.list_sources(dataset)), dtype=dtype
+            )
+            * prior_tau
+            for dataset in datasets
+        }
 
     def prepare_corpusstate(self, dataset):
 
-        n_observations = np.array([
-            sample.X.sum().data.item()
-            for _, sample in self.GT.iter_samples(dataset)
-        ])
+        n_observations = np.array(
+            [sample.X.sum().data.item() for _, sample in self.GT.iter_samples(dataset)]
+        )
 
         return dict(
             topic_compositions=DataArray(
@@ -330,24 +341,73 @@ class MixtureModel(LocalsModel):
             ),
         )
 
-
     def _get_mixture_kw(self, dataset):
 
-        alpha = np.concatenate([self.alpha[name] for name, _ in self.GT.expand_datasets(dataset)])
-        alpha = np.ascontiguousarray(alpha, dtype=self.dtype)
-        tau = np.ascontiguousarray(self.tau, dtype=self.dtype)
+        alpha = np.concatenate(
+            [self.alpha[basename(name)] for name, _ in self.GT.expand_datasets(dataset)]
+        )
+        alpha = self.to_contig(alpha)
+
+        tau = self.to_contig(self.tau[self.GT.get_name(dataset)])
 
         n_sources = len(self.GT.list_sources(dataset))
 
         fraction_map = (
-            idx_array_to_design(np.repeat(np.arange(n_sources), self.n_components), n_sources)
+            idx_array_to_design(
+                np.repeat(np.arange(n_sources), self.n_components), n_sources
+            )
             .todense()
             .T
         )
-        fraction_map = np.ascontiguousarray(fraction_map, dtype=self.dtype)
+        fraction_map = self.to_contig(fraction_map)
 
         return {
             "alpha": alpha,
             "tau": tau,
             "fraction_map": fraction_map,
         }
+
+    def Mstep(self, datasets, learning_rate=1):
+
+        Nks_by_source = {}
+        for name, dataset in self.GT.expand_datasets(*datasets):
+
+            Nks = (
+                self.GT.fetch_val(dataset, "topic_compositions")
+                .transpose("sample", ...)
+                .data
+            )
+
+            source_name = basename(name)
+
+            if source_name not in Nks_by_source:
+                Nks_by_source[source_name] = Nks
+            else:
+                Nks_by_source[source_name] = np.concatenate(
+                    (Nks_by_source[source_name], Nks), axis=0
+                )
+
+        for source_name, alpha0 in self.alpha.items():
+
+            self.alpha[source_name] = _svi_update_fn(
+                alpha0, update_alpha(alpha0, Nks_by_source[source_name]), learning_rate
+            )
+
+        """for dataset in datasets:
+
+            name = self.GT.get_name(dataset)
+            Nds = (
+                self.GT.fetch_val(dataset, "topic_compositions")
+                .sum(dim="component")
+                .transpose("sample", "source")
+                .data
+            )
+
+            tau = self.tau[name]
+            self.tau[name] = _svi_update_fn(
+                tau,
+                update_alpha(tau, Nds),
+                learning_rate
+            )"""
+
+        return self

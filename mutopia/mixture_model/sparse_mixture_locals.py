@@ -37,7 +37,6 @@ class SparseMixtureModel(MixtureModel, LDAUpdateSparse):
 
         return logp_X
 
-
     def _conditional_observation_likelihood(
         self,
         dataset,
@@ -46,26 +45,28 @@ class SparseMixtureModel(MixtureModel, LDAUpdateSparse):
         *,
         sample_dict,
     ):
-        X = np.array([
-            self._source_log_likelihood(
-                ds,
-                factor_model,
-                sample_dict=sample_dict,
-            )
-            for _, ds in self.GT.sources(dataset)
-        ])
+        X = np.array(
+            [
+                self._source_log_likelihood(
+                    ds,
+                    factor_model,
+                    sample_dict=sample_dict,
+                )
+                for _, ds in self.GT.sources(dataset)
+            ]
+        )
 
         if logsafe:
             X = X - np.max(X)
 
-        X = np.nan_to_num(np.exp(X), nan=0.0) 
+        X = np.nan_to_num(np.exp(X), nan=0.0)
 
         n_sources = len(self.GT.list_sources(dataset))
         return np.ascontiguousarray(
             X.reshape(n_sources * self.n_components, -1),
             dtype=self.dtype,
         )
-    
+
     def _calc_sstats(
         self,
         alpha,  # D*K
@@ -87,10 +88,12 @@ class SparseMixtureModel(MixtureModel, LDAUpdateSparse):
             weights,
         )
 
-        weighted_posterior = calc_local_variables(*args, Nk) # (D*K, I)
+        weighted_posterior = calc_local_variables(*args, Nk)  # (D*K, I)
 
         n_sources = len(tau)
-        weighted_posterior = weighted_posterior.reshape(n_sources, self.n_components, -1) 
+        weighted_posterior = weighted_posterior.reshape(
+            n_sources, self.n_components, -1
+        )
         Nk = Nk.reshape(n_sources, self.n_components)
 
         suffstats = {
@@ -100,7 +103,6 @@ class SparseMixtureModel(MixtureModel, LDAUpdateSparse):
         }
 
         return suffstats
-
 
     def _update_fn(
         self,
@@ -116,13 +118,13 @@ class SparseMixtureModel(MixtureModel, LDAUpdateSparse):
         tau,
         fraction_map,
     ):
-        
+
         weights = self._get_weights(sample) / locus_subsample
         sample_dict = self._convert_sample(sample)
-        
+
         conditional_likelihood = self._conditional_observation_likelihood(
-            dataset, 
-            factor_model, 
+            dataset,
+            factor_model,
             sample_dict=sample_dict,
             logsafe=True,
         )
@@ -154,7 +156,6 @@ class SparseMixtureModel(MixtureModel, LDAUpdateSparse):
         )
 
         return suffstats
-    
 
     def _get_update_fns(
         self,
@@ -178,7 +179,9 @@ class SparseMixtureModel(MixtureModel, LDAUpdateSparse):
         updates = (
             partial(
                 self._update_fn,
-                (exposures_fn or self.GT.fetch_topic_compositions)(dataset, sample_name),
+                (exposures_fn or self.GT.fetch_topic_compositions)(
+                    dataset, sample_name
+                ),
                 sample=sample,
                 dataset=dataset,
                 factor_model=factor_model,
@@ -192,26 +195,16 @@ class SparseMixtureModel(MixtureModel, LDAUpdateSparse):
 
         return updates
 
-    
     def reduce_model_sstats(
-        self,
-        model, carry, dataset, 
-        *,
-        weighted_posterior, 
-        Nk, 
-        **sample_sstats
+        self, model, carry, dataset, *, weighted_posterior, Nk, **sample_sstats
     ):
-        
+
         for (name, ds), Nk_d, w_d in zip(
             self.GT.expand_datasets(dataset),
             Nk,
             weighted_posterior,
         ):
-            
+
             model.reduce_sparse_sstats(
-                carry[name],
-                ds,
-                weighted_posterior=w_d,
-                Nk=Nk_d,
-                **sample_sstats
+                carry[name], ds, weighted_posterior=w_d, Nk=Nk_d, **sample_sstats
             )

@@ -7,7 +7,7 @@ from itertools import chain
 from sklearn.preprocessing import OneHotEncoder
 from ...utils import FeatureType, logger, str_wrapped_list
 from .base import idx_array_to_design, get_feature_classes
-from .. import gtensor_interface as CS
+from ..gtensor_interface import GtensorInterface as CS
 
 
 def _custom_combiner(feature, category):

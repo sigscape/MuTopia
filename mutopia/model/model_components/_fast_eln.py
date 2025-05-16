@@ -1,7 +1,6 @@
 import numpy as np
 from sklearn.linear_model import _cd_fast as cd_fast
-from sklearn.utils import check_array, check_random_state
-from sklearn.exceptions import ConvergenceWarning
+from sklearn.utils import check_array
 import warnings
 
 

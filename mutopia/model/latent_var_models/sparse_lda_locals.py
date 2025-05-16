@@ -1,22 +1,20 @@
-from xarray import DataArray
 import numpy as np
 from functools import partial, reduce
-import sparse
 from ..model_components.base import _svi_update_fn
-from .. import gtensor_interface as CS
 from ...gtensor import dims_except_for
 from math import prod
 from .base import *
 import warnings
 
+
 @njit(
     "Tuple((float32, float32))(float32[::1], float32[::1,:], float32[::1], float32, float32[::1], int64)",
-    nogil=True
+    nogil=True,
 )
 def _sample_deviance(
-    weights, # I
-    conditional_likelihood, # K x I
-    Nk, # K
+    weights,  # I
+    conditional_likelihood,  # K x I
+    Nk,  # K
     context_sum,
     log_context_effect,
     n_types,
@@ -26,8 +24,10 @@ def _sample_deviance(
     d_sat = weights @ np.log(weights) - y_sum * np.log(y_sum)
 
     # model
-    contributions = Nk/np.sum(Nk)    
-    d_fit = weights @ (np.log(contributions @ conditional_likelihood) - log_context_effect)
+    contributions = Nk / np.sum(Nk)
+    d_fit = weights @ (
+        np.log(contributions @ conditional_likelihood) - log_context_effect
+    )
 
     # null
     d_null = -y_sum * np.log(context_sum) - y_sum * np.log(n_types)
@@ -52,11 +52,11 @@ class LDAUpdateSparse(LocalsModel):
                 tuple(sample.coords["obs_indices"].data),
                 sample.indices.data,
             )
-        )       
+        )
 
         return idx_dict
 
-    '''@classmethod
+    """@classmethod
     def _unconvert_sample(cls, sample, sample_dict, data):
 
         dims = tuple(sample.dims)
@@ -78,7 +78,7 @@ class LDAUpdateSparse(LocalsModel):
             attrs={
                 k: v for k, v in sample.attrs.items() if not k in ("shape", "format")
             },
-        )'''
+        )"""
 
     def _get_log_context_effect(
         self,
@@ -130,7 +130,9 @@ class LDAUpdateSparse(LocalsModel):
         if logsafe:
             logp_X - logp_X.max()
 
-        return np.ascontiguousarray(np.nan_to_num(np.exp(logp_X), nan=0.0), dtype=self.dtype)
+        return np.ascontiguousarray(
+            np.nan_to_num(np.exp(logp_X), nan=0.0), dtype=self.dtype
+        )
 
     @staticmethod
     def _calc_sstats(
@@ -176,11 +178,11 @@ class LDAUpdateSparse(LocalsModel):
         sample_dict = self._convert_sample(sample)
 
         conditional_likelihood = self._conditional_observation_likelihood(
-            dataset, 
-            factor_model, 
+            dataset,
+            factor_model,
             sample_dict=sample_dict,
         )
-        
+
         alpha = np.ascontiguousarray(self.alpha[self.GT.get_name(dataset)])
         Nk = np.ascontiguousarray(Nk, dtype=self.dtype)
 
@@ -227,7 +229,9 @@ class LDAUpdateSparse(LocalsModel):
         updates = (
             partial(
                 self._update_fn,
-                (exposures_fn or self.GT.fetch_topic_compositions)(dataset, sample_name),
+                (exposures_fn or self.GT.fetch_topic_compositions)(
+                    dataset, sample_name
+                ),
                 sample=sample,
                 dataset=dataset,
                 factor_model=factor_model,
@@ -263,7 +267,9 @@ class LDAUpdateSparse(LocalsModel):
         )
 
         # the context frequencies are missing dimensions that the observations have ...
-        log_context_effect = self.to_contig( self._get_log_context_effect(dataset, **sample_dict) )
+        log_context_effect = self.to_contig(
+            self._get_log_context_effect(dataset, **sample_dict)
+        )
         Nk = self.to_contig(Nk)
 
         # 3. penalize the log context effect for the missing dimensions
@@ -275,7 +281,6 @@ class LDAUpdateSparse(LocalsModel):
             log_context_effect,
             n_types,
         )
-
 
     def _get_deviance_fns(
         self,
@@ -289,8 +294,7 @@ class LDAUpdateSparse(LocalsModel):
 
         # 1. figure out the missing dimensions
         missing_dims = dims_except_for(
-            self.GT.observation_dims(dataset), 
-            *self.GT.get_freqs(dataset).dims
+            self.GT.observation_dims(dataset), *self.GT.get_freqs(dataset).dims
         )
         # 2. figure out the number of possible types of observations missing
         n_types = prod(dataset.sizes[dim] for dim in missing_dims)
@@ -301,7 +305,9 @@ class LDAUpdateSparse(LocalsModel):
                 dataset=dataset,
                 factor_model=factor_model,
                 sample=sample,
-                Nk=(exposures_fn or self.GT.fetch_topic_compositions)(dataset, sample_name).ravel(),
+                Nk=(exposures_fn or self.GT.fetch_topic_compositions)(
+                    dataset, sample_name
+                ).ravel(),
                 context_sum=context_sum,
                 n_types=n_types,
             )
@@ -310,12 +316,9 @@ class LDAUpdateSparse(LocalsModel):
 
         return deviance_fns
 
-
     def reduce_model_sstats(self, model, carry, dataset, **sample_sstats):
         model.reduce_sparse_sstats(
-            carry[self.GT.get_name(dataset)], 
-            dataset, 
-            **sample_sstats
+            carry[self.GT.get_name(dataset)], dataset, **sample_sstats
         )
 
     ##

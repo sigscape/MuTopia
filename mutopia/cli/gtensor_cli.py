@@ -414,6 +414,7 @@ def info(dataset):
 def offsets():
     pass
 
+
 @offsets.command("add")
 @click.argument(
     "dataset",
@@ -442,7 +443,7 @@ def add_locus_offsets(
         column=column,
     ).astype(np.float32)
 
-    exp_offsets/=exp_offsets.mean()
+    exp_offsets /= exp_offsets.mean()
 
     disk.write_locus_offsets(
         dataset,
@@ -525,8 +526,8 @@ def continuous_feature(
     feature_name: str,
 ):
 
-    logger.info(f"Ingesting data from {ingest_file} ...")
-    
+    logger.info(f"Ingesting data from {', '.join(ingest_file)} ...")
+
     read_file = partial(
         _read_continuous_file,
         dataset,
@@ -618,7 +619,7 @@ def add_discrete_feature(
 
     if not ingest.FileType.from_extension(ingest_file) == ingest.FileType.BED:
         raise ValueError("Discrete features must be ingested from Bed files.")
-    
+
     logger.info(f"Ingesting data from {ingest_file} ...")
 
     feature_vals, classes = ingest.make_discrete_features(
@@ -1046,15 +1047,17 @@ def ingest_sample(
         ploidy = make_continuous_features_bed(
             copy_number,
             regions_file,
-            null=2.,
+            null=2.0,
         )
-        ploidy = ploidy/2 - 1 # normalize for diploid and center around 0
+        ploidy = ploidy / 2 - 1  # normalize for diploid and center around 0
         ploidy = COO(ploidy)
 
-        sample = xr.Dataset({
-            "X": X,
-            "ploidy": ploidy,
-        })
+        sample = xr.Dataset(
+            {
+                "X": X,
+                "ploidy": ploidy,
+            }
+        )
 
     disk.write_sample(
         dataset,

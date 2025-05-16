@@ -260,11 +260,7 @@ def _objective(
     model = (
         train[0]
         .modality()
-        .TopographyModel(
-            **model_kw,
-            callback=callback, 
-            seed=trial.number
-        )
+        .TopographyModel(**model_kw, callback=callback, seed=trial.number)
         .fit(
             *train,
             test_datasets=test,
@@ -335,8 +331,7 @@ def run_trial(
         _sample_params,
         study,
         partial(
-            example_corpus.modality().sample_params, 
-            extensive=study_attrs["extensive"]
+            example_corpus.modality().sample_params, extensive=study_attrs["extensive"]
         ),
     )
 
@@ -391,12 +386,16 @@ def retrain(
     )
     example_corpus = train[0]
 
-    model = example_corpus.modality().TopographyModel(
-        **model_kw,
-        seed=seed,
-    ).fit(
-        *train,
-        test_datasets=test,
+    model = (
+        example_corpus.modality()
+        .TopographyModel(
+            **model_kw,
+            seed=seed,
+        )
+        .fit(
+            *train,
+            test_datasets=test,
+        )
     )
 
     model.save(save_name)

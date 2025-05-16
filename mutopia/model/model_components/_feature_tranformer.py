@@ -19,9 +19,8 @@ from sklearn.base import clone, OneToOneFeatureMixin
 from collections import defaultdict
 from sklearn.base import BaseEstimator, TransformerMixin
 from functools import reduce
-from .. import gtensor_interface as CS
+from ..gtensor_interface import GtensorInterface as CS
 from ...utils import FeatureType, logger, str_wrapped_list
-from .. import gtensor_interface as CS
 from .base import get_feature_classes
 from mutopia.genome_utils.fancy_iterators import (
     streaming_groupby,
