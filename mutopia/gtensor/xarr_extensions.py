@@ -200,6 +200,12 @@ class FetchSample(BaseAccessor):
         return self._xrds.sample.values
 
 
+@xr.register_dataset_accessor("mutate")
+class FetchSample(BaseAccessor):
+    def __call__(self, fn):
+        return fn(self._xrds)
+
+
 @xr.register_dataset_accessor("fetch_sample")
 class FetchSample(BaseAccessor):
     def __call__(self, sample_name):

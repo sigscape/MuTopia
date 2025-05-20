@@ -1,5 +1,6 @@
 import os
 import mutopia.gtensor.disk_interface as disk
+from copy import copy
 
 
 class CorpusInterface:
@@ -11,6 +12,8 @@ class CorpusInterface:
     Note, we don't need to copy "features", "varm" etc.
     because those elements are not used in the EM step.
     """
+
+    __slots__ = ("_corpus",)
 
     def __init__(self, corpus):  # datatree
         # first, make a copy of the corpus
@@ -37,6 +40,23 @@ class CorpusInterface:
 
     def __getitem__(self, key):
         return self._corpus[key]
+
+    def _clone(self):
+
+        attributes = {"__init__": lambda self: None}
+        for slot in self.__slots__:
+            attributes[slot] = getattr(self, slot)
+
+        return type(
+            self.__class__.__name__,
+            (self.__class__,),
+            attributes,
+        )()
+
+    def mutate(self, fn):
+        shift = self._clone()
+        shift._corpus = shift._corpus.mutate(fn)
+        return shift
 
 
 class NoVars(ValueError):
@@ -114,11 +134,10 @@ class LazySlicer(CorpusInterface):
     to the original data matrix, foregoing the copying step.
     """
 
+    __slots__ = ("_corpus", "_apply_slices", "_base_corpus")
+
     def __init__(self, corpus, keep_features=True, **slices):
         # first, make a copy of the corpus
-
-        self._base_corpus = corpus
-        self._apply_slices = {d: s for d, s in slices.items() if not s is None}
 
         sliced = corpus.copy()
 
@@ -128,6 +147,8 @@ class LazySlicer(CorpusInterface):
         if not keep_features:
             sliced = sliced.drop_vars(corpus.sections.groups["Features"])
 
+        self._base_corpus = corpus
+        self._apply_slices = {d: s for d, s in slices.items() if not s is None}
         self._corpus = sliced.isel(**self._apply_slices)
 
     @property
@@ -151,6 +172,8 @@ class LazySlicer(CorpusInterface):
 
 
 class SampleCorpusFusion(CorpusInterface):
+
+    __slots__ = ("_corpus", "_sample")
 
     def __init__(self, corpus, sample):
         self._corpus = corpus
@@ -187,6 +210,8 @@ class BootstrapCorpus(CorpusInterface):
 
 class DifferentSamples(CorpusInterface):
 
+    __slots__ = ("_corpus", "_samples")
+
     def __init__(self, corpus, samples):
         self._corpus = corpus
         self._samples = samples
@@ -202,6 +227,8 @@ class TransformerInterface(CorpusInterface):
     into a different space, or apply a different transformation to the
     data.
     """
+
+    __slots__ = ("_corpus", "_func")
 
     def __init__(self, corpus, func):
         self._corpus = corpus

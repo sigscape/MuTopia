@@ -4,11 +4,18 @@ from typing import Union, List
 from numpy.typing import NDArray
 from pandas import IntervalIndex, Index, Interval, DataFrame
 from ..utils import FeatureType, logger, str_wrapped_list
+from ..genome_utils.bed12_utils import unstack_regions as _unstack_regions
 from collections import defaultdict
 from functools import reduce, partial
 from tqdm import tqdm
 from .interfaces import *
 import mutopia.gtensor.disk_interface as disk
+
+BED_COLS = [
+    "Regions/chrom",
+    "Regions/start",
+    "Regions/end",
+]
 
 
 def GTensor(
@@ -71,25 +78,16 @@ def apply_to_samples(data, func, bar=True):
     )
 
 
-def inplace(func):
+def mutate_wrapper(func):
     """
     Decorator function to modify a dataset in place - allows one to run mutations on the dataset
     without messing up the interface chains.
     """
 
     def wrapper(dataset, *args, **kwargs):
-        original = CorpusInterface(dataset)
-        result = func(original.corpus, *args, **kwargs)
-        original.corpus = result
-        return original._corpus
+        return dataset.mutate(lambda x: func(x, *args, **kwargs))
 
     return wrapper
-
-
-def mutate(dataset, func):
-    inner = CorpusInterface(dataset)
-    inner.corpus = CorpusInterface(func(dataset)).corpus
-    return inner._corpus
 
 
 def load_dataset(dataset, with_samples=True, with_state=True):
@@ -132,8 +130,8 @@ def train_test_split(dataset, *test_chroms: Union[str, List[str]], lazy=False):
         return train, test
 
     else:
-        train = dataset.isel(locus=~test_mask)
-        test = dataset.isel(locus=test_mask)
+        train = CorpusInterface(dataset.isel(locus=~test_mask))
+        test = CorpusInterface(dataset.isel(locus=test_mask))
 
     return train, test
 
@@ -334,6 +332,7 @@ def make_mixture_dataset(**datasets):
         source_names,
         dims=("source",),
     )
+    merged = merged.set_coords("source")
 
     return CorpusInterface(merged)
 
@@ -513,3 +512,34 @@ def prepare_data(dataset):
     )
 
     return dataset
+
+
+def get_regions_filename(dataset):
+    return os.path.join(
+        os.path.dirname(dataset.attrs["filename"]), dataset.attrs["regions_file"]
+    )
+
+
+def unstack_regions(dataset):
+
+    check_structure(dataset)
+
+    n_regions = dataset.coords["locus"].size
+
+    chrom, start, end, idx = _unstack_regions(
+        dataset.coords["locus"].values,
+        get_regions_filename(dataset),
+        n_regions,
+    )
+
+    return (
+        dataset.drop_vars(dataset.sections.groups["Regions"])
+        .isel(locus=idx)
+        .update(
+            {
+                "Regions/chrom": xr.DataArray(chrom, dims=("locus",)),
+                "Regions/start": xr.DataArray(start, dims=("locus",)),
+                "Regions/end": xr.DataArray(end, dims=("locus",)),
+            }
+        )
+    )

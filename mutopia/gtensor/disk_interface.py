@@ -210,7 +210,7 @@ def write_locus_offsets(
         name="exposures",
     ).to_netcdf(
         dataset,
-        group="Regions",
+        group="regions",
         mode="a",
         **WRITE_KW,
     )
@@ -520,7 +520,7 @@ def load_dataset(filename, with_samples=True, with_state=True):
         return corpus
 
     with retry_until_write(nc.Dataset)(filename, "r") as dset:
-        section_names = list(dset.groups.keys())
+        section_names = list(set([g.lower() for g in dset.groups.keys()]))
 
     # load the base data
     dataset = open_ds()
