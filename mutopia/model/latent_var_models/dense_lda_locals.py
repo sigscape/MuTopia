@@ -232,7 +232,7 @@ class LDAUpdateDense(LocalsModel):
                 self.to_contig(
                     (exposures_fn or self.GT.fetch_topic_compositions)(
                         dataset, sample_name
-                    )
+                    ).ravel()
                 ),
                 context_sum,
                 LOG_context_effects,

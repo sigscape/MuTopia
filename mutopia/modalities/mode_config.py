@@ -34,10 +34,9 @@ class ModeConfig(ABC):
     def TopographyModel(self) -> TopographyModel:
         raise NotImplementedError
 
-    @classmethod
-    def available_components(cls):
-        filepath = os.path.join(os.path.dirname(__file__), cls.DATABASE)
-        with open(filepath, "r") as f:
+    @property
+    def available_components(self):
+        with open(self.DATABASE, "r") as f:
             database = json.load(f)
 
         return list(database.keys())
@@ -45,8 +44,7 @@ class ModeConfig(ABC):
     @classmethod
     def load_components(cls, *init_components):
 
-        filepath = os.path.join(os.path.dirname(__file__), cls.DATABASE)
-        with open(filepath, "r") as f:
+        with open(cls.DATABASE, "r") as f:
             database = json.load(f)
 
         comps = []

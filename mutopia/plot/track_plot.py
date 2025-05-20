@@ -1,14 +1,15 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+from typing import Iterable
 from functools import partial
 from xarray import DataArray
 from scipy.cluster.hierarchy import linkage, optimal_leaf_ordering, leaves_list
 from numpy._core._multiarray_umath import _array_converter
 from functools import cache
 from ..genome_utils.bed12_utils import unstack_regions
-from ..utils import borrow_kwargs, logger
-from ..gtensor.gtensor import slice_regions
+from ..utils import borrow_kwargs, logger, diverging_palette, categorical_palette
+from ..gtensor.gtensor import slice_regions, get_regions_filename
 
 plt.rc("axes", linewidth=0.75)
 
@@ -47,6 +48,9 @@ def feature_matrix(*feature_names):
     Returns:
     A function that retrieves the specified features from the dataset.
     """
+
+    if len(feature_names) == 1 and isinstance(feature_names[0], Iterable):
+        feature_names = list(feature_names[0])
 
     def _accessor(dataset):
 
@@ -117,6 +121,27 @@ def apply_rows(fn):
 
 def _get_optimal_row_order(data, **kwargs):
     return leaves_list(optimal_leaf_ordering(linkage(data, **kwargs), data))
+
+
+def gene_track(
+    gtf,
+    label="Genes",
+    all_labels_inside=False,
+    style="flybase",
+    fontsize=5,
+    ax_fn=lambda ax: ax.spines["bottom"].set_visible(False),
+    **kw,
+):
+    return static_track(
+        "GtfTrack",
+        gtf,
+        label=label,
+        all_labels_inside=all_labels_inside,
+        style=style,
+        fontsize=fontsize,
+        ax_fn=ax_fn,
+        **kw,
+    )
 
 
 class _GenomeView:
@@ -193,11 +218,9 @@ def make_view(dataset, *, chrom, start, end):
     dataset = slice_regions(dataset, chrom, start, end)
     n_regions = dataset.coords["locus"].size
 
-    starts, ends, idxs = unstack_regions(
+    _, starts, ends, idxs = unstack_regions(
         dataset.coords["locus"].values,
-        os.path.join(
-            os.path.dirname(dataset.attrs["filename"]), dataset.attrs["regions_file"]
-        ),
+        get_regions_filename(dataset),
         np.arange(n_regions),
     )
 
@@ -540,7 +563,7 @@ def scatterplot(
 @borrow_kwargs(plt.pcolormesh)
 def heatmap_plot(
     accessor,
-    palette="crest_r",
+    palette=diverging_palette,
     label=None,
     yticks=True,
     height=1,

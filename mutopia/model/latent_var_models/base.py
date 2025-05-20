@@ -639,14 +639,12 @@ class LocalsModel:
     def prepare_corpusstate(self, dataset):
 
         n_observations = np.array(
-            [
-                sample.X.sum().data.item()
-                for _, sample in tqdm(
-                    self.GT.iter_samples(dataset),
-                    total=len(dataset.list_samples()),
-                    desc="Collecting sample information",
-                )
-            ]
+            [sample.X.sum().data.item() for _, sample in self.GT.iter_samples(dataset)]
+        )
+
+        n_observations = DataArray(
+            n_observations,
+            dims=("sample",),
         )
 
         if hasattr(dataset, "ploidy"):
@@ -662,10 +660,7 @@ class LocalsModel:
                 self.init_locals(len(n_observations)),
                 dims=("component", "sample"),
             ),
-            n_observations=DataArray(
-                n_observations,
-                dims=("sample",),
-            ),
+            n_observations=n_observations,
             weighted_ploidy=DataArray(
                 weighted_ploidy,
                 dims=("locus",),

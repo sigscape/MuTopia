@@ -1,3 +1,4 @@
 from .dense_mixture_locals import DenseMixtureModel
 from .sparse_mixture_locals import SparseMixtureModel
 from .mixture_interface import MixtureInterface
+from .base import SharedExposuresMixtureModel, DifferentExposuresMixtureModel

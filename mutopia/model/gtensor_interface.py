@@ -27,6 +27,18 @@ class GtensorInterface:
         return tuple(d for d in dataset.X.dims if not d == "sample")
 
     @classmethod
+    def is_mixture_corpus(cls, dataset):
+        return False
+
+    @classmethod
+    def n_sources(cls, dataset):
+        return 1
+
+    @classmethod
+    def list_sources(cls, dataset):
+        return [cls.get_name(dataset)]
+
+    @classmethod
     def init_state(
         cls,
         dataset,

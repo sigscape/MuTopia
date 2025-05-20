@@ -7,17 +7,15 @@ from joblib import dump, delayed
 from collections import defaultdict
 from sklearn.base import BaseEstimator
 from abc import ABC, abstractmethod
-import typing
+from typing import *
 from ..utils import *
 from .model_components import *
 from .latent_var_models import *
 from ..plot.coef_matrix_plot import _plot_interaction_matrix
 from ..gtensor import *
-from ..tuning import sample_params
 from .optim import fit_model
 from .factor_model import FactorModel
-from .latent_var_models.base import LocalsModel
-from ..mixture_model import SparseMixtureModel, DenseMixtureModel
+from ..mixture_model import *
 
 # interfaces
 from .gtensor_interface import GtensorInterface as CS
@@ -45,6 +43,9 @@ class TopographyModel(ABC, BaseEstimator):
         # locals model
         pi_prior=1.0,
         tau_prior=1.0,
+        estep_iterations=1000,
+        difference_tol=5e-5,
+        shared_exposures=False,
         # locus model
         locus_model_type="gbt",
         tree_learning_rate=0.15,
@@ -188,6 +189,8 @@ class TopographyModel(ABC, BaseEstimator):
         # locals model
         self.pi_prior = pi_prior
         self.tau_prior = tau_prior
+        self.estep_iterations = estep_iterations
+        self.difference_tol = difference_tol
         # locus model
         self.locus_model_type = locus_model_type
         self.tree_learning_rate = tree_learning_rate
@@ -219,9 +222,83 @@ class TopographyModel(ABC, BaseEstimator):
         self.eval_every = eval_every
         self.verbose = verbose
         self.time_limit = time_limit
+        self.shared_exposures = shared_exposures
 
     def sample_params(self, study, trial, extensive=0):
-        return sample_params(study, trial, extensive=extensive)
+
+        params = {}
+
+        if extensive > 0:
+            params = {
+                "l2_regularization": trial.suggest_float(
+                    "l2_regularization", 1e-5, 1000.0, log=True
+                ),
+                "tree_learning_rate": trial.suggest_float(
+                    "tree_learning_rate", 0.025, 0.2
+                ),
+                "init_variance_theta": trial.suggest_float(
+                    "init_variance_theta", 0.025, 0.1
+                ),
+                "empirical_bayes": trial.suggest_categorical(
+                    "empirical_bayes", [True, False]
+                ),
+            }
+
+        if extensive > 1:
+            params["convolution_width"] = trial.suggest_categorical(
+                "convolution_width", [0, 1, 2]
+            )
+            params["max_features"] = 1 / (params["convolution_width"] + 1)
+
+        if extensive > 2:
+            params.update(
+                {
+                    "context_reg": trial.suggest_float(
+                        "context_reg", 1e-5, 5e-2, log=True
+                    ),
+                    "context_conditioning": trial.suggest_float(
+                        "context_conditioning", 1e-9, 1e-2, log=True
+                    ),
+                    "init_variance_context": trial.suggest_float(
+                        "init_variance_context", 0.025, 0.15
+                    ),
+                }
+            )
+
+        if extensive > 3:
+            params.update(
+                {
+                    "batch_subsample": trial.suggest_categorical(
+                        "batch_subsample",
+                        [
+                            None,
+                            0.0625,
+                            0.125,
+                            0.25,
+                        ],
+                    ),
+                    "locus_subsample": trial.suggest_categorical(
+                        "locus_subsample",
+                        [
+                            None,
+                            0.0625,
+                            0.125,
+                            0.25,
+                        ],
+                    ),
+                }
+            )
+
+        if extensive > 4:
+            params.update(
+                {
+                    "conditioning_alpha": trial.suggest_float(
+                        "conditioning_alpha", 1e-10, 1e-7, log=True
+                    ),
+                }
+            )
+
+        return params
 
     @abstractmethod
     def _init_factor_model(
@@ -262,7 +339,18 @@ class TopographyModel(ABC, BaseEstimator):
             logger.warning("** Inferring mixture of epigenomes model **")
 
         if is_mixture:
-            locals_model = SparseMixtureModel if is_sparse else DenseMixtureModel
+            locals_model = type(
+                "MixtureLocalsModel",
+                (
+                    SparseMixtureModel if is_sparse else DenseMixtureModel,
+                    (
+                        SharedExposuresMixtureModel
+                        if self.shared_exposures
+                        else DifferentExposuresMixtureModel
+                    ),
+                ),
+                {},
+            )
         else:
             locals_model = LDAUpdateSparse if is_sparse else LDAUpdateDense
 
@@ -274,6 +362,8 @@ class TopographyModel(ABC, BaseEstimator):
             random_state=random_state,
             prior_alpha=self.pi_prior,
             prior_tau=self.tau_prior,
+            estep_iterations=self.estep_iterations,
+            difference_tol=self.difference_tol,
         )
 
         return locals_model
@@ -385,7 +475,7 @@ class TopographyModel(ABC, BaseEstimator):
         except ValueError:
             raise ValueError(f"Component {component_name} not found in model.")
 
-    def rename_components(self, dataset, names: typing.List[str]):
+    def rename_components(self, dataset, names: List[str]):
         """
         Rename the components of the model and update the dataset coordinates accordingly.
 

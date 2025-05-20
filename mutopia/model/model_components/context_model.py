@@ -18,7 +18,7 @@ from .base import (
     SparseDataBase,
     DenseDataBase,
 )
-from ._strand_transformer import MesoscaleEncoder, DesignMatrixHelper
+from ._strand_transformer import get_strand_transformer, DesignMatrixHelper
 from ...gtensor import dims_except_for
 
 
@@ -71,7 +71,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         self._context_distribution /= self._context_distribution.sum()
 
         self.context_transformer = context_encoder.fit(self.context_names)
-        self.mesoscale_transformer = MesoscaleEncoder().fit(corpus)
+        self.mesoscale_transformer = get_strand_transformer(corpus)
 
         self.encoding_matrix_ = DesignMatrixHelper.compose_encoding_matrix(
             self.context_transformer.encoding_matrix,
@@ -142,12 +142,16 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         tol,
         max_iter,
     ):
-        split_solver = partial(
-            setup_mixed_solver,
-            is_regularized=~is_intercept,
-            unreg_solver=unreg_solver,  # f(X) -> f(z, w, beta) -> beta
-            reg_solver=reg_solver,  # f(X) -> f(z, w, beta) -> beta
-        )
+
+        if all(is_intercept):
+            split_solver = unreg_solver
+        else:
+            split_solver = partial(
+                setup_mixed_solver,
+                is_regularized=~is_intercept,
+                unreg_solver=unreg_solver,  # f(X) -> f(z, w, beta) -> beta
+                reg_solver=reg_solver,  # f(X) -> f(z, w, beta) -> beta
+            )
 
         solver = partial(
             right_intercept_solver,

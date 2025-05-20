@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.special import psi, gammaln, polygamma, xlogy
 from scipy.optimize import line_search
+import warnings
 import logging
 
 logger = logging.getLogger(" Prior update")
@@ -72,14 +73,17 @@ def _dir_prior_update_step(prior, N, logphat):
 
     dprior = -(gradf - b) / q
 
-    step_size, *search = line_search(
-        lambda x: _dir_prior_objective(x, N, logphat),
-        _gradient,
-        prior,
-        dprior,
-        amax=1.0,
-        maxiter=100,
-    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+
+        step_size, *search = line_search(
+            lambda x: _dir_prior_objective(x, N, logphat),
+            _gradient,
+            prior,
+            dprior,
+            amax=1.0,
+            maxiter=100,
+        )
 
     if step_size is None:
         if np.linalg.norm(gradf) < 1e-4:
@@ -94,9 +98,9 @@ def _dir_prior_update_step(prior, N, logphat):
 
     new_prior = step_size * dprior + prior
 
-    if np.any(new_prior < 0.01):
+    if np.any(new_prior < 0.001):
         logger.debug("Performing projected gradient descent update.")
-        new_prior = np.maximum(new_prior, 0.01)
+        new_prior = np.maximum(new_prior, 0.001)
 
     return new_prior
 

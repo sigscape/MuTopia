@@ -132,6 +132,10 @@ class DesignMatrixHelper:
         return X
 
 
+class NoMesoscaleFeatures(ValueError):
+    pass
+
+
 class MesoscaleEncoder:
 
     uselog = True
@@ -177,6 +181,13 @@ class MesoscaleEncoder:
         (self.n_states_, self.n_encoded_features_) = DesignMatrixHelper.encoding_dim(
             *design_args
         )
+
+        if self.n_encoded_features_ == 0:
+            raise NoMesoscaleFeatures(
+                "No mesoscale features found in corpus. "
+                "Please check the corpus for the presence of mesoscale features."
+            )
+
         self._encoding_matrix_block_, encoder = (
             DesignMatrixHelper.get_joint_encoding_matrix(*design_args)
         )
@@ -256,3 +267,48 @@ class MesoscaleEncoder:
 
     def get_feature_names_out(self):
         return self.feature_names_out_
+
+
+class NoStateTransformer:
+
+    uselog = True
+
+    def fit(self, corpus):
+        (self.n_states_, self.n_encoded_features_) = (1, 0)
+        self._encoding_matrix_block_ = np.empty((1, 0))
+        self.feature_names_out_ = []
+
+        return self
+
+    @property
+    def encoding_matrix(self):
+        return self._encoding_matrix_block_
+
+    @property
+    def n_coefs(self):
+        return self._encoding_matrix_block_.shape[1]
+
+    @property
+    def n_states(self):
+        return self._encoding_matrix_block_.shape[0]
+
+    def encode(self, corpus, invert=False):
+        return np.zeros((corpus.sizes["locus"],), dtype=int)
+
+    def transform(self, corpus, invert=False):
+        return idx_array_to_design(self.encode(corpus, invert=invert), self.n_states_)
+
+    def independent_effects_encoding(self):
+        return np.vstack(
+            [np.zeros((1, self.n_encoded_features_)), np.eye(self.n_encoded_features_)]
+        )
+
+    def get_feature_names_out(self):
+        return self.feature_names_out_
+
+
+def get_strand_transformer(corpus):
+    try:
+        return MesoscaleEncoder().fit(corpus)
+    except NoMesoscaleFeatures:
+        return NoStateTransformer().fit(corpus)

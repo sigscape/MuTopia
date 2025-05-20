@@ -6,7 +6,7 @@ from ..model.model_components.base import _svi_update_fn
 from ..model.latent_var_models import LDAUpdateSparse
 
 
-class SparseMixtureModel(MixtureModel, LDAUpdateSparse):
+class SparseMixtureModel(LDAUpdateSparse):
 
     def _source_log_likelihood(
         self,
@@ -88,22 +88,6 @@ class SparseMixtureModel(MixtureModel, LDAUpdateSparse):
             weights,
         )
 
-        weighted_posterior = calc_local_variables(*args, Nk)  # (D*K, I)
-
-        n_sources = len(tau)
-        weighted_posterior = weighted_posterior.reshape(
-            n_sources, self.n_components, -1
-        )
-        Nk = Nk.reshape(n_sources, self.n_components)
-
-        suffstats = {
-            **sample_dict,
-            "weighted_posterior": weighted_posterior / batch_subsample,
-            "Nk": Nk,
-        }
-
-        return suffstats
-
     def _update_fn(
         self,
         Nk,
@@ -116,6 +100,7 @@ class SparseMixtureModel(MixtureModel, LDAUpdateSparse):
         sample,
         alpha,
         tau,
+        component_map,  # Dx(D*K)
         fraction_map,
     ):
 
@@ -130,8 +115,10 @@ class SparseMixtureModel(MixtureModel, LDAUpdateSparse):
         )
 
         args = (
+            self.same_exposures,
             alpha,  # D*K
             tau,  # D
+            component_map,  # Dx(D*K)
             fraction_map,  # Dx(D*K)
             conditional_likelihood,
             weights,
@@ -140,20 +127,27 @@ class SparseMixtureModel(MixtureModel, LDAUpdateSparse):
         Nk = np.ascontiguousarray(Nk.ravel(), dtype=self.dtype)
 
         map_estimate = iterative_update(
-            *args,
             self.estep_iterations,
             self.difference_tol,
+            *args,
             Nk,
         )
 
-        new_Nk = _svi_update_fn(Nk, map_estimate, learning_rate)
+        Nk = _svi_update_fn(Nk, map_estimate, learning_rate)
 
-        suffstats = self._calc_sstats(
-            *args,
-            new_Nk,
-            batch_subsample=batch_subsample,
-            sample_dict=sample_dict,
+        weighted_posterior = calc_local_variables(*args, Nk)  # (D*K, I)
+
+        n_sources = len(tau)
+        weighted_posterior = weighted_posterior.reshape(
+            n_sources, self.n_components, -1
         )
+        Nk = Nk.reshape(n_sources, self.n_components)
+
+        suffstats = {
+            **sample_dict,
+            "weighted_posterior": weighted_posterior / batch_subsample,
+            "Nk": Nk,
+        }
 
         return suffstats
 

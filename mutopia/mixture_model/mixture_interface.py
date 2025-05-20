@@ -5,7 +5,7 @@ structure of the datasets.
 """
 
 import xarray as xr
-from mutopia.gtensor import *
+from ..gtensor import *
 from mutopia.utils import parallel_gen
 from ..model.gtensor_interface import GtensorInterface
 import numpy as np
@@ -36,7 +36,7 @@ class MixtureInterface(GtensorInterface):
 
     @classmethod
     def is_mixture_corpus(cls, dataset):
-        return len(cls.list_sources(dataset)) > 1
+        return cls.n_sources(dataset) > 1
 
     @classmethod
     def list_sources(cls, dataset):
@@ -45,18 +45,22 @@ class MixtureInterface(GtensorInterface):
         return []
 
     @classmethod
-    def fetch_source(cls, dataset, source):
-        if not source in cls.list_sources(dataset):
+    def n_sources(cls, dataset):
+        return len(cls.list_sources(dataset))
+
+    @staticmethod
+    @mutate_wrapper
+    def fetch_source(dataset, source):
+        sources = MixtureInterface.list_sources(dataset)
+        if not source in sources:
             raise ValueError(f"Source {source} not found in dataset")
 
         groups = dataset.sections.groups
         state = groups.pop("State", [])
         features = groups.pop("Features", [])
 
-        use_features = [
-            path.basename(v) for v in features if v.startswith("Features/" + source)
-        ]
-        use_state = [path.basename(v) for v in state if v.startswith("State/" + source)]
+        use_features = [path.basename(v) for v in features if v.split("/")[1] == source]
+        use_state = [path.basename(v) for v in state if v.split("/")[1] == source]
 
         rename_map = {
             os.path.join("Features", source, v): os.path.join("Features", v)
@@ -69,12 +73,12 @@ class MixtureInterface(GtensorInterface):
             }
         )
 
-        other_features = [v for g in groups.values() for v in g]
-
-        source_corpus = dataset[list(rename_map.keys()) + other_features].rename(
-            rename_map
-        )
-        source_corpus.attrs["name"] = cls.get_name(dataset) + "/" + source
+        other_dvars = [v for g in groups.values() for v in g]
+        shared_features = [v for v in features if len(v.split("/")) == 2]
+        source_corpus = dataset[
+            list(rename_map.keys()) + other_dvars + shared_features
+        ].rename(rename_map)
+        source_corpus.attrs["name"] = MixtureInterface.get_name(dataset) + "/" + source
 
         if "source" in source_corpus.dims:
             source_corpus = source_corpus.sel(source=source, drop=True)
@@ -188,4 +192,16 @@ class MixtureInterface(GtensorInterface):
 
         return lambda dataset, sample_name: cls.fetch_topic_compositions(
             corpus_dict[cls.get_name(dataset)], sample_name
+        )
+
+    @classmethod
+    def fetch_locals(cls, dataset):
+        return xr.concat(
+            [
+                cls.fetch_val(source, "topic_compositions")
+                for _, source in cls.sources(dataset)
+            ],
+            dim="source",
+        ).assign_coords(
+            source=cls.list_sources(dataset),
         )

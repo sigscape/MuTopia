@@ -11,7 +11,7 @@ logsafe_exp_transform = lambda x: np.nan_to_num(
 exp_transform = lambda x: np.nan_to_num(np.exp(x), nan=0.0, neginf=0.0)
 
 
-class DenseMixtureModel(MixtureModel, LDAUpdateDense):
+class DenseMixtureModel(LDAUpdateDense):
 
     def _source_log_likelihood(
         self,
@@ -60,45 +60,6 @@ class DenseMixtureModel(MixtureModel, LDAUpdateDense):
             dtype=self.dtype,
         )
 
-    def _calc_sstats(
-        self,
-        alpha,  # D*K
-        tau,  # D
-        fraction_map,  # Dx(D*K)
-        conditional_likelihood,
-        weights,
-        Nk,
-        batch_subsample=1.0,
-        *,
-        dims,
-    ):
-
-        args = (
-            alpha,  # D*K
-            tau,  # D
-            fraction_map,  # Dx(D*K)
-            conditional_likelihood,
-            weights,
-        )
-
-        weighted_posterior = calc_local_variables(*args, Nk)  # (D*K, I)
-
-        n_sources = len(tau)
-        weighted_posterior = weighted_posterior.reshape(
-            n_sources, self.n_components, -1
-        )
-        Nk = Nk.reshape(n_sources, self.n_components)
-
-        suffstats = {
-            "weighted_posterior": DataArray(
-                weighted_posterior / batch_subsample,
-                dims=("component", *dims),
-            ),
-            "Nk": Nk,
-        }
-
-        return suffstats
-
     def _update_fn(
         self,
         Nk,
@@ -107,10 +68,10 @@ class DenseMixtureModel(MixtureModel, LDAUpdateDense):
         batch_subsample=1.0,
         *,
         dataset,
-        factor_model,
         sample,
         alpha,
         tau,
+        component_map,  # Dx(D*K)
         fraction_map,
         #
         dims,
@@ -120,8 +81,10 @@ class DenseMixtureModel(MixtureModel, LDAUpdateDense):
         weights = self._get_weights(sample) / locus_subsample
 
         args = (
+            self.same_exposures,
             alpha,  # D*K
             tau,  # D
+            component_map,  # Dx(D*K)
             fraction_map,  # Dx(D*K)
             conditional_likelihood,
             weights,
@@ -130,20 +93,31 @@ class DenseMixtureModel(MixtureModel, LDAUpdateDense):
         Nk = np.ascontiguousarray(Nk.ravel(), dtype=self.dtype)
 
         map_estimate = iterative_update(
-            *args,
             self.estep_iterations,
             self.difference_tol,
+            *args,
             Nk,
         )
 
-        new_Nk = _svi_update_fn(Nk, map_estimate, learning_rate)
+        Nk = _svi_update_fn(Nk, map_estimate, learning_rate)
 
-        suffstats = self._calc_sstats(
-            *args,
-            new_Nk,
-            batch_subsample=batch_subsample,
-            dims=dims,
+        weighted_posterior = calc_local_variables(*args, Nk)  # (D*K, I)
+        trailing_shape = weighted_posterior.shape[1:]
+
+        n_sources = len(tau)
+
+        weighted_posterior = weighted_posterior.reshape(
+            -1, self.n_components, *trailing_shape
         )
+        Nk = Nk.reshape(n_sources, self.n_components)
+
+        suffstats = {
+            "weighted_posterior": DataArray(
+                weighted_posterior / batch_subsample,
+                dims=("source", "component", *dims),
+            ),
+            "Nk": Nk,
+        }
 
         return suffstats
 
@@ -196,7 +170,6 @@ class DenseMixtureModel(MixtureModel, LDAUpdateDense):
     def reduce_model_sstats(
         self, model, carry, dataset, *, weighted_posterior, Nk, **sample_sstats
     ):
-
         for (name, ds), Nk_d, w_d in zip(
             self.GT.expand_datasets(dataset),
             Nk,

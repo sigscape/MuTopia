@@ -3,6 +3,7 @@ from numba.core.errors import NumbaPerformanceWarning
 import warnings
 
 warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
+import xarray as xr
 import numpy as np
 from collections import defaultdict
 from ..model.model_components.base import idx_array_to_design, _svi_update_fn
@@ -13,9 +14,10 @@ from os.path import basename
 
 def reshape_output(fn):
     @wraps(fn)
-    def wrapper(alpha, tau, fraction_map, conditional_likelihood, weights, *args):
-        tensor_dim = conditional_likelihood.shape
-        out = fn(alpha, tau, fraction_map, conditional_likelihood, weights, *args)
+    def wrapper(*args):
+        likelihood = args[-3]
+        tensor_dim = likelihood.shape
+        out = fn(*args)
         return reshape_same_mem(out, tensor_dim)
 
     return wrapper
@@ -23,19 +25,19 @@ def reshape_output(fn):
 
 def flatten_tensor_for_update(fn):
     @wraps(fn)
-    def wrapper(alpha, tau, fraction_map, conditional_likelihood, weights, *args):
-        K = conditional_likelihood.shape[0]
-        remainder_shape = conditional_likelihood.shape[1:]
+    def wrapper(*args):
+        likelihood, weights = args[-3], args[-2]
+        K = likelihood.shape[0]
+        remainder_shape = likelihood.shape[1:]
         assert (
             remainder_shape == weights.shape
         ), "conditional_likelihood and weights must have the same trailing shape"
+
         return fn(
-            alpha,
-            tau,
-            fraction_map,
-            reshape_same_mem(conditional_likelihood, (K, -1)),
+            *args[:-3],
+            reshape_same_mem(likelihood, (K, -1)),
             reshape_same_mem(weights, (-1,)),
-            *args,
+            *args[-1:],
         )
 
     return wrapper
@@ -47,12 +49,39 @@ Mixture model inference functions
 
 
 @njit(
-    "float32[::1](float32[::1], float32[::1], float32[:,:], float32[:,::1], float32[::1], float32[::1])",
+    "float32[::1](float32[::1], float32[::1], float32[:,:], float32[:,:], float32[::1])",
+    nogil=True,
+)
+def shared_exposures_prior(alpha, tau, component_map, fraction_map, Nk):
+    exp_Elog_prior = np.exp(
+        psivec32(alpha + (Nk @ component_map.T)) @ component_map
+        + psivec32(tau + (Nk @ fraction_map.T)) @ fraction_map
+    )
+    return exp_Elog_prior
+
+
+@njit(
+    "float32[::1](float32[::1], float32[::1], float32[:,:], float32[:,:], float32[::1])",
+    nogil=True,
+)
+def different_exposures_prior(alpha, tau, component_map, fraction_map, Nk):
+    exp_Elog_prior = np.exp(
+        psivec32(alpha + Nk)
+        - psivec32((alpha + Nk) @ fraction_map.T) @ fraction_map
+        + psivec32(tau + (Nk @ fraction_map.T)) @ fraction_map
+    )
+    return exp_Elog_prior
+
+
+@njit(
+    "float32[::1](bool, float32[::1], float32[::1], float32[:,:], float32[:,:], float32[:,::1], float32[::1], float32[::1])",
     nogil=True,
 )
 def _update_step(
+    same_exposure,
     alpha,  # D*K
     tau,  # D
+    component_map,  # Kx(D*K)
     fraction_map,  # Dx(D*K)
     conditional_likelihood,  # D*K x I
     weights,  # I,
@@ -60,11 +89,12 @@ def _update_step(
 ):
 
     # D*K
-    exp_Elog_prior = np.exp(
-        psivec32(alpha + Nk)
-        - psivec32((alpha + Nk) @ fraction_map.T) @ fraction_map
-        + psivec32(tau + (Nk @ fraction_map.T)) @ fraction_map
-    )
+    prior_args = (alpha, tau, component_map, fraction_map, Nk)
+
+    if same_exposure:
+        exp_Elog_prior = shared_exposures_prior(*prior_args)
+    else:
+        exp_Elog_prior = different_exposures_prior(*prior_args)
 
     X_div_X_tild = np.where(
         weights > 0.0,
@@ -79,25 +109,29 @@ def _update_step(
 
 @flatten_tensor_for_update
 @njit(
-    "float32[::1](float32[::1], float32[::1], float32[:,:], float32[:,::1], float32[::1], int64, float32, float32[::1])",
+    "float32[::1](int64, float32, bool, float32[::1], float32[::1], float32[:,:], float32[:,:], float32[:,::1], float32[::1], float32[::1])",
     nogil=True,
 )
 def iterative_update(
+    iters,
+    tol,
+    same_exposure,
     alpha,  # D*K
     tau,  # D
+    component_map,  # Kx(D*K)
     fraction_map,  # Dx(D*K)
     conditional_likelihood,
     weights,
-    iters,
-    tol,
     Nk,  # move gamma to the end so we can curry the function
 ):
     for _ in range(iters):  # inner e-step loop
 
         old_Nk = Nk.copy()
         Nk = _update_step(
+            same_exposure,
             alpha,  # D*K
             tau,  # D
+            component_map,  # Kx(D*K)
             fraction_map,  # Dx(D*K)
             conditional_likelihood,
             weights,
@@ -113,22 +147,25 @@ def iterative_update(
 @reshape_output
 @flatten_tensor_for_update
 @njit(
-    "float32[:,::1](float32[::1], float32[::1], float32[:,:], float32[:,::1], float32[::1], float32[::1])",
+    "float32[:,::1](bool, float32[::1], float32[::1], float32[:,:], float32[:,:], float32[:,::1], float32[::1], float32[::1])",
     nogil=True,
 )
 def calc_local_variables(
+    same_exposure,
     alpha,  # D*K
     tau,  # D
+    component_map,  # Kx(D*K)
     fraction_map,  # Dx(D*K)
     conditional_likelihood,
     weights,
     Nk,
 ):
-    exp_Elog_prior = np.exp(
-        psivec32(alpha + Nk)
-        - psivec32((alpha + Nk) @ fraction_map.T) @ fraction_map
-        + psivec32(tau + (Nk @ fraction_map.T)) @ fraction_map
-    )
+    prior_args = (alpha, tau, component_map, fraction_map, Nk)
+
+    if same_exposure:
+        exp_Elog_prior = shared_exposures_prior(*prior_args)
+    else:
+        exp_Elog_prior = different_exposures_prior(*prior_args)
 
     X_div_X_tild = np.where(
         weights > 0.0,
@@ -141,154 +178,9 @@ def calc_local_variables(
     return phi_matrix
 
 
-"""
-Gibb's sampling for mixture models
-"""
-
-
-@njit(nogil=True)
-def _parallel_categorical_draw(logits, u):
-    logits = np.exp(logits - logits.max())
-    cdf = np.cumsum(logits)
-    z = cdf[-1]
-    return np.searchsorted(cdf, u * z)
-
-
-@njit(nogil=True)
-def _gibbs_sample_mixture_step(
-    alpha,  # D*K
-    tau,  # D
-    fraction_map,  # Dx(D*K)
-    log_conditional_likelihood,  # Ix(D*K)
-    weights,  # I
-    Nk,
-    z,
-    temperature,
-):
-    log_weight = 0.0
-    I = log_conditional_likelihood.shape[0]
-    sampling_order = np.random.permutation(I)
-
-    for i in sampling_order:
-        Nk[z[i]] -= weights[i]
-        logits = (
-            temperature * log_conditional_likelihood[i]
-            + np.log(alpha + Nk)
-            - np.log((alpha + Nk) @ fraction_map.T) @ fraction_map
-            + np.log(tau + (Nk @ fraction_map.T)) @ fraction_map
-        )
-        z[i] = categorical_draw(logits)
-        Nk[z[i]] += weights[i]
-        log_weight += weights[i] * log_conditional_likelihood[i, z[i]]
-
-    return Nk, z, log_weight
-
-
-@njit(nogil=True)
-def _gibbs_sample_mixture_step_implicit(
-    alpha,  # D*K
-    tau,  # D
-    fraction_map,  # Dx(D*K)
-    log_conditional_likelihood,  # Ix(D*K)
-    weights,  # I
-    Nk,
-    temperature,
-):
-    """
-    This function performs Gibbs sampling for a mixture of MuTopia models,
-    but with block sampling. The major advantage of block gibbs sampling is that
-    one needs not explicitly store the latent variable assignments (z) for each mutation.
-
-    For samples with large number of mutations, mutations are essientailly independent given the current
-    mixture contributions, and so this estimator is not much less efficient than the full Gibbs sampler.
-    """
-    log_weight = 0.0
-    I, _ = log_conditional_likelihood.shape
-    new_Nk = np.zeros_like(Nk)
-    u = np.random.uniform(0, 1, size=I)
-
-    logits = (
-        temperature * log_conditional_likelihood
-        + np.log(alpha + Nk)
-        - np.log((alpha + Nk) @ fraction_map.T) @ fraction_map
-        + np.log(tau + (Nk @ fraction_map.T)) @ fraction_map
-    )
-
-    for i in range(I):
-        k = _parallel_categorical_draw(logits[i], u[i])
-        log_weight += weights[i] * log_conditional_likelihood[i, k]
-        new_Nk[k] += weights[i]
-
-    return new_Nk, log_weight
-
-
-@njit(nogil=True)
-def gibbs_sample(
-    alpha,  # D*K
-    tau,  # D
-    fraction_map,  # Dx(D*K)
-    log_conditional_likelihood,  # Ix(D*K)
-    weights,  # I
-    Nk,
-    warmup=100,
-    steps=1000,
-):
-
-    out = np.zeros((Nk.shape[0], steps), dtype=Nk.dtype)
-    lls = np.zeros(steps + warmup, dtype=Nk.dtype)
-
-    for t in range(steps + warmup):
-        # Perform a Gibbs sampling step
-        Nk, ll = _gibbs_sample_mixture_step_implicit(
-            alpha,
-            tau,
-            fraction_map,
-            log_conditional_likelihood,
-            weights,
-            Nk,
-            min(1, t / warmup),  # warm up for 100 steps
-        )
-
-        lls[t] = ll
-
-        if t >= warmup:
-            out[:, t - warmup] = Nk
-
-    return out, lls
-
-
-def iterative_update_gibbs(
-    alpha,  # D*K
-    tau,  # D
-    fraction_map,  # Dx(D*K)
-    conditional_likelihood,
-    weights,
-    iters,
-    tol,
-    Nk,
-):
-    args = (
-        alpha,
-        tau,
-        fraction_map,
-        np.log(conditional_likelihood),
-        weights,
-    )
-
-    # renormalize Nk to match the weights
-    Nk = Nk / np.sum(Nk) * np.sum(weights)
-
-    Nks, _ = gibbs_sample(
-        *args,
-        Nk,
-        warmup=100,
-        steps=iters,
-    )
-
-    return Nks[:, -1]
-
-
 class MixtureModel(LocalsModel):
+
+    same_exposures = True
 
     def __init__(
         self,
@@ -311,23 +203,15 @@ class MixtureModel(LocalsModel):
         self.dtype = dtype
         self.GT = GT
 
-        self.alpha = {
-            basename(name): np.ones(n_components, dtype=dtype) * prior_alpha
-            for name, _ in self.GT.expand_datasets(*datasets)
-        }
-
-        self.tau = {
-            self.GT.get_name(dataset): np.ones(
-                len(self.GT.list_sources(dataset)), dtype=dtype
-            )
-            * prior_tau
-            for dataset in datasets
-        }
-
     def prepare_corpusstate(self, dataset):
 
         n_observations = np.array(
             [sample.X.sum().data.item() for _, sample in self.GT.iter_samples(dataset)]
+        )
+
+        n_observations = DataArray(
+            n_observations,
+            dims=("sample",),
         )
 
         return dict(
@@ -335,37 +219,124 @@ class MixtureModel(LocalsModel):
                 self.init_locals(len(n_observations)),
                 dims=("component", "sample"),
             ),
-            n_observations=DataArray(
-                n_observations,
-                dims=("sample",),
-            ),
+            n_observations=n_observations,
         )
 
     def _get_mixture_kw(self, dataset):
+        raise NotImplementedError()
 
-        alpha = np.concatenate(
-            [self.alpha[basename(name)] for name, _ in self.GT.expand_datasets(dataset)]
-        )
-        alpha = self.to_contig(alpha)
+    def Mstep(self, datasets, learning_rate=1):
+        raise NotImplementedError()
 
+
+class SharedExposuresMixtureModel(MixtureModel):
+    """
+    This model assumes that all samples share the same exposure to the mixture components.
+    """
+
+    same_exposures = True
+
+    def __init__(
+        self,
+        GT: MixtureInterface,
+        datasets,
+        prior_alpha=1.0,
+        prior_tau=1.0,
+        **kw,
+    ):
+        super().__init__(GT, datasets, prior_alpha, prior_tau, **kw)
+
+        self.alpha = {
+            self.GT.get_name(dataset): np.ones(self.n_components, dtype=self.dtype)
+            * prior_alpha
+            for dataset in datasets
+        }
+
+        self.tau = {
+            self.GT.get_name(dataset): np.ones(
+                len(self.GT.list_sources(dataset)), dtype=self.dtype
+            )
+            * prior_tau
+            for dataset in datasets
+        }
+
+    def _get_mixture_kw(self, dataset):
+
+        alpha = self.to_contig(self.alpha[self.GT.get_name(dataset)])
         tau = self.to_contig(self.tau[self.GT.get_name(dataset)])
 
         n_sources = len(self.GT.list_sources(dataset))
+        n_comps = self.n_components
 
-        fraction_map = (
-            idx_array_to_design(
-                np.repeat(np.arange(n_sources), self.n_components), n_sources
-            )
+        component_map = self.to_contig(
+            idx_array_to_design(np.tile(np.arange(n_comps), n_sources), n_comps)
             .todense()
             .T
         )
-        fraction_map = self.to_contig(fraction_map)
+
+        fraction_map = self.to_contig(
+            idx_array_to_design(np.repeat(np.arange(n_sources), n_comps), n_sources)
+            .todense()
+            .T
+        )
 
         return {
-            "alpha": alpha,
             "tau": tau,
+            "alpha": alpha,
+            "component_map": component_map,
             "fraction_map": fraction_map,
         }
+
+    def Mstep(self, datasets, learning_rate=1):
+
+        for dataset in datasets:
+
+            name = self.GT.get_name(dataset)
+
+            locals = self.GT.fetch_locals(dataset)
+            Nks = locals.sum(dim="source").transpose("sample", ...).data
+
+            alpha0 = self.alpha[name]
+            self.alpha[name] = _svi_update_fn(
+                alpha0, update_alpha(alpha0, np.array(Nks)), learning_rate
+            )
+
+            Nds = locals.sum(dim="component").transpose("sample", ...).data
+
+            tau = self.tau[name]
+            self.tau[name] = _svi_update_fn(tau, update_alpha(tau, Nds), learning_rate)
+
+        return self
+
+
+class DifferentExposuresMixtureModel(MixtureModel):
+
+    def __init__(
+        self,
+        GT: MixtureInterface,
+        datasets,
+        prior_alpha=1.0,
+        prior_tau=1.0,
+        **kw,
+    ):
+        super().__init__(GT, datasets, prior_alpha, prior_tau, **kw)
+
+        self.alpha = {
+            self.GT.get_name(dataset): np.ones(self.n_components, dtype=self.dtype)
+            * prior_alpha
+            for dataset in datasets
+        }
+
+        self.tau = {
+            self.GT.get_name(dataset): np.ones(
+                len(self.GT.list_sources(dataset)), dtype=self.dtype
+            )
+            * prior_tau
+            for dataset in datasets
+        }
+
+    def _get_mixture_kw(self, dataset):
+        raise NotImplementedError()
 
     def Mstep(self, datasets, learning_rate=1):
 
@@ -380,7 +351,7 @@ class MixtureModel(LocalsModel):
 
             source_name = basename(name)
 
-            if source_name not in Nks_by_source:
+            if not source_name in Nks_by_source:
                 Nks_by_source[source_name] = Nks
             else:
                 Nks_by_source[source_name] = np.concatenate(
@@ -393,21 +364,29 @@ class MixtureModel(LocalsModel):
                 alpha0, update_alpha(alpha0, Nks_by_source[source_name]), learning_rate
             )
 
-        """for dataset in datasets:
+        GT = self.GT
 
-            name = self.GT.get_name(dataset)
+        for dataset in datasets:
+
+            name = GT.get_name(dataset)
+
             Nds = (
-                self.GT.fetch_val(dataset, "topic_compositions")
+                xr.concat(
+                    [
+                        GT.fetch_val(
+                            GT.fetch_source(dataset, source), "topic_compositions"
+                        )
+                        for source in GT.list_sources(dataset)
+                    ],
+                    dim="source",
+                )
                 .sum(dim="component")
+                .assign_coords(source=GT.list_sources(dataset))
                 .transpose("sample", "source")
-                .data
+                .values
             )
 
             tau = self.tau[name]
-            self.tau[name] = _svi_update_fn(
-                tau,
-                update_alpha(tau, Nds),
-                learning_rate
-            )"""
+            self.tau[name] = _svi_update_fn(tau, update_alpha(tau, Nds), learning_rate)
 
         return self

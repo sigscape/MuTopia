@@ -11,6 +11,7 @@ import pandas as pd
 import sys
 from tabulate import tabulate
 from ..model import *
+from ..model.gtensor_interface import GtensorInterface as CS
 from ..utils import logger
 from ..genome_utils.bed12_utils import stream_bed12
 from .mode_config import ModeConfig

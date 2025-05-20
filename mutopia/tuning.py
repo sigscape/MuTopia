@@ -9,79 +9,6 @@ from .gtensor import *
 from .utils import logger
 
 
-def sample_params(study, trial, extensive=0):
-
-    params = {}
-
-    if extensive > 0:
-        params = {
-            "l2_regularization": trial.suggest_float(
-                "l2_regularization", 1e-5, 1000.0, log=True
-            ),
-            "tree_learning_rate": trial.suggest_float("tree_learning_rate", 0.025, 0.2),
-            "init_variance_theta": trial.suggest_float(
-                "init_variance_theta", 0.025, 0.1
-            ),
-            "empirical_bayes": trial.suggest_categorical(
-                "empirical_bayes", [True, False]
-            ),
-        }
-
-    if extensive > 1:
-        params["convolution_width"] = trial.suggest_categorical(
-            "convolution_width", [0, 1, 2]
-        )
-        params["max_features"] = 1 / (params["convolution_width"] + 1)
-
-    if extensive > 2:
-        params.update(
-            {
-                "context_reg": trial.suggest_float("context_reg", 1e-5, 5e-2, log=True),
-                "context_conditioning": trial.suggest_float(
-                    "context_conditioning", 1e-9, 1e-2, log=True
-                ),
-                "init_variance_context": trial.suggest_float(
-                    "init_variance_context", 0.025, 0.15
-                ),
-            }
-        )
-
-    if extensive > 3:
-        params.update(
-            {
-                "batch_subsample": trial.suggest_categorical(
-                    "batch_subsample",
-                    [
-                        None,
-                        0.0625,
-                        0.125,
-                        0.25,
-                    ],
-                ),
-                "locus_subsample": trial.suggest_categorical(
-                    "locus_subsample",
-                    [
-                        None,
-                        0.0625,
-                        0.125,
-                        0.25,
-                    ],
-                ),
-            }
-        )
-
-    if extensive > 4:
-        params.update(
-            {
-                "conditioning_alpha": trial.suggest_float(
-                    "conditioning_alpha", 1e-10, 1e-7, log=True
-                ),
-            }
-        )
-
-    return params
-
-
 def _get_nfs_storage(study_name):
 
     journal = os.path.join(
@@ -244,6 +171,26 @@ def _get_save_model_fn(
     return _save_model
 
 
+def _sample_params(study, extra_param_fn, trial):
+
+    params = {
+        "num_components": trial.suggest_int(
+            "num_components",
+            study.user_attrs["min_components"],
+            study.user_attrs["max_components"],
+        )
+    }
+
+    params.update(extra_param_fn(study, trial))
+
+    logger.info(
+        f"Running trial {trial.number} with params:\n\t"
+        + "\n\t".join([f"{key}: {value}" for key, value in params.items()])
+    )
+
+    return params
+
+
 def _objective(
     trial,
     *,
@@ -272,26 +219,6 @@ def _objective(
     return model.test_scores_[-1]
 
 
-def _sample_params(study, extra_param_fn, trial):
-
-    params = {
-        "num_components": trial.suggest_int(
-            "num_components",
-            study.user_attrs["min_components"],
-            study.user_attrs["max_components"],
-        )
-    }
-
-    params.update(extra_param_fn(study, trial))
-
-    logger.info(
-        f"Running trial {trial.number} with params:\n\t"
-        + "\n\t".join([f"{key}: {value}" for key, value in params.items()])
-    )
-
-    return params
-
-
 def run_trial(
     storage=None,
     lazy=False,
@@ -315,6 +242,7 @@ def run_trial(
     )
 
     example_corpus = train[0]
+    model_cls = example_corpus.modality().TopographyModel
 
     if "eval_every" in model_kw:
         model_kw.pop("eval_every")
@@ -330,9 +258,7 @@ def run_trial(
     param_sampling_fn = partial(
         _sample_params,
         study,
-        partial(
-            example_corpus.modality().sample_params, extensive=study_attrs["extensive"]
-        ),
+        partial(model_cls.sample_params, extensive=study_attrs["extensive"]),
     )
 
     obj_fn = partial(
