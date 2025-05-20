@@ -127,10 +127,12 @@ def slice_loci(
 
 
 @gtensor_cli.command("create")
-@click.argument(
-    "cutout_regions",
-    type=click.Path(exists=True),
-    nargs=-1,
+@click.option(
+    "-cut",
+    "--cutout-regions",
+    type=(str, click.Path(exists=True)),
+    multiple=True,
+    help="Regions to cut out of the genome.",
 )
 @click.option(
     "-n",
@@ -203,7 +205,7 @@ def create(
     genome_file,
     fasta_file,
     blacklist_file,
-    cutout_regions: List[str] = [],
+    cutout_regions=[],
     min_region_size=25,
     region_size: int = 10000,
     base_regions: Union[None, str] = None,
@@ -498,12 +500,20 @@ def add_feature():
     default=4,
     help="Column in the bedfile to use for the class",
 )
+@click.option(
+    "-s",
+    "--source",
+    type=str,
+    default=None,
+    help="Source to assign the feature to",
+)
 def continuous_feature(
     dataset: str,
     ingest_file: List[str],
     normalization: str = "log1p_cpm",
     group="all",
     column: int = 4,
+    source=None,
     *,
     feature_name: str,
 ):
@@ -531,7 +541,7 @@ def continuous_feature(
         dataset,
         vals,
         group=group,
-        name=feature_name,
+        name=feature_name if source is None else os.path.join(source, feature_name),
         normalization=FeatureType(normalization),
     )
 
@@ -587,6 +597,13 @@ def continuous_feature(
     type=str,
     help="Group to assign the feature to",
 )
+@click.option(
+    "-s",
+    "--source",
+    type=str,
+    default=None,
+    help="Source to assign the feature to",
+)
 def add_discrete_feature(
     ingest_file: str,
     group: str = "all",
@@ -594,6 +611,7 @@ def add_discrete_feature(
     null: str = "None",
     column: int = 4,
     classes: List[str] = [],
+    source: Union[None, str] = None,
     *,
     dataset: str,
     feature_name: str,
@@ -616,7 +634,7 @@ def add_discrete_feature(
         dataset,
         feature_vals,
         group=group,
-        name=feature_name,
+        name=feature_name if source is None else os.path.join(source, feature_name),
         normalization=FeatureType.MESOSCALE if mesoscale else FeatureType.CATEGORICAL,
         classes=classes,
     )
@@ -647,13 +665,22 @@ def add_discrete_feature(
     type=str,
     help="Group to assign the feature to",
 )
+@click.option(
+    "-s",
+    "--source",
+    type=str,
+    default=None,
+    help="Source to assign the feature to",
+)
 def add_distance_feature(
     ingest_file: str,
     group: str = "all",
+    source: Union[None, str] = None,
     *,
     dataset: str,
     feature_name: str,
 ):
+    raise NotImplemented()
     if not ingest.FileType.from_extension(ingest_file) == ingest.FileType.BED:
         raise ValueError("Discrete features must be ingested from Bed files.")
 
@@ -671,7 +698,7 @@ def add_distance_feature(
 
     write_fn(
         progress_between,
-        name=f"{feature_name}_positionBetween",
+        name=f,
     )
 
     write_fn(
@@ -710,10 +737,18 @@ def add_distance_feature(
     default=4,
     help="Column in the bedfile to use for the class",
 )
+@click.option(
+    "-s",
+    "--source",
+    type=str,
+    default=None,
+    help="Source to assign the feature to",
+)
 def add_strand_feature(
     ingest_file: str,
     group: str = "all",
     column: int = 4,
+    source: Union[None, str] = None,
     *,
     dataset: str,
     feature_name: str,
@@ -731,7 +766,7 @@ def add_strand_feature(
         dataset,
         feature_vals,
         group=group,
-        name=feature_name,
+        name=feature_name if source is None else os.path.join(source, feature_name),
         normalization=FeatureType.STRAND,
     )
 
@@ -1087,7 +1122,6 @@ def list_samples(dataset: str):
     print(*samples, sep="\n")
 
 
-
 @gtensor_cli.group("utils")
 def utils():
     pass
@@ -1142,13 +1176,19 @@ def linearize_beds(
     help="Format string for output. Use {column_name} to insert values from the GFF record. Use {attributes[key]} to insert values from the attributes dictionary.",
 )
 @click.option(
-    '--as-regions',
+    "--as-regions",
     is_flag=True,
     help='Output in regions format. Default format is "{chrom}:{start}-{end}\n"',
 )
 @click.option(
-    '--as-gtf',
+    "--as-gtf",
     is_flag=True,
+)
+@click.option(
+    "--zero-based/--one-based",
+    default=False,
+    is_flag=True,
+    help="Use 0-based coordinates instead of 1-based, default is 1-based.",
 )
 def _query_gtf(*args, **kwargs):
     query_gtf(*args, **kwargs)
@@ -1156,13 +1196,15 @@ def _query_gtf(*args, **kwargs):
 
 @utils.command("make-expression-bedfile")
 @click.argument(
-    "output",
-    type=click.Path(writable=True),
-)
-@click.argument(
     "quantitation_files",
     type=click.Path(exists=True),
     nargs=-1,
+)
+@click.option(
+    "-o",
+    "--output",
+    type=click.File("w"),
+    default="-",
 )
 @click.option(
     "--join-on",
@@ -1178,20 +1220,21 @@ def _query_gtf(*args, **kwargs):
 )
 def make_quant_file(
     output,
-    quantitation_files : List[str],
+    quantitation_files: List[str],
     gtf_file: str = None,
     join_on="gene_id",
-):      
-    
-    gtf_file = gtf_file or "MANE.GRCh38.v1.3.ensembl_genomic.gtf.gz"
+):
+
+    gtf_file = gtf_file or "MANE.GRCh38.v1.3.ensembl_genomic.gtf"
 
     if not os.path.exists(gtf_file):
         logger.info(f"Downloading GTF file: {gtf_file} ...")
         gene_features.download_gtf(gtf_file)
 
-    annotation_file="MANE.GRCh38.annotation.bed"
-    logger.info(f"Creating annotation file: {annotation_file} ...")
-    gene_features.make_annotation(gtf_file, annotation_file)
+    annotation_file = "MANE.GRCh38.annotation.bed"
+    if not os.path.exists(annotation_file):
+        logger.info(f"Creating annotation file: {annotation_file} ...")
+        gene_features.make_annotation(gtf_file, annotation_file)
 
     quant = gene_features.join_quantitation(
         annotation_file,
@@ -1203,7 +1246,6 @@ def make_quant_file(
     quant.to_csv(
         output,
         sep="\t",
-        compression="gzip",
         header=None,
         index=False,
     )

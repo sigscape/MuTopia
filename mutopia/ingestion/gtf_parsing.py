@@ -90,10 +90,16 @@ def format_records(
     gff_parser,
     format_str="{chrom}\t{start}\t{end}\t{attributes[ID]}\n",
     outfile=sys.stdout,
+    zero_based=False,
 ):
 
     accepted_records = 0
     for record in gff_parser:
+
+        if zero_based:
+            record["start"] = int(record["start"]) - 1
+            record["end"] = int(record["end"]) - 1
+
         try:
             print(format_str.format(**record), end="", file=outfile)
             accepted_records += 1
@@ -138,6 +144,7 @@ def query_gtf(
     format_str=None,
     as_regions=False,
     as_gtf=False,
+    zero_based=False,
 ):
     """Parse and filter GTF/GFF files."""
     # Determine format string based on options
@@ -145,14 +152,12 @@ def query_gtf(
         if as_regions:
             format_str = "{chrom}:{start}-{end}\n"
         elif as_gtf:
-            format_str = (
-                "{chrom}\t{source}\t{type}\t{start}\t{end}\t{score}\t{strand}\t{phase}\t{attributes[all]}\n"
-            )
+            format_str = "{chrom}\t{source}\t{type}\t{start}\t{end}\t{score}\t{strand}\t{phase}\t{attributes[all]}\n"
         else:
             format_str = "{chrom}\t{start}\t{end}\t{attributes[ID]}\n"  # default format
     else:
-        format_str = format_str.encode().decode('unicode-escape')
-        
+        format_str = format_str.encode().decode("unicode-escape")
+
     # Choose parser based on file format
     parser_fn = (
         parse_GFF
@@ -177,4 +182,6 @@ def query_gtf(
         print_format_str(format_str, outfile=output)
 
     # Format and print records
-    format_records(gff_parser, format_str=format_str, outfile=output)
+    format_records(
+        gff_parser, format_str=format_str, outfile=output, zero_based=zero_based
+    )

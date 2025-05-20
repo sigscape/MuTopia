@@ -180,7 +180,7 @@ def unstack_regions(
         key=lambda x: (x[0][0], x[0][1]),
     )
 
-    data = map(lambda x: (x[0][1], x[0][2], x[1]), data)
+    data = map(lambda x: (*x[0], x[1]), data)
 
     data = list(map(array, (zip(*data))))
 

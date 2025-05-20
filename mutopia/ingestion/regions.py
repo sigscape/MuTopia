@@ -160,9 +160,9 @@ def _get_endpoints(
 
     endpoints = [
         wrap_error(f"Error raised when processing {bedfile}")(
-            _iter_endpoints_bedfile(bedfile, os.path.basename(bedfile)),
+            _iter_endpoints_bedfile(bedfile, feature_name),
         )
-        for bedfile in bedfiles
+        for feature_name, bedfile in bedfiles
     ]
 
     if not blacklist is None:

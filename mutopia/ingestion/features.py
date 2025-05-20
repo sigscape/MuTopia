@@ -45,6 +45,7 @@ def make_continuous_features_bed(
     *,
     null="nan",
     column: int = 4,
+    split=True,
     **kw,
 ):
     check_regions_file(regions_file)
@@ -63,6 +64,7 @@ def make_continuous_features_bed(
             "mean",
             "-null",
             null,
+            "-split" if split else "",
         ]
     )
 
@@ -89,6 +91,7 @@ def make_continous_features_bedgraph(
         regions_file,
         null=null,
         column=4,
+        split=False,
     )
 
 
