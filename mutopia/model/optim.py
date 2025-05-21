@@ -270,10 +270,11 @@ def fit_model(
     ]
 
     test_score_fn = partial(
-        locals_model.deviance,
+        locals_model.score,
         factor_model,
         test_datasets,
         exposures_fn=GT.using_exposures_from(*train_datasets),
+        locus_subsample=locus_subsample,
     )
 
     """

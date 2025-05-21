@@ -356,7 +356,6 @@ class TopographyModel(ABC, BaseEstimator):
 
         # instantiate the locals model
         locals_model = locals_model(
-            (MIX if is_mixture else CS),
             train_datasets,
             n_components=self.num_components,
             random_state=random_state,

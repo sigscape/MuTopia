@@ -5,7 +5,6 @@ import warnings
 warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
 import xarray as xr
 import numpy as np
-from collections import defaultdict
 from ..model.model_components.base import idx_array_to_design, _svi_update_fn
 from ..model.latent_var_models.base import *
 from .mixture_interface import MixtureInterface
@@ -178,13 +177,12 @@ def calc_local_variables(
     return phi_matrix
 
 
-class MixtureModel(LocalsModel):
+class MixtureModelBase(LocalsModel):
 
     same_exposures = True
 
     def __init__(
         self,
-        GT: MixtureInterface,
         datasets,
         prior_alpha=1.0,
         prior_tau=1.0,
@@ -201,7 +199,7 @@ class MixtureModel(LocalsModel):
         self.random_state = random_state
         self.n_components = n_components
         self.dtype = dtype
-        self.GT = GT
+        self.GT = MixtureInterface()
 
     def prepare_corpusstate(self, dataset):
 
@@ -229,7 +227,7 @@ class MixtureModel(LocalsModel):
         raise NotImplementedError()
 
 
-class SharedExposuresMixtureModel(MixtureModel):
+class SharedExposuresMixtureModel(MixtureModelBase):
     """
     This model assumes that all samples share the same exposure to the mixture components.
     """
@@ -238,13 +236,12 @@ class SharedExposuresMixtureModel(MixtureModel):
 
     def __init__(
         self,
-        GT: MixtureInterface,
         datasets,
         prior_alpha=1.0,
         prior_tau=1.0,
         **kw,
     ):
-        super().__init__(GT, datasets, prior_alpha, prior_tau, **kw)
+        super().__init__(datasets, prior_alpha, prior_tau, **kw)
 
         self.alpha = {
             self.GT.get_name(dataset): np.ones(self.n_components, dtype=self.dtype)
@@ -309,17 +306,16 @@ class SharedExposuresMixtureModel(MixtureModel):
         return self
 
 
-class DifferentExposuresMixtureModel(MixtureModel):
+class DifferentExposuresMixtureModel(MixtureModelBase):
 
     def __init__(
         self,
-        GT: MixtureInterface,
         datasets,
         prior_alpha=1.0,
         prior_tau=1.0,
         **kw,
     ):
-        super().__init__(GT, datasets, prior_alpha, prior_tau, **kw)
+        super().__init__(datasets, prior_alpha, prior_tau, **kw)
 
         self.alpha = {
             self.GT.get_name(dataset): np.ones(self.n_components, dtype=self.dtype)

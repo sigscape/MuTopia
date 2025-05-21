@@ -78,32 +78,56 @@ cython code underlying the scipy.special module.
 """
 addr = get_cython_function_address("scipy.special.cython_special", "__pyx_fuse_1psi")
 functype = ctypes.CFUNCTYPE(ctypes.c_double, ctypes.c_double)
-psi = functype(addr)
 
+psi = functype(addr)
 
 @vectorize(["double(double)"])
 def psivec(x):
     return psi(x)
 
+@njit("float32[:](float32[:])", nogil=True)
+def psivec32(x):
+    return psivec(x).astype(np.float32)
+
+@njit("float32(float32)", nogil=True)
+def psi32(x):
+    return np.float32(psi(x))
 
 gammaln = functype(
     get_cython_function_address("scipy.special.cython_special", "gammaln")
 )
 
+@njit("float32(float32)", nogil=True)
+def gammaln32(x):
+    return np.float32(gammaln(x))
 
 @vectorize(["double(double)"])
 def gammalnvec(x):
     return gammaln(x)
 
-
 @njit("float32[:](float32[:])", nogil=True)
-def psivec32(x):
-    return psivec(x).astype(np.float32)
+def gammalnvec32(x):
+    return gammalnvec(x).astype(np.float32)
 
 
 @njit("float32[::1](float32[::1])", nogil=True)
 def exp_log_dirichlet_expectation(alpha):
     return np.exp(psivec(alpha) - psi(np.sum(alpha))).astype(np.float32)
+
+
+@njit(
+    "float32(float32[::1], float32[::1])",
+    nogil=True
+)
+def dirichlet_bound(alpha, x):
+
+    logE_x = np.log(exp_log_dirichlet_expectation(x))
+
+    return (
+        gammaln32(np.sum(alpha))
+        - gammaln32(np.sum(x))
+        + np.sum(gammalnvec32(x) - gammalnvec32(alpha) + (alpha - x) * logE_x)
+    )
 
 
 @njit(
@@ -184,50 +208,8 @@ def calc_local_variables(
 
 
 """
-@njit("double(double[:], double[:])", nogil=True)
-def dirichlet_bound(alpha, Nk):
-
-    logE_Nk = log_dirichlet_expectation(Nk).astype(np.float64)
-
-    return (
-        Nkln(np.sum(alpha))
-        - Nkln(np.sum(Nk))
-        + np.sum(Nklnvec(Nk) - Nklnvec(alpha) + (alpha - Nk) * logE_Nk)
-    )
-    
-@flatten_tensor_for_update
-@flatten_last_arg
-@njit(
-    "double(double[::1], double[:,::1], double[::1], double[::1], double[:,::1])",
-    nogil=True,
-)
-def bound(
-    alpha,
-    conditional_likelihood,
-    weights,
-    Nk,
-    weighted_posterior,
-):
-
-    phi = weighted_posterior / weights[None, :]
-    entropy_sstats = -np.sum(weighted_posterior * np.where(phi > 0, np.log(phi), 0.0))
-    entropy_sstats += dirichlet_bound(alpha, Nk)
-
-    flattened_logweight = log_dirichlet_expectation(Nk)[:, None] + np.log(
-        conditional_likelihood
-    )
-
-    return (
-        np.sum(weighted_posterior * np.nan_to_num(flattened_logweight, nan=0.0))
-        + entropy_sstats
-    )
-"""
-
-"""
 Annealed importance sampling (AIS) for marginal likelihood estimation
 """
-
-
 @njit(nogil=True)
 def categorical_draw(logits):
     logits = np.exp(logits - logits.max())
@@ -426,7 +408,6 @@ class LocalsModel:
 
     def __init__(
         self,
-        GT: GtensorInterface,  # gtensor_interface
         datasets,
         prior_alpha=1.0,
         estep_iterations=1000,
@@ -442,7 +423,7 @@ class LocalsModel:
         self.random_state = random_state
         self.n_components = n_components
         self.dtype = dtype
-        self.GT = GT
+        self.GT = GtensorInterface()
 
         self.alpha = {
             name: np.ones(n_components, dtype=dtype) * prior_alpha
@@ -570,12 +551,13 @@ class LocalsModel:
                 par_context=par,
             )
 
-    def deviance(
+    def score(
         self,
         factor_model,
         datasets,
         exposures_fn=None,
         par_context=None,
+        locus_subsample=1.0, # doesn't matter for deviance
     ):
 
         factor_model.update_normalizers(datasets, par_context)

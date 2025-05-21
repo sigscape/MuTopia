@@ -78,7 +78,7 @@ def apply_to_samples(data, func, bar=True):
     )
 
 
-def mutate_wrapper(func):
+def mutate_function(func):
     """
     Decorator function to modify a dataset in place - allows one to run mutations on the dataset
     without messing up the interface chains.
@@ -86,6 +86,18 @@ def mutate_wrapper(func):
 
     def wrapper(dataset, *args, **kwargs):
         return dataset.mutate(lambda x: func(x, *args, **kwargs))
+
+    return wrapper
+
+
+def mutate_method(func):
+    """
+    Decorator function to modify a dataset in place - allows one to run mutations on the dataset
+    without messing up the interface chains.
+    """
+
+    def wrapper(self, dataset, *args, **kwargs):
+        return dataset.mutate(lambda x: func(self, x, *args, **kwargs))
 
     return wrapper
 
@@ -510,6 +522,9 @@ def prepare_data(dataset):
         dataset["Regions/exposures"],
         dtype=np.float32,
     )
+
+    if hasattr(dataset, "ploidy"):
+        dataset["ploidy"].data.data = dataset["ploidy"].data.data.astype(np.float32)
 
     return dataset
 

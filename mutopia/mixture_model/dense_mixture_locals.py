@@ -1,7 +1,7 @@
 import numpy as np
 from functools import reduce, partial
 from .base import *
-from ..model.model_components.base import _svi_update_fn, idx_array_to_design
+from ..model.model_components.base import _svi_update_fn
 from ..model.latent_var_models import LDAUpdateDense
 
 logsafe_exp_transform = lambda x: np.nan_to_num(
