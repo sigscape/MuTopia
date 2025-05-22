@@ -225,7 +225,7 @@ def create(
 
     logger.info("Calculating context frequencies ...")
 
-    modality = get_config(dtype)
+    modality = get_mode_config(dtype)
 
     context_freqs = modality.get_context_frequencies(
         regions_file=regions_file,
@@ -300,7 +300,7 @@ def convert(
     output_regions_file = output + ".regions.bed"
     copyfile(input_regions_file, output_regions_file)
 
-    modality = get_config(dtype)
+    modality = get_mode_config(dtype)
 
     context_freqs = modality.get_context_frequencies(
         regions_file=output_regions_file,
@@ -1033,7 +1033,7 @@ def ingest_sample(
     num_regions = sum(1 for _ in stream_bed12(regions_file))
     locus_coords = disk.read_coords(dataset)["locus"]
 
-    modality = get_config(attrs["dtype"])
+    modality = get_mode_config(attrs["dtype"])
 
     fasta = fasta or attrs["fasta_file"]
     if not os.path.exists(fasta):

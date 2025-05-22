@@ -10,16 +10,15 @@ from sparse import COO
 import pandas as pd
 import sys
 from tabulate import tabulate
+import matplotlib.colors as mcolors
+from .mode_config import ModeConfig
+from ._sbs_nucdata import *
+from ._sbs_ingestion import featurize_mutations
+from ._sbs_clustering import transfer_annotations_to_vcf
 from ..model import *
 from ..model.gtensor_interface import GtensorInterface as CS
 from ..utils import logger
 from ..genome_utils.bed12_utils import stream_bed12
-from .mode_config import ModeConfig
-from ..model import TopographyModel
-from ._sbs_nucdata import *
-from ._sbs_ingestion import featurize_mutations
-from ._sbs_clustering import transfer_annotations_to_vcf
-import matplotlib.colors as mcolors
 
 _transition_palette = {
     ("C", "A"): mcolors.to_rgb("#427aa1ff"),

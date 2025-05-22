@@ -8,14 +8,15 @@ from collections import defaultdict
 from sklearn.base import BaseEstimator
 from abc import ABC, abstractmethod
 from typing import *
-from ..utils import *
+from .optim import fit_model
 from .model_components import *
 from .latent_var_models import *
+from .factor_model import FactorModel
+from ..utils import *
 from ..plot.coef_matrix_plot import _plot_interaction_matrix
 from ..gtensor import *
-from .optim import fit_model
-from .factor_model import FactorModel
 from ..mixture_model import *
+from ..dtypes import get_mode_config
 
 # interfaces
 from .gtensor_interface import GtensorInterface as CS
@@ -26,6 +27,12 @@ The Model class is a wrapper around a trained model state object,
 and provides the high-level interface for interacting with the model.
 This is the entry point for the user to interact with and annotate data.
 """
+
+class DenseSharedMixtureModel(DenseMixtureModel, SharedExposuresMixtureModel):
+    pass
+
+class SparseSharedMixtureModel(SparseMixtureModel, SharedExposuresMixtureModel):
+    pass
 
 
 class TopographyModel(ABC, BaseEstimator):
@@ -224,6 +231,15 @@ class TopographyModel(ABC, BaseEstimator):
         self.time_limit = time_limit
         self.shared_exposures = shared_exposures
 
+
+    @property
+    def modality(self):
+        if not hasattr(self, "_modality"):
+            raise AttributeError(
+                "Modality not set. Please set the modality before using it."
+            )
+        return get_mode_config(self._modality)
+
     def sample_params(self, study, trial, extensive=0):
 
         params = {}
@@ -339,18 +355,7 @@ class TopographyModel(ABC, BaseEstimator):
             logger.warning("** Inferring mixture of epigenomes model **")
 
         if is_mixture:
-            locals_model = type(
-                "MixtureLocalsModel",
-                (
-                    SparseMixtureModel if is_sparse else DenseMixtureModel,
-                    (
-                        SharedExposuresMixtureModel
-                        if self.shared_exposures
-                        else DifferentExposuresMixtureModel
-                    ),
-                ),
-                {},
-            )
+            locals_model = SparseSharedMixtureModel if is_sparse else DenseSharedMixtureModel
         else:
             locals_model = LDAUpdateSparse if is_sparse else LDAUpdateDense
 
@@ -415,8 +420,7 @@ class TopographyModel(ABC, BaseEstimator):
         - locals_model_ : The fitted locals model
         - test_scores_ : Performance metrics on test datasets
         """
-
-        self.modality_ = train_datasets[0].modality()
+        self._modality = train_datasets[0].attrs["dtype"]
 
         if len(train_datasets) == 0:
             raise ValueError("At least one dataset is required to fit the model.")
@@ -610,7 +614,7 @@ class TopographyModel(ABC, BaseEstimator):
 
         component = self._get_k(component)
 
-        return self.modality_.plot(
+        return self.modality.plot(
             self.factor_model_.format_signature(component, normalization=normalization),
             *select,
             **kwargs,
@@ -748,7 +752,7 @@ class TopographyModel(ABC, BaseEstimator):
 
         component = self._get_k(component)
 
-        flatten = partial(self.modality_._flatten_observations)
+        flatten = partial(self.modality._flatten_observations)
 
         interactions = self.factor_model_.format_interactions(component)
 
@@ -762,7 +766,7 @@ class TopographyModel(ABC, BaseEstimator):
         )
 
         return _plot_interaction_matrix(
-            partial(self.modality_.plot, signature, "Baseline"),
+            partial(self.modality.plot, signature, "Baseline"),
             interactions,
             shared_effects,  # .iloc[:,0],
             palette=palette,
@@ -1114,7 +1118,7 @@ class TopographyModel(ABC, BaseEstimator):
 
         component = self._get_k(component)
 
-        return self.modality_._flatten_observations(
+        return self.modality._flatten_observations(
             self.factor_model_.format_signature(component, normalization=normalization)
         )
 

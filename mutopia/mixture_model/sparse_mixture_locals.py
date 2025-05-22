@@ -67,27 +67,6 @@ class SparseMixtureModel(LDAUpdateSparse):
             dtype=self.dtype,
         )
 
-    def _calc_sstats(
-        self,
-        alpha,  # D*K
-        tau,  # D
-        fraction_map,  # Dx(D*K)
-        conditional_likelihood,
-        weights,
-        Nk,
-        batch_subsample=1.0,
-        *,
-        sample_dict,
-    ):
-
-        args = (
-            alpha,  # D*K
-            tau,  # D
-            fraction_map,  # Dx(D*K)
-            conditional_likelihood,
-            weights,
-        )
-
     def _update_fn(
         self,
         Nk,

@@ -557,7 +557,6 @@ class LocalsModel:
         datasets,
         exposures_fn=None,
         par_context=None,
-        locus_subsample=1.0, # doesn't matter for deviance
     ):
 
         factor_model.update_normalizers(datasets, par_context)

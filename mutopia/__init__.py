@@ -3,10 +3,17 @@ import mutopia.model as model
 import mutopia.plot as pl
 import mutopia.tuning as tune
 import mutopia.tools as tl
-from joblib import load as load_model
-from .modalities import get_mode, SBS
-from .utils import FeatureType, diverging_palette, categorical_palette
-from mutopia.utils import using_exposures_from
+from mutopia.utils import (
+    FeatureType, 
+    diverging_palette, 
+    categorical_palette, 
+    using_exposures_from
+)
 import mutopia.mixture_model as mm
+from mutopia.modalities import SBS
+from mutopia.dtypes import get_mode, MODALITIES
+from joblib import load as load_model
+
+MODALITIES.append(SBS)
 
 __version__ = "1.0.0a5"

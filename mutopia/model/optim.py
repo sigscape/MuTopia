@@ -274,7 +274,6 @@ def fit_model(
         factor_model,
         test_datasets,
         exposures_fn=GT.using_exposures_from(*train_datasets),
-        locus_subsample=locus_subsample,
     )
 
     """

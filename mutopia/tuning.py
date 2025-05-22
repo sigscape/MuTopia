@@ -151,6 +151,10 @@ def _model_report_callback(trial, factor_model, epoch, test_scores):
             raise optuna.TrialPruned()
 
 
+def get_reporting_callback(trial):
+    return partial(_model_report_callback, trial)
+
+
 def _get_save_model_fn(
     study_name,
     output_dir,

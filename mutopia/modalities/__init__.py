@@ -1,2 +1,4 @@
-from .modalities import get_mode, get_config, load_mode_config, SBS
+from .sbs import SBSMode as _SBSMode
 from .mode_config import ModeConfig
+
+SBS = _SBSMode()

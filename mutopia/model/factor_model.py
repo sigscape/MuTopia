@@ -52,8 +52,8 @@ class FactorModel:
         }
 
         self._genome_size = {
-            name: self.GT.get_freqs(dataset).sum().item()
-            for name, dataset in self.GT.expand_datasets(*datasets)
+            self.GT.get_name(dataset) : self.GT.get_freqs(dataset).sum().item()
+            for dataset in datasets
         }
 
     def Mstep(
