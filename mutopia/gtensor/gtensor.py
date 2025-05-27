@@ -78,7 +78,7 @@ def apply_to_samples(data, func, bar=True):
     )
 
 
-def mutate_function(func):
+def mutate(func):
     """
     Decorator function to modify a dataset in place - allows one to run mutations on the dataset
     without messing up the interface chains.

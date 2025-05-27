@@ -432,7 +432,7 @@ def make_regions(
     windowsize_dist = quantile(window_sizes, q)
     print(
         f"""Window size report
-------------------
+----------------------
 Num windows   | {len(window_sizes)}
 Smallest      | {min(window_sizes)}
 Largest       | {max(window_sizes)}    

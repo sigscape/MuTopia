@@ -1,7 +1,6 @@
 import xarray as xr
 from abc import ABC, abstractmethod
 from sparse import SparseArray, COO
-import os
 import json
 import numpy as np
 from ..model import TopographyModel

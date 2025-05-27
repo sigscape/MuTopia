@@ -1,6 +1,7 @@
 import mutopia as mu
 from mutopia.gtensor import *
-from mutopia.modalities import get_mode
+from mutopia.dtypes import get_mode
+from mutopia.tuning import _run_trial_cli
 from mutopia.model import GtensorInterface as CS
 import mutopia.gtensor.disk_interface as disk
 from ..utils import logger
@@ -324,10 +325,11 @@ def study():
 
 @study.command("create")
 @click.argument("study_name", type=str)  # , help="Name of the study")
-@click.argument(
-    "train_corpuses",
-    type=click.Path(exists=True),
-    nargs=-1,
+@click.option(
+    "-ds",
+    "--dataset",
+    type=click.Tuple([click.Path(exists=True), click.Path(exists=True)]),
+    multiple=True,
 )
 @click.option(
     "--min-components",
@@ -515,7 +517,7 @@ def study():
 def create_study(
     study_name: str,
     *,
-    train_corpuses: List[str],
+    dataset : List[Tuple[str, str]] = [],
     min_components: int,
     max_components: int,
     seed: int = 0,
@@ -525,7 +527,7 @@ def create_study(
     test_chroms: List[str] = ["chr1"],
     **model_kw,
 ):
-    if not len(train_corpuses) > 0:
+    if not len(dataset) > 0:
         raise click.exceptions.BadOptionUsage(
             "train-corpuses",
             "At least one training corpus is required",
@@ -541,17 +543,19 @@ def create_study(
         )
     )
 
+    train, test = list(zip(*dataset))
+
     mu.tune.create_study(
-        list(map(os.path.abspath, train_corpuses)),
+        train=train,
+        test=test,
         eval_every=5,
         min_components=min_components,
         max_components=max_components,
         study_name=study_name,
         seed=seed,
         save_model=save_model,
-        output_dir=os.path.abspath(output_dir),
+        output_dir=output_dir,
         extensive=extensive,
-        test_chroms=test_chroms,
         **model_kw,
     )
 
@@ -579,18 +583,8 @@ def create_study(
     default=None,
     help="Time limit for training, in minutes",
 )
-def run_trial(
-    study_name: str,
-    threads: int = 1,
-    time_limit: Union[None, int] = None,
-    lazy: bool = False,
-):
-    mu.tune.run_trial(
-        study_name=study_name,
-        threads=threads,
-        lazy=lazy,
-        time_limit=time_limit,
-    )
+def run_trial(**kw):
+    _run_trial_cli(**kw)
 
 
 @study.command("dashboard")

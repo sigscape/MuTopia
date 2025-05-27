@@ -325,7 +325,7 @@ def rm_sample(
 
 def write_dataset(dataset, filename, bar=False):
 
-    special_vars = [v for v in ["X", "ploidy"] if hasattr(dataset, v)]
+    special_vars = [v for v in ["X", "ploidy"] if v in dataset.data_vars]
 
     # write base data (coords, index, attrs)
     (

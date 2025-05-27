@@ -174,9 +174,9 @@ class FactorModel:
 
             return xr.apply_ufunc(
                 logsafe_matmul,
-                exposures / np.sum(exposures),
+                exposures,
                 log_mutrate_tensor,
-                input_core_dims=[[], ["component"]],
+                input_core_dims=[[], ["source", "component"]],
             )
 
     def _log_component_posterior(self, log_mutrate_tensor, exposures):

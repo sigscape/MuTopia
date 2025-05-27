@@ -1,68 +1,48 @@
 import click
 from typing import *
-from functools import partial
 import os
 import numpy as np
-from sparse import COO
 import mutopia.ingestion as ingest
 from mutopia.gtensor import *
 import netCDF4 as nc
 from shutil import copyfile
-import tempfile
-from ..gtensor.interfaces import *
+
 import mutopia.gtensor.disk_interface as disk
-from ..ingestion import make_continuous_features_bed
+from ..gtensor import *
 from ..ingestion.gtf_parsing import query_gtf
 from ..ingestion import gene_features
 from ..modalities import *
 from ..genome_utils.bed12_utils import stream_bed12
 from ..utils import FeatureType, logger
-
-
-def _read_continuous_file(
-    dataset,
-    ingest_file,
-    normalization: FeatureType,
-    column=4,
-):
-
-    file_type = ingest.FileType.from_extension(ingest_file)
-
-    if not file_type in (
-        ingest.FileType.BEDGRAPH,
-        ingest.FileType.BIGWIG,
-        ingest.FileType.BED,
-    ):
-        raise ValueError(
-            f"File type {file_type} not supported for continuous feature ingestion."
-        )
-
-    if not FeatureType(normalization) in file_type.allowed_normalizations:
-        raise ValueError(
-            f"Normalization {normalization} not supported for file type {file_type}"
-        )
-
-    corpus_attrs = disk.read_attrs(dataset)
-
-    feature_vals = file_type.get_ingestion_fn(
-        is_distance_feature=False,
-        is_discrete_feature=False,
-    )(
-        ingest_file,
-        disk.fetch_regions_path(dataset),
-        genome_file=corpus_attrs["genome_file"],
-        column=column,
-    )
-
-    return feature_vals
+from ..dtypes import get_mode_config
+from .core import *
+from .pipeline_tasks import run_pipeline
 
 
 @click.group("G-tensor commands")
 def gtensor_cli():
     pass
 
+@gtensor_cli.command("compose", short_help="Run the G-Tensor construction pipeline")
+@click.argument("config_file", type=click.Path(exists=True))
+@click.option(
+    "-w",
+    "--workers",
+    type=click.IntRange(1, 100),
+    default=1,
+    help="Number of workers to use for the pipeline",
+)
+@click.option(
+    "--dry-run/--no-dry-run",
+    default=False,
+    is_flag=True,
+    help="Whether to run the pipeline in dry-run mode",
+)
+def _run_pipeline(*args, **kwargs):
+    run_pipeline(*args, **kwargs)
 
-@gtensor_cli.command("split")
+
+@gtensor_cli.command("split", short_help="Split a G-Tensor into training and test sets")
 @click.argument("filename", type=click.Path(exists=True))
 @click.argument("test_contigs", nargs=-1, type=str, required=True)
 @click.option(
@@ -71,40 +51,11 @@ def gtensor_cli():
     type=click.IntRange(1, 100000000),
     default=5,
 )
-def train_test_split(
-    filename: str,
-    test_contigs: list[str],
-    min_region_size=5,
-):
-
-    if not len(test_contigs) > 0:
-        raise click.BadParameter("Must provide at least one contig to use for testing.")
-
-    outprefix = ".".join(filename.split(".")[:-1])
-
-    dataset = disk.load_dataset(filename, with_samples=False)
-    dataset.attrs["regions_file"] = "none"
-
-    test_mask = np.isin(dataset.regions.chrom.values, test_contigs)
-    include_region = dataset.regions.length.values >= min_region_size
-
-    train_mask = ~test_mask & include_region
-    test_mask = test_mask & include_region
-
-    if not np.any(test_mask) or not np.any(train_mask):
-        raise ValueError(
-            "Was not able to produce a valid test or training partition given these parameters.\n"
-            "Either check to make sure the corpus contains the contigs you provided, or try using a smaller min-region-size."
-        )
-
-    train = LazySlicer(LazySampleLoader(dataset), locus=train_mask)
-    test = LazySlicer(LazySampleLoader(dataset), locus=test_mask)
-
-    disk.write_dataset(train, outprefix + ".train.nc", bar=True)
-    disk.write_dataset(test, outprefix + ".test.nc", bar=True)
+def _train_test_split(*args, **kwargs):
+    train_test_split(*args, **kwargs)
 
 
-@gtensor_cli.command("slice")
+@gtensor_cli.command("slice", short_help="Slice a G-Tensor by region")
 @click.argument("dataset", type=click.Path(exists=True))
 @click.argument("output", type=click.Path(writable=True))
 @click.option(
@@ -120,13 +71,12 @@ def slice_loci(
     dataset,
     query_region: list[tuple[str, int, int]],
 ):
-
     dataset = lazy_load(dataset)
     dataset = slice_regions(dataset, *query_region, lazy=True)
     disk.write_dataset(dataset, output, bar=True)
 
 
-@gtensor_cli.command("create")
+@gtensor_cli.command("create", short_help="Create a new G-Tensor")
 @click.option(
     "-cut",
     "--cutout-regions",
@@ -197,72 +147,11 @@ def slice_loci(
     default=None,
     help="File containing regions to use as a base for the G-Tensor.\nIf none provided, uniform regions of size `region-size` will be created.",
 )
-def create(
-    *,
-    name: str,
-    dtype: str,
-    output: str,
-    genome_file,
-    fasta_file,
-    blacklist_file,
-    cutout_regions=[],
-    min_region_size=25,
-    region_size: int = 10000,
-    base_regions: Union[None, str] = None,
-):
-    logger.info("Creating genomic regions ...")
-    regions_file = output + ".regions.bed"
-    with open(regions_file, "w") as r:
-        ingest.make_regions(
-            *cutout_regions,
-            genome_file=genome_file,
-            window_size=region_size,
-            blacklist_file=blacklist_file,
-            min_windowsize=min_region_size,
-            output=r,
-            base_regions=base_regions,
-        )
-
-    logger.info("Calculating context frequencies ...")
-
-    modality = get_mode_config(dtype)
-
-    context_freqs = modality.get_context_frequencies(
-        regions_file=regions_file,
-        fasta_file=fasta_file,
-    )
-
-    logger.info("Formatting G-Tensor ...")
-
-    chrom, start, end = list(
-        zip(*((s.chromosome, s.start, s.end) for s in stream_bed12(regions_file)))
-    )
-
-    gtensor = GTensor(
-        modality,
-        name=name,
-        chrom=chrom,
-        start=start,
-        end=end,
-        context_frequencies=context_freqs,
-        dtype=dtype,
-    )
-
-    gtensor.attrs["regions_file"] = os.path.basename(regions_file)
-    gtensor.attrs["genome_file"] = genome_file
-    gtensor.attrs["fasta_file"] = fasta_file
-    gtensor.attrs["blacklist_file"] = blacklist_file
-    gtensor.attrs["region_size"] = region_size
-
-    logger.info(
-        f"Writing G-Tensor to {output}, and accompanying regions file to {regions_file} ...\n"
-        "Make sure not to leave the regions file behind if you move the G-Tensor!."
-    )
-
-    write_dataset(gtensor, output)
+def _create_gtensor(*args, **kwargs):
+    create_gtensor(*args, **kwargs)
 
 
-@gtensor_cli.command("convert")
+@gtensor_cli.command("convert", short_help="Convert a G-Tensor to a different modality")
 @click.argument(
     "input",
     type=click.Path(exists=True),
@@ -336,7 +225,7 @@ def convert(
     write_dataset(new_dataset, output)
 
 
-@gtensor_cli.command("set-attr")
+@gtensor_cli.command("set-attr", short_help="Set attributes on a G-Tensor")
 @click.argument(
     "dataset",
     type=click.Path(exists=True),
@@ -361,7 +250,7 @@ def set_attrs(
                 dset.setncattr(k, v)
 
 
-@gtensor_cli.command("info")
+@gtensor_cli.command("info", short_help="Get information about a G-Tensor")
 @click.argument(
     "dataset",
     type=click.Path(exists=True),
@@ -394,7 +283,7 @@ def info(dataset):
             click.echo(f"\t{k}: {v}")
 
 
-@gtensor_cli.group("offsets")
+@gtensor_cli.group("offsets", short_help="Manage locus offsets")
 def offsets():
     pass
 
@@ -420,7 +309,7 @@ def add_locus_offsets(
     offsets_file,
     column=4,
 ):
-    exp_offsets = _read_continuous_file(
+    exp_offsets = read_continuous_file(
         dataset,
         offsets_file,
         normalization="log1p_cpm",
@@ -443,7 +332,6 @@ def add_locus_offsets(
 def rm_locus_offsets(
     dataset,
 ):
-
     exp_exposures = np.ones(disk.read_dims(dataset)["locus"], dtype=np.float32)
 
     disk.write_locus_offsets(
@@ -452,7 +340,7 @@ def rm_locus_offsets(
     )
 
 
-@gtensor_cli.group("feature")
+@gtensor_cli.group("feature", short_help="Manage features in a G-Tensor")
 def featurecmds():
     pass
 
@@ -470,7 +358,6 @@ def add_feature():
 @click.argument(
     "ingest_file",
     type=click.Path(exists=True),
-    nargs=-1,
 )
 @click.option(
     "-name",
@@ -507,45 +394,9 @@ def add_feature():
     default=None,
     help="Source to assign the feature to",
 )
-def continuous_feature(
-    dataset: str,
-    ingest_file: List[str],
-    normalization: str = "log1p_cpm",
-    group="all",
-    column: int = 4,
-    source=None,
-    *,
-    feature_name: str,
-):
+def _add_continuous_feature(*args, **kwargs):
+    add_continuous_feature(*args, **kwargs)
 
-    logger.info(f"Ingesting data from {', '.join(ingest_file)} ...")
-
-    read_file = partial(
-        _read_continuous_file,
-        dataset,
-        normalization=normalization,
-        column=column,
-    )
-
-    vals = np.mean([read_file(f) for f in ingest_file], axis=0)
-
-    def arr_render(arr):
-        return ", ".join("{:.2f}".format(x) for x in arr)
-
-    logger.info(
-        f"First values of feature {feature_name}: {arr_render(vals[:5])}\n"
-        f"First non-null values: {arr_render(vals[~np.isnan(vals)][:5])}"
-    )
-
-    disk.write_feature(
-        dataset,
-        vals,
-        group=group,
-        name=feature_name if source is None else os.path.join(source, feature_name),
-        normalization=FeatureType(normalization),
-    )
-
-    logger.info(f"Added feature: {feature_name}")
 
 
 @add_feature.command("discrete")
@@ -604,107 +455,9 @@ def continuous_feature(
     default=None,
     help="Source to assign the feature to",
 )
-def add_discrete_feature(
-    ingest_file: str,
-    group: str = "all",
-    mesoscale: bool = True,
-    null: str = "None",
-    column: int = 4,
-    classes: List[str] = [],
-    source: Union[None, str] = None,
-    *,
-    dataset: str,
-    feature_name: str,
-):
+def _add_discrete_feature(*args, **kwargs):
+    add_discrete_feature(*args, **kwargs)
 
-    if not ingest.FileType.from_extension(ingest_file) == ingest.FileType.BED:
-        raise ValueError("Discrete features must be ingested from Bed files.")
-
-    logger.info(f"Ingesting data from {ingest_file} ...")
-
-    feature_vals, classes = ingest.make_discrete_features(
-        ingest_file,
-        disk.fetch_regions_path(dataset),
-        column=column,
-        null=null,
-        class_priority=classes if len(classes) > 0 else None,
-    )
-
-    disk.write_feature(
-        dataset,
-        feature_vals,
-        group=group,
-        name=feature_name if source is None else os.path.join(source, feature_name),
-        normalization=FeatureType.MESOSCALE if mesoscale else FeatureType.CATEGORICAL,
-        classes=classes,
-    )
-
-    logger.info(f"Added feature: {feature_name}")
-
-
-@add_feature.command("distance")
-@click.argument(
-    "dataset",
-    type=click.Path(exists=True),
-)
-@click.argument(
-    "ingest_file",
-    type=click.Path(exists=True),
-)
-@click.option(
-    "-name",
-    "--feature-name",
-    type=str,
-    required=True,
-    help="Name to assign the feature",
-)
-@click.option(
-    "-g",
-    "--group",
-    default="all",
-    type=str,
-    help="Group to assign the feature to",
-)
-@click.option(
-    "-s",
-    "--source",
-    type=str,
-    default=None,
-    help="Source to assign the feature to",
-)
-def add_distance_feature(
-    ingest_file: str,
-    group: str = "all",
-    source: Union[None, str] = None,
-    *,
-    dataset: str,
-    feature_name: str,
-):
-    raise NotImplemented()
-    if not ingest.FileType.from_extension(ingest_file) == ingest.FileType.BED:
-        raise ValueError("Discrete features must be ingested from Bed files.")
-
-    (progress_between, distance_between) = ingest.make_distance_features(
-        ingest_file,
-        disk.fetch_regions_path(dataset),
-    )
-
-    write_fn = partial(
-        disk.write_feature,
-        dataset,
-        group=group,
-        normalization=FeatureType.QUANTILE,
-    )
-
-    write_fn(
-        progress_between,
-        name=f,
-    )
-
-    write_fn(
-        distance_between,
-        name=f"{feature_name}_distanceBetween",
-    )
 
 
 @add_feature.command("strand")
@@ -744,31 +497,8 @@ def add_distance_feature(
     default=None,
     help="Source to assign the feature to",
 )
-def add_strand_feature(
-    ingest_file: str,
-    group: str = "all",
-    column: int = 4,
-    source: Union[None, str] = None,
-    *,
-    dataset: str,
-    feature_name: str,
-):
-    if not ingest.FileType.from_extension(ingest_file) == ingest.FileType.BED:
-        raise ValueError("Discrete features must be ingested from Bed files.")
-
-    feature_vals = ingest.make_strand_features(
-        ingest_file,
-        disk.fetch_regions_path(dataset),
-        column=column,
-    )
-
-    disk.write_feature(
-        dataset,
-        feature_vals,
-        group=group,
-        name=feature_name if source is None else os.path.join(source, feature_name),
-        normalization=FeatureType.STRAND,
-    )
+def _add_strand_feature(*args, **kwargs):
+    add_strand_feature(*args, **kwargs)
 
 
 @add_feature.command("vector")
@@ -801,31 +531,9 @@ def add_strand_feature(
     default="log1p_cpm",
     help="Normalization to apply to the feature",
 )
-def add_vector(
-    ingest_file: str,
-    group: str = "all",
-    normalization: str = "log1p_cpm",
-    *,
-    dataset: str,
-    feature_name: str,
-):
+def _add_vector_feature(*args, **kwargs):
+    add_vector_feature(*args, **kwargs)
 
-    with open(ingest_file) as f:
-        feature_vals = np.array([float(x.strip()) for x in f])
-
-    dims = disk.read_dims(dataset)
-    if not len(feature_vals) == dims["locus"]:
-        raise ValueError(
-            f'Feature vector length ({len(feature_vals)}) does not match the number of loci in the dataset ({dims["locus"]}).'
-        )
-
-    disk.write_feature(
-        dataset,
-        feature_vals,
-        group=group,
-        name=feature_name,
-        normalization=FeatureType(normalization),
-    )
 
 
 @featurecmds.command("ls")
@@ -925,7 +633,7 @@ def edit_feature(
     )
 
 
-@gtensor_cli.group("sample")
+@gtensor_cli.group("sample", short_help="Manage samples in a G-Tensor")
 def samplecmds():
     pass
 
@@ -1011,76 +719,9 @@ def samplecmds():
     default=None,
     help="Bed file containing copy number information for the sample.",
 )
-def ingest_sample(
-    dataset: str,
-    sample_file: str,
-    sample_name: str,
-    chr_prefix: str = "",
-    pass_only: bool = True,
-    weight_col: Union[None, str] = None,
-    mutation_rate_file: Union[None, str] = None,
-    sample_weight: Union[None, float] = 1.0,
-    skip_sort: bool = False,
-    cluster: bool = True,
-    fasta: Union[None, str] = None,
-    copy_number: Union[None, str] = None,
-    *,
-    sample_id: str,
-):
+def _add_sample(*args, **kwargs):
+    add_sample(*args, **kwargs)
 
-    attrs = disk.read_attrs(dataset)
-    regions_file = disk.fetch_regions_path(dataset)
-    num_regions = sum(1 for _ in stream_bed12(regions_file))
-    locus_coords = disk.read_coords(dataset)["locus"]
-
-    modality = get_mode_config(attrs["dtype"])
-
-    fasta = fasta or attrs["fasta_file"]
-    if not os.path.exists(fasta):
-        raise click.FileError(
-            f"No such file exists: {fasta}, provide a valid fasta file using the `--fasta/-fa` argument."
-        )
-
-    X = modality.ingest_observations(
-        sample_file,
-        #
-        regions_file=regions_file,
-        locus_dim=num_regions,
-        locus_coords=locus_coords,
-        fasta_file=fasta,
-        #
-        chr_prefix=chr_prefix,
-        pass_only=pass_only,
-        weight_col=weight_col,
-        sample_weight=sample_weight,
-        sample_name=sample_name,
-        #
-        mutation_rate_file=mutation_rate_file,
-        skip_sort=skip_sort,
-        cluster=cluster,
-    )
-
-    if not copy_number is None:
-        ploidy = make_continuous_features_bed(
-            copy_number,
-            regions_file,
-            null=2.0,
-        )
-        ploidy = ploidy / 2 - 1  # normalize for diploid and center around 0
-        ploidy = COO(ploidy)
-
-        sample = xr.Dataset(
-            {
-                "X": X,
-                "ploidy": ploidy,
-            }
-        )
-
-    disk.write_sample(
-        dataset,
-        sample,
-        sample_name=sample_id,
-    )
 
 
 @samplecmds.command("rm")
@@ -1122,7 +763,7 @@ def list_samples(dataset: str):
     print(*samples, sep="\n")
 
 
-@gtensor_cli.group("utils")
+@gtensor_cli.group("utils", short_help="Utility functions for G-Tensors")
 def utils():
     pass
 

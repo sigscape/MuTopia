@@ -240,7 +240,7 @@ class TopographyModel(ABC, BaseEstimator):
             )
         return get_mode_config(self._modality)
 
-    def sample_params(self, study, trial, extensive=0):
+    def sample_params(self, trial, extensive=0):
 
         params = {}
 
@@ -384,7 +384,7 @@ class TopographyModel(ABC, BaseEstimator):
 
     def fit(
         self,
-        *train_datasets,
+        train_datasets,
         test_datasets=None,
     ):
         """
@@ -420,14 +420,15 @@ class TopographyModel(ABC, BaseEstimator):
         - locals_model_ : The fitted locals model
         - test_scores_ : Performance metrics on test datasets
         """
+        if not isinstance(train_datasets, Iterable):
+            train_datasets = (train_datasets,)
         self._modality = train_datasets[0].attrs["dtype"]
 
-        if len(train_datasets) == 0:
-            raise ValueError("At least one dataset is required to fit the model.")
-
-        if test_datasets is None:
+        if test_datasets is None or (isinstance(test_datasets, Iterable) and len(test_datasets) == 0):
             logger.info("Splitting train/test partitions...")
             train_datasets, test_datasets = self._train_test_split(train_datasets)
+        elif not isinstance(test_datasets, Iterable):
+            test_datasets = (test_datasets,)
 
         random_state = np.random.RandomState(self.seed)
 
@@ -527,9 +528,9 @@ class TopographyModel(ABC, BaseEstimator):
         return dataset
 
     def _check_corpus(self, dataset, enforce_sample=True):
-        check_corpus(dataset, enforce_sample=enforce_sample)
+        check_corpus(dataset)
         if enforce_sample:
-            check_dims(dataset, self.model_state_)
+            check_dims(dataset, self.factor_model_)
 
     def setup_corpus(self, dataset):
         """
@@ -551,7 +552,11 @@ class TopographyModel(ABC, BaseEstimator):
 
         logger.info("Setting up dataset state ...")
 
-        dataset = self.GT.init_state(dataset, self.factor_model_, self.locals_model_)
+        dataset = self.GT.init_state(
+            dataset,
+            self.factor_model_,
+            self.locals_model_
+        )
 
         with ParContext(1) as par:
             self.GT.update_state(
@@ -561,7 +566,7 @@ class TopographyModel(ABC, BaseEstimator):
                 par_context=par,
             )
 
-        for ds in self.GT.expand_datasets(dataset):
+        for _, ds in self.GT.expand_datasets(dataset):
             self.GT.update_normalizers(ds, self.factor_model_.get_normalizers(ds))
 
         logger.info("Done ...")
@@ -840,7 +845,6 @@ class TopographyModel(ABC, BaseEstimator):
         self,
         dataset,
         threads=1,
-        verbose=0,
     ):
         """
         Calculate and add component contributions to a dataset.
@@ -869,20 +873,21 @@ class TopographyModel(ABC, BaseEstimator):
         if not self.GT.has_corpusstate(dataset):
             dataset = self.setup_corpus(dataset)
 
-        with ParContext(threads, verbose=verbose) as par:
-            contributions = self.locals_model.predict(
-                dataset, self.factor_model_, par_context=par
-            )
+        contributions = self.locals_model_.predict(
+            dataset, 
+            self.factor_model_,
+            threads=threads,
+        )
 
-        dataset = CorpusInterface(dataset)
-        dataset.dataset = dataset.assign_coords(
-            {
-                "component": self.component_names,
-            }
-        ).assign(
-            {
-                "contributions": contributions,
-            }
+        dataset = dataset.mutate( 
+            lambda ds : (
+                ds.assign_coords({
+                    "component": self.component_names,
+                    "source" : self.GT.list_sources(dataset),
+                }).assign({
+                    "contributions": contributions,
+                })
+            )
         )
 
         logger.info('Added key to dataset: "contributions"')
@@ -893,29 +898,36 @@ class TopographyModel(ABC, BaseEstimator):
         dataset,
         threads=1,
     ):
-        self._check_corpus(dataset, enforce_sample=False)
+        self._check_corpus(dataset)
 
         if not self.GT.has_corpusstate(dataset):
             dataset = self.setup_corpus(dataset)
 
         with ParContext(threads) as par:
-            lmrt = self.factor_model_._get_log_mutation_rate_tensor(
-                dataset,
-                par_context=par,
-                with_context=False,
-            )
-
-        dataset["component_distributions"] = (
-            np.exp(lmrt - lmrt.max(skipna=True)).fillna(0.0).astype(np.float32)
-        )
-
-        dataset["component_locus_distributions"] = (
-            (dataset.component_distributions * dataset.regions.context_frequencies).sum(
-                dim=dims_except_for(
-                    dataset.component_distributions.dims, "locus", "component"
+            X = (
+                xr.concat(
+                    [
+                        self.factor_model_._get_log_mutation_rate_tensor(
+                            ds,
+                            par_context=par,
+                            with_context=False,
+                        )
+                        for _, ds in self.GT.expand_datasets(dataset)
+                    ],
+                    dim="source",
+                )
+                .transpose("source", "component", ...)\
+                .assign_coords(source=self.GT.list_sources(dataset))
+                .pipe(
+                    lambda X : np.exp(X - X.max(skipna=True)).fillna(0.0).astype(np.float32)
                 )
             )
-            / dataset.regions.length
+
+        dataset["component_distributions"] = X
+
+        dataset["component_locus_distributions"] = (
+            (X * self.GT.get_freqs(dataset)).sum(dim=dims_except_for(X.dims, "source", "locus", "component"))
+            / self.GT.get_regions(dataset).length
         ).astype(np.float32)
 
         logger.info('Added key: "component_distributions"')
@@ -925,7 +937,6 @@ class TopographyModel(ABC, BaseEstimator):
     def annot_marginal_prediction(
         self,
         dataset,
-        exposures=None,
         threads=1,
     ):
         self._check_corpus(dataset, enforce_sample=False)
@@ -938,21 +949,13 @@ class TopographyModel(ABC, BaseEstimator):
         except KeyError:
             dataset = self.annot_component_distributions(dataset, threads)
 
-        if exposures is None:
-            try:
-                dataset["contributions"]
-            except KeyError:
-                dataset = self.annot_contributions(dataset, threads)
-            marginal_exposures = dataset["contributions"].sum(dim="sample").data
-        else:
-            marginal_exposures = np.sum(
-                [
-                    exposures(dataset, sample_name)
-                    for sample_name in self.GT.list_samples(dataset)
-                ],
-                axis=0,
-            )
+        try:
+            dataset["contributions"]
+        except KeyError:
+            dataset = self.annot_contributions(dataset, threads)
 
+        marginal_exposures = dataset["contributions"].sum(dim="sample").data
+       
         marginal = self.factor_model_._log_marginalize_mutrate(
             np.log(dataset["component_distributions"]), marginal_exposures
         )
@@ -962,7 +965,7 @@ class TopographyModel(ABC, BaseEstimator):
         )
         dataset["predicted_locus_marginal"] = (
             (np.exp(marginal) * dataset.regions.context_frequencies).sum(
-                dim=dims_except_for(marginal.dims, "locus")
+                dim=dims_except_for(marginal.dims, "source", "locus")
             )
             / dataset.regions.length
         ).astype(np.float32)
@@ -1076,43 +1079,6 @@ class TopographyModel(ABC, BaseEstimator):
                 ),
                 par_context=par,
             ).item()
-
-    def marginal_ll(
-        self,
-        dataset,
-        threads=1,
-        alpha=None,
-        steps=64000,
-    ):
-
-        if isinstance(alpha, str):
-            if alpha == "uniform":
-                alpha = np.ones(self.n_components)
-            else:
-                raise ValueError('Alpha must be a list of floats or "uniform"')
-
-        self._check_corpus(dataset)
-
-        if not self.GT.has_corpusstate(dataset):
-            dataset = self.setup_corpus(dataset)
-
-        ll_fns = self.locals_model.get_marginal_ll_fns(
-            (dataset,),
-            self.factor_model_,
-            alpha=alpha,
-            steps=steps,
-        )
-
-        bar = trange(
-            len(dataset.list_samples()), desc="Calculating marginal lls", leave=False
-        )
-
-        ll = 0.0
-        for sample_ll, *_ in parallel_gen(ll_fns, threads, ordered=False):
-            ll += sample_ll
-            bar.update(1)
-
-        return ll
 
     def format_signature(self, component, normalization="global"):
 

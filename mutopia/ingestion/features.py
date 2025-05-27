@@ -63,7 +63,7 @@ def make_continuous_features_bed(
             "-o",
             "mean",
             "-null",
-            null,
+            str(null),
             "-split" if split else "",
         ]
     )

@@ -1,3 +1,4 @@
+from typing import Iterable
 import optuna
 import os
 from glob import glob
@@ -64,14 +65,14 @@ def summary(study_name, storage=None):
 
 
 def create_study(
-    train_corpuses,
     seed=0,
     storage=None,
-    save_model=False,
-    output_dir=None,
+    save_model=True,
+    output_dir=".",
     extensive=0,
-    test_chroms=["chr1"],
     *,
+    train,
+    test,
     min_components,
     max_components,
     study_name,
@@ -92,13 +93,19 @@ def create_study(
         ),
     )
 
+    if not isinstance(train, Iterable):
+        train = (train,)
+
+    if not isinstance(test, Iterable):
+        test = (test,)
+
     study.set_user_attr("min_components", min_components)
     study.set_user_attr("max_components", max_components)
-    study.set_user_attr("train_corpuses", train_corpuses)
+    study.set_user_attr("train", list(map(os.path.abspath, train)))
+    study.set_user_attr("test", list(map(os.path.abspath, test)))
     study.set_user_attr("save_model", save_model)
     study.set_user_attr("extensive", extensive)
-    study.set_user_attr("test_corpuses", test_chroms)
-    study.set_user_attr("output_dir", output_dir)
+    study.set_user_attr("output_dir", os.path.abspath(output_dir))
 
     for key, value in model_kw.items():
         study.set_user_attr(key, value)
@@ -128,8 +135,8 @@ def load_study(study_name, storage=None, prune=True):
     study_attrs = {
         "min_components": model_attrs.pop("min_components"),
         "max_components": model_attrs.pop("max_components"),
-        "train_corpuses": model_attrs.pop("train_corpuses"),
-        "test_corpuses": model_attrs.pop("test_corpuses"),
+        "train": model_attrs.pop("train"),
+        "test": model_attrs.pop("test"),
         "save_model": model_attrs.pop("save_model"),
         "output_dir": model_attrs.pop("output_dir"),
         "extensive": model_attrs.pop("extensive", 0),
@@ -141,6 +148,18 @@ def load_study(study_name, storage=None, prune=True):
         study_attrs,
         model_attrs,
     )
+
+
+def load_study_data(study, lazy=False):
+
+    train = study.user_attrs["train"]
+    test = study.user_attrs["test"]
+
+    load_fn = lazy_load if lazy else eager_load
+    train = list(map(load_fn, train))
+    test = list(map(load_fn, test))
+
+    return train, test
 
 
 def _model_report_callback(trial, factor_model, epoch, test_scores):
@@ -155,17 +174,18 @@ def get_reporting_callback(trial):
     return partial(_model_report_callback, trial)
 
 
-def _get_save_model_fn(
-    study_name,
-    output_dir,
-):
+def _get_save_model_fn(study):
+
+    study_name = study.study_name
+    output_dir = study.user_attrs["output_dir"]
+
     if not os.access(output_dir, os.W_OK):
         raise PermissionError(f"Cannot write to directory: {output_dir}")
 
     def _save_model(trial, model):
 
         model_path = os.path.join(
-            os.path.abspath(output_dir),
+            output_dir,
             f'{study_name.replace("/",".")}_{trial.number}.pkl',
         )
 
@@ -175,7 +195,25 @@ def _get_save_model_fn(
     return _save_model
 
 
-def _sample_params(study, extra_param_fn, trial):
+def _objective(
+    trial,
+    save_model=True,
+    param_sampling_fn=None,
+    *,
+    study,
+    model,
+    train,
+    test,
+):
+    
+    if save_model:
+        save_fn = _get_save_model_fn(study)
+
+    if param_sampling_fn is None:
+        param_sampling_fn = partial(
+            model.sample_params,
+            extensive=study.user_attrs["extensive"],
+        )
 
     params = {
         "num_components": trial.suggest_int(
@@ -185,45 +223,58 @@ def _sample_params(study, extra_param_fn, trial):
         )
     }
 
-    params.update(extra_param_fn(study, trial))
+    params.update( param_sampling_fn(trial) )
 
     logger.info(
         f"Running trial {trial.number} with params:\n\t"
         + "\n\t".join([f"{key}: {value}" for key, value in params.items()])
     )
 
-    return params
-
-
-def _objective(
-    trial,
-    *,
-    model_kw,
-    train,
-    test,
-    param_sampling_fn,
-    model_save_fn,
-):
-    params = param_sampling_fn(trial)
-    model_kw.update(params)
     callback = partial(_model_report_callback, trial)
 
-    model = (
-        train[0]
-        .modality()
-        .TopographyModel(**model_kw, callback=callback, seed=trial.number)
-        .fit(
-            *train,
-            test_datasets=test,
-        )
+    model.set_params(
+        **params,
+        callback=callback,
+        seed=trial.number,
     )
-
-    model_save_fn(trial, model)
+    
+    model.fit(
+        train,
+        test_datasets=test,
+    )
+    
+    if save_model:
+        save_fn(trial, model)
 
     return model.test_scores_[-1]
 
 
 def run_trial(
+    save_model=True,
+    param_sampling_fn=None,
+    *,
+    study,
+    model,
+    train,
+    test,
+):
+    objective = partial(
+        _objective,
+        save_model=save_model,
+        param_sampling_fn=param_sampling_fn,
+        study=study,
+        model=model,
+        train=train,
+        test=test,
+    )
+
+    return study.optimize(
+        objective,
+        n_trials=1,
+    )
+
+
+def _run_trial_cli(
     storage=None,
     lazy=False,
     *,
@@ -234,49 +285,20 @@ def run_trial(
     study, study_attrs, model_kw = load_study(study_name, storage)
     model_kw.update(kwargs)
 
-    train, test = list(
-        zip(
-            *[
-                (lazy_train_test_load if lazy else eager_train_test_load)(
-                    corpus, study_attrs["test_chroms"]
-                )
-                for corpus in study_attrs["train_corpuses"]
-            ]
-        )
+    train, test = load_study_data(study, lazy)
+ 
+    model = (
+        train[0].
+        modality().
+        TopographyModel(**model_kw)
     )
 
-    example_corpus = train[0]
-    model_cls = example_corpus.modality().TopographyModel
-
-    if "eval_every" in model_kw:
-        model_kw.pop("eval_every")
-
-    if not study_attrs["save_model"]:
-        model_save_fn = lambda *args: None
-    else:
-        model_save_fn = _get_save_model_fn(
-            study_name,
-            study_attrs["output_dir"],
-        )
-
-    param_sampling_fn = partial(
-        _sample_params,
-        study,
-        partial(model_cls.sample_params, extensive=study_attrs["extensive"]),
-    )
-
-    obj_fn = partial(
-        _objective,
-        model_kw=model_kw,
+    run_trial(
+        save_model=study_attrs["save_model"],
+        study=study,
+        model=model,
         train=train,
         test=test,
-        param_sampling_fn=param_sampling_fn,
-        model_save_fn=model_save_fn,
-    )
-
-    study.optimize(
-        obj_fn,
-        n_trials=1,
     )
 
 

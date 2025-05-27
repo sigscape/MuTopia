@@ -131,7 +131,7 @@ class GtensorInterface:
 
     @classmethod
     def has_corpusstate(cls, dataset):
-        return "State" in dataset.sections
+        return "State" in dataset.sections.groups
 
     @classmethod
     def is_marginal_corpus(cls, dataset):

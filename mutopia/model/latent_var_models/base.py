@@ -505,51 +505,55 @@ class LocalsModel:
 
         return sstats
 
-    def predict(self, dataset, factor_model, par_context=None):
+    def _predict(self, dataset, factor_model, threads=1):
+        
+        old_iters = self.estep_iterations
         self.estep_iterations = 10000
-        self.difference_tol = 5e-5
 
         subsample_rate = (
-            dataset.regions.context_frequencies.sum().item()
+            self.GT.get_freqs(dataset).sum().item()
             / factor_model.get_genome_size(dataset)
         )
 
         update_fns = self._get_update_fns(
-            (dataset,),
+            dataset,
             factor_model,
-            par_context=par_context,
-            exposures_fn=random_locals(np.random.RandomState(1776), self.n_components),
+            exposures_fn=random_locals(
+                np.random.RandomState(1776),
+                self.n_components * self.GT.n_sources(dataset),
+            ),
             locus_subsample=subsample_rate,
         )
 
-        Nks = []
-        for s in tqdm(
-            parallel_map(update_fns, par_context),
+        update_fns = tqdm(
+            update_fns,
+            total=len(dataset.list_samples()),
             ncols=100,
-            desc="Estimating contributions",
-        ):
-            Nks.append(s[1])
-
-        return DataArray(
-            np.array(Nks),
-            dims=("sample", "component"),
+            desc='Estimating contributions'
         )
 
-    def predict_sample(
+        Nks = np.array([stats["Nk"] for stats in parallel_map(update_fns, threads=threads)])
+
+        self.estep_iterations = old_iters
+        return Nks
+    
+    def predict(
         self,
-        sample,
         dataset,
         factor_model,
+        threads=1,
     ):
-        self.estep_iterations = 10000
-        self.difference_tol = 5e-5
-
-        with ParContext(1) as par:
-            return self.predict(
-                SampleCorpusFusion(CorpusInterface(dataset), sample),
-                factor_model,
-                par_context=par,
-            )
+        Nks = self._predict(dataset, factor_model=factor_model, threads=threads)
+        n_sources = self.GT.n_sources(dataset)
+        Nks = (
+            Nks
+            .reshape((-1, n_sources, self.n_components))
+            .transpose((1,0,2))
+        )
+        return DataArray(
+            Nks,
+            dims=("source","sample","component")
+        )
 
     def score(
         self,
@@ -623,11 +627,6 @@ class LocalsModel:
             [sample.X.sum().data.item() for _, sample in self.GT.iter_samples(dataset)]
         )
 
-        n_observations = DataArray(
-            n_observations,
-            dims=("sample",),
-        )
-
         if hasattr(dataset, "ploidy"):
             weighted_ploidy = (
                 (n_observations / n_observations.sum())
@@ -641,7 +640,10 @@ class LocalsModel:
                 self.init_locals(len(n_observations)),
                 dims=("component", "sample"),
             ),
-            n_observations=n_observations,
+            n_observations = DataArray(
+                n_observations,
+                dims=("sample",),
+            ),
             weighted_ploidy=DataArray(
                 weighted_ploidy,
                 dims=("locus",),

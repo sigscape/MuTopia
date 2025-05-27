@@ -6,6 +6,15 @@ from numpy import array
 from .fancy_iterators import streaming_local_sort, sorted_iterator
 
 
+def stream_sort_bed(data, buffer_len=1000):
+    return streaming_local_sort(
+        data,
+        key=lambda x: (x[0], x[1]),
+        has_lapsed=lambda curr, buffval: curr[0] != buffval[0]
+        or curr[1] - buffval[1] > buffer_len,
+    )
+
+
 @dataclass
 class BED12Record:
     chromosome: str
