@@ -75,6 +75,8 @@ class MixtureInterface(GtensorInterface):
         if "source" in source_corpus.dims:
             source_corpus = source_corpus.sel(source=source, drop=True)
 
+        source_corpus = source_corpus.assign_coords(**dataset.coords).drop_dims("source")
+
         return source_corpus
 
     def sources(self, dataset):

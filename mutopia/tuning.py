@@ -199,6 +199,7 @@ def _objective(
     trial,
     save_model=True,
     param_sampling_fn=None,
+    summary_callback=None,
     *,
     study,
     model,
@@ -246,12 +247,22 @@ def _objective(
     if save_model:
         save_fn(trial, model)
 
+    if not summary_callback is None:
+        summary_callback(
+            trial, 
+            model=model, 
+            study=study,
+            train=train,
+            test=test
+        )
+
     return model.test_scores_[-1]
 
 
 def run_trial(
     save_model=True,
     param_sampling_fn=None,
+    summary_callback=None,
     *,
     study,
     model,
@@ -262,6 +273,7 @@ def run_trial(
         _objective,
         save_model=save_model,
         param_sampling_fn=param_sampling_fn,
+        summary_callback=summary_callback,
         study=study,
         model=model,
         train=train,
