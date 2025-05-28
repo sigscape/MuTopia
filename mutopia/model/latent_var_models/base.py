@@ -563,7 +563,8 @@ class LocalsModel:
         par_context=None,
     ):
 
-        factor_model.update_normalizers(datasets, par_context)
+        for _, dataset in self.GT.expand_datasets(*datasets):
+            self.GT.update_normalizers(dataset, factor_model.get_normalizers(dataset))
 
         kw = dict(
             factor_model=factor_model,

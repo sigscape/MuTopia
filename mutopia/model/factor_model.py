@@ -52,8 +52,8 @@ class FactorModel:
         }
 
         self._genome_size = {
-            self.GT.get_name(dataset) : self.GT.get_freqs(dataset).sum().item()
-            for dataset in datasets
+            name : self.GT.get_freqs(dataset).sum().item()
+            for name, dataset in self.GT.expand_datasets(*datasets)
         }
 
     def Mstep(
@@ -108,7 +108,10 @@ class FactorModel:
         )
 
     def get_normalizers(self, dataset):
-        return self._normalizers[self.GT.get_name(dataset)]
+        return (
+            self._normalizers[self.GT.get_name(dataset)]
+            + np.log(self.get_genome_size(dataset)/self.GT.get_freqs(dataset).sum().item())
+        )
 
     def get_genome_size(self, dataset):
         return self._genome_size[self.GT.get_name(dataset)]
@@ -294,7 +297,8 @@ class FactorModel:
     def update_normalizers(self, datasets, par_context=None):
         for name, dataset in self.GT.expand_datasets(*datasets):
             self.GT.update_normalizers(
-                dataset, self._calc_normalizers(dataset, par_context)
+                dataset, 
+                self._calc_normalizers(dataset, par_context) + np.log(self.GT.get_freqs(dataset).sum().item()/self.get_genome_size(dataset))
             )
 
     def _calc_normalizers(

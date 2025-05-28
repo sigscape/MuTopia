@@ -98,9 +98,9 @@ def _dir_prior_update_step(prior, N, logphat):
 
     new_prior = step_size * dprior + prior
 
-    if np.any(new_prior < 0.01):
+    if np.any(new_prior < 0.00001):
         logger.debug("Performing projected gradient descent update.")
-        new_prior = np.maximum(new_prior, 0.01)
+        new_prior = np.maximum(new_prior, 0.00001)
 
     return new_prior
 

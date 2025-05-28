@@ -245,6 +245,10 @@ def fit_model(
         check_dims(dataset, factor_model)
         check_corpus(dataset)
 
+    sources = list(set([source for ds in train_datasets + test_datasets for source in GT.list_sources(ds)]))
+    if len(sources) > 1:
+        logger.info(f"Found sources: {str_wrapped_list(sources)}")
+
     # Ensure all train datasets have different names
     corpus_names = [name for name, _ in GT.expand_datasets(*train_datasets)]
     if len(corpus_names) != len(set(corpus_names)):
