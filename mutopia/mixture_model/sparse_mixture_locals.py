@@ -19,7 +19,7 @@ class SparseMixtureModel(LDAUpdateSparse):
         # What's going on here: we have the normalized log mutation rate for each signature, configuration, context, locus.
         # For the mutations in this sample, we select over these axes.
         ##
-        logp_normalizer = self.GT.fetch_normalizers(dataset)[:, None]
+        logp_normalizer = factor_model.get_normalizers(dataset)[:, None]
 
         offset = self._get_log_context_effect(dataset, **sample_dict)
 

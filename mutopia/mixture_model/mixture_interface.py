@@ -13,7 +13,6 @@ import numpy as np
 from functools import partial
 from os import path
 
-
 class MixtureInterface(GtensorInterface):
 
     def to_datasets(self, *datasets):
@@ -101,20 +100,13 @@ class MixtureInterface(GtensorInterface):
 
         sample_names = dataset.list_samples()
         n_components = factor_model.n_components
-        genome_size = dataset.sections["Regions"].context_frequencies.sum().data.item()
 
         dataset.corpus = dataset.corpus.drop_dims(
             "component", errors="ignore"
         ).assign_coords(sample=sample_names)
 
         for source, data in self.sources(dataset):
-            state_elements = {
-                "normalizers": xr.DataArray(
-                    np.zeros(n_components, dtype=float),
-                    dims=("component",),
-                    attrs={"genome_size": genome_size},
-                ),
-            }
+            state_elements = {}
 
             state_elements.update(locals_model.prepare_corpusstate(data))
 

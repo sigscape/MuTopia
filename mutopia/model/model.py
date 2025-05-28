@@ -566,9 +566,6 @@ class TopographyModel(ABC, BaseEstimator):
                 par_context=par,
             )
 
-        for _, ds in self.GT.expand_datasets(dataset):
-            self.GT.update_normalizers(ds, self.factor_model_.get_normalizers(ds))
-
         logger.info("Done ...")
         return dataset
 

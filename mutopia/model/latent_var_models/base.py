@@ -562,10 +562,6 @@ class LocalsModel:
         exposures_fn=None,
         par_context=None,
     ):
-
-        for _, dataset in self.GT.expand_datasets(*datasets):
-            self.GT.update_normalizers(dataset, factor_model.get_normalizers(dataset))
-
         kw = dict(
             factor_model=factor_model,
             exposures_fn=exposures_fn,

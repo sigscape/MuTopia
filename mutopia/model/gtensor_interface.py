@@ -55,16 +55,8 @@ class GtensorInterface:
                 dataset.corpus = dataset.corpus.drop_dims("feature")
 
         sample_names = dataset.list_samples()
-        n_components = factor_model.n_components
-        genome_size = dataset.sections["Regions"].context_frequencies.sum().data.item()
 
-        state_elements = {
-            "normalizers": xr.DataArray(
-                np.zeros(n_components, dtype=float),
-                dims=("component",),
-                attrs={"genome_size": genome_size},
-            ),
-        }
+        state_elements = {}
 
         state_elements.update(locals_model.prepare_corpusstate(dataset))
 
@@ -140,19 +132,6 @@ class GtensorInterface:
     @classmethod
     def fetch_val(cls, dataset, key):
         return dataset["State/" + key]
-
-    @classmethod
-    def fetch_normalizers(cls, dataset):
-        return cls.fetch_val(dataset, "normalizers").data
-
-    @classmethod
-    def update_normalizers(cls, dataset, normalizers):
-        cls.fetch_normalizers(dataset)[:] = normalizers
-        return dataset
-
-    @classmethod
-    def genome_size(cls, dataset):
-        return cls.fetch_val(dataset, "normalizers").attrs["genome_size"]
 
     @classmethod
     def get_name(cls, dataset):

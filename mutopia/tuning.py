@@ -296,6 +296,7 @@ def _run_trial_cli(
 
     study, study_attrs, model_kw = load_study(study_name, storage)
     model_kw.update(kwargs)
+    model_kw["eval_every"] = 5
 
     train, test = load_study_data(study, lazy)
  

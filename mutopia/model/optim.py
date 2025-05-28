@@ -30,7 +30,7 @@ def VI_step(
     In the previous "offsets" step, new normalizers were calculated. 
     Now we need to transer the normalizers to the full data set.
     """
-    factor_model.set_model_normalizers(datasets, normalizers)
+    factor_model.update_normalizers(normalizers)
 
     """
     The normalizers are updated in the previous function
@@ -97,15 +97,11 @@ def SVI_step(
     """
     offsets, normalizers = timer_wrapper(factor_model.get_exp_offsets_dict)(**args)
 
-    factor_model.set_model_normalizers(
-        slices,
+    factor_model.update_normalizers(
         normalizers,
         learning_rate=learning_rate,
         subsample_rate=locus_subsample or 1.0,
     )
-
-    for _slice, _dataset in zip(GT.to_datasets(*slices), GT.to_datasets(*datasets)):
-        GT.update_normalizers(_dataset, GT.fetch_normalizers(_slice))
 
     """
     Okay, now we can calculate the sufficient statistics.

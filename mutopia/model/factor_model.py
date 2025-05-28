@@ -19,7 +19,7 @@ def overrided_by(default_fn):
             if getattr(self, default_fn) is None:
                 return fn(self, *args, **kwargs)
             else:
-                return getattr(self, default_fn)(*args, **kwargs)
+                return getattr(self, default_fn)(self, *args, **kwargs)
 
         return wrapped_fn
 
@@ -108,16 +108,14 @@ class FactorModel:
         )
 
     def get_normalizers(self, dataset):
-        return (
-            self._normalizers[self.GT.get_name(dataset)]
-            + np.log(self.get_genome_size(dataset)/self.GT.get_freqs(dataset).sum().item())
-        )
+        return self._normalizers[self.GT.get_name(dataset)]
 
     def get_genome_size(self, dataset):
         return self._genome_size[self.GT.get_name(dataset)]
 
     @overrided_by("predict_fn")
     def predict(self, k, dataset, with_context=True):
+        raise NotImplementedError()
         """
         The difference between this method and the _get_propto_log_mutation_rate
         is that this method returns the log mutation rate for all
@@ -132,7 +130,7 @@ class FactorModel:
                     model.predict(k, dataset) for model in self.models.values()
                 ),  # sum over models
                 np.log(self.GT.get_exposures(dataset))
-                + self.GT.fetch_normalizers(dataset)[k],
+                + factor_model.get_normalizers(dataset)[k],
             )
             if with_context:
                 y_hat += np.log(self.GT.get_freqs(dataset))
@@ -219,7 +217,7 @@ class FactorModel:
         ]
 
         offset_fns = (
-            partial(self.offsets_fn or self._get_exp_offsets_k_c, k, dataset)
+            partial(self.offsets_fn or self._get_exp_offsets_k_c, self, k, dataset)
             for k, dataset in args
         )
 
@@ -238,6 +236,7 @@ class FactorModel:
 
     @overrided_by("offsets_fn")
     def _get_exp_offsets_k_c(self, k, dataset):
+        raise NotImplementedError()
 
         model_predictions = {
             model_name: model.predict(k, dataset)
@@ -277,48 +276,14 @@ class FactorModel:
 
             return (-logsumexp(log_mutation_rate.data), exp_offsets)
 
-    def set_model_normalizers(
-        self, datasets, normalizers, learning_rate=1.0, subsample_rate=1.0
+    def update_normalizers(
+        self, normalizers, learning_rate=1.0, subsample_rate=1.0
     ):
-
-        for name, dataset in self.GT.expand_datasets(*datasets):
-
+        for name, norms in normalizers.items():
             curr = self._normalizers[name]
-
             self._normalizers[name][:] = _svi_update_fn(
-                curr, np.log(subsample_rate or 1.0) + normalizers[name], learning_rate
+                curr, np.log(subsample_rate or 1.0) + norms, learning_rate
             )
-
-            self.GT.update_normalizers(
-                dataset,
-                self._normalizers[name],
-            )
-
-    def update_normalizers(self, datasets, par_context=None):
-        for name, dataset in self.GT.expand_datasets(*datasets):
-            self.GT.update_normalizers(
-                dataset, 
-                self._calc_normalizers(dataset, par_context) + np.log(self.GT.get_freqs(dataset).sum().item()/self.get_genome_size(dataset))
-            )
-
-    def _calc_normalizers(
-        self,
-        dataset,
-        par_context=None,
-    ):
-
-        if self.offsets_fn is None:
-            norm_fn = lambda k: -logsumexp(
-                self._get_propto_log_mutation_rate(k, dataset).data
-            )
-        else:
-            norm_fn = lambda k: self.offsets_fn(k, dataset)[0]
-
-        return np.array(
-            parallel_map(
-                (partial(norm_fn, k) for k in range(self.n_components)), par_context
-            )
-        )
 
     def format_signature(self, k, normalization="global"):
         return np.exp(
