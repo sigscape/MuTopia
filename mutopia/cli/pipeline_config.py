@@ -5,10 +5,10 @@ from ..ingestion import FileType
 
 class URLConfig(BaseModel):
     celltype: Optional[str] = Field(None, description="Name of the data source")
-    url: str = Field(..., description="URL to the data source")
+    file: str = Field(..., description="URL to the data source")
     
     def __str__(self) -> str:
-        return f"{self.source}: {self.url}"
+        return f"{self.source}: {self.file}"
 
 class FeatureConfig(BaseModel):
     normalization: str = Field(..., description="Type of normalization to apply")
@@ -17,7 +17,7 @@ class FeatureConfig(BaseModel):
         description="Column number to use from input file (if applicable)"
     ) 
     group: Optional[str] = Field(
-        None,
+        "all",
         description="Group name for the feature"
     )
     null: Optional[str] = Field(
@@ -28,15 +28,15 @@ class FeatureConfig(BaseModel):
         None,
         description="List of classes for the feature"
     )
-    urls: List[URLConfig] = Field(
+    files: List[URLConfig] = Field(
         ..., 
-        description="Mapping of source names to URLs for feature data"
+        description="Mapping of source names to files for feature data"
     )
     
     @property
     def file_type(self) -> FileType:
-        """Determine file type from the first URL's extension"""
-        return FileType.from_extension(self.urls[0].url)
+        """Determine file type from the first file's extension"""
+        return FileType.from_extension(self.files[0].file)
     
     def validate_extension(self) -> None:
         """Validate that the file type supports the chosen normalization"""
@@ -76,5 +76,5 @@ class GTensorConfig(BaseModel):
         cuts = []
         for name, feature in self.features.items():
             if feature.file_type == FileType.BED:
-                cuts.extend((name, url) for url in feature.urls.values())
+                cuts.extend((name, conf.file) for conf in feature.files)
         return cuts 

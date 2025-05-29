@@ -23,6 +23,8 @@ def retry_until_write(func, n_tries=1000, sleep=1):
         for t in range(n_tries):
             try:
                 return func(*args, **kwargs)
+            except FileNotFoundError as err:
+                raise err from None
             except OSError:
                 if t > 10:
                     logger.warning(

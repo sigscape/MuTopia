@@ -2,6 +2,7 @@ import luigi
 import yaml
 import os
 import click
+from functools import cache
 
 from ..utils import FeatureType, logger
 from ..gtensor.disk_interface import (
@@ -9,6 +10,10 @@ from ..gtensor.disk_interface import (
     list_features,
 )
 from .pipeline_config import GTensorConfig
+from urllib.parse import urlparse
+from pathlib import Path
+import requests
+import shutil
 from .core import (
     create_gtensor,
     add_continuous_feature,
@@ -46,11 +51,52 @@ class GTensorFeatureTarget(luigi.Target):
             return False
 
 
+@cache
 def load_config(config_path: str) -> GTensorConfig:
     """Load and validate GTensor configuration from file."""
     with open(config_path) as f:
         config_dict = yaml.safe_load(f)
     return GTensorConfig.model_validate(config_dict)
+
+
+class DownloadTask(luigi.Task):
+
+    url = luigi.Parameter(
+        description="Path to download the file to",
+        significant=True
+    )
+
+    @property
+    def download_path(self):
+        """Determine the local path to download the file to."""
+        parsed_url = urlparse(self.url)
+        filename = os.path.basename(parsed_url.path)
+        return os.path.join("downloads", filename)
+
+    def output(self):
+        return luigi.LocalTarget(self.download_path)
+    
+    def run(self):
+        
+        logger.info(f"Downloading {self.url}")
+        os.makedirs("downloads", exist_ok=True)
+        
+        with requests.get(self.url, stream=True) as r:
+            r.raise_for_status()
+        
+        with open(self.download_path, 'wb') as f:
+            shutil.copyfileobj(r.raw, f)
+
+
+class FileExistsTask(luigi.Task):
+    """Task that checks if a file exists"""
+    path = luigi.Parameter(
+        description="Path to the file to check",
+        significant=True
+    )
+    
+    def output(self):
+        return luigi.LocalTarget(self.path)
 
 
 class CreateGTensorTask(luigi.Task):
@@ -101,7 +147,14 @@ class IngestFeatureTask(luigi.Task):
     )
 
     def requires(self):
-        return CreateGTensorTask(config_path=self.config_path)
+        # First require the GTensor to exist
+        config = load_config(self.config_path)
+        file = config.features[self.feature_name].files[int(self.idx)].file
+        
+        return {
+            "gtensor" : CreateGTensorTask(config_path=self.config_path),
+            "file" : FileExistsTask(file)
+        }
     
     def output(self):
         config = load_config(self.config_path)
@@ -111,8 +164,8 @@ class IngestFeatureTask(luigi.Task):
             source=(
                 config
                 .features[self.feature_name]
-                .urls[int(self.idx)]
-                .source
+                .files[int(self.idx)]
+                .celltype
             )
         )
     
@@ -120,13 +173,15 @@ class IngestFeatureTask(luigi.Task):
         config = load_config(self.config_path)
         gtensor_path = f"{config.name}.nc"
         fc = config.features[self.feature_name]
-        url_config = fc.urls[int(self.idx)]
+        file_config = fc.files[int(self.idx)]
+        
+        file_path = self.input()["file"].path
 
         kw = {
             'dataset': gtensor_path,
             'feature_name': self.feature_name,
-            'ingest_file' : url_config.url, 
-            'source': url_config.source,
+            'ingest_file' : file_path, 
+            'source': file_config.celltype,
             'group': fc.group,
             'mesoscale': FeatureType(fc.normalization) == FeatureType.MESOSCALE,
             'null': fc.null,
@@ -158,22 +213,21 @@ class GTensorPipeline(luigi.WrapperTask):
                 feature_name=feature_name,
                 idx=idx,
             )
-            for feature_name, feature_config in config.features
-            for idx, _ in enumerate(feature_config.urls)
+            for feature_name, feature_config in config.features.items()
+            for idx, _ in enumerate(feature_config.files)
         ]
 
 def run_pipeline(
-    *,
-    config_path: str, 
-    workers: int, 
-    remote_scheduler: bool, 
-    dry_run: bool
+    config_file: str,
+    workers=1,
+    remote_scheduler=False,
+    dry_run=False,
 ):
     """Run the GTensor pipeline with the given configuration file."""
     
     # Validate configuration first to fail fast if invalid
     try:
-        with open(config_path) as f:
+        with open(config_file) as f:
             config_dict = yaml.safe_load(f)
         GTensorConfig.model_validate(config_dict)
     except Exception as e:
@@ -182,7 +236,7 @@ def run_pipeline(
     
     # Run pipeline
     success = luigi.build(
-        [GTensorPipeline(config_path=config_path)],
+        [GTensorPipeline(config_path=config_file)],
         workers=workers * (not dry_run),
         local_scheduler=not remote_scheduler,
         detailed_summary=True,
