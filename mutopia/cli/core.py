@@ -3,6 +3,7 @@ from typing import *
 from functools import partial
 import os
 import numpy as np
+import xarray as xr
 import mutopia.ingestion as ingest
 from mutopia.gtensor import *
 import mutopia.gtensor.disk_interface as disk
@@ -13,6 +14,9 @@ from ..utils import FeatureType, logger
 from ..dtypes import get_mode_config
 from ..ingestion import make_continuous_features_bed
 from sparse import COO
+import netCDF4 as nc
+from shutil import copyfile
+from ..ingestion import gene_features
 
 def create_gtensor(
     *,
@@ -354,9 +358,238 @@ def add_sample(
                 "ploidy": ploidy,
             }
         )
+    else:
+        sample = X
 
     disk.write_sample(
         dataset,
         sample,
         sample_name=sample_id,
+    )
+
+
+def slice_gtensor(
+    dataset: str,
+    output: str,
+    query_region: list[tuple[str, int, int]],
+):
+    """Slice a G-Tensor by genomic regions."""
+    dataset = lazy_load(dataset)
+    dataset = slice_regions(dataset, *query_region, lazy=True)
+    disk.write_dataset(dataset, output, bar=True)
+
+
+def convert_gtensor(
+    input: str,
+    output: str,
+    dtype: str,
+    fasta_file: str,
+):
+    """Convert a G-Tensor to a different modality."""
+    old_dataset = disk.load_dataset(input, with_samples=False)
+    attrs = old_dataset.attrs
+
+    input_regions_file = attrs["regions_file"]
+    output_regions_file = output + ".regions.bed"
+    copyfile(input_regions_file, output_regions_file)
+
+    modality = get_mode_config(dtype)
+
+    context_freqs = modality.get_context_frequencies(
+        regions_file=output_regions_file,
+        fasta_file=fasta_file,
+    )
+
+    chrom, start, end = list(
+        zip(
+            *((s.chromosome, s.start, s.end) for s in stream_bed12(output_regions_file))
+        )
+    )
+
+    new_dataset = GTensor(
+        modality,
+        name=attrs["name"],
+        chrom=chrom,
+        start=start,
+        end=end,
+        context_frequencies=context_freqs,
+        exposures=old_dataset.regions.exposures.values,
+        dtype=dtype,
+    )
+
+    for k, v in attrs.items():
+        if not k in ("regions_file", "dtype"):
+            new_dataset.attrs[k] = v
+
+    new_dataset.attrs["regions_file"] = output_regions_file
+
+    # transfer features from old to new
+    new_dataset = new_dataset.merge(old_dataset.sections["Features"])
+
+    write_dataset(new_dataset, output)
+
+
+def set_gtensor_attrs(
+    dataset: str,
+    attrs: List[tuple[str, str]],
+):
+    """Set attributes on a G-Tensor."""
+    with nc.Dataset(dataset, "a") as dset:
+        for k, v in attrs:
+            try:
+                setattr(dset, k, v)
+            except AttributeError:
+                dset.setncattr(k, v)
+
+
+def get_gtensor_info(dataset: str) -> dict:
+    """Get information about a G-Tensor."""
+    attrs = disk.read_attrs(dataset)
+    try:
+        n_features = len(disk.list_features(dataset))
+    except disk.NoFeaturesError:
+        n_features = 0
+
+    try:
+        n_samples = len(disk.list_samples(dataset))
+    except disk.NoSamplesError:
+        n_samples = 0
+
+    dims = disk.read_dims(dataset)
+    
+    return {
+        "n_features": n_features,
+        "n_samples": n_samples,
+        "name": attrs["name"],
+        "dims": {k: v for k, v in dims.items() if k != "sample"},
+        "attrs": {k: v for k, v in attrs.items() if k != "name"}
+    }
+
+
+def add_locus_offsets_to_gtensor(
+    dataset: str,
+    offsets_file: str,
+    column: int = 4,
+):
+    """Add locus offsets to a G-Tensor from a file."""
+    exp_offsets = read_continuous_file(
+        dataset,
+        offsets_file,
+        normalization="log1p_cpm",
+        column=column,
+    ).astype(np.float32)
+
+    exp_offsets /= exp_offsets.mean()
+
+    disk.write_locus_offsets(
+        dataset,
+        exp_offsets,
+    )
+
+
+def remove_locus_offsets_from_gtensor(dataset: str):
+    """Remove locus offsets from a G-Tensor."""
+    exp_exposures = np.ones(disk.read_dims(dataset)["locus"], dtype=np.float32)
+
+    disk.write_locus_offsets(
+        dataset,
+        exp_exposures,
+    )
+
+
+def list_gtensor_features(dataset: str) -> dict:
+    """List features in a G-Tensor with formatted output."""
+    feature_info = disk.list_features(dataset)
+
+    if "sample" in feature_info:
+        del feature_info["sample"]
+
+    return feature_info
+
+
+def remove_gtensor_features(
+    dataset: str,
+    feature_names: List[str],
+):
+    """Remove features from a G-Tensor."""
+    for feature_name in feature_names:
+        disk.rm_feature(
+            dataset,
+            feature_name,
+        )
+
+
+def edit_gtensor_feature(
+    dataset: str,
+    feature_name: str,
+    group: Union[None, str] = None,
+    normalization: Union[None, str] = None,
+):
+    """Edit feature attributes in a G-Tensor."""
+    disk.edit_feature_attrs(
+        dataset,
+        feature_name,
+        group=group,
+        normalization=FeatureType(normalization) if normalization else None,
+    )
+
+
+def remove_gtensor_samples(
+    dataset: str,
+    sample_names: List[str],
+):
+    """Remove samples from a G-Tensor."""
+    for sample_name in sample_names:
+        disk.rm_sample(
+            dataset,
+            sample_name,
+        )
+
+
+def list_gtensor_samples(dataset: str) -> List[str]:
+    """List samples in a G-Tensor."""
+    return disk.list_samples(dataset)
+
+
+def linearize_bed_files(
+    bed_files: List[str],
+    max_region_size: int = 25000,
+):
+    """Linearize BED files."""
+    ingest.linearize_beds(
+        *bed_files,
+        max_region_size=max_region_size,
+    )
+
+
+def make_expression_bedfile(
+    quantitation_file: str,
+    output_file,
+    gtf_file: str = None,
+    join_on: str = "gene_id",
+):
+    """Create an expression bedfile from quantitation files."""
+    gtf_file = gtf_file or "MANE.GRCh38.v1.3.ensembl_genomic.gtf"
+
+    if not os.path.exists(gtf_file):
+        logger.info(f"Downloading GTF file: {gtf_file} ...")
+        gene_features.download_gtf(gtf_file)
+
+    annotation_file = "MANE.GRCh38.annotation.bed"
+    if not os.path.exists(annotation_file):
+        logger.info(f"Creating annotation file: {annotation_file} ...")
+        gene_features.make_annotation(gtf_file, annotation_file)
+
+    quant = gene_features.join_quantitation(
+        annotation_file,
+        quantitation_file,
+        join_on=join_on,
+    )
+
+    logger.info(f"Writing quantitation file: {output_file} ...")
+    quant.to_csv(
+        output_file,
+        sep="\t",
+        header=None,
+        index=False,
     )
