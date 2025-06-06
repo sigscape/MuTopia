@@ -1,7 +1,5 @@
 from mutopia.model import GtensorInterface as CS
-from .model.model_components.base import idx_array_to_design
-from .utils import logger, ParContext
-from .gtensor import check_structure, dims_except_for
+from .utils import ParContext
 from tqdm import tqdm
 from sparse import COO
 import xarray as xr

@@ -201,23 +201,41 @@ class MixtureModelBase(LocalsModel):
         self.dtype = dtype
         self.GT = MixtureInterface()
 
+
+    def _init_locals_sample(self, sample,*, alpha, tau, **_):
+
+        N = sample.X.sum().data.item()
+        
+        prior = tau[:,None] * alpha[None,:]  # D x K
+        p_hat = prior/prior.sum(axis=1, keepdims=True)  # normalize
+
+        output_shape = p_hat.shape
+        concentration = p_hat.ravel() * 1000
+        # Sample from Dirichlet distribution and scale by N
+        Nk = np.random.dirichlet(concentration) * N
+
+        return Nk.reshape(output_shape) # G*D*K
+
+
+    def init_locals(self, dataset):
+
+        mixture_kw = self._get_mixture_kw(dataset)
+
+        return self.to_contig(
+            np.array(
+                [
+                    self._init_locals_sample(sample, **mixture_kw)
+                    for _, sample in self.GT.iter_samples(dataset)
+                ]
+            )
+        )
+
     def prepare_corpusstate(self, dataset):
-
-        n_observations = np.array(
-            [sample.X.sum().data.item() for _, sample in self.GT.iter_samples(dataset)]
-        )
-
-        n_observations = DataArray(
-            n_observations,
-            dims=("sample",),
-        )
-
         return dict(
             topic_compositions=DataArray(
-                self.init_locals(len(n_observations)),
-                dims=("component", "sample"),
+                self.init_locals(dataset),
+                dims=("sample", "source", "component"),
             ),
-            n_observations=n_observations,
         )
 
     def _get_mixture_kw(self, dataset):

@@ -3,20 +3,40 @@ import numpy as np
 from typing import Union, List
 from numpy.typing import NDArray
 from pandas import IntervalIndex, Index, Interval, DataFrame
-from ..utils import FeatureType, logger, str_wrapped_list
+from ..utils import logger
 from ..genome_utils.bed12_utils import unstack_regions as _unstack_regions
-from collections import defaultdict
-from functools import reduce, partial
+from functools import reduce
+import os
 from tqdm import tqdm
 from .interfaces import *
 import mutopia.gtensor.disk_interface as disk
+
+__all__ = [
+    "GTensor",
+    "apply_to_samples",
+    "load_dataset",
+    "train_test_split",
+    "lazy_load",
+    "eager_load",
+    "lazy_train_test_load",
+    "eager_train_test_load",
+    "get_explanation",
+    "equal_size_quantiles",
+    "slice_regions",
+    "annot_empirical_marginal",
+    "make_mixture_dataset",
+    "match_dims",
+    "dims_except_for",
+    "unstack_regions",
+    "mutate_method",
+    "BED_COLS",
+]
 
 BED_COLS = [
     "Regions/chrom",
     "Regions/start",
     "Regions/end",
 ]
-
 
 def GTensor(
     modality,
@@ -29,6 +49,37 @@ def GTensor(
     exposures: Union[None, NDArray[np.number]] = None,
     dtype=None,
 ):
+    """
+    Create a GTensor dataset for genomic tensor analysis.
+
+    This function constructs an xarray Dataset with the standardized structure
+    required for genomic tensor operations, including region coordinates,
+    context frequencies, and metadata.
+
+    Parameters
+    ----------
+    modality : object
+        Modality object containing coordinate information and mode configuration
+    name : str
+        Name identifier for the dataset
+    chrom : List[str]
+        List of chromosome names for each genomic region
+    start : List[int]
+        List of start positions for each genomic region
+    end : List[int]
+        List of end positions for each genomic region
+    context_frequencies : xr.DataArray
+        Array containing context frequency data for each region
+    exposures : Union[None, NDArray[np.number]], optional
+        Exposure values for each region. If None, defaults to ones
+    dtype : optional
+        Data type for the dataset. If None, uses modality.MODE_ID
+
+    Returns
+    -------
+    xr.Dataset
+        Structured dataset with regions, coordinates, and metadata
+    """
 
     locus_coords = Index(np.arange(len(chrom)))
 
@@ -63,16 +114,40 @@ def GTensor(
 
 
 def apply_to_samples(data, func, bar=True):
+    """
+    Apply a function to each sample in a dataset with parallel processing.
+
+    This function applies a given function to each sample (region) in the dataset,
+    handling the parallelization and aggregation of results. It's designed for
+    operations that need to process each genomic region independently.
+
+    Parameters
+    ----------
+    data : object
+        Input dataset or data loader containing samples to process
+    func : callable
+        Function to apply to each sample. Should accept a dataset slice and
+        return a result that can be concatenated
+    bar : bool, default=True
+        Whether to display a progress bar during processing
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset containing the concatenated results from all sample applications
+    """
 
     if not hasattr(data, "X"):
         data = LazySampleLoader(data)
 
-    pbar = partial(tqdm, data.list_samples(), desc="Processing samples")
-
     return xr.concat(
         [
             func(data.fetch_sample(sample_name))
-            for sample_name in (data.list_samples() if not bar else pbar)
+            for sample_name in (
+                data.list_samples() 
+                if not bar else
+                tqdm(data.list_samples(), desc="Applying function to samples")
+            )
         ],
         dim="sample",
     )
@@ -80,8 +155,22 @@ def apply_to_samples(data, func, bar=True):
 
 def mutate(func):
     """
-    Decorator function to modify a dataset in place - allows one to run mutations on the dataset
-    without messing up the interface chains.
+    Decorator function to modify a dataset in place.
+    
+    This decorator allows running mutations on a dataset without disrupting
+    the interface chains. It wraps a function to work with the dataset's
+    mutate method.
+
+    Parameters
+    ----------
+    func : callable
+        Function that takes a dataset as first argument and returns
+        a modified dataset
+
+    Returns
+    -------
+    callable
+        Wrapped function that can be used with dataset.mutate()
     """
 
     def wrapper(dataset, *args, **kwargs):
@@ -92,8 +181,22 @@ def mutate(func):
 
 def mutate_method(func):
     """
-    Decorator function to modify a dataset in place - allows one to run mutations on the dataset
-    without messing up the interface chains.
+    Decorator function to modify a dataset in place for class methods.
+    
+    This decorator allows running mutations on a dataset without disrupting
+    the interface chains, specifically for methods that take 'self' as the
+    first parameter.
+
+    Parameters
+    ----------
+    func : callable
+        Method that takes self and dataset as first two arguments and
+        returns a modified dataset
+
+    Returns
+    -------
+    callable
+        Wrapped method that can be used with dataset.mutate()
     """
 
     def wrapper(self, dataset, *args, **kwargs):
@@ -104,8 +207,25 @@ def mutate_method(func):
 
 def load_dataset(dataset, with_samples=True, with_state=True):
     """
-    Loads a dataset from disk. If the dataset is not present,
-    it will be created.
+    Load a dataset from disk with configurable loading options.
+
+    This function loads a dataset from disk storage. The loading behavior can be customized
+    based on whether samples and state information should be included.
+
+    Parameters
+    ----------
+    dataset : str or path-like
+        Path or identifier for the dataset to load
+    with_samples : bool, default=True
+        Whether to load sample data along with the dataset structure
+    with_state : bool, default=True
+        Whether to load state information (model parameters, etc.)
+
+    Returns
+    -------
+    LazySampleLoader or CorpusInterface
+        Loaded dataset interface. Returns LazySampleLoader if with_samples=False,
+        otherwise returns CorpusInterface
     """
     return (LazySampleLoader if not with_samples else CorpusInterface)(
         disk.load_dataset(dataset, with_samples=with_samples, with_state=with_state)
@@ -113,6 +233,35 @@ def load_dataset(dataset, with_samples=True, with_state=True):
 
 
 def train_test_split(dataset, *test_chroms: Union[str, List[str]], lazy=False):
+    """
+    Split a dataset into training and testing sets based on chromosomes.
+
+    This function splits the dataset by chromosomes, with specified chromosomes
+    reserved for testing and the remainder used for training. The split can be
+    performed eagerly (loading all data) or lazily (for memory efficiency).
+
+    Parameters
+    ----------
+    dataset : xr.Dataset
+        Input dataset to split
+    *test_chroms : Union[str, List[str]]
+        Chromosome names to reserve for the test set. Can be provided as
+        multiple string arguments or lists of strings
+    lazy : bool, default=False
+        Whether to perform lazy splitting. If True, returns LazySlicer objects
+        that don't load data until accessed
+
+    Returns
+    -------
+    tuple[CorpusInterface or LazySlicer, CorpusInterface or LazySlicer]
+        Training and testing dataset interfaces
+
+    Raises
+    ------
+    ValueError
+        If no test chromosomes are provided or none of the specified
+        chromosomes are found in the dataset
+    """
 
     if not len(test_chroms) > 0:
         raise ValueError("No test chromosomes provided.")
@@ -149,22 +298,115 @@ def train_test_split(dataset, *test_chroms: Union[str, List[str]], lazy=False):
 
 
 def lazy_load(dataset):
+    """
+    Load a dataset lazily without samples or state information.
+
+    This is a convenience function that loads a dataset with minimal memory
+    footprint by excluding sample data and state information.
+
+    Parameters
+    ----------
+    dataset : str or path-like
+        Path or identifier for the dataset to load
+
+    Returns
+    -------
+    LazySampleLoader
+        Lazy dataset interface that loads data on demand
+    """
     return load_dataset(dataset, with_samples=False, with_state=False)
 
 
 def eager_load(dataset):
+    """
+    Load a dataset eagerly with samples but without state information.
+
+    This is a convenience function that loads a dataset with sample data
+    but excludes state information for faster access patterns.
+
+    Parameters
+    ----------
+    dataset : str or path-like
+        Path or identifier for the dataset to load
+
+    Returns
+    -------
+    CorpusInterface
+        Eager dataset interface with samples loaded into memory
+    """
     return load_dataset(dataset, with_samples=True, with_state=False)
 
 
 def lazy_train_test_load(dataset, *test_chroms):
+    """
+    Load a dataset and perform lazy train/test split by chromosomes.
+
+    This convenience function combines lazy loading with train/test splitting,
+    providing memory-efficient access to training and testing data.
+
+    Parameters
+    ----------
+    dataset : str or path-like
+        Path or identifier for the dataset to load
+    *test_chroms : str
+        Chromosome names to reserve for the test set
+
+    Returns
+    -------
+    tuple[LazySlicer, LazySlicer]
+        Training and testing dataset slicers
+    """
     return train_test_split(lazy_load(dataset), *test_chroms, lazy=True)
 
 
 def eager_train_test_load(dataset, *test_chroms):
+    """
+    Load a dataset and perform eager train/test split by chromosomes.
+
+    This convenience function combines eager loading with train/test splitting,
+    loading all data into memory for fast access.
+
+    Parameters
+    ----------
+    dataset : str or path-like
+        Path or identifier for the dataset to load
+    *test_chroms : str
+        Chromosome names to reserve for the test set
+
+    Returns
+    -------
+    tuple[CorpusInterface, CorpusInterface]
+        Training and testing dataset interfaces
+    """
     return train_test_split(eager_load(dataset), *test_chroms, lazy=False)
 
 
 def get_explanation(dataset, component):
+    """
+    Generate SHAP explanations for a specific model component.
+
+    This function extracts and formats SHAP values for interpretability analysis,
+    creating an explanation object that can be used with SHAP visualization tools.
+
+    Parameters
+    ----------
+    dataset : xr.Dataset
+        Dataset containing SHAP values and feature information
+    component : str
+        Name of the model component to explain
+
+    Returns
+    -------
+    shap.Explanation
+        SHAP explanation object with values, features, and display data
+
+    Raises
+    ------
+    ImportError
+        If SHAP library is not installed
+    ValueError
+        If the specified component doesn't have SHAP values in the dataset
+    """
 
     try:
         import shap
@@ -224,7 +466,31 @@ def get_explanation(dataset, component):
     return expl
 
 
-def equal_size_quantiles(dataset, var_name, n_bins=10):
+def equal_size_quantiles(dataset, var_name, n_bins=10, key=None):
+    """
+    Create equal-size quantile bins for a variable in the dataset.
+
+    This function bins the values of a specified variable into quantiles of equal
+    cumulative region length, which is useful for creating balanced genomic bins.
+
+    Parameters
+    ----------
+    dataset : xarray.Dataset
+        Dataset containing the variable to bin
+    var_name : str
+        Name of the variable to create quantile bins for
+    n_bins : int, default=10
+        Number of quantile bins to create
+    key : str, optional
+        Custom name for the output bin variable. If None, generates name as
+        '{var_name_base}_qbins_{n_bins}' where var_name_base is the last part
+        of var_name after splitting on '/'
+
+    Returns
+    -------
+    xarray.Dataset
+        The input dataset with quantile bins added as a new variable
+    """
 
     bin_nums = np.arange(dataset.sizes["locus"])
     sorted_vals = DataFrame(
@@ -241,7 +507,9 @@ def equal_size_quantiles(dataset, var_name, n_bins=10):
 
     sorted_vals["bin"] = (sorted_vals.cumm_fraction // (1 / (n_bins - 1))).astype(int)
 
-    key = f'{var_name.rsplit("/", 1)[-1]}_qbins_{n_bins}'
+    if key is None:
+        key = f'{var_name.rsplit("/", 1)[-1]}_qbins_{n_bins}'
+    
     dataset[key] = xr.DataArray(
         sorted_vals["bin"].loc[bin_nums].values,
         dims="locus",
@@ -252,9 +520,37 @@ def equal_size_quantiles(dataset, var_name, n_bins=10):
     return dataset
 
 
-def slice_regions(dataset, chrom: str, start: int, end: int, lazy=False):
+def slice_regions(dataset, chrom: str, start: int = 0, end: int = np.inf, lazy=False):
+    """
+    Extract regions that overlap with a specified genomic interval.
 
-    check_structure(dataset)
+    This function filters the dataset to include only regions that overlap
+    with the specified chromosome and coordinate range.
+
+    Parameters
+    ----------
+    dataset : xr.Dataset
+        Input dataset containing genomic regions
+    chrom : str
+        Chromosome name to filter by
+    start : int
+        Start coordinate of the interval
+    end : int
+        End coordinate of the interval
+    lazy : bool, default=False
+        Whether to return a lazy slicer instead of materializing the data
+
+    Returns
+    -------
+    xr.Dataset or LazySlicer
+        Filtered dataset containing only overlapping regions
+
+    Raises
+    ------
+    ValueError
+        If no regions match the specified query interval
+    """
+    lazy = lazy or not "X" in dataset.data_vars
 
     regions = dataset.sections["Regions"]
     regions_mask = (regions.chrom.values == chrom) & (
@@ -276,10 +572,28 @@ def slice_regions(dataset, chrom: str, start: int, end: int, lazy=False):
     return dataset.isel(locus=regions_mask)
 
 
-def annot_empirical_marginal(dataset):
+def annot_empirical_marginal(dataset, key="empirical_marginal"):
+    """
+    Calculate and add empirical marginal mutation rates to a dataset.
 
-    check_structure(dataset)
+    This method computes empirical marginal mutation rates by aggregating observed mutations
+    across all samples in the dataset and normalizing by context frequencies and region lengths.
 
+    Parameters
+    ----------
+    dataset : xarray.Dataset
+        Dataset containing mutation data to analyze
+    key : str, default="empirical_marginal"
+        Base name for the mutation rate variables to be added to the dataset.
+        Creates two variables: `{key}` and `{key}_locus`
+
+    Returns
+    -------
+    xarray.Dataset
+        The input dataset with empirical marginal rates added as new variables:
+        - {key}: Marginal mutation rates normalized by context frequencies
+        - {key}_locus: Per-locus marginal rates normalized by region length
+    """
     todense = lambda x: x.asdense() if x.is_sparse() else x
     coo_or_dense = lambda x: x.ascoo() if x.is_sparse() else x
 
@@ -297,13 +611,14 @@ def annot_empirical_marginal(dataset):
 
     X_emp = todense(X_emp)
 
-    logger.info('Added key: "empirical_marginal"')
-    dataset["empirical_marginal"] = (
+    logger.info(f'Added key: "{key}"')
+    dataset[key] = (
         X_emp / dataset.sections["Regions"].context_frequencies
     ).fillna(0.0)
 
-    logger.info('Added key: "empirical_locus_marginal"')
-    dataset["empirical_locus_marginal"] = (
+    locus_key = f"{key}_locus"
+    logger.info(f'Added key: "{locus_key}"')
+    dataset[locus_key] = (
         (
             X_emp.sum(dim=dims_except_for(X_emp.dims, "locus"))
             / dataset.sections["Regions"].length
@@ -316,6 +631,23 @@ def annot_empirical_marginal(dataset):
 
 
 def make_mixture_dataset(**datasets):
+    """
+    Create a mixed dataset by combining multiple source datasets.
+
+    This function merges multiple datasets, renaming their features and state
+    variables to include source identifiers, enabling comparative analysis
+    across different data sources.
+
+    Parameters
+    ----------
+    **datasets : dict
+        Named datasets to combine. Keys become source identifiers.
+
+    Returns
+    -------
+    CorpusInterface
+        Combined dataset with source-specific feature namespaces
+    """
 
     source_names = list(datasets.keys())
     merge_dsets = []
@@ -359,186 +691,31 @@ def match_dims(X, **dim_sizes):
     )
 
 
-def check_dims(dataset, model_state):
-    rm_dim = dims_except_for(
-        dataset.X.dims,
-        *model_state.requires_dims,
-    )
-    if not len(rm_dim) == 0:
-        logger.warning(
-            f'The dataset {dataset.attrs["name"]} has extra dimensions: {", ".join(rm_dim)}.\n'
-            f'The model requires the following dimensions: {", ".join(model_state.requires_dims)}.\n'
-            "Having extra data dimensions will increase training time and memory usage,\n"
-            'remove them by summing over them: `dataset.sum(dim="extra_dim", keep_attrs=True)`.'
-        )
-
-    missing_dims = set(model_state.requires_dims).difference(
-        dataset.X.dims + ("sample",)
-    )
-    if not len(missing_dims) == 0:
-        raise ValueError(
-            f'The dataset {dataset.attrs["name"]} is missing the following dimensions: {", ".join(missing_dims)}.\n'
-            f'The model requires the following dimensions: {", ".join(model_state.requires_dims)}.\n'
-        )
-
-
-def check_structure(dataset):
-
-    required_vars = {
-        "chrom",
-        "start",
-        "end",
-        "length",
-        "context_frequencies",
-        "exposures",
-    }
-
-    if not "name" in dataset.attrs:
-        raise ValueError("The dataset is missing a name attribute.")
-
-    sections = dataset.sections.names
-
-    if not "Regions" in sections:
-        raise ValueError('The dataset is missing the "Regions" section.')
-
-    if not "Features" in sections or len(dataset.sections["Features"].data_vars) == 0:
-        raise ValueError(
-            'The dataset is missing the "Features" section, or it is empty.'
-        )
-
-    for key in required_vars:
-        if not hasattr(dataset, "Regions/" + key):
-            raise ValueError(f'The dataset is missing the "{key}" node.')
-
-
-def check_sample_data(dataset, dtype):
-    pass
-
-
-def check_feature(feature):
-
-    if not "normalization" in feature.attrs:
-        raise ValueError("The feature is missing a normalization attribute.")
-
-    normalization = feature.attrs["normalization"]
-    try:
-        FeatureType(normalization)
-    except ValueError:
-        raise ValueError(
-            f"Normalization type {normalization} not recognized. "
-            f'Please use one of {", ".join(FeatureType.__members__)}'
-        )
-
-    allowed_types = FeatureType(normalization).allowed_dtypes
-    dtype = feature.data.dtype
-
-    if not dtype in allowed_types and not any(
-        np.issubdtype(dtype, t) for t in allowed_types
-    ):
-        raise ValueError(
-            f'The feature {feature.name} has dtype {dtype} but must be one of {", ".join(map(repr, allowed_types))}.'
-        )
-
-
-def check_corpus(dataset):
-
-    check_structure(dataset)
-
-    for feature in dataset.sections["Features"].values():
-        check_feature(feature)
-
-
-def check_feature_consistency(*datasets):
-
-    type_dict = defaultdict(set)
-    for feature_name, dtype in list(
-        (feature_name, FeatureType(feature.attrs["normalization"]))
-        for dataset in datasets
-        for feature_name, feature in dataset.sections["Features"].data_vars.items()
-    ):
-        type_dict[feature_name].add(dtype)
-
-    for feature_name, types in type_dict.items():
-        if not len(types) == 1:
-            raise ValueError(
-                f"The feature {feature_name} has inconsistent normalization types across datasets: {str_wrapped_list(types)}"
-            )
-
-    def _get_classes(dataset, feature):
-        try:
-            return feature.attrs["classes"]
-        except KeyError as err:
-            raise KeyError(
-                f'The feature {feature.name} in dataset {dataset.attrs["name"]} is missing the `classes` attribute.'
-            ) from err
-
-    priority_dict = defaultdict(list)
-    for feature_name, classes in list(
-        (feature_name, tuple(_get_classes(dataset, feature)))
-        for dataset in datasets
-        for feature_name, feature in dataset.sections["Features"].data_vars.items()
-        if FeatureType(feature.attrs["normalization"])
-        in (FeatureType.CATEGORICAL, FeatureType.MESOSCALE)
-    ):
-        priority_dict[feature_name].append(classes)
-
-    for feature_name, priorities in priority_dict.items():
-        if not all(p == priorities[0] for p in priorities):
-            raise ValueError(
-                f"The feature {feature_name} has inconsistent class priorities across datasets:\n\t"
-                + "\n\t".join(map(lambda p: ", ".join(map(str, p)), priorities))
-            )
-
-    corpus_membership = {
-        dataset.attrs["name"]: {
-            feature_name
-            for feature_name in dataset.sections["Features"].data_vars.keys()
-        }
-        for dataset in datasets
-    }
-    shared_features = set.intersection(*corpus_membership.values())
-
-    for corpus_name, features in corpus_membership.items():
-        extra_features = features.difference(shared_features)
-        if len(extra_features) > 0:
-            logger.warning(
-                f'The dataset {corpus_name} has extra features: {", ".join(extra_features)}.\n'
-                "Extra features will be ignored during training."
-            )
-
-
-def prepare_data(dataset):
-
-    dataset["Regions/context_frequencies"] = dataset[
-        "Regions/context_frequencies"
-    ].transpose(..., "locus")
-
-    dataset["Regions/context_frequencies"].data = np.asfortranarray(
-        dataset["Regions/context_frequencies"].data,
-        dtype=np.float32,
-    )
-
-    dataset["Regions/exposures"].data = np.ascontiguousarray(
-        dataset["Regions/exposures"],
-        dtype=np.float32,
-    )
-
-    if hasattr(dataset, "ploidy"):
-        dataset["ploidy"].data.data = dataset["ploidy"].data.data.astype(np.float32)
-
-    return dataset
-
-
 def get_regions_filename(dataset):
+
     return os.path.join(
         os.path.dirname(dataset.attrs["filename"]), dataset.attrs["regions_file"]
     )
 
 
 def unstack_regions(dataset):
+    """
+    Unstack regions from a compressed format to full coordinate arrays.
 
-    check_structure(dataset)
+    This function expands region data from a compact representation to
+    full coordinate arrays, using external region file information to
+    reconstruct chromosome, start, and end coordinates.
 
+    Parameters
+    ----------
+    dataset : xr.Dataset
+        Dataset with stacked region representation
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with unstacked region coordinates
+    """
     n_regions = dataset.coords["locus"].size
 
     chrom, start, end, idx = _unstack_regions(

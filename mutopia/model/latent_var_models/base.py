@@ -6,12 +6,10 @@ import numpy as np
 from numba.extending import get_cython_function_address
 import ctypes
 from functools import wraps
-
-from ...utils import logger, ParContext, parallel_map, parallel_gen
+from ...utils import logger, parallel_map, parallel_gen
 from ._dirichlet_update import update_alpha
-from ..model_components.base import _svi_update_fn, PrimitiveModel
+from ..model_components.base import _svi_update_fn
 from ..gtensor_interface import GtensorInterface
-from ...gtensor import CorpusInterface, SampleCorpusFusion
 
 
 """

@@ -253,7 +253,7 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         sstats += weights
         return sstats
 
-    def format_signature(self, k, normalization="none"):
+    def format_component(self, k, normalization="none"):
         return 0.0
 
 

@@ -1,3 +1,11 @@
+"""
+Hyperparameter tuning utilities for machine learning models.
+
+This module provides functions for creating and managing Optuna studies for
+hyperparameter optimization, including database storage, study management,
+and model training with automated pruning.
+"""
+
 from typing import Iterable
 import optuna
 import os
@@ -11,6 +19,19 @@ from .utils import logger
 
 
 def _get_nfs_storage(study_name):
+    """
+    Create a journal file storage backend for Optuna studies.
+
+    Parameters
+    ----------
+    study_name : str
+        Name of the study to create storage for
+
+    Returns
+    -------
+    JournalStorage
+        Optuna storage backend using journal file
+    """
 
     journal = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -22,6 +43,17 @@ def _get_nfs_storage(study_name):
 
 
 def list_studies():
+    """
+    List all available Optuna studies.
+
+    Searches for journal database files in the parent directory and extracts
+    study names from the file names.
+
+    Returns
+    -------
+    list of str
+        List of study names found in journal files
+    """
 
     glob_script = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -37,6 +69,21 @@ def list_studies():
 
 
 def dashboard(study_name, storage=None):
+    """
+    Launch an Optuna dashboard for visualizing study progress.
+
+    Parameters
+    ----------
+    study_name : str
+        Name of the study to visualize
+    storage : optuna.storages.BaseStorage, optional
+        Custom storage backend. If None, uses default NFS storage.
+
+    Raises
+    ------
+    ImportError
+        If optuna_dashboard package is not installed
+    """
 
     try:
         from optuna_dashboard import run_server
@@ -52,6 +99,22 @@ def dashboard(study_name, storage=None):
 
 
 def summary(study_name, storage=None):
+    """
+    Get a summary dataframe of all trials in a study.
+
+    Parameters
+    ----------
+    study_name : str
+        Name of the study to summarize
+    storage : optuna.storages.BaseStorage, optional
+        Custom storage backend. If None, uses default NFS storage.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame containing trial information including parameters,
+        values, and metadata
+    """
 
     if storage is None:
         storage = _get_nfs_storage(study_name)
@@ -78,6 +141,34 @@ def create_study(
     study_name,
     **model_kw,
 ):
+    """
+    Create a new Optuna study for hyperparameter optimization.
+
+    Parameters
+    ----------
+    seed : int, default 0
+        Random seed for reproducible sampling
+    storage : optuna.storages.BaseStorage, optional
+        Custom storage backend. If None, uses default NFS storage.
+    save_model : bool, default True
+        Whether to save trained models during optimization
+    output_dir : str, default "."
+        Directory to save models and results
+    extensive : int, default 0
+        Level of extensive parameter sampling
+    train : str or list of str
+        Path(s) to training dataset(s)
+    test : str or list of str
+        Path(s) to test dataset(s)
+    min_components : int
+        Minimum number of components to try
+    max_components : int
+        Maximum number of components to try
+    study_name : str
+        Unique name for the study
+    **model_kw
+        Additional model parameters to store as study attributes
+    """
 
     if storage is None:
         storage = _get_nfs_storage(study_name)
@@ -112,6 +203,29 @@ def create_study(
 
 
 def load_study(study_name, storage=None, prune=True):
+    """
+    Load an existing Optuna study with its configuration.
+
+    Parameters
+    ----------
+    study_name : str
+        Name of the study to load
+    storage : optuna.storages.BaseStorage, optional
+        Custom storage backend. If None, uses default NFS storage.
+    prune : bool, default True
+        Whether to enable hyperband pruning for the study
+
+    Returns
+    -------
+    tuple
+        Three-element tuple containing:
+        - study : optuna.Study
+            The loaded Optuna study object
+        - study_attrs : dict
+            Study-specific attributes (components, datasets, etc.)
+        - model_attrs : dict
+            Model-specific attributes and parameters
+    """
 
     if storage is None:
         storage = _get_nfs_storage(study_name)
@@ -151,6 +265,25 @@ def load_study(study_name, storage=None, prune=True):
 
 
 def load_study_data(study, lazy=False):
+    """
+    Load training and test datasets from a study configuration.
+
+    Parameters
+    ----------
+    study : optuna.Study
+        Optuna study object containing dataset paths in user attributes
+    lazy : bool, default False
+        Whether to use lazy loading for datasets
+
+    Returns
+    -------
+    tuple
+        Two-element tuple containing:
+        - train : list
+            List of loaded training datasets
+        - test : list
+            List of loaded test datasets
+    """
 
     train = study.user_attrs["train"]
     test = study.user_attrs["test"]
@@ -163,6 +296,28 @@ def load_study_data(study, lazy=False):
 
 
 def _model_report_callback(trial, factor_model, epoch, test_scores):
+    """
+    Callback function for reporting trial progress to Optuna.
+
+    Reports the latest test score to the trial and checks if the trial
+    should be pruned based on intermediate results.
+
+    Parameters
+    ----------
+    trial : optuna.Trial
+        Current trial object
+    factor_model : object
+        The model being trained (unused in this callback)
+    epoch : int
+        Current training epoch
+    test_scores : list
+        List of test scores from training
+
+    Raises
+    ------
+    optuna.TrialPruned
+        If the trial should be pruned based on intermediate results
+    """
 
     if isfinite(test_scores[-1]):
         trial.report(test_scores[-1], epoch)
@@ -171,10 +326,41 @@ def _model_report_callback(trial, factor_model, epoch, test_scores):
 
 
 def get_reporting_callback(trial):
+    """
+    Create a partial callback function for trial reporting.
+
+    Parameters
+    ----------
+    trial : optuna.Trial
+        Trial object to bind to the callback
+
+    Returns
+    -------
+    functools.partial
+        Partial callback function with trial pre-bound
+    """
     return partial(_model_report_callback, trial)
 
 
 def _get_save_model_fn(study):
+    """
+    Create a model saving function for a specific study.
+
+    Parameters
+    ----------
+    study : optuna.Study
+        Study object containing output directory configuration
+
+    Returns
+    -------
+    callable
+        Function that saves models with trial-specific naming
+
+    Raises
+    ------
+    PermissionError
+        If the output directory is not writable
+    """
 
     study_name = study.study_name
     output_dir = study.user_attrs["output_dir"]
@@ -206,6 +392,37 @@ def _objective(
     train,
     test,
 ):
+    """
+    Objective function for Optuna optimization trials.
+
+    This function defines what happens during each trial: parameter sampling,
+    model training, evaluation, and optional model saving.
+
+    Parameters
+    ----------
+    trial : optuna.Trial
+        Current trial object for parameter sampling
+    save_model : bool, default True
+        Whether to save the trained model
+    param_sampling_fn : callable, optional
+        Custom function for sampling model parameters.
+        If None, uses model's default sampling method.
+    summary_callback : callable, optional
+        Callback function called after trial completion
+    study : optuna.Study
+        Study object containing configuration
+    model : object
+        Model instance to train
+    train : list
+        Training datasets
+    test : list
+        Test datasets
+
+    Returns
+    -------
+    float
+        Final test score for this trial
+    """
     
     if save_model:
         save_fn = _get_save_model_fn(study)
@@ -269,6 +486,31 @@ def run_trial(
     train,
     test,
 ):
+    """
+    Run a single optimization trial.
+
+    Parameters
+    ----------
+    save_model : bool, default True
+        Whether to save the trained model
+    param_sampling_fn : callable, optional
+        Custom function for sampling model parameters
+    summary_callback : callable, optional
+        Callback function called after trial completion
+    study : optuna.Study
+        Study object to run trial on
+    model : object
+        Model instance to train
+    train : list
+        Training datasets
+    test : list
+        Test datasets
+
+    Returns
+    -------
+    object
+        Result of study.optimize() call
+    """
     objective = partial(
         _objective,
         save_model=save_model,
@@ -293,6 +535,24 @@ def _run_trial_cli(
     study_name,
     **kwargs,
 ):
+    """
+    Command-line interface for running a single trial.
+
+    This function loads a study configuration, sets up the model,
+    and runs a single optimization trial. Intended for use in
+    distributed optimization scenarios.
+
+    Parameters
+    ----------
+    storage : optuna.storages.BaseStorage, optional
+        Custom storage backend. If None, uses default NFS storage.
+    lazy : bool, default False
+        Whether to use lazy loading for datasets
+    study_name : str
+        Name of the study to run trial for
+    **kwargs
+        Additional keyword arguments passed to model configuration
+    """
 
     study, study_attrs, model_kw = load_study(study_name, storage)
     model_kw.update(kwargs)
@@ -325,6 +585,35 @@ def retrain(
     save_name,
     **kwargs,
 ):
+    """
+    Retrain a model using parameters from a specific trial.
+
+    This function loads the best parameters from a completed trial
+    and retrains the model with those parameters, typically for
+    final model deployment or further analysis.
+
+    Parameters
+    ----------
+    storage : optuna.storages.BaseStorage, optional
+        Custom storage backend. If None, uses default NFS storage.
+    lazy : bool, default False
+        Whether to use lazy loading for datasets
+    seed : int, optional
+        Random seed for reproducible training. If None, uses trial number.
+    study_name : str
+        Name of the study containing the trial
+    trial_number : int
+        Trial number to retrain from
+    save_name : str
+        Path where to save the retrained model
+    **kwargs
+        Additional keyword arguments to override model parameters
+
+    Notes
+    -----
+    This function automatically sets max_features based on convolution_width
+    and removes eval_every from parameters to ensure full training.
+    """
 
     study, study_attrs, model_kw = load_study(study_name, storage)
     model_kw.update(kwargs)

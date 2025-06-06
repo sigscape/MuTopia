@@ -66,9 +66,12 @@ class MixtureInterface(GtensorInterface):
 
         other_dvars = [v for g in groups.values() for v in g]
         shared_features = [v for v in features if len(v.split("/")) == 2]
+        shared_state = [v for v in state if len(v.split("/")) == 2]
+
         source_corpus = dataset[
-            list(rename_map.keys()) + other_dvars + shared_features
+            list(rename_map.keys()) + other_dvars + shared_features + shared_state
         ].rename(rename_map)
+
         source_corpus.attrs["name"] = MixtureInterface.get_name(dataset) + "/" + source
 
         if "source" in source_corpus.dims:
@@ -99,25 +102,26 @@ class MixtureInterface(GtensorInterface):
                 dataset.corpus = dataset.corpus.drop_dims("feature")
 
         sample_names = dataset.list_samples()
-        n_components = factor_model.n_components
 
         dataset.corpus = dataset.corpus.drop_dims(
             "component", errors="ignore"
         ).assign_coords(sample=sample_names)
 
-        for source, data in self.sources(dataset):
-            state_elements = {}
+        state_elements = {}
+        state_elements.update(locals_model.prepare_corpusstate(dataset))
 
-            state_elements.update(locals_model.prepare_corpusstate(data))
+        for source, data in self.sources(dataset):
+            source_elements={}
 
             for model in factor_model.models.values():
-                state_elements.update(model.prepare_corpusstate(data))
+                source_elements.update(model.prepare_corpusstate(data))
 
-            state_elements = {
-                f"State/{source}/{k}": v for k, v in state_elements.items()
-            }
+            source_elements = {f"{source}/{k}": v for k, v in source_elements.items()}
 
-            dataset.corpus = dataset.corpus.assign(**state_elements)
+            state_elements.update(source_elements)
+        
+        state_elements = {f"State/{k}": v for k, v in state_elements.items()}
+        dataset.corpus = dataset.corpus.assign(**state_elements)
 
         return dataset
 
@@ -140,46 +144,24 @@ class MixtureInterface(GtensorInterface):
             pass
 
         return dataset
-
-    def _fetch_topic_compositions(self, dataset, sample_name):
+    
+    @classmethod
+    def fetch_topic_compositions(self, dataset, sample_name):
+        """
+        Fetch topic compositions for a given sample from the dataset.
+        """
         gamma = (
             self.fetch_val(dataset, "topic_compositions")
             .sel(sample=sample_name)
-            .transpose("component", ...)
+            .transpose("source", "component")
             .data
         )
 
-        if len(gamma.shape) > 1:
-            gamma = gamma[:, 0]
-
         return gamma
-
-    def fetch_topic_compositions(self, dataset, sample_name):
-        return np.array(
-            [
-                self._fetch_topic_compositions(ds, sample_name)
-                for name, ds in self.sources(dataset)
-            ]
-        )
-
-    def update_topic_compositions(self, dataset, sample_name, gamma):
-        for (_, ds), gamma_d in zip(self.sources(dataset), gamma):
-            self._fetch_topic_compositions(ds, sample_name)[:] = gamma_d
-
-    def using_exposures_from(self, *corpuses):
-        corpus_dict = {self.get_name(dataset): dataset for dataset in corpuses}
-
-        return lambda dataset, sample_name: self.fetch_topic_compositions(
-            corpus_dict[self.get_name(dataset)], sample_name
-        )
-
+    
     def fetch_locals(self, dataset):
-        return xr.concat(
-            [
-                self.fetch_val(source, "topic_compositions")
-                for _, source in self.sources(dataset)
-            ],
-            dim="source",
-        ).assign_coords(
-            source=self.list_sources(dataset),
-        )
+        """
+        Fetch local topic compositions for a given sample from the dataset.
+        This is a wrapper around fetch_topic_compositions to maintain compatibility.
+        """
+        return self.fetch_val(dataset, "topic_compositions")

@@ -427,7 +427,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
             )
         )
 
-    def format_signature(self, k, normalization="global"):
+    def format_component(self, k, normalization="global"):
 
         if not normalization in ("global", "weighted", "none"):
             raise ValueError(
@@ -458,7 +458,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         )
 
     def get_baseline_summary(self, k):
-        return self.format_signature(k, normalization="none").sel(
+        return self.format_component(k, normalization="none").sel(
             mesoscale_state="Baseline"
         )
 

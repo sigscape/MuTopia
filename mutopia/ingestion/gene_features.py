@@ -42,7 +42,7 @@ def make_annotation(gtf, output):
 
 def join_quantitation(
     annotation_file,
-    *quantitation_files,
+    quantitation_file,
     join_on="gene_id",
 ):
 
@@ -67,21 +67,15 @@ def join_quantitation(
         inplace=True,
     )
 
-    # Read all quantification files
-    quantifications = []
-    for file in quantitation_files:
-        df = pd.read_csv(
-            file,
-            sep=None,
-            header=None,
-            engine="python",
-            names=[join_on, "expression_est"],
-        )
-        quantifications.append(df)
-
-    quantifications = (
-        pd.concat(quantifications, axis=0).groupby(join_on).mean().reset_index()
+    quantifications = pd.read_csv(
+        quantitation_file,
+        sep=None,
+        header=None,
+        engine="python",
+        names=[join_on, "expression_est"],
     )
+
+    quantifications = quantifications.groupby(join_on).mean().reset_index()
 
     if join_on == "gene_id":
         quantifications[join_on] = quantifications[join_on].str.rsplit(".", n=1).str[0]

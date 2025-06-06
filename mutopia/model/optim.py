@@ -1,7 +1,22 @@
 from tqdm import trange
 from functools import partial
-from ..utils import *
-from ..gtensor import *
+from math import isnan
+from ..utils import (
+    logger,
+    str_wrapped_list,
+    timer_wrapper,
+    ParContext
+)
+import time
+from ..gtensor import (
+    DifferentSamples,
+    LazySlicer,
+)
+from ..gtensor.validation import (
+    check_dims,
+    check_corpus,
+    check_feature_consistency,
+)
 from .factor_model import FactorModel
 from .latent_var_models.base import LocalsModel
 from .gtensor_interface import GtensorInterface
@@ -13,10 +28,10 @@ def VI_step(
     datasets,
     GT: GtensorInterface,
     update_prior=True,
-    learning_rate=1.0,
     *,
     test_score_fn,
     par_context,
+    **kw, # just soak up the kwargs for compatibility
 ):
 
     args = dict(
@@ -30,7 +45,7 @@ def VI_step(
     In the previous "offsets" step, new normalizers were calculated. 
     Now we need to transer the normalizers to the full data set.
     """
-    factor_model.update_normalizers(normalizers)
+    factor_model.update_normalizers(datasets, normalizers)
 
     """
     The normalizers are updated in the previous function
@@ -74,6 +89,7 @@ def SVI_step(
     datasets,
     GT: GtensorInterface,
     update_prior=True,
+    full_normalizers=False,
     *,
     test_score_fn,
     par_context,
@@ -97,11 +113,25 @@ def SVI_step(
     """
     offsets, normalizers = timer_wrapper(factor_model.get_exp_offsets_dict)(**args)
 
-    factor_model.update_normalizers(
-        normalizers,
-        learning_rate=learning_rate,
-        subsample_rate=locus_subsample or 1.0,
-    )
+    if full_normalizers:
+        '''
+        If the locus subsample is very small, we need to update the normalizers
+        on the full datasets to reduce variance.
+        '''
+        _, normalizers = factor_model.get_exp_offsets_dict(
+            datasets=datasets,
+            par_context=par_context,
+        )
+
+        factor_model.update_normalizers(datasets, normalizers)
+    else:
+
+        factor_model.update_normalizers(
+            slices,
+            normalizers,
+            learning_rate=learning_rate,
+            subsample_rate=locus_subsample or 1.0,
+        )
 
     """
     Okay, now we can calculate the sufficient statistics.
@@ -227,6 +257,7 @@ def fit_model(
     eval_every=10,
     verbose=0,
     time_limit=None,
+    full_normalizers=False,
     **kw,
 ) -> tuple[FactorModel, LocalsModel, list]:
 
@@ -261,12 +292,12 @@ def fit_model(
 
     logger.info("Preprocessing training datasets...")
     train_datasets = [
-        GT.init_state(prepare_data(dataset), *models) for dataset in train_datasets
+        GT.init_state(GT.prepare_data(dataset), *models) for dataset in train_datasets
     ]
 
     logger.info("Preprocessing testing datasets...")
     test_datasets = [
-        GT.init_state(prepare_data(dataset), *models) for dataset in test_datasets
+        GT.init_state(GT.prepare_data(dataset), *models) for dataset in test_datasets
     ]
 
     test_score_fn = partial(
@@ -280,11 +311,16 @@ def fit_model(
     Sometimes we'd like to skip evaluating the test data
     to decrease the computational burden.
     """
-    dummy_score_fn = lambda *x, **y: np.nan
+    dummy_score_fn = lambda *x, **y: float("nan")
 
     lr_schedule = partial(learning_rate_schedule, tau, kappa)
 
     stop_fn = partial(_should_stop, stop_condition // eval_every)
+
+    if full_normalizers:
+        logger.warning(
+            "Calculating full factor normalizers for updates - this will increase the memory usage, but will reduce variance."
+        )
 
     if locus_subsample is None and batch_subsample is None:
         logger.warning("Using batch variational inference.")
@@ -293,6 +329,7 @@ def fit_model(
             *models,
             train_datasets,
             GT,
+            full_normalizers=full_normalizers,
         )
     else:
 
@@ -310,6 +347,7 @@ def fit_model(
             train_datasets,
             GT,
             batch_generator=subsampler,
+            full_normalizers=full_normalizers,
             **subsample_rates,
         )
 
@@ -328,6 +366,9 @@ def fit_model(
     prior_has_been_updated = False
 
     with ParContext(threads, verbose) as par:
+
+        #factor_model.init_normalizers(train_datasets, par_context=par)
+        
         try:
             progress_bar = trange(
                 1,
@@ -362,7 +403,7 @@ def fit_model(
                     test_score_fn=test_score_fn if evaluate_test else dummy_score_fn,
                 )
 
-                if np.isnan(train_score):
+                if isnan(train_score):
                     raise ValueError(
                         "The model has diverged - some parameter is NaN. "
                         "This usually means that the model is under-regularized, or it suffered a bad initial condition.\n"

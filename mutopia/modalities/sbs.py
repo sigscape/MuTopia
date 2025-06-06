@@ -107,7 +107,7 @@ def _fast_exp_offsets(
     )
 
 
-def _get_exp_offsets_k_c(k, corpus):
+def _get_exp_offsets_k_c(factor_model, k, corpus):
 
     (normalizer, context_offsets, locus_offsets) = _fast_exp_offsets(
         *_get_args(k, corpus)
@@ -158,11 +158,11 @@ def _fast_component_predict(
     return np.log(out) + normalizer
 
 
-def _predict(k, corpus, with_context=True):
+def _predict(factor_model, k, corpus, with_context=True):
 
     out = _fast_component_predict(
         *_get_args(k, corpus),
-        np.float32(CS.fetch_normalizers(corpus)[k]),
+        np.float32(factor_model.get_normalizers(corpus)[k]),
         with_context=with_context,
     )
 

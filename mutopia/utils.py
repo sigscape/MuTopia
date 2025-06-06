@@ -1,13 +1,9 @@
-import sparse
 import numpy as np
-from pandas import DataFrame
-from xarray import DataArray
 from joblib import Parallel, delayed
 from contextlib import contextmanager
 from enum import Enum
 import inspect
 from functools import wraps
-from collections import defaultdict
 import logging
 import subprocess
 from gzip import open as gzopen
