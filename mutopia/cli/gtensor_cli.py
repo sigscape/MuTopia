@@ -74,14 +74,7 @@ def _train_test_split(*args, **kwargs):
 @gtensor_cli.command("slice", short_help="Extract genomic regions from a G-Tensor")
 @click.argument("dataset", type=click.Path(exists=True), metavar="DATASET")
 @click.argument("output", type=click.Path(writable=True), metavar="OUTPUT")
-@click.option(
-    "-r",
-    "--query-region",
-    required=True,
-    multiple=True,
-    type=(str, int, int),
-    help="Genomic region as 'chromosome start end'. Can be specified multiple times.",
-)
+@click.argument('query_regions', type=str, nargs=-1, metavar='REGIONS...')
 def _slice_loci(*args, **kwargs):
     """
     Extract specific genomic regions from a G-Tensor dataset.

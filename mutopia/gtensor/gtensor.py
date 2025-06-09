@@ -1,3 +1,9 @@
+"""
+GTensor module for genomic tensor analysis.
+This module provides functionality for creating, manipulating, and analyzing genomic tensors,
+including loading datasets, applying transformations, and generating explanations for model components.
+"""
+
 import xarray as xr
 import numpy as np
 from typing import Union, List
@@ -10,6 +16,7 @@ import os
 from tqdm import tqdm
 from .interfaces import *
 import mutopia.gtensor.disk_interface as disk
+from ..utils import parse_region
 
 __all__ = [
     "GTensor",
@@ -520,23 +527,24 @@ def equal_size_quantiles(dataset, var_name, n_bins=10, key=None):
     return dataset
 
 
-def slice_regions(dataset, chrom: str, start: int = 0, end: int = np.inf, lazy=False):
+def slice_regions(dataset, *regions, lazy=False):
     """
-    Extract regions that overlap with a specified genomic interval.
+    Extract genomic regions that overlap with specified intervals.
 
     This function filters the dataset to include only regions that overlap
-    with the specified chromosome and coordinate range.
+    with any of the specified genomic intervals. Intervals can be specified in 
+    multiple formats: "chr:start-end", "chr" (entire chromosome), or a comma-separated
+    list of such specifications.
 
     Parameters
     ----------
     dataset : xr.Dataset
         Input dataset containing genomic regions
-    chrom : str
-        Chromosome name to filter by
-    start : int
-        Start coordinate of the interval
-    end : int
-        End coordinate of the interval
+    regions : str
+        Region specification(s) in formats:
+        - "chr:start-end" (e.g., "chr1:1000-2000")
+        - "chr" (entire chromosome, e.g., "chr1")
+        - List of any of the above
     lazy : bool, default=False
         Whether to return a lazy slicer instead of materializing the data
 
@@ -548,27 +556,37 @@ def slice_regions(dataset, chrom: str, start: int = 0, end: int = np.inf, lazy=F
     Raises
     ------
     ValueError
-        If no regions match the specified query interval
+        If no regions match the specified query intervals
     """
     lazy = lazy or not "X" in dataset.data_vars
-
-    regions = dataset.sections["Regions"]
-    regions_mask = (regions.chrom.values == chrom) & (
-        IntervalIndex.from_arrays(regions.start.values, regions.end.values).overlaps(
-            Interval(start, end)
-        )
-    )
-
+    
+    parsed_regions = list(map(parse_region, regions))
+    
+    # Create mask for regions overlapping with any of the parsed regions
+    ds_regions = dataset.sections["Regions"]
+    regions_mask = np.zeros(len(ds_regions.chrom), dtype=bool)
+    
+    for chrom, start, end in parsed_regions:
+        chrom_mask = ds_regions.chrom.values == chrom
+        if np.any(chrom_mask):
+            interval_mask = IntervalIndex.from_arrays(
+                ds_regions.start.values[chrom_mask], 
+                ds_regions.end.values[chrom_mask]
+            ).overlaps(Interval(start, end))
+            
+            # Update the overall mask
+            regions_mask[chrom_mask] |= interval_mask
+    
     if not np.any(regions_mask):
-        raise ValueError("No regions match query")
-
+        raise ValueError(f"No regions match the specified query: {regions}")
+    
     logger.info(
         f"Found {np.sum(regions_mask)}/{len(regions_mask)} regions matching query."
     )
-
+    
     if lazy:
         return LazySlicer(dataset, locus=regions_mask)
-
+    
     return dataset.isel(locus=regions_mask)
 
 

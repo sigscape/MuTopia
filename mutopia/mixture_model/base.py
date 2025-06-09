@@ -1,5 +1,6 @@
 from numba import njit
 from numba.core.errors import NumbaPerformanceWarning
+from functools import wraps, partial
 import warnings
 
 warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
@@ -202,7 +203,15 @@ class MixtureModelBase(LocalsModel):
         self.GT = MixtureInterface()
 
 
-    def _init_locals_sample(self, sample,*, alpha, tau, **_):
+    def _get_sample_init_fn(self, dataset):
+        mixture_kw = self._get_mixture_kw(dataset)
+        return partial(
+            self._init_locals_sample,
+            **mixture_kw,
+        )
+    
+    @staticmethod
+    def _init_locals_sample(sample,*, alpha, tau, **_):
 
         N = sample.X.sum().data.item()
         
@@ -215,28 +224,6 @@ class MixtureModelBase(LocalsModel):
         Nk = np.random.dirichlet(concentration) * N
 
         return Nk.reshape(output_shape) # G*D*K
-
-
-    def init_locals(self, dataset):
-
-        mixture_kw = self._get_mixture_kw(dataset)
-
-        return self.to_contig(
-            np.array(
-                [
-                    self._init_locals_sample(sample, **mixture_kw)
-                    for _, sample in self.GT.iter_samples(dataset)
-                ]
-            )
-        )
-
-    def prepare_corpusstate(self, dataset):
-        return dict(
-            topic_compositions=DataArray(
-                self.init_locals(dataset),
-                dims=("sample", "source", "component"),
-            ),
-        )
 
     def _get_mixture_kw(self, dataset):
         raise NotImplementedError()

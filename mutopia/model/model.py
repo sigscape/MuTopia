@@ -14,7 +14,7 @@ from .model_components import *
 from .latent_var_models import *
 from .factor_model import FactorModel
 from ..mixture_model import *
-from ..utils import logger, ParContext, diverging_palette
+from ..utils import logger, ParContext, diverging_palette, parallel_map
 from ..plot.coef_matrix_plot import _plot_interaction_matrix
 from ..gtensor import *
 from ..gtensor.validation import check_corpus, check_dims
@@ -539,6 +539,9 @@ class TopographyModel(ABC, BaseEstimator):
         self._component_names = names
 
         return dataset
+    
+    def predict(self, dataset, exposures_fn=None, threads=1):
+        pass
 
     def _check_corpus(self, dataset, enforce_sample=True):
         check_corpus(dataset)
@@ -1029,7 +1032,7 @@ class TopographyModel(ABC, BaseEstimator):
         except KeyError:
             dataset = self.annot_contributions(dataset, threads)
 
-        marginal_exposures = dataset["contributions"].sum(dim="sample").data
+        marginal_exposures = self.GT.fetch_locals(dataset).sum(dim="sample")
        
         marginal = self.factor_model_._log_marginalize_mutrate(
             np.log(dataset["component_distributions"]), marginal_exposures
@@ -1114,11 +1117,14 @@ class TopographyModel(ABC, BaseEstimator):
 
         if not scan:
             subset_loci = np.random.RandomState(seed).choice(
-                dataset.locus.size, max(n_samples, 1500), replace=False
+                dataset.locus.size, max(n_samples, 2000), replace=False
             )
             subset = dataset.isel(locus=subset_loci)
         else:
             subset = dataset
+
+        if self.GT.n_sources(subset) > 1:
+            subset = next(self.GT.expand_datasets(subset))
 
         locus_model = self.factor_model_.models["theta_model"]
         X = locus_model._fetch_feature_matrix(subset)
@@ -1153,10 +1159,13 @@ class TopographyModel(ABC, BaseEstimator):
             )
         )
 
-        with ParContext(threads) as par:
-            shap_matrix = np.array(
-                list(par(delayed(_component_shap)(k) for k in use_components))
+        
+        shap_matrix = np.array(
+            parallel_map(
+                (partial(_component_shap, k) for k in use_components),
+                threads=threads
             )
+        )
 
         features = dataset.state.coords["feature"].data
         coords = {

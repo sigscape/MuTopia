@@ -170,7 +170,11 @@ class FactorModel:
     @staticmethod
     def _log_marginalize_mutrate(log_mutrate_tensor, exposures):
 
-        def logsafe_matmul(y, log_x):
+        def logsafe_matmul(log_x, y):
+
+            y = y.ravel()
+            log_x = log_x.reshape(*log_x.shape[:-2], -1)
+
             alpha = log_x.max()
             return alpha + np.log(
                 np.dot(np.nan_to_num(np.exp(log_x - alpha), nan=0.0, copy=False), y)
@@ -181,9 +185,9 @@ class FactorModel:
 
             return xr.apply_ufunc(
                 logsafe_matmul,
-                exposures,
                 log_mutrate_tensor,
-                input_core_dims=[[], ["source", "component"]],
+                exposures,
+                input_core_dims=[["source","component"], ["source","component"]],
             )
 
     def _log_component_posterior(self, log_mutrate_tensor, exposures):

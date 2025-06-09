@@ -371,11 +371,11 @@ def add_sample(
 def slice_gtensor(
     dataset: str,
     output: str,
-    query_region: list[tuple[str, int, int]],
+    query_regions: list[str],
 ):
     """Slice a G-Tensor by genomic regions."""
     dataset = lazy_load(dataset)
-    dataset = slice_regions(dataset, *query_region, lazy=True)
+    dataset = slice_regions(dataset, *query_regions, lazy=True)
     disk.write_dataset(dataset, output, bar=True)
 
 

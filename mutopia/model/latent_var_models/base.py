@@ -5,7 +5,7 @@ from numba import njit, vectorize, objmode
 import numpy as np
 from numba.extending import get_cython_function_address
 import ctypes
-from functools import wraps
+from functools import wraps, partial
 from ...utils import logger, parallel_map, parallel_gen
 from ._dirichlet_update import update_alpha
 from ..model_components.base import _svi_update_fn
@@ -394,12 +394,11 @@ def AIS_marginal_ll(
         steps,
     )
 
-
-def random_locals(random_state, n_components):
-    def init_locals(dataset, sample_name):
-        return random_state.gamma(100.0, 1.0 / 100.0, size=(n_components,))
-
-    return init_locals
+def _just_next_Nk(Nks):
+    i = iter(Nks)
+    def _next_Nk(*args, **kw):
+        return next(i)
+    return _next_Nk
 
 
 class LocalsModel:
@@ -508,19 +507,12 @@ class LocalsModel:
         old_iters = self.estep_iterations
         self.estep_iterations = 10000
 
-        subsample_rate = (
-            self.GT.get_freqs(dataset).sum().item()
-            / factor_model.get_genome_size(dataset)
-        )
+        Nk = self.init_locals(dataset)
 
         update_fns = self._get_update_fns(
             dataset,
             factor_model,
-            exposures_fn=random_locals(
-                np.random.RandomState(1776),
-                self.n_components * self.GT.n_sources(dataset),
-            ),
-            locus_subsample=subsample_rate,
+            exposures_fn=_just_next_Nk(Nk),
         )
 
         update_fns = tqdm(
@@ -605,16 +597,48 @@ class LocalsModel:
         **sample_sstats,
     ):
         raise NotImplementedError
+    
 
+    def _get_sample_init_fn(self, dataset):
+        return partial(
+            self.random_state.gamma,
+            100.0,
+            1.0 / 100.0,
+            size=(self.n_components,),
+        )
+
+
+    def init_locals(self, dataset):
+
+        init_fn = self._get_sample_init_fn(dataset)
+
+        return self.to_contig(
+            np.array(
+                [
+                    init_fn(sample)
+                    for _, sample in self.GT.iter_samples(dataset)
+                ]
+            )
+        )
+
+    def prepare_corpusstate(self, dataset):
+        return dict(
+            topic_compositions=DataArray(
+                self.init_locals(dataset),
+                dims=("sample", "source", "component"),
+            ),
+        )
+    
     ##
     # M-step functionality to satisfy the PrimModel interface
     ##
-    def init_locals(self, n_samples):
+    '''def init_locals(self, n_samples):
         return self.random_state.gamma(
             100.0,
             1.0 / 100.0,
             size=(self.n_components, n_samples),
         ).astype(self.dtype)
+
 
     def prepare_corpusstate(self, dataset):
 
@@ -643,7 +667,7 @@ class LocalsModel:
                 weighted_ploidy,
                 dims=("locus",),
             ),
-        )
+        )'''
 
     @staticmethod
     def reduce_sparse_sstats(
