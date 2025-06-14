@@ -539,9 +539,6 @@ class TopographyModel(ABC, BaseEstimator):
         self._component_names = names
 
         return dataset
-    
-    def predict(self, dataset, exposures_fn=None, threads=1):
-        pass
 
     def _check_corpus(self, dataset, enforce_sample=True):
         check_corpus(dataset)
@@ -1117,17 +1114,20 @@ class TopographyModel(ABC, BaseEstimator):
 
         if not scan:
             subset_loci = np.random.RandomState(seed).choice(
-                dataset.locus.size, max(n_samples, 2000), replace=False
+                dataset.locus.size, max(n_samples, 50), replace=False
             )
             subset = dataset.isel(locus=subset_loci)
         else:
             subset = dataset
 
-        if self.GT.n_sources(subset) > 1:
-            subset = next(self.GT.expand_datasets(subset))
-
+        n_loci = subset.sizes['locus']
+        n_sources = self.GT.n_sources(subset)
         locus_model = self.factor_model_.models["theta_model"]
-        X = locus_model._fetch_feature_matrix(subset)
+        
+        X = np.vstack([
+            locus_model._fetch_feature_matrix(subset)
+            for _, subset in self.GT.expand_datasets(subset)
+        ])
 
         background_idx = np.random.RandomState(0).choice(
             len(X), size=min(1000, len(X)), replace=False
@@ -1158,7 +1158,6 @@ class TopographyModel(ABC, BaseEstimator):
                 ),
             )
         )
-
         
         shap_matrix = np.array(
             parallel_map(
@@ -1167,7 +1166,7 @@ class TopographyModel(ABC, BaseEstimator):
             )
         )
 
-        features = dataset.state.coords["feature"].data
+        features = dataset.coords["feature"].data
         coords = {
             "shap_features": features,
             "shap_component": [self.component_names[k] for k in use_components],
@@ -1176,14 +1175,19 @@ class TopographyModel(ABC, BaseEstimator):
         if not scan:
             coords["shap_locus"] = subset.locus.data
 
+        shap_matrix = shap_matrix.reshape(
+            (len(use_components), n_sources, n_loci, -1)
+        )
+
         dataset[key] = xr.DataArray(
             shap_matrix,
-            dims=("shap_component", "locus" if scan else "shap_locus", "shap_features"),
+            dims=("shap_component", "source", "locus" if scan else "shap_locus", "shap_features"),
             coords=coords,
         )
 
         logger.info(f'Added key: "{key}"')
         return dataset
+
 
     def format_component(self, component, normalization="global"):
         """
@@ -1212,7 +1216,7 @@ class TopographyModel(ABC, BaseEstimator):
     def alpha_(self):
         return self.locals_model_.alpha
 
-    def execel_report(self, dataset, output):
+    def excel_report(self, dataset, output, normalization="global"):
         """
         Generate a comprehensive Excel report with model results.
 
@@ -1256,7 +1260,7 @@ class TopographyModel(ABC, BaseEstimator):
 
             for sig in self.component_names:
                 (
-                    renorm(self.format_component(sig))
+                    renorm(self.format_component(sig, normalization=normalization))
                     .to_pandas()
                     .T.to_excel(
                         writer,

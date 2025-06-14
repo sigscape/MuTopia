@@ -50,23 +50,27 @@ def make_continuous_features_bed(
 ):
     check_regions_file(regions_file)
 
-    map_out = subprocess.check_output(
-        [
-            "bedtools",
-            "map",
-            "-a",
-            regions_file,
-            "-b",
-            bed_file,
-            "-c",
-            str(column),
-            "-o",
-            "mean",
-            "-null",
-            str(null),
-            "-split" if split else "",
-        ]
-    )
+    split=True
+
+    cmd = [
+        "bedtools",
+        "map",
+        "-a",
+        regions_file,
+        "-b",
+        bed_file,
+        "-c",
+        str(column),
+        "-o",
+        "mean",
+        "-null",
+        str(null),
+    ]
+
+    if split:
+        cmd.append("-split")
+
+    map_out = subprocess.check_output(cmd)
 
     vals = []
     for line in map_out.decode().strip().split("\n"):

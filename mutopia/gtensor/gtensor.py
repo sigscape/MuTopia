@@ -4,7 +4,9 @@ This module provides functionality for creating, manipulating, and analyzing gen
 including loading datasets, applying transformations, and generating explanations for model components.
 """
 
+from os import path
 import xarray as xr
+from pandas import concat as pd_concat
 import numpy as np
 from typing import Union, List
 from numpy.typing import NDArray
@@ -27,6 +29,10 @@ __all__ = [
     "eager_load",
     "lazy_train_test_load",
     "eager_train_test_load",
+    "num_sources",
+    "is_mixture_dataset",
+    "list_sources",
+    "fetch_source",
     "get_explanation",
     "equal_size_quantiles",
     "slice_regions",
@@ -387,6 +393,57 @@ def eager_train_test_load(dataset, *test_chroms):
     """
     return train_test_split(eager_load(dataset), *test_chroms, lazy=False)
 
+def num_sources(dataset):
+    return len(list_sources(dataset))
+
+def is_mixture_dataset(dataset):
+    return num_sources(dataset) > 1
+
+def list_sources(dataset):
+    if "source" in dataset.coords:
+        return dataset.coords["source"].values.tolist()
+    return []
+
+def fetch_source(dataset, source):
+    sources = list_sources(dataset)
+    if not source in sources:
+        raise ValueError(f"Source {source} not found in dataset")
+
+    groups = dataset.sections.groups
+    state = groups.pop("State", [])
+    features = groups.pop("Features", [])
+
+    use_features = [path.basename(v) for v in features if v.split("/")[1] == source]
+    use_state = [path.basename(v) for v in state if v.split("/")[1] == source]
+
+    rename_map = {
+        os.path.join("Features", source, v): os.path.join("Features", v)
+        for v in use_features
+    }
+    rename_map.update(
+        {
+            os.path.join("State", source, v): os.path.join("State", v)
+            for v in use_state
+        }
+    )
+
+    other_dvars = [v for g in groups.values() for v in g]
+    shared_features = [v for v in features if len(v.split("/")) == 2]
+    shared_state = [v for v in state if len(v.split("/")) == 2]
+
+    source_corpus = dataset[
+        list(rename_map.keys()) + other_dvars + shared_features + shared_state
+    ].rename(rename_map)
+
+    source_corpus.attrs["name"] = dataset.attrs["name"] + "/" + source
+
+    if "source" in source_corpus.dims:
+        source_corpus = source_corpus.sel(source=source, drop=True)
+
+    source_corpus = source_corpus.assign_coords(**dataset.coords).drop_dims("source")
+
+    return source_corpus
+
 
 def get_explanation(dataset, component):
     """
@@ -425,48 +482,77 @@ def get_explanation(dataset, component):
             f"The dataset does not have SHAP values for component {component}."
         )
 
-    shap_values = dataset["SHAP_values"]
+    def _get_shap_from_source(dataset, component):
+        
+        shap_values = dataset["SHAP_values"]
+        locus_dim = "locus" if "locus" in shap_values.dims else "shap_locus"
 
-    shap_df = (
-        shap_values.sel(shap_component=component)
-        .to_pandas()
-        .melt(ignore_index=False, var_name="feature", value_name="value")
-        .reset_index()
-    )
-
-    # handle this case to remove the convolution
-    if any(shap_df.feature.str.contains(":")):
-        shap_df[["feature", "convolution"]] = shap_df.feature.str.split(
-            ":", expand=True, n=1
-        ).rename(columns={0: "feature", 1: "convolution"})
-
-    locus_dim = "locus" if "locus" in shap_df.columns else "shap_locus"
-
-    shap_df = (
-        shap_df.groupby(["feature", locus_dim])["value"].sum().unstack().fillna(0).T
-    )
-
-    data = (
-        dataset.state.locus_features.sel(locus=shap_df.index).sel(
-            feature=[
-                f"{s}:0" if f"{s}:0" in dataset.state.feature.values else s
-                for s in shap_df.columns
-            ]
+        shap_df = (
+            shap_values.sel(shap_component=component)
+            .to_pandas()
+            .melt(ignore_index=False, var_name="feature", value_name="value")
+            .reset_index()
         )
-    ).values
 
-    display_features = (
-        dataset.sections["Features"]
-        .assign_coords(locus=dataset.locus.data)
-        .sel(locus=shap_df.index)
-    )
+        # handle this case to remove the convolution
+        if any(shap_df.feature.str.contains(":")):
+            shap_df[["feature", "convolution"]] = shap_df.feature.str.split(
+                ":", expand=True, n=1
+            ).rename(columns={0: "feature", 1: "convolution"})
 
-    display_data = DataFrame([display_features[s].data for s in shap_df.columns]).T
+        locus_dim = "locus" if "locus" in shap_df.columns else "shap_locus"
+
+        shap_df = (
+            shap_df.groupby(["feature", locus_dim])["value"]
+            .sum().unstack().fillna(0).T
+        )
+
+        data = (
+            dataset['State/locus_features'].sel(locus=shap_df.index).sel(
+                feature=[
+                    f"{s}:0" if f"{s}:0" in dataset.coords['feature'].values else s
+                    for s in shap_df.columns
+                ]
+            )
+        ).to_pandas()
+
+        display_features = (
+            dataset.sections["Features"]
+            .assign_coords(locus=dataset.locus.data)
+            .sel(locus=shap_df.index)
+        )
+
+        display_data = DataFrame(
+            [
+                display_features[s].data 
+                for s in shap_df.columns
+            ],
+            index=shap_df.columns,
+        ).T
+
+        return (
+            shap_df,
+            data,
+            display_data,
+        )
+    
+    if is_mixture_dataset(dataset):
+        if "ploidy" in dataset.data_vars:
+            dataset = dataset.drop_vars("ploidy")
+            
+        shap_data = [
+            _get_shap_from_source(fetch_source(dataset, source_name), component)
+            for source_name in list_sources(dataset)
+        ]
+    else:
+        shap_data = [_get_shap_from_source(dataset, component)]
+
+    shap_df, data, display_data = [pd_concat(x) for x in zip(*shap_data)]
 
     expl = shap.Explanation(
         shap_df.values,
         feature_names=shap_df.columns,
-        data=data,
+        data=data.values,
         display_data=display_data,
     )
 

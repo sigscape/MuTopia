@@ -13,7 +13,7 @@ class URLConfig(BaseModel):
 class FeatureConfig(BaseModel):
     normalization: str = Field(..., description="Type of normalization to apply")
     column: Optional[int] = Field(
-        None, 
+        4, 
         description="Column number to use from input file (if applicable)"
     ) 
     group: Optional[str] = Field(

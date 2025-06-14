@@ -118,7 +118,7 @@ def SVI_step(
         If the locus subsample is very small, we need to update the normalizers
         on the full datasets to reduce variance.
         '''
-        _, normalizers = factor_model.get_exp_offsets_dict(
+        _, normalizers = timer_wrapper(factor_model.get_exp_offsets_dict, "get_normalizers")(
             datasets=datasets,
             par_context=par_context,
         )

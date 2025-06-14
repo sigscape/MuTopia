@@ -4,7 +4,6 @@ This interface is meant to be used by the model, which should not depend on the 
 structure of the datasets.
 """
 
-import xarray as xr
 import os
 from ..utils import parallel_gen
 from ..model.gtensor_interface import GtensorInterface

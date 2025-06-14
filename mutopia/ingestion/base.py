@@ -26,7 +26,7 @@ class FileType(Enum):
         exts = {
             FileType.BIGWIG: [".bw", ".bigwig"],
             FileType.BEDGRAPH: [".bedgraph", ".bg", ".bg.gz", ".bedgraph.gz"],
-            FileType.BED: [".bed", ".bed.gz"],
+            FileType.BED: [".bed", ".bed.gz", ".tsv", ".tsv.gz"],
         }
         for k, v in exts.items():
             if any(filename.lower().endswith(ext) for ext in v):

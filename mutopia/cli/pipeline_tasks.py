@@ -142,8 +142,8 @@ class IngestFeatureTask(luigi.Task):
     feature_name = luigi.Parameter(
         description="Name of the feature to ingest"
     )
-    idx = luigi.Parameter(
-        description="Idx of the feature to ingest"
+    idx = luigi.IntParameter(
+        description="Idx of the feature to ingest",
     )
 
     def requires(self):

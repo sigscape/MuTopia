@@ -5,7 +5,6 @@ from xarray.core.formatting_html import *
 from xarray.core.formatting_html import _get_indexes_dict, _obj_repr
 from collections import defaultdict
 
-
 def _get_section(var_name, raw=False):
     if var_name == "X":
         return "X"
@@ -184,7 +183,10 @@ class AsCSR(BaseAccessor):
 @xr.register_dataarray_accessor("asdense")
 class AsCSR(BaseAccessor):
     def __call__(self):
-        self._xrds.data = self._xrds.data.todense()
+        try:
+            self._xrds.data = self._xrds.data.todense()
+        except AttributeError:
+            pass
         return self._xrds
 
 
