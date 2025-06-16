@@ -146,7 +146,7 @@ class LazySlicer(CorpusInterface):
         if hasattr(sliced, "X"):
             sliced = sliced.drop_vars("X", errors="ignore")
 
-        if hasattr(sliced, "ploidy"):
+        if hasattr(sliced, "ploidy") and not keep_features:
             sliced['ploidy'] = sliced['ploidy'].asdense()
 
         if not keep_features:

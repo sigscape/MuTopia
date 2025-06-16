@@ -299,6 +299,11 @@ def fit_model(
     test_datasets = [
         GT.init_state(GT.prepare_data(dataset), *models) for dataset in test_datasets
     ]
+    
+    # since the test datasets are not sliced by locus, we should make it faster to slice by sample instead.
+    for dataset in test_datasets:
+        if hasattr(dataset, "ploidy"):
+            dataset["ploidy"] = dataset["ploidy"].ascsr("sample")
 
     test_score_fn = partial(
         locals_model.score,

@@ -442,15 +442,15 @@ class TopographyModel(ABC, BaseEstimator):
         - locals_model_ : The fitted locals model
         - test_scores_ : Performance metrics on test datasets
         """
-        if not isinstance(train_datasets, Iterable):
+        if isinstance(train_datasets, xr.Dataset):
             train_datasets = (train_datasets,)
         self._modality = train_datasets[0].attrs["dtype"]
 
-        if test_datasets is None or (isinstance(test_datasets, Iterable) and len(test_datasets) == 0):
+        if isinstance(test_datasets, xr.Dataset):
+            test_datasets = (test_datasets,)
+        elif test_datasets is None or (isinstance(test_datasets, Iterable) and len(test_datasets) == 0):
             logger.info("Splitting train/test partitions...")
             train_datasets, test_datasets = self._train_test_split(train_datasets)
-        elif not isinstance(test_datasets, Iterable):
-            test_datasets = (test_datasets,)
 
         try:
             self.factor_model_, self.locals_model_
