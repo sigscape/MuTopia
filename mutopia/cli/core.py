@@ -18,6 +18,7 @@ import netCDF4 as nc
 from shutil import copyfile
 from ..ingestion import gene_features
 
+
 def create_gtensor(
     *,
     name: str,
@@ -163,7 +164,6 @@ def add_continuous_feature(
     logger.info(f"Added feature: {feature_name}")
 
 
-
 def add_discrete_feature(
     ingest_file: str,
     group: str = "all",
@@ -293,7 +293,6 @@ def train_test_split(
     disk.write_dataset(test, outprefix + ".test.nc", bar=True)
 
 
-
 def add_sample(
     dataset: str,
     sample_file: str,
@@ -316,7 +315,7 @@ def add_sample(
     num_regions = sum(1 for _ in stream_bed12(regions_file))
     locus_coords = disk.read_coords(dataset)["locus"]
 
-    modality : ModeConfig = get_mode_config(attrs["dtype"])
+    modality: ModeConfig = get_mode_config(attrs["dtype"])
 
     fasta = fasta or attrs["fasta_file"]
     if not os.path.exists(fasta):
@@ -456,13 +455,13 @@ def get_gtensor_info(dataset: str) -> dict:
         n_samples = 0
 
     dims = disk.read_dims(dataset)
-    
+
     return {
         "n_features": n_features,
         "n_samples": n_samples,
         "name": attrs["name"],
         "dims": {k: v for k, v in dims.items() if k != "sample"},
-        "attrs": {k: v for k, v in attrs.items() if k != "name"}
+        "attrs": {k: v for k, v in attrs.items() if k != "name"},
     }
 
 
@@ -562,23 +561,30 @@ def linearize_bed_files(
     )
 
 
+def make_annotation_bedfile(gtf_file: str = None, output=None):
+    """Create an expression bedfile from quantitation files."""
+
+    gtf_file = gtf_file or "MANE.GRCh38.v1.3.ensembl_genomic.gtf"
+    if not os.path.exists(gtf_file):
+        logger.info(f"Downloading GTF file: {gtf_file} ...")
+        gene_features.download_gtf(gtf_file)
+
+    annotation_file = output or "MANE.GRCh38.annotation.bed"
+    if not os.path.exists(annotation_file):
+        logger.info(f"Creating annotation file: {annotation_file} ...")
+        gene_features.make_annotation(gtf_file, annotation_file)
+
+    return annotation_file
+
+
 def make_expression_bedfile(
     quantitation_file: str,
     output_file,
     gtf_file: str = None,
     join_on: str = "gene_id",
 ):
-    """Create an expression bedfile from quantitation files."""
-    gtf_file = gtf_file or "MANE.GRCh38.v1.3.ensembl_genomic.gtf"
 
-    if not os.path.exists(gtf_file):
-        logger.info(f"Downloading GTF file: {gtf_file} ...")
-        gene_features.download_gtf(gtf_file)
-
-    annotation_file = "MANE.GRCh38.annotation.bed"
-    if not os.path.exists(annotation_file):
-        logger.info(f"Creating annotation file: {annotation_file} ...")
-        gene_features.make_annotation(gtf_file, annotation_file)
+    annotation_file = make_annotation_bedfile(gtf_file)
 
     quant = gene_features.join_quantitation(
         annotation_file,

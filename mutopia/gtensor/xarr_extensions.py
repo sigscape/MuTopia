@@ -5,6 +5,7 @@ from xarray.core.formatting_html import *
 from xarray.core.formatting_html import _get_indexes_dict, _obj_repr
 from collections import defaultdict
 
+
 def _get_section(var_name, raw=False):
     if var_name == "X":
         return "X"

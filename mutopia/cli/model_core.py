@@ -120,7 +120,7 @@ def create_optimization_study(
 ):
     """
     Create a hyperparameter optimization study.
-    
+
     Parameters
     ----------
     study_name : str
@@ -172,7 +172,7 @@ def create_optimization_study(
 def run_optimization_trial(**kw):
     """
     Execute optimization trials for an existing study.
-    
+
     Parameters
     ----------
     **kw
@@ -184,7 +184,7 @@ def run_optimization_trial(**kw):
 def launch_optimization_dashboard(study_name: str):
     """
     Launch interactive optimization dashboard.
-    
+
     Parameters
     ----------
     study_name : str
@@ -204,7 +204,7 @@ def get_study_summary(study_name: str):
 
     trials = trials[sel_cols]
     trials.columns = [col.removeprefix("params_") for col in trials.columns]
-    
+
     return trials
 
 
@@ -263,7 +263,7 @@ def predict_model(
 ):
     """
     Apply trained model to predict component contributions and activities.
-    
+
     Parameters
     ----------
     model_path : str

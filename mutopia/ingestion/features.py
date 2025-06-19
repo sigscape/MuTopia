@@ -19,11 +19,11 @@ def make_continous_features_bigwig(
 
     with tempfile.NamedTemporaryFile() as bed, tempfile.NamedTemporaryFile() as regions:
 
-        with open(regions.name, "w") as r:
-            subprocess.check_call(["cut", "-f", "1-4", regions_file], stdout=r)
+        # with open(regions.name, "w") as r:
+        #    subprocess.check_call(["cut", "-f", "1-4", regions_file], stdout=r)
 
         subprocess.check_output(
-            ["bigWigAverageOverBed", bigwig_file, regions.name, bed.name]
+            ["bigWigAverageOverBed", bigwig_file, regions_file, bed.name]
         )
 
         with open(bed.name, "r") as bed:
@@ -50,7 +50,7 @@ def make_continuous_features_bed(
 ):
     check_regions_file(regions_file)
 
-    split=True
+    split = True
 
     cmd = [
         "bedtools",
@@ -65,10 +65,11 @@ def make_continuous_features_bed(
         "mean",
         "-null",
         str(null),
+        "-split",
     ]
 
-    if split:
-        cmd.append("-split")
+    # if split:
+    #    cmd.append("-split")
 
     map_out = subprocess.check_output(cmd)
 

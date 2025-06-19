@@ -52,7 +52,7 @@ class FactorModel:
         }
 
         self._genome_size = {
-            name : self.GT.get_genome_size(dataset)
+            name: self.GT.get_genome_size(dataset)
             for name, dataset in self.GT.expand_datasets(*datasets)
         }
 
@@ -187,7 +187,7 @@ class FactorModel:
                 logsafe_matmul,
                 log_mutrate_tensor,
                 exposures,
-                input_core_dims=[["source","component"], ["source","component"]],
+                input_core_dims=[["source", "component"], ["source", "component"]],
             )
 
     def _log_component_posterior(self, log_mutrate_tensor, exposures):
@@ -292,17 +292,19 @@ class FactorModel:
         genome_size = self.GT.get_genome_size(datasets[0])
 
         for name, ds in self.GT.expand_datasets(*datasets):
-            
+
             curr = self._normalizers[name]
 
             self._normalizers[name][:] = _svi_update_fn(
-                curr, 
-                np.log(genome_size/self.get_genome_size(ds)) + normalizers[name],
-                learning_rate
+                curr,
+                np.log(genome_size / self.get_genome_size(ds)) + normalizers[name],
+                learning_rate,
             )
 
     def init_normalizers(self, datasets, par_context=None):
-        _, self._normalizers = self.get_exp_offsets_dict(datasets, par_context=par_context)
+        _, self._normalizers = self.get_exp_offsets_dict(
+            datasets, par_context=par_context
+        )
 
     def format_component(self, k, normalization="global"):
         return np.exp(

@@ -12,6 +12,7 @@ import numpy as np
 from functools import partial
 from os import path
 
+
 class MixtureInterface(GtensorInterface):
 
     def to_datasets(self, *datasets):
@@ -76,7 +77,9 @@ class MixtureInterface(GtensorInterface):
         if "source" in source_corpus.dims:
             source_corpus = source_corpus.sel(source=source, drop=True)
 
-        source_corpus = source_corpus.assign_coords(**dataset.coords).drop_dims("source")
+        source_corpus = source_corpus.assign_coords(**dataset.coords).drop_dims(
+            "source"
+        )
 
         return source_corpus
 
@@ -110,7 +113,7 @@ class MixtureInterface(GtensorInterface):
         state_elements.update(locals_model.prepare_corpusstate(dataset))
 
         for source, data in self.sources(dataset):
-            source_elements={}
+            source_elements = {}
 
             for model in factor_model.models.values():
                 source_elements.update(model.prepare_corpusstate(data))
@@ -118,7 +121,7 @@ class MixtureInterface(GtensorInterface):
             source_elements = {f"{source}/{k}": v for k, v in source_elements.items()}
 
             state_elements.update(source_elements)
-        
+
         state_elements = {f"State/{k}": v for k, v in state_elements.items()}
         dataset.corpus = dataset.corpus.assign(**state_elements)
 
@@ -143,7 +146,7 @@ class MixtureInterface(GtensorInterface):
             pass
 
         return dataset
-    
+
     @classmethod
     def fetch_topic_compositions(self, dataset, sample_name):
         """
@@ -157,7 +160,7 @@ class MixtureInterface(GtensorInterface):
         )
 
         return gamma
-    
+
     def fetch_locals(self, dataset):
         """
         Fetch local topic compositions for a given sample from the dataset.

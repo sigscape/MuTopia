@@ -1,12 +1,7 @@
 from tqdm import trange
 from functools import partial
 from math import isnan
-from ..utils import (
-    logger,
-    str_wrapped_list,
-    timer_wrapper,
-    ParContext
-)
+from ..utils import logger, str_wrapped_list, timer_wrapper, ParContext
 import time
 from ..gtensor import (
     DifferentSamples,
@@ -31,7 +26,7 @@ def VI_step(
     *,
     test_score_fn,
     par_context,
-    **kw, # just soak up the kwargs for compatibility
+    **kw,  # just soak up the kwargs for compatibility
 ):
 
     args = dict(
@@ -114,11 +109,13 @@ def SVI_step(
     offsets, normalizers = timer_wrapper(factor_model.get_exp_offsets_dict)(**args)
 
     if full_normalizers:
-        '''
+        """
         If the locus subsample is very small, we need to update the normalizers
         on the full datasets to reduce variance.
-        '''
-        _, normalizers = timer_wrapper(factor_model.get_exp_offsets_dict, "get_normalizers")(
+        """
+        _, normalizers = timer_wrapper(
+            factor_model.get_exp_offsets_dict, "get_normalizers"
+        )(
             datasets=datasets,
             par_context=par_context,
         )
@@ -272,7 +269,15 @@ def fit_model(
         check_dims(dataset, factor_model)
         check_corpus(dataset)
 
-    sources = list(set([source for ds in train_datasets + test_datasets for source in GT.list_sources(ds)]))
+    sources = list(
+        set(
+            [
+                source
+                for ds in train_datasets + test_datasets
+                for source in GT.list_sources(ds)
+            ]
+        )
+    )
     if len(sources) > 1:
         logger.info(f"Found sources: {str_wrapped_list(sources)}")
 
@@ -299,7 +304,7 @@ def fit_model(
     test_datasets = [
         GT.init_state(GT.prepare_data(dataset), *models) for dataset in test_datasets
     ]
-    
+
     # since the test datasets are not sliced by locus, we should make it faster to slice by sample instead.
     for dataset in test_datasets:
         if hasattr(dataset, "ploidy"):
@@ -372,8 +377,8 @@ def fit_model(
 
     with ParContext(threads, verbose) as par:
 
-        #factor_model.init_normalizers(train_datasets, par_context=par)
-        
+        # factor_model.init_normalizers(train_datasets, par_context=par)
+
         try:
             progress_bar = trange(
                 1,

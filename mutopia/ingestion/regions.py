@@ -72,7 +72,7 @@ def stream_bedfile(bedfile):
                 yield chrom, start, end, feature
     except Exception as e:
         raise ValueError(f"Error reading bedfile {bedfile}: {str(e)}") from e
-    
+
 
 @dataclass
 class Region:

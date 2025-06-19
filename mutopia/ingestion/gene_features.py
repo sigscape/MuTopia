@@ -1,8 +1,5 @@
 import pandas as pd
-import sys
 import subprocess
-import tempfile
-
 
 def download_gtf(output):
     import urllib.request

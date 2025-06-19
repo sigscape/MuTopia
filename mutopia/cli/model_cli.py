@@ -10,7 +10,7 @@ from . import model_core
 def model():
     """
     Train and manage genome topography models for genomic data analysis.
-    
+
     Tools for training models that learn genomic components from G-Tensor datasets,
     hyperparameter optimization, and model analysis.
     """
@@ -19,10 +19,7 @@ def model():
 
 @model.command("train", short_help="Train a genome topography model")
 @click.argument(
-    "train_corpuses",
-    type=click.Path(exists=True),
-    nargs=-1,
-    metavar="CORPUS..."
+    "train_corpuses", type=click.Path(exists=True), nargs=-1, metavar="CORPUS..."
 )
 @click.option(
     "-o",
@@ -38,7 +35,9 @@ def model():
     required=True,
     help="Number of components to learn",
 )
-@click.option("--seed", type=int, default=0, help="Random seed for reproducible training")
+@click.option(
+    "--seed", type=int, default=0, help="Random seed for reproducible training"
+)
 @click.option(
     "-init",
     "--init-components",
@@ -297,9 +296,9 @@ def train(
             test_chroms=test_chroms,
             **model_kw,
         )
-        
+
         click.echo("Best test score:\t{:.5f}".format(best_score))
-        
+
     except ValueError as e:
         raise click.exceptions.BadOptionUsage("train-corpuses", str(e))
 
@@ -308,7 +307,7 @@ def train(
 def study():
     """
     Hyperparameter optimization studies for model training.
-    
+
     Tools for systematic hyperparameter tuning using Optuna optimization to find
     optimal model configurations based on validation performance.
     """
@@ -353,7 +352,9 @@ def study():
     default=".",
     help="Directory to save model files and study results",
 )
-@click.option("--seed", type=int, default=42, help="Random seed for reproducible optimization")
+@click.option(
+    "--seed", type=int, default=42, help="Random seed for reproducible optimization"
+)
 @click.option(
     "-init",
     "--init-components",
@@ -511,7 +512,7 @@ def study():
 def create_study(
     study_name: str,
     *,
-    dataset : List[Tuple[str, str]] = [],
+    dataset: List[Tuple[str, str]] = [],
     min_components: int,
     max_components: int,
     seed: int = 0,
@@ -608,17 +609,17 @@ def create_study(
 def run_trial(**kw):
     """
     Execute optimization trials for a previously created study.
-    
+
     Runs hyperparameter optimization using Optuna's suggestion engine to test
     different parameter combinations and report performance.
-    
+
     Examples:
         # Run trials with default settings
         model study run my_study
-        
+
         # Run with multiple threads and time limits
         model study run my_study --threads 8 --time-limit 30
-        
+
         # Run with lazy loading for large datasets
         model study run my_study --lazy --threads 4
     """
@@ -636,10 +637,10 @@ def dashboard(
 ):
     """
     Launch an interactive web dashboard for monitoring study progress.
-    
+
     Opens a browser interface showing real-time optimization progress,
     parameter importance, trial history, and convergence analysis.
-    
+
     Examples:
         # Launch dashboard for study monitoring
         model study dashboard my_study
@@ -666,14 +667,14 @@ def summary(
 ):
     """
     Display a summary of optimization study results.
-    
+
     Shows trial performance rankings, best parameter combinations, and
     optimization progress. Can export results to CSV for analysis.
-    
+
     Examples:
         # Display results in console
         model study summary my_study
-        
+
         # Export results to CSV file
         model study summary my_study --output results.csv
     """
@@ -704,7 +705,9 @@ def summary(
         raise click.ClickException(f"Failed to get study summary: {str(e)}")
 
 
-@study.command("retrain", short_help="Retrain a specific trial with optional modifications")
+@study.command(
+    "retrain", short_help="Retrain a specific trial with optional modifications"
+)
 @click.argument("study_name", type=str, metavar="STUDY_NAME")
 @click.argument("trial_number", type=int, metavar="TRIAL_NUM")
 @click.argument("output", type=click.Path(writable=True), metavar="OUTPUT_PATH")
@@ -746,17 +749,17 @@ def retrain(
 ):
     """
     Retrain a specific trial from an optimization study.
-    
+
     Takes the best parameters from a completed trial and retrains the model,
     optionally with different computational settings or random seed.
-    
+
     Examples:
         # Retrain best trial from study
         model study retrain my_study 42 final_model.pkl
-        
+
         # Retrain with more computational resources
         model study retrain my_study 42 model.pkl --threads 16 --time-limit 120
-        
+
         # Retrain with different random seed for ensemble
         model study retrain my_study 42 model_v2.pkl --seed 999 --lazy
     """
@@ -770,7 +773,9 @@ def retrain(
             threads=threads,
             time_limit=time_limit,
         )
-        click.echo(f"Successfully retrained trial {trial_number} from study {study_name}")
+        click.echo(
+            f"Successfully retrained trial {trial_number} from study {study_name}"
+        )
         click.echo(f"Model saved to: {output}")
     except Exception as e:
         raise click.ClickException(f"Retraining failed: {str(e)}")
@@ -780,10 +785,10 @@ def retrain(
 def list_studies():
     """
     List all available hyperparameter optimization studies.
-    
+
     Shows the names of all studies that have been created and are available
     for running trials, viewing results, or retraining models.
-    
+
     Examples:
         # List all studies
         model study ls
@@ -800,17 +805,17 @@ def list_studies():
 
 
 @model.command(
-    "report", 
+    "report",
     short_help="Generate comprehensive PDF report of discovered components",
-    help="Generate a detailed PDF report showing component patterns, contributions, and model performance"
+    help="Generate a detailed PDF report showing component patterns, contributions, and model performance",
 )
 @click.argument("model_path", type=click.Path(exists=True), metavar="MODEL_FILE")
 @click.option(
-    "-o", 
-    "--output", 
-    type=click.Path(writable=True), 
+    "-o",
+    "--output",
+    type=click.Path(writable=True),
     default=None,
-    help="Output PDF file path (default: <model_name>.report.pdf)"
+    help="Output PDF file path (default: <model_name>.report.pdf)",
 )
 def report(
     model_path: str,
@@ -818,14 +823,14 @@ def report(
 ):
     """
     Generate a comprehensive PDF report of the trained genome topography model.
-    
+
     Creates a multi-page PDF with detailed visualizations of the discovered
     components, their patterns, contributions, and model performance metrics.
-    
+
     Examples:
         # Generate report with default naming
         model report my_model.pkl
-        
+
         # Generate report with custom output path
         model report model.pkl -o detailed_report.pdf
     """
@@ -837,9 +842,9 @@ def report(
 
 
 @model.command(
-    "predict", 
+    "predict",
     short_help="Predict component contributions for samples in dataset",
-    help="Apply trained model to predict component contributions and activities for genomic samples"
+    help="Apply trained model to predict component contributions and activities for genomic samples",
 )
 @click.argument("model", type=click.Path(exists=True), metavar="MODEL_FILE")
 @click.argument("dataset", type=click.Path(exists=True), metavar="DATASET_FILE")
@@ -872,29 +877,29 @@ def predict(
 ):
     """
     Apply trained model to predict component contributions and activities.
-    
+
     Uses a previously trained genome topography model to predict component
     activities and contributions for samples in a new dataset. Essential for
     applying discovered components to new cohorts or analyzing model predictions.
-    
+
     Prediction Process:
     - Loads trained model and applies to new dataset
     - Predicts component activities for each sample
     - Saves results to dataset file or separate output file
-    
+
     Output Data:
     - Sample-level component activities
     - Locus-level component contributions (if enabled)
     - Model state variables and parameters
     - Compatible with downstream analysis tools
-    
+
     Examples:
         # Predict with in-place modification
         model predict trained_model.pkl new_samples.nc
-        
+
         # Predict with separate output file
         model predict model.pkl samples.nc --output predictions.nc
-        
+
         # Fast prediction without detailed contributions
         model predict model.pkl data.nc --no-contributions --threads 8
     """
@@ -948,24 +953,24 @@ def shap(
 ):
     """
     Calculate SHAP (SHapley Additive exPlanations) values for model interpretability.
-    
+
     Computes SHAP values to explain how genomic features contribute to component
     predictions. Provides quantitative feature importance scores that identify
     which genomic features drive component activity patterns.
-    
+
     Analysis Features:
     - Feature-level prediction explanations
-    - Positive and negative contribution quantification  
+    - Positive and negative contribution quantification
     - Local (per-sample) and global (average) explanations
     - Compatible with visualization tools
-    
+
     Examples:
         # Calculate SHAP for all components
         model SHAP trained_model.pkl dataset.nc
-        
+
         # Calculate SHAP for specific components
         model SHAP model.pkl data.nc Component1 Component5 --threads 8
-        
+
         # Memory-efficient calculation
         model SHAP model.pkl large_dataset.nc --scan --n-samples 1000
     """
@@ -984,9 +989,9 @@ def shap(
 
 
 @model.command(
-    "tables", 
+    "tables",
     short_help="Export model results to Excel spreadsheet",
-    help="Create comprehensive Excel file with components, contributions, and SHAP values"
+    help="Create comprehensive Excel file with components, contributions, and SHAP values",
 )
 @click.argument("model", type=click.Path(exists=True), metavar="MODEL_FILE")
 @click.argument("dataset", type=click.Path(exists=True), metavar="DATASET_FILE")
@@ -998,18 +1003,18 @@ def excel(
 ):
     """
     Export comprehensive model results to an Excel spreadsheet.
-    
+
     Creates a multi-sheet Excel file containing all model results for easy
-    analysis, sharing, and integration with other tools. Perfect for 
+    analysis, sharing, and integration with other tools. Perfect for
     collaborations and detailed data exploration.
-    
+
     Excel Sheets:
     - Components: Genome topography component patterns and probabilities
-    - Contributions: Sample-wise component contribution matrices  
+    - Contributions: Sample-wise component contribution matrices
     - SHAP Values: Feature importance scores (if calculated)
     - Model Metadata: Training parameters and performance metrics
     - Sample Information: Sample annotations and contribution summaries
-    
+
     Examples:
         # Export complete model results
         model tables trained_model.pkl dataset.nc results.xlsx
@@ -1029,7 +1034,7 @@ def excel(
 def tools():
     """
     Utility tools for model analysis and data simulation.
-    
+
     This command group provides specialized tools for working with trained
     models, including data simulation and advanced analysis utilities.
     """
@@ -1058,30 +1063,30 @@ def simulate_from_model(
 ):
     """
     Simulate genomic mutation data from a trained genome topography model.
-    
+
     Uses learned component patterns and activity models to generate synthetic
     genomic datasets following the same patterns as the original training data.
     Useful for model validation, power analysis, and method development.
-    
+
     Simulation Process:
     - Uses template dataset structure and genomic features
-    - Samples mutation counts based on learned activity patterns  
+    - Samples mutation counts based on learned activity patterns
     - Generates mutations according to component probabilities
     - Preserves spatial patterns and feature dependencies
-    
+
     Applications:
     - Model validation and testing
-    - Power analysis for study design  
+    - Power analysis for study design
     - Benchmarking component detection methods
     - Generating training data for new algorithms
-    
+
     Examples:
         # Basic simulation with same mutation burden
         model tools simulate trained_model.pkl template.nc simulated.nc
-        
+
         # Simulate with doubled mutation burden
         model tools simulate model.pkl template.nc high_burden.nc --scale 2.0
-        
+
         # Reproducible simulation with specific seed
         model tools simulate model.pkl template.nc sim_data.nc --seed 12345
     """

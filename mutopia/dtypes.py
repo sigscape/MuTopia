@@ -6,6 +6,7 @@ from functools import cache
 
 MODALITIES = []
 
+
 @cache
 def load_mode_config(filename):
 

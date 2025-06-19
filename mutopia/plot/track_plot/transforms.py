@@ -1,8 +1,8 @@
 from functools import partial
-import os
 import numpy as np
-from xarray import DataArray
+from mutopia.gtensor import fetch_features
 from numpy._core._multiarray_umath import _array_converter
+
 
 def _xarr_op(fn):
     """
@@ -186,40 +186,11 @@ def feature_matrix(*feature_names, source=None):
     --------
     >>> get_features = feature_matrix("gc_content", "cpg_density")
     >>> matrix = get_features(dataset)  # Shape: (2, n_loci)
-    
+
     >>> get_all_features = feature_matrix()
     >>> all_matrix = get_all_features(dataset)  # All numeric features
     """
-
-    if len(feature_names) == 1 and isinstance(feature_names[0], (tuple, list, set)):
-        feature_names = list(feature_names[0])
-
-    def _accessor(dataset):
-
-        fnames = [
-            name
-            for name, arr in dataset.sections["Features"].items()
-            if (
-                np.issubdtype(arr.dtype, np.number)
-                and (
-                    name in feature_names
-                    or os.path.basename(name) in feature_names
-                    or len(feature_names) == 0
-                )
-                and source is None or os.path.dirname(name) == source 
-            )
-        ]
-
-        feature_matrix = DataArray(
-            np.vstack([dataset.sections["Features"][name].values for name in fnames]),
-            dims=("feature", "locus"),
-            coords={"feature": fnames, "locus": dataset.coords["locus"].values},
-            name="Features",
-        )
-
-        return feature_matrix.squeeze()
-
-    return _accessor
+    return lambda dataset: fetch_features(dataset, *feature_names, source=source)
 
 
 def clip(min_quantile=0.0, max_quantile=1.0):

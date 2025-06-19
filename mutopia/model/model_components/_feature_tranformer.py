@@ -306,6 +306,17 @@ class CPMTransformer(BaseEstimator, TransformerMixin, OneToOneFeatureMixin):
     def transform(self, X):
         return X / self.normalizers_ * 1e6
 
+class DuplicatesToNaNTransformer(BaseEstimator, TransformerMixin, OneToOneFeatureMixin):
+    
+    def fit(self, X, y=None):
+        self.n_features_in_ = X.shape[1]
+        return self
+    
+    def transform(self, X):
+        df = pd.DataFrame(X)
+        df = df.mask(df.duplicated(keep='first'), other=np.nan)
+        return df.to_numpy()
+    
 
 def log1p_cpm():
     return Pipeline(

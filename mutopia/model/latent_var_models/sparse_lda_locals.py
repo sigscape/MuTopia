@@ -6,13 +6,14 @@ from math import prod
 from .base import *
 import warnings
 
+
 class WrapsFactorModel:
-    '''
+    """
     A bit of a clunky hack - we need to temporarily spoof the get_normalizers
     method on the factor model to return the normalizers
     for a specific dataset. For SNVs, this is necessary to make the loss work
     for some reason?
-    '''
+    """
 
     def __init__(self, factor_model, normalizers):
         self.factor_model = factor_model
@@ -20,7 +21,7 @@ class WrapsFactorModel:
 
     def __getattr__(self, name):
         return getattr(self.factor_model, name)
-    
+
     def get_normalizers(self, dataset):
         return self.normalizers[self.factor_model.GT.get_name(dataset)]
 
@@ -345,4 +346,3 @@ class LDAUpdateSparse(LocalsModel):
         model.reduce_sparse_sstats(
             carry[self.GT.get_name(dataset)], dataset, **sample_sstats
         )
-

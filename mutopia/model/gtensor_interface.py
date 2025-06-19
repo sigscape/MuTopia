@@ -3,6 +3,7 @@ Why go through the trouble of creating these redundant functions?
 This interface is meant to be used by the model, which should not depend on the underlying
 structure of the datasets.
 """
+
 from ..gtensor import *
 from ..utils import parallel_gen
 from numpy import asfortranarray, ascontiguousarray, float32
@@ -106,7 +107,7 @@ class GtensorInterface:
     @classmethod
     def get_freqs(cls, dataset):
         return dataset["Regions/context_frequencies"]
-    
+
     @classmethod
     def get_region_lengths(cls, dataset):
         return dataset["Regions/length"]
@@ -145,8 +146,7 @@ class GtensorInterface:
             cls.fetch_val(dataset, "topic_compositions")
             .sel(sample=sample_name)
             .transpose(..., "component")
-            .data
-            .ravel()
+            .data.ravel()
         )
 
         return gamma
@@ -167,7 +167,7 @@ class GtensorInterface:
     @classmethod
     def get_genome_size(cls, dataset):
         return cls.get_region_lengths(dataset).sum().item()
-    
+
     @classmethod
     def prepare_data(cls, dataset):
 

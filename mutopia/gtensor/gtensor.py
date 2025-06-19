@@ -23,6 +23,7 @@ from ..utils import parse_region
 __all__ = [
     "GTensor",
     "apply_to_samples",
+    "fetch_features",
     "load_dataset",
     "train_test_split",
     "lazy_load",
@@ -50,6 +51,7 @@ BED_COLS = [
     "Regions/start",
     "Regions/end",
 ]
+
 
 def GTensor(
     modality,
@@ -157,9 +159,9 @@ def apply_to_samples(data, func, bar=True):
         [
             func(data.fetch_sample(sample_name))
             for sample_name in (
-                data.list_samples() 
-                if not bar else
-                tqdm(data.list_samples(), desc="Applying function to samples")
+                data.list_samples()
+                if not bar
+                else tqdm(data.list_samples(), desc="Applying function to samples")
             )
         ],
         dim="sample",
@@ -169,7 +171,7 @@ def apply_to_samples(data, func, bar=True):
 def mutate(func):
     """
     Decorator function to modify a dataset in place.
-    
+
     This decorator allows running mutations on a dataset without disrupting
     the interface chains. It wraps a function to work with the dataset's
     mutate method.
@@ -195,7 +197,7 @@ def mutate(func):
 def mutate_method(func):
     """
     Decorator function to modify a dataset in place for class methods.
-    
+
     This decorator allows running mutations on a dataset without disrupting
     the interface chains, specifically for methods that take 'self' as the
     first parameter.
@@ -393,16 +395,20 @@ def eager_train_test_load(dataset, *test_chroms):
     """
     return train_test_split(eager_load(dataset), *test_chroms, lazy=False)
 
+
 def num_sources(dataset):
     return len(list_sources(dataset))
 
+
 def is_mixture_dataset(dataset):
     return num_sources(dataset) > 1
+
 
 def list_sources(dataset):
     if "source" in dataset.coords:
         return dataset.coords["source"].values.tolist()
     return []
+
 
 def fetch_source(dataset, source):
     sources = list_sources(dataset)
@@ -421,10 +427,7 @@ def fetch_source(dataset, source):
         for v in use_features
     }
     rename_map.update(
-        {
-            os.path.join("State", source, v): os.path.join("State", v)
-            for v in use_state
-        }
+        {os.path.join("State", source, v): os.path.join("State", v) for v in use_state}
     )
 
     other_dvars = [v for g in groups.values() for v in g]
@@ -483,7 +486,7 @@ def get_explanation(dataset, component):
         )
 
     def _get_shap_from_source(dataset, component):
-        
+
         shap_values = dataset["SHAP_values"]
         locus_dim = "locus" if "locus" in shap_values.dims else "shap_locus"
 
@@ -503,14 +506,15 @@ def get_explanation(dataset, component):
         locus_dim = "locus" if "locus" in shap_df.columns else "shap_locus"
 
         shap_df = (
-            shap_df.groupby(["feature", locus_dim])["value"]
-            .sum().unstack().fillna(0).T
+            shap_df.groupby(["feature", locus_dim])["value"].sum().unstack().fillna(0).T
         )
 
         data = (
-            dataset['State/locus_features'].sel(locus=shap_df.index).sel(
+            dataset["State/locus_features"]
+            .sel(locus=shap_df.index)
+            .sel(
                 feature=[
-                    f"{s}:0" if f"{s}:0" in dataset.coords['feature'].values else s
+                    f"{s}:0" if f"{s}:0" in dataset.coords["feature"].values else s
                     for s in shap_df.columns
                 ]
             )
@@ -523,10 +527,7 @@ def get_explanation(dataset, component):
         )
 
         display_data = DataFrame(
-            [
-                display_features[s].data 
-                for s in shap_df.columns
-            ],
+            [display_features[s].data for s in shap_df.columns],
             index=shap_df.columns,
         ).T
 
@@ -535,11 +536,11 @@ def get_explanation(dataset, component):
             data,
             display_data,
         )
-    
+
     if is_mixture_dataset(dataset):
         if "ploidy" in dataset.data_vars:
             dataset = dataset.drop_vars("ploidy")
-            
+
         shap_data = [
             _get_shap_from_source(fetch_source(dataset, source_name), component)
             for source_name in list_sources(dataset)
@@ -602,7 +603,7 @@ def equal_size_quantiles(dataset, var_name, n_bins=10, key=None):
 
     if key is None:
         key = f'{var_name.rsplit("/", 1)[-1]}_qbins_{n_bins}'
-    
+
     dataset[key] = xr.DataArray(
         sorted_vals["bin"].loc[bin_nums].values,
         dims="locus",
@@ -618,7 +619,7 @@ def slice_regions(dataset, *regions, lazy=False):
     Extract genomic regions that overlap with specified intervals.
 
     This function filters the dataset to include only regions that overlap
-    with any of the specified genomic intervals. Intervals can be specified in 
+    with any of the specified genomic intervals. Intervals can be specified in
     multiple formats: "chr:start-end", "chr" (entire chromosome), or a comma-separated
     list of such specifications.
 
@@ -645,34 +646,33 @@ def slice_regions(dataset, *regions, lazy=False):
         If no regions match the specified query intervals
     """
     lazy = lazy or not "X" in dataset.data_vars
-    
+
     parsed_regions = list(map(parse_region, regions))
-    
+
     # Create mask for regions overlapping with any of the parsed regions
     ds_regions = dataset.sections["Regions"]
     regions_mask = np.zeros(len(ds_regions.chrom), dtype=bool)
-    
+
     for chrom, start, end in parsed_regions:
         chrom_mask = ds_regions.chrom.values == chrom
         if np.any(chrom_mask):
             interval_mask = IntervalIndex.from_arrays(
-                ds_regions.start.values[chrom_mask], 
-                ds_regions.end.values[chrom_mask]
+                ds_regions.start.values[chrom_mask], ds_regions.end.values[chrom_mask]
             ).overlaps(Interval(start, end))
-            
+
             # Update the overall mask
             regions_mask[chrom_mask] |= interval_mask
-    
+
     if not np.any(regions_mask):
         raise ValueError(f"No regions match the specified query: {regions}")
-    
+
     logger.info(
         f"Found {np.sum(regions_mask)}/{len(regions_mask)} regions matching query."
     )
-    
+
     if lazy:
         return LazySlicer(dataset, locus=regions_mask)
-    
+
     return dataset.isel(locus=regions_mask)
 
 
@@ -716,9 +716,7 @@ def annot_empirical_marginal(dataset, key="empirical_marginal"):
     X_emp = todense(X_emp)
 
     logger.info(f'Added key: "{key}"')
-    dataset[key] = (
-        X_emp / dataset.sections["Regions"].context_frequencies
-    ).fillna(0.0)
+    dataset[key] = (X_emp / dataset.sections["Regions"].context_frequencies).fillna(0.0)
 
     locus_key = f"{key}_locus"
     logger.info(f'Added key: "{locus_key}"')
@@ -839,3 +837,76 @@ def unstack_regions(dataset):
             }
         )
     )
+
+
+def fetch_features(
+    dataset: xr.Dataset,
+    *feature_names: Union[str, List[str], tuple, set],
+    source: Union[str, None] = None,
+):
+    """
+    Extract numerical features from a dataset.
+
+    This function selects numerical features from the dataset's 'Features' section
+    based on the provided feature names and optional source filter.
+
+    Parameters
+    ----------
+    dataset : xr.Dataset
+        The dataset containing the features in its 'Features' section.
+    feature_names : Union[str, List[str], tuple, set]
+        Names of features to extract. If empty, all numerical features are returned.
+        Feature names can be full paths or just the basename.
+    source : Union[str, None], optional
+        If provided, only features from this source directory will be returned.
+        Default is None, which includes features from all sources.
+
+    Returns
+    -------
+    xr.DataArray
+        A DataArray containing the selected features with the following structure:
+        - Values: Feature values arranged as a matrix
+        - Dimensions: 'feature' and 'locus'
+        - Coordinates:
+            - 'locus': locus values from the dataset
+            - 'feature': full feature paths
+            - 'feature_name': basename of each feature
+            - 'source': directory name of each feature
+
+    Notes
+    -----
+    Features are filtered to include only those with numerical data types,
+    since these can be stuck together in an xarray DataArray.
+    """
+
+    fnames = [
+        name
+        for name, arr in dataset.sections["Features"].items()
+        if (
+            np.issubdtype(arr.dtype, np.number)
+            and (
+                name in feature_names
+                or os.path.basename(name) in feature_names
+                or len(feature_names) == 0
+            )
+            and source is None
+            or os.path.dirname(name) == source
+        )
+    ]
+
+    features = [os.path.basename(name) for name in fnames]
+    sources = [os.path.dirname(name) for name in fnames]
+
+    feature_matrix = xr.DataArray(
+        np.vstack([dataset.sections["Features"][name].values for name in fnames]),
+        dims=("feature", "locus"),
+        coords={
+            "locus": dataset.coords["locus"].values,
+            "feature": fnames,
+            "feature_name": ("feature", features),
+            "source": ("feature", sources),
+        },
+        name="Features",
+    )
+
+    return feature_matrix.squeeze()

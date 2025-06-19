@@ -79,29 +79,36 @@ functype = ctypes.CFUNCTYPE(ctypes.c_double, ctypes.c_double)
 
 psi = functype(addr)
 
+
 @vectorize(["double(double)"])
 def psivec(x):
     return psi(x)
+
 
 @njit("float32[:](float32[:])", nogil=True)
 def psivec32(x):
     return psivec(x).astype(np.float32)
 
+
 @njit("float32(float32)", nogil=True)
 def psi32(x):
     return np.float32(psi(x))
+
 
 gammaln = functype(
     get_cython_function_address("scipy.special.cython_special", "gammaln")
 )
 
+
 @njit("float32(float32)", nogil=True)
 def gammaln32(x):
     return np.float32(gammaln(x))
 
+
 @vectorize(["double(double)"])
 def gammalnvec(x):
     return gammaln(x)
+
 
 @njit("float32[:](float32[:])", nogil=True)
 def gammalnvec32(x):
@@ -113,10 +120,7 @@ def exp_log_dirichlet_expectation(alpha):
     return np.exp(psivec(alpha) - psi(np.sum(alpha))).astype(np.float32)
 
 
-@njit(
-    "float32(float32[::1], float32[::1])",
-    nogil=True
-)
+@njit("float32(float32[::1], float32[::1])", nogil=True)
 def dirichlet_bound(alpha, x):
 
     logE_x = np.log(exp_log_dirichlet_expectation(x))
@@ -208,6 +212,8 @@ def calc_local_variables(
 """
 Annealed importance sampling (AIS) for marginal likelihood estimation
 """
+
+
 @njit(nogil=True)
 def categorical_draw(logits):
     logits = np.exp(logits - logits.max())
@@ -394,10 +400,13 @@ def AIS_marginal_ll(
         steps,
     )
 
+
 def _just_next_Nk(Nks):
     i = iter(Nks)
+
     def _next_Nk(*args, **kw):
         return next(i)
+
     return _next_Nk
 
 
@@ -503,7 +512,7 @@ class LocalsModel:
         return sstats
 
     def _predict(self, dataset, factor_model, threads=1):
-        
+
         old_iters = self.estep_iterations
         self.estep_iterations = 10000
 
@@ -519,14 +528,16 @@ class LocalsModel:
             update_fns,
             total=len(dataset.list_samples()),
             ncols=100,
-            desc='Estimating contributions'
+            desc="Estimating contributions",
         )
 
-        Nks = np.array([stats["Nk"] for stats in parallel_map(update_fns, threads=threads)])
+        Nks = np.array(
+            [stats["Nk"] for stats in parallel_map(update_fns, threads=threads)]
+        )
 
         self.estep_iterations = old_iters
         return Nks
-    
+
     def predict(
         self,
         dataset,
@@ -535,15 +546,8 @@ class LocalsModel:
     ):
         Nks = self._predict(dataset, factor_model=factor_model, threads=threads)
         n_sources = self.GT.n_sources(dataset)
-        Nks = (
-            Nks
-            .reshape((-1, n_sources, self.n_components))
-            .transpose((1,0,2))
-        )
-        return DataArray(
-            Nks,
-            dims=("source","sample","component")
-        )
+        Nks = Nks.reshape((-1, n_sources, self.n_components)).transpose((1, 0, 2))
+        return DataArray(Nks, dims=("source", "sample", "component"))
 
     def score(
         self,
@@ -597,7 +601,6 @@ class LocalsModel:
         **sample_sstats,
     ):
         raise NotImplementedError
-    
 
     def _get_sample_init_fn(self, dataset):
         return partial(
@@ -607,18 +610,12 @@ class LocalsModel:
             size=(self.n_components,),
         )
 
-
     def init_locals(self, dataset):
 
         init_fn = self._get_sample_init_fn(dataset)
 
         return self.to_contig(
-            np.array(
-                [
-                    init_fn(sample)
-                    for _, sample in self.GT.iter_samples(dataset)
-                ]
-            )
+            np.array([init_fn(sample) for _, sample in self.GT.iter_samples(dataset)])
         )
 
     def prepare_corpusstate(self, dataset):
@@ -628,11 +625,11 @@ class LocalsModel:
                 dims=("sample", "source", "component"),
             ),
         )
-    
+
     ##
     # M-step functionality to satisfy the PrimModel interface
     ##
-    '''def init_locals(self, n_samples):
+    """def init_locals(self, n_samples):
         return self.random_state.gamma(
             100.0,
             1.0 / 100.0,
@@ -667,7 +664,7 @@ class LocalsModel:
                 weighted_ploidy,
                 dims=("locus",),
             ),
-        )'''
+        )"""
 
     @staticmethod
     def reduce_sparse_sstats(

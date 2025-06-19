@@ -4,6 +4,7 @@ Genome track plotting utilities for visualizing genomic data.
 This module provides functions for creating genome browser-style visualizations
 with multiple data tracks including line plots, heatmaps, and genomic annotations.
 """
+
 import numpy as np
 from pandas import read_csv
 import matplotlib.pyplot as plt
@@ -24,6 +25,7 @@ from .transforms import (
 
 plt.rc("axes", linewidth=0.75)
 
+
 def _wraps_err(fn):
     def _inner(*args, **kwargs):
         try:
@@ -31,7 +33,7 @@ def _wraps_err(fn):
         except Exception as e:
             logger.error(f"Error in plotting function {fn.__name__}: {e}")
             raise e
-        
+
     return _inner
 
 
@@ -52,15 +54,24 @@ __all__ = [
     "custom_plot",
 ]
 
+
 def _get_optimal_row_order(data, **kwargs):
+
+    if (~np.isfinite(data)).any():
+        logger.warning(
+            "Data contains NaN or infinite values. Filling with zeros for clustering."
+        )
+        data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+
     return leaves_list(optimal_leaf_ordering(linkage(data, **kwargs), data))
+
 
 @dataclass
 class GenomeView:
     chrom: str
-    interval : tuple[int, int]
+    interval: tuple[int, int]
     dataset: Dataset
-    title : str
+    title: str
     n_regions: int
     starts: np.ndarray[int]
     ends: np.ndarray[int]
@@ -74,7 +85,7 @@ class GenomeView:
         )
 
         return _xarr_op(smooth_fn)
-    
+
     def renorm(self, x):
         return x / np.nansum(x) * self.n_regions
 
@@ -100,7 +111,6 @@ def make_view(dataset, region=None, title=None):
         Configured genome view object
     """
 
-
     if region is None:
         chroms = set(dataset["Regions/chrom"].values)
         if len(chroms) > 1:
@@ -120,7 +130,8 @@ def make_view(dataset, region=None, title=None):
         np.arange(n_regions),
     )
 
-    start = min(starts); end = max(ends)
+    start = min(starts)
+    end = max(ends)
 
     return GenomeView(
         chrom=chrom,
@@ -134,12 +145,9 @@ def make_view(dataset, region=None, title=None):
     )
 
 
-'''def __call__(self, configuration, *args, width=7, **kwargs):
-    return self._plot(configuration(self, *args, **kwargs), width=width)'''
-
 def plot_views(
-    configuration : Callable,
-    views : Union[GenomeView, Iterable[GenomeView]],
+    configuration: Callable,
+    views: Union[GenomeView, Iterable[GenomeView]],
     width: float = 7,
     gridpsec_kw: dict = {"hspace": 0.1, "wspace": 0.1},
     *args,
@@ -173,14 +181,14 @@ def plot_views(
         sharey="row",
     )
 
-    if n_cols==1:
+    if n_cols == 1:
         ax = np.array(ax).reshape((n_rows, 1))
 
     if len(tracks) == 1:
         ax = [ax]
 
     for j, (view, tracks) in enumerate(zip(views, configurations)):
-        for i, (_ax, fn) in enumerate(zip(ax[:,j], tracks)):
+        for i, (_ax, fn) in enumerate(zip(ax[:, j], tracks)):
 
             fn(
                 _ax,
@@ -204,8 +212,8 @@ def plot_views(
 
             _ax.set(xlim=view.interval)
 
-        ax[0,j].set_title(view.title, fontsize=9, loc="left")
-    
+        ax[0, j].set_title(view.title, fontsize=9, loc="left")
+
     return ax
 
 
@@ -408,10 +416,10 @@ def _name_or_none(x):
 @cache
 def _read_ideogram(cytobands_file):
     return read_csv(
-        cytobands_file, 
-        sep='\t', 
-        header=None, 
-        names=['chrom','start','end','band','stain']
+        cytobands_file,
+        sep="\t",
+        header=None,
+        names=["chrom", "start", "end", "band", "stain"],
     )
 
 

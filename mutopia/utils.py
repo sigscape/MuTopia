@@ -203,12 +203,12 @@ def stream_subprocess_output(process):
 # Parse regions into a list of (chrom, start, end) tuples
 def parse_region(region):
     region = str(region).strip()
-    
-    if ':' in region:
+
+    if ":" in region:
         # Format: chr:start-end
-        chrom, pos = region.split(':', 1)
-        if '-' in pos:
-            start, end = map(lambda x : int(x.replace(',','')), pos.split('-', 1))
+        chrom, pos = region.split(":", 1)
+        if "-" in pos:
+            start, end = map(lambda x: int(x.replace(",", "")), pos.split("-", 1))
         else:
             # Handle case like "chr1:1000" (no end specified)
             start = int(pos)
@@ -218,5 +218,5 @@ def parse_region(region):
         chrom = region
         start = 0
         end = np.inf
-        
+
     return (chrom, start, end)

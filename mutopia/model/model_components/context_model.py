@@ -1,7 +1,6 @@
 from functools import partial, reduce
 import numpy as np
 from xarray import DataArray
-from numba import njit
 from ._glm_compiled import (
     make_optimizer,
     setup_mixed_solver,

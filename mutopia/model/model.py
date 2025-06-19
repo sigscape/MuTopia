@@ -29,8 +29,10 @@ and provides the high-level interface for interacting with the model.
 This is the entry point for the user to interact with and annotate data.
 """
 
+
 class DenseSharedMixtureModel(DenseMixtureModel, SharedExposuresMixtureModel):
     pass
+
 
 class SparseSharedMixtureModel(SparseMixtureModel, SharedExposuresMixtureModel):
     pass
@@ -234,7 +236,6 @@ class TopographyModel(ABC, BaseEstimator):
         self.shared_exposures = shared_exposures
         self.full_normalizers = full_normalizers
 
-
     @property
     def modality(self):
         if not hasattr(self, "_modality"):
@@ -336,18 +337,14 @@ class TopographyModel(ABC, BaseEstimator):
     ):
 
         is_sparse = train_datasets[0].X.is_sparse()
-        if not all(
-            corpus.X.is_sparse() == is_sparse
-            for corpus in train_datasets
-        ):
+        if not all(corpus.X.is_sparse() == is_sparse for corpus in train_datasets):
             raise ValueError(
                 "All corpuses must be either sparse or dense - mixing is not allowed!"
             )
 
         is_mixture = MIX.is_mixture_corpus(train_datasets[0])
         if not all(
-            MIX.is_mixture_corpus(corpus) == is_mixture
-            for corpus in train_datasets
+            MIX.is_mixture_corpus(corpus) == is_mixture for corpus in train_datasets
         ):
             raise ValueError(
                 "All corpuses must be either multi-source or single-source - mixing is not allowed!"
@@ -357,7 +354,9 @@ class TopographyModel(ABC, BaseEstimator):
             logger.warning("** Inferring mixture of epigenomes model **")
 
         if is_mixture:
-            locals_model = SparseSharedMixtureModel if is_sparse else DenseSharedMixtureModel
+            locals_model = (
+                SparseSharedMixtureModel if is_sparse else DenseSharedMixtureModel
+            )
         else:
             locals_model = LDAUpdateSparse if is_sparse else LDAUpdateDense
 
@@ -383,7 +382,7 @@ class TopographyModel(ABC, BaseEstimator):
                 )
             )
         )
-    
+
     def init_model(self, train_datasets):
 
         random_state = np.random.RandomState(self.seed)
@@ -442,13 +441,15 @@ class TopographyModel(ABC, BaseEstimator):
         - locals_model_ : The fitted locals model
         - test_scores_ : Performance metrics on test datasets
         """
-        if isinstance(train_datasets, xr.Dataset):
+        if not isinstance(train_datasets, (tuple, list)):
             train_datasets = (train_datasets,)
         self._modality = train_datasets[0].attrs["dtype"]
 
-        if isinstance(test_datasets, xr.Dataset):
+        if not isinstance(test_datasets, (tuple, list)):
             test_datasets = (test_datasets,)
-        elif test_datasets is None or (isinstance(test_datasets, Iterable) and len(test_datasets) == 0):
+        elif test_datasets is None or (
+            isinstance(test_datasets, (tuple, list)) and len(test_datasets) == 0
+        ):
             logger.info("Splitting train/test partitions...")
             train_datasets, test_datasets = self._train_test_split(train_datasets)
 
@@ -565,11 +566,7 @@ class TopographyModel(ABC, BaseEstimator):
 
         logger.info("Setting up dataset state ...")
 
-        dataset = self.GT.init_state(
-            dataset,
-            self.factor_model_,
-            self.locals_model_
-        )
+        dataset = self.GT.init_state(dataset, self.factor_model_, self.locals_model_)
 
         with ParContext(1) as par:
             self.GT.update_state(
@@ -891,19 +888,23 @@ class TopographyModel(ABC, BaseEstimator):
             dataset = self.setup_corpus(dataset)
 
         contributions = self.locals_model_.predict(
-            dataset, 
+            dataset,
             self.factor_model_,
             threads=threads,
         )
 
-        dataset = dataset.mutate( 
-            lambda ds : (
-                ds.assign_coords({
-                    "component": self.component_names,
-                    "source" : self.GT.list_sources(dataset),
-                }).assign({
-                    key: contributions,
-                })
+        dataset = dataset.mutate(
+            lambda ds: (
+                ds.assign_coords(
+                    {
+                        "component": self.component_names,
+                        "source": self.GT.list_sources(dataset),
+                    }
+                ).assign(
+                    {
+                        key: contributions,
+                    }
+                )
             )
         )
 
@@ -929,7 +930,7 @@ class TopographyModel(ABC, BaseEstimator):
         threads : int, default=1
             Number of parallel threads to use for computation
         key : str, default="component_distributions"
-            Name of the variable to store distributions in the dataset. 
+            Name of the variable to store distributions in the dataset.
             Per-locus distributions will be stored with the name "{key}_locus"
 
         Returns
@@ -962,17 +963,21 @@ class TopographyModel(ABC, BaseEstimator):
                     ],
                     dim="source",
                 )
-                .transpose("source", "component", ...)\
+                .transpose("source", "component", ...)
                 .assign_coords(source=self.GT.list_sources(dataset))
                 .pipe(
-                    lambda X : np.exp(X - X.max(skipna=True)).fillna(0.0).astype(np.float32)
+                    lambda X: np.exp(X - X.max(skipna=True))
+                    .fillna(0.0)
+                    .astype(np.float32)
                 )
             )
 
         dataset[key] = X
 
         dataset[f"{key}_locus"] = (
-            (X * self.GT.get_freqs(dataset)).sum(dim=dims_except_for(X.dims, "source", "locus", "component"))
+            (X * self.GT.get_freqs(dataset)).sum(
+                dim=dims_except_for(X.dims, "source", "locus", "component")
+            )
             / self.GT.get_regions(dataset).length
         ).astype(np.float32)
 
@@ -1030,7 +1035,7 @@ class TopographyModel(ABC, BaseEstimator):
             dataset = self.annot_contributions(dataset, threads)
 
         marginal_exposures = self.GT.fetch_locals(dataset).sum(dim="sample")
-       
+
         marginal = self.factor_model_._log_marginalize_mutrate(
             np.log(dataset["component_distributions"]), marginal_exposures
         )
@@ -1120,14 +1125,16 @@ class TopographyModel(ABC, BaseEstimator):
         else:
             subset = dataset
 
-        n_loci = subset.sizes['locus']
+        n_loci = subset.sizes["locus"]
         n_sources = self.GT.n_sources(subset)
         locus_model = self.factor_model_.models["theta_model"]
-        
-        X = np.vstack([
-            locus_model._fetch_feature_matrix(subset)
-            for _, subset in self.GT.expand_datasets(subset)
-        ])
+
+        X = np.vstack(
+            [
+                locus_model._fetch_feature_matrix(subset)
+                for _, subset in self.GT.expand_datasets(subset)
+            ]
+        )
 
         background_idx = np.random.RandomState(0).choice(
             len(X), size=min(1000, len(X)), replace=False
@@ -1158,11 +1165,10 @@ class TopographyModel(ABC, BaseEstimator):
                 ),
             )
         )
-        
+
         shap_matrix = np.array(
             parallel_map(
-                (partial(_component_shap, k) for k in use_components),
-                threads=threads
+                (partial(_component_shap, k) for k in use_components), threads=threads
             )
         )
 
@@ -1175,19 +1181,21 @@ class TopographyModel(ABC, BaseEstimator):
         if not scan:
             coords["shap_locus"] = subset.locus.data
 
-        shap_matrix = shap_matrix.reshape(
-            (len(use_components), n_sources, n_loci, -1)
-        )
+        shap_matrix = shap_matrix.reshape((len(use_components), n_sources, n_loci, -1))
 
         dataset[key] = xr.DataArray(
             shap_matrix,
-            dims=("shap_component", "source", "locus" if scan else "shap_locus", "shap_features"),
+            dims=(
+                "shap_component",
+                "source",
+                "locus" if scan else "shap_locus",
+                "shap_features",
+            ),
             coords=coords,
         )
 
         logger.info(f'Added key: "{key}"')
         return dataset
-
 
     def format_component(self, component, normalization="global"):
         """
@@ -1270,11 +1278,10 @@ class TopographyModel(ABC, BaseEstimator):
 
             if hasattr(dataset, "contributions"):
                 (
-                    dataset
-                    .contributions
-                    .stack(observations=("source", "component"))
+                    dataset.contributions.stack(observations=("source", "component"))
                     .transpose("sample", ...)
-                    .to_pandas().to_excel(
+                    .to_pandas()
+                    .to_excel(
                         writer,
                         sheet_name="Sample_contributions",
                     )

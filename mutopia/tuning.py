@@ -423,7 +423,7 @@ def _objective(
     float
         Final test score for this trial
     """
-    
+
     if save_model:
         save_fn = _get_save_model_fn(study)
 
@@ -441,7 +441,7 @@ def _objective(
         )
     }
 
-    params.update( param_sampling_fn(trial) )
+    params.update(param_sampling_fn(trial))
 
     logger.info(
         f"Running trial {trial.number} with params:\n\t"
@@ -455,23 +455,17 @@ def _objective(
         callback=callback,
         seed=trial.number,
     )
-    
+
     model.fit(
         train,
         test_datasets=test,
     )
-    
+
     if save_model:
         save_fn(trial, model)
 
     if not summary_callback is None:
-        summary_callback(
-            trial, 
-            model=model, 
-            study=study,
-            train=train,
-            test=test
-        )
+        summary_callback(trial, model=model, study=study, train=train, test=test)
 
     return model.test_scores_[-1]
 
@@ -559,12 +553,8 @@ def _run_trial_cli(
     model_kw["eval_every"] = 5
 
     train, test = load_study_data(study, lazy)
- 
-    model = (
-        train[0].
-        modality().
-        TopographyModel(**model_kw)
-    )
+
+    model = train[0].modality().TopographyModel(**model_kw)
 
     run_trial(
         save_model=study_attrs["save_model"],

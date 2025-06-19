@@ -1,5 +1,6 @@
 from .track_plot import static_track
 
+
 def gene_track(
     gtf,
     label="Genes",

@@ -277,7 +277,7 @@ def write_sample(
             group=f"/raw/ploidy/{sample_name}",
             mode="a",
             encoding={
-                "data": {"dtype" : "float32"},
+                "data": {"dtype": "float32"},
                 "indices": {"dtype": "uint32"},
             },
             **WRITE_KW,

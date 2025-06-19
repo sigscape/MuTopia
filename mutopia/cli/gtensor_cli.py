@@ -1,20 +1,22 @@
 import click
 import sys
-from typing import (List, Union)
+from typing import List, Union
 from ..utils import FeatureType
 from .core import *
 from .pipeline_tasks import run_pipeline
 from ..ingestion.gtf_parsing import query_gtf
 
+
 @click.group("G-tensor commands")
 def gtensor_cli():
     """
     Manage G-Tensor datasets for genomic data analysis.
-    
+
     G-Tensors are structured genomic datasets that organize samples, features,
     and observations across genomic loci for machine learning applications.
     """
     pass
+
 
 @gtensor_cli.command("compose", short_help="Run the G-Tensor construction pipeline")
 @click.argument("config_file", type=click.Path(exists=True), metavar="CONFIG_FILE")
@@ -34,10 +36,10 @@ def gtensor_cli():
 def _run_pipeline(*args, **kwargs):
     """
     Execute the G-Tensor construction pipeline from a configuration file.
-    
+
     CONFIG_FILE should be a YAML or JSON file containing pipeline configuration
     including data sources, processing steps, and output specifications.
-    
+
     The pipeline can ingest various genomic data formats (BED, BigWig, etc.)
     and create structured G-Tensor datasets with features and samples.
     """
@@ -57,14 +59,14 @@ def _run_pipeline(*args, **kwargs):
 def _train_test_split(*args, **kwargs):
     """
     Split a G-Tensor dataset into training and test sets based on chromosomes/contigs.
-    
+
     DATASET is the path to the G-Tensor file to split.
     CONTIG... are one or more chromosome/contig names to use for the test set.
-    
+
     Creates two new files: DATASET.train.nc and DATASET.test.nc
     The training set contains all contigs except those specified for testing.
     Only regions meeting the minimum size requirement are included.
-    
+
     Example:
         gtensor split my_dataset.nc chr21 chr22 --min-region-size 100
     """
@@ -74,17 +76,17 @@ def _train_test_split(*args, **kwargs):
 @gtensor_cli.command("slice", short_help="Extract genomic regions from a G-Tensor")
 @click.argument("dataset", type=click.Path(exists=True), metavar="DATASET")
 @click.argument("output", type=click.Path(writable=True), metavar="OUTPUT")
-@click.argument('query_regions', type=str, nargs=-1, metavar='REGIONS...')
+@click.argument("query_regions", type=str, nargs=-1, metavar="REGIONS...")
 def _slice_loci(*args, **kwargs):
     """
     Extract specific genomic regions from a G-Tensor dataset.
-    
+
     DATASET is the input G-Tensor file.
     OUTPUT is the output path for the sliced G-Tensor.
-    
+
     Each region is specified as three space-separated values:
     chromosome (string), start position (int), end position (int).
-    
+
     Example:
         gtensor slice input.nc output.nc -r chr1 1000 2000 -r chr2 5000 6000
     """
@@ -183,16 +185,8 @@ def _create_gtensor(*args, **kwargs):
 
 
 @gtensor_cli.command("convert", short_help="Convert a G-Tensor to a different modality")
-@click.argument(
-    "input",
-    type=click.Path(exists=True),
-    metavar="INPUT"
-)
-@click.argument(
-    "output",
-    type=click.Path(writable=True),
-    metavar="OUTPUT"
-)
+@click.argument("input", type=click.Path(exists=True), metavar="INPUT")
+@click.argument("output", type=click.Path(writable=True), metavar="OUTPUT")
 @click.option(
     "-dtype",
     "--dtype",
@@ -216,15 +210,15 @@ def _convert_gtensor(
 ):
     """
     Convert an existing G-Tensor dataset to a different modality.
-    
+
     INPUT is the path to the source G-Tensor file.
     OUTPUT is the path for the converted G-Tensor file.
-    
+
     This command preserves all features and attributes from the original dataset
     while recalculating context frequencies for the new modality. The genomic
     regions remain unchanged, but the observation space is adapted to the new
     modality type.
-    
+
     Example:
         gtensor convert input_sbs.nc output_indel.nc -dtype indel -fa reference.fa
     """
@@ -232,11 +226,7 @@ def _convert_gtensor(
 
 
 @gtensor_cli.command("set-attr", short_help="Set attributes on a G-Tensor")
-@click.argument(
-    "dataset",
-    type=click.Path(exists=True),
-    metavar="DATASET"
-)
+@click.argument("dataset", type=click.Path(exists=True), metavar="DATASET")
 @click.option(
     "-set",
     "--set-attribute",
@@ -252,12 +242,12 @@ def _set_attrs(
 ):
     """
     Set or modify attributes on a G-Tensor dataset.
-    
+
     DATASET is the path to the G-Tensor file to modify.
-    
+
     Attributes are metadata key-value pairs stored with the dataset.
     This command allows you to add new attributes or modify existing ones.
-    
+
     Example:
         gtensor set-attr dataset.nc -set experiment_name "ChIP-seq" -set genome_build "hg38"
     """
@@ -265,36 +255,32 @@ def _set_attrs(
 
 
 @gtensor_cli.command("info", short_help="Display information about a G-Tensor")
-@click.argument(
-    "dataset",
-    type=click.Path(exists=True),
-    metavar="DATASET"
-)
+@click.argument("dataset", type=click.Path(exists=True), metavar="DATASET")
 def _info(dataset):
     """
     Display comprehensive information about a G-Tensor dataset.
-    
+
     DATASET is the path to the G-Tensor file to examine.
-    
+
     Shows dataset dimensions, number of features and samples, dataset name,
     and all stored attributes. This is useful for quickly understanding
     the structure and contents of a G-Tensor dataset.
-    
+
     Example:
         gtensor info my_dataset.nc
     """
     info = get_gtensor_info(dataset)
-    
+
     click.echo(f"Num features: {info['n_features']}")
     click.echo(f"Num samples: {info['n_samples']}")
     click.echo(f"Dataset name: {info['name']}")
 
     click.echo("Dataset dimensions:")
-    for k, v in info['dims'].items():
+    for k, v in info["dims"].items():
         click.echo(f"\t{k}: {v}")
 
     click.echo("Dataset attributes:")
-    for k, v in info['attrs'].items():
+    for k, v in info["attrs"].items():
         click.echo(f"\t{k}: {v}")
 
 
@@ -302,7 +288,7 @@ def _info(dataset):
 def offsets():
     """
     Manage exposure offsets for genomic loci in G-Tensor datasets.
-    
+
     Locus offsets are used to account for varying sequencing depth, mappability,
     or other technical factors that affect the expected observation rate across
     different genomic regions.
@@ -311,16 +297,8 @@ def offsets():
 
 
 @offsets.command("add", short_help="Add locus offsets from a file")
-@click.argument(
-    "dataset",
-    type=click.Path(exists=True),
-    metavar="DATASET"
-)
-@click.argument(
-    "offsets_file",
-    type=click.Path(exists=True),
-    metavar="OFFSETS_FILE"
-)
+@click.argument("dataset", type=click.Path(exists=True), metavar="DATASET")
+@click.argument("offsets_file", type=click.Path(exists=True), metavar="OFFSETS_FILE")
 @click.option(
     "-col",
     "--column",
@@ -335,14 +313,14 @@ def _add_locus_offsets(
 ):
     """
     Add locus-specific exposure offsets to a G-Tensor from a BED file.
-    
+
     DATASET is the G-Tensor file to modify.
     OFFSETS_FILE is a BED file with offset values for each genomic region.
-    
+
     Offset values are normalized to have a mean of 1.0 and are used to adjust
     the expected rate of observations in each genomic region. Higher offsets
     indicate regions with higher expected observation rates.
-    
+
     Example:
         gtensor offsets add dataset.nc mappability.bed --column 5
     """
@@ -350,22 +328,18 @@ def _add_locus_offsets(
 
 
 @offsets.command("rm", short_help="Remove locus offsets")
-@click.argument(
-    "dataset",
-    type=click.Path(exists=True),
-    metavar="DATASET"
-)
+@click.argument("dataset", type=click.Path(exists=True), metavar="DATASET")
 def _rm_locus_offsets(
     dataset,
 ):
     """
     Remove locus offsets from a G-Tensor dataset.
-    
+
     DATASET is the G-Tensor file to modify.
-    
+
     This resets all locus offsets to 1.0, effectively removing any
     region-specific exposure adjustments.
-    
+
     Example:
         gtensor offsets rm dataset.nc
     """
@@ -376,7 +350,7 @@ def _rm_locus_offsets(
 def featurecmds():
     """
     Manage features in G-Tensor datasets.
-    
+
     Features represent genomic annotations or experimental data values
     associated with each genomic region in the G-Tensor.
     """
@@ -387,7 +361,7 @@ def featurecmds():
 def add_feature():
     """
     Add various types of features to a G-Tensor dataset.
-    
+
     Features can be continuous values (e.g., ChIP-seq signal), discrete
     categories (e.g., chromatin states), or specialized types like strand
     information or pre-computed vectors.
@@ -396,16 +370,8 @@ def add_feature():
 
 
 @add_feature.command("continuous", short_help="Add a continuous-valued feature")
-@click.argument(
-    "dataset",
-    type=click.Path(exists=True),
-    metavar="DATASET"
-)
-@click.argument(
-    "ingest_file",
-    type=click.Path(exists=True),
-    metavar="INGEST_FILE"
-)
+@click.argument("dataset", type=click.Path(exists=True), metavar="DATASET")
+@click.argument("ingest_file", type=click.Path(exists=True), metavar="INGEST_FILE")
 @click.option(
     "-name",
     "--feature-name",
@@ -444,18 +410,18 @@ def add_feature():
 def _add_continuous_feature(*args, **kwargs):
     """
     Add a continuous-valued feature from BED, bedGraph, or BigWig files.
-    
+
     DATASET is the G-Tensor file to modify.
     INGEST_FILE is the input file containing feature values.
-    
+
     Continuous features represent numeric values like ChIP-seq signal intensity,
     conservation scores, or other quantitative genomic annotations.
-    
+
     Supported file formats:
     - BED files with numeric values in specified column
     - bedGraph files with 4-column format
     - BigWig files with continuous signal data
-    
+
     Example:
         gtensor feature add continuous dataset.nc chipseq.bw -name H3K4me3 -norm log1p_cpm
     """
@@ -463,22 +429,9 @@ def _add_continuous_feature(*args, **kwargs):
 
 
 @add_feature.command("discrete", short_help="Add a discrete/categorical feature")
-@click.argument(
-    "dataset",
-    type=click.Path(exists=True),
-    metavar="DATASET"
-)
-@click.argument(
-    "ingest_file",
-    type=click.Path(exists=True),
-    metavar="INGEST_FILE"
-)
-@click.argument(
-    "classes",
-    type=str,
-    nargs=-1,
-    metavar="CLASS..."
-)
+@click.argument("dataset", type=click.Path(exists=True), metavar="DATASET")
+@click.argument("ingest_file", type=click.Path(exists=True), metavar="INGEST_FILE")
+@click.argument("classes", type=str, nargs=-1, metavar="CLASS...")
 @click.option(
     "-name",
     "--feature-name",
@@ -544,16 +497,8 @@ def _add_discrete_feature(*args, **kwargs):
 
 
 @add_feature.command("strand", short_help="Add strand orientation feature")
-@click.argument(
-    "dataset",
-    type=click.Path(exists=True),
-    metavar="DATASET"
-)
-@click.argument(
-    "ingest_file",
-    type=click.Path(exists=True),
-    metavar="INGEST_FILE"
-)
+@click.argument("dataset", type=click.Path(exists=True), metavar="DATASET")
+@click.argument("ingest_file", type=click.Path(exists=True), metavar="INGEST_FILE")
 @click.option(
     "-name",
     "--feature-name",
@@ -585,14 +530,14 @@ def _add_discrete_feature(*args, **kwargs):
 def _add_strand_feature(*args, **kwargs):
     """
     Add a strand orientation feature from a BED file.
-    
+
     DATASET is the G-Tensor file to modify.
     INGEST_FILE is a BED file with strand information ('+', '-', or '.').
-    
+
     Strand features encode the directionality of genomic elements like
     genes, transcripts, or other oriented annotations. Values are encoded
     as: '+' = 1, '-' = -1, '.' or missing = 0.
-    
+
     Example:
         gtensor feature add strand dataset.nc genes.bed -name GeneStrand -col 6
     """
@@ -600,16 +545,8 @@ def _add_strand_feature(*args, **kwargs):
 
 
 @add_feature.command("vector", short_help="Add a pre-computed feature vector")
-@click.argument(
-    "dataset",
-    type=click.Path(exists=True),
-    metavar="DATASET"
-)
-@click.argument(
-    "ingest_file",
-    type=click.Path(exists=True),
-    metavar="INGEST_FILE"
-)
+@click.argument("dataset", type=click.Path(exists=True), metavar="DATASET")
+@click.argument("ingest_file", type=click.Path(exists=True), metavar="INGEST_FILE")
 @click.option(
     "-name",
     "--feature-name",
@@ -641,18 +578,18 @@ def _add_strand_feature(*args, **kwargs):
 def _add_vector_feature(*args, **kwargs):
     """
     Add a pre-computed feature vector from a text file.
-    
+
     DATASET is the G-Tensor file to modify.
     INGEST_FILE is a text file with one numeric value per line.
-    
+
     Vector features are pre-computed numeric values for each genomic
     region in the dataset. The file must contain exactly as many values
     as there are regions in the G-Tensor, in the same order.
-    
+
     This is useful for adding externally computed features like
     chromatin accessibility scores, conservation metrics, or
     machine learning-derived features.
-    
+
     Example:
         gtensor feature add vector dataset.nc accessibility.txt -name ATAC_signal
     """
@@ -660,22 +597,18 @@ def _add_vector_feature(*args, **kwargs):
 
 
 @featurecmds.command("ls", short_help="List features in a G-Tensor")
-@click.argument(
-    "dataset",
-    type=click.Path(exists=True),
-    metavar="DATASET"
-)
+@click.argument("dataset", type=click.Path(exists=True), metavar="DATASET")
 def _list_features(
     dataset: str,
 ):
     """
     List all features in a G-Tensor dataset with their attributes.
-    
+
     DATASET is the G-Tensor file to examine.
-    
+
     Displays a formatted table showing feature names, normalization methods,
     and group assignments for all features in the dataset.
-    
+
     Example:
         gtensor feature ls dataset.nc
     """
@@ -705,17 +638,9 @@ def _list_features(
 
 
 @featurecmds.command("rm", short_help="Remove features from a G-Tensor")
+@click.argument("dataset", type=click.Path(exists=True), metavar="DATASET")
 @click.argument(
-    "dataset",
-    type=click.Path(exists=True),
-    metavar="DATASET"
-)
-@click.argument(
-    "feature_names",
-    type=str,
-    nargs=-1,
-    required=True,
-    metavar="FEATURE..."
+    "feature_names", type=str, nargs=-1, required=True, metavar="FEATURE..."
 )
 def _rm_features(
     dataset: str,
@@ -723,13 +648,13 @@ def _rm_features(
 ):
     """
     Remove one or more features from a G-Tensor dataset.
-    
+
     DATASET is the G-Tensor file to modify.
     FEATURE... are the names of features to remove.
-    
+
     This permanently deletes the specified features and their data
     from the dataset. Use with caution.
-    
+
     Example:
         gtensor feature rm dataset.nc old_feature1 old_feature2
     """
@@ -739,16 +664,8 @@ def _rm_features(
 
 
 @featurecmds.command("edit", short_help="Edit feature attributes")
-@click.argument(
-    "dataset",
-    type=click.Path(exists=True),
-    metavar="DATASET"
-)
-@click.argument(
-    "feature_name",
-    type=str,
-    metavar="FEATURE_NAME"
-)
+@click.argument("dataset", type=click.Path(exists=True), metavar="DATASET")
+@click.argument("feature_name", type=str, metavar="FEATURE_NAME")
 @click.option(
     "-g",
     "--group",
@@ -772,14 +689,14 @@ def _edit_feature(
 ):
     """
     Edit the attributes of an existing feature in a G-Tensor.
-    
+
     DATASET is the G-Tensor file to modify.
     FEATURE_NAME is the name of the feature to edit.
-    
+
     This command allows you to change the group assignment or
     normalization method of an existing feature without re-ingesting
     the data.
-    
+
     Example:
         gtensor feature edit dataset.nc my_feature -g regulatory -norm zscore
     """
@@ -790,7 +707,7 @@ def _edit_feature(
 def samplecmds():
     """
     Manage samples in G-Tensor datasets.
-    
+
     Samples represent individual observations (e.g., tumor samples, cell lines)
     that contain genomic variations or other observations mapped to the G-Tensor's
     genomic regions.
@@ -799,16 +716,8 @@ def samplecmds():
 
 
 @samplecmds.command("add", short_help="Add a sample to a G-Tensor")
-@click.argument(
-    "dataset",
-    type=click.Path(exists=True),
-    metavar="DATASET"
-)
-@click.argument(
-    "sample_file",
-    type=click.Path(exists=True),
-    metavar="SAMPLE_FILE"
-)
+@click.argument("dataset", type=click.Path(exists=True), metavar="DATASET")
+@click.argument("sample_file", type=click.Path(exists=True), metavar="SAMPLE_FILE")
 @click.option(
     "-id",
     "--sample-id",
@@ -906,31 +815,21 @@ def _add_sample(*args, **kwargs):
 
 
 @samplecmds.command("rm", short_help="Remove samples from a G-Tensor")
-@click.argument(
-    "dataset",
-    type=click.Path(exists=True),
-    metavar="DATASET"
-)
-@click.argument(
-    "sample_names",
-    type=str,
-    nargs=-1,
-    required=True,
-    metavar="SAMPLE..."
-)
+@click.argument("dataset", type=click.Path(exists=True), metavar="DATASET")
+@click.argument("sample_names", type=str, nargs=-1, required=True, metavar="SAMPLE...")
 def _rm_samples(
     dataset,
     sample_names: List[str],
 ):
     """
     Remove one or more samples from a G-Tensor dataset.
-    
+
     DATASET is the G-Tensor file to modify.
     SAMPLE... are the names/IDs of samples to remove.
-    
+
     This permanently deletes the specified samples and their data
     from the dataset. Use with caution.
-    
+
     Example:
         gtensor sample rm dataset.nc SAMPLE_001 SAMPLE_002
     """
@@ -940,19 +839,15 @@ def _rm_samples(
 
 
 @samplecmds.command("ls", short_help="List samples in a G-Tensor")
-@click.argument(
-    "dataset",
-    type=click.Path(exists=True),
-    metavar="DATASET"
-)
+@click.argument("dataset", type=click.Path(exists=True), metavar="DATASET")
 def _list_samples(dataset: str):
     """
     List all samples in a G-Tensor dataset.
-    
+
     DATASET is the G-Tensor file to examine.
-    
+
     Displays the names/IDs of all samples contained in the dataset.
-    
+
     Example:
         gtensor sample ls dataset.nc
     """
@@ -969,7 +864,7 @@ def _list_samples(dataset: str):
 def utils():
     """
     Utility functions for working with genomic data files and G-Tensors.
-    
+
     These commands provide helpful data processing and format conversion
     utilities for preparing data for G-Tensor ingestion.
     """
@@ -982,7 +877,7 @@ def utils():
     type=click.Path(exists=True),
     nargs=-1,
     required=True,
-    metavar="BED_FILE..."
+    metavar="BED_FILE...",
 )
 @click.option(
     "--max-region-size",
@@ -996,16 +891,16 @@ def _linearize_beds(
 ):
     """
     Convert overlapping BED files into non-overlapping linear regions.
-    
+
     BED_FILE... are one or more BED files to process.
-    
+
     This utility resolves overlapping genomic regions by splitting them
     into non-overlapping segments. This is useful for preparing annotation
     files for G-Tensor ingestion when multiple features overlap.
-    
+
     The output files will have the same names as input files with
     '.linearized' added before the extension.
-    
+
     Example:
         gtensor utils linearize-beds annotations.bed genes.bed
     """
@@ -1014,24 +909,26 @@ def _linearize_beds(
 
 @utils.command("query-gtf", short_help="Query and filter GTF/GFF files")
 @click.option(
-    "--input", "-i", 
-    type=click.File("r"), 
-    default="-", 
-    help="Input GTF or GFF file (default: stdin)"
+    "--input",
+    "-i",
+    type=click.File("r"),
+    default="-",
+    help="Input GTF or GFF file (default: stdin)",
 )
 @click.option(
-    "--output", "-o", 
-    type=click.File("w"), 
-    default="-", 
-    help="Output file (default: stdout)"
+    "--output",
+    "-o",
+    type=click.File("w"),
+    default="-",
+    help="Output file (default: stdout)",
 )
 @click.option(
-    "--type-filter", "-type", 
-    help="Only include records of this feature type (e.g., 'gene', 'exon')"
+    "--type-filter",
+    "-type",
+    help="Only include records of this feature type (e.g., 'gene', 'exon')",
 )
 @click.option(
-    "--attribute-key", "-attr", 
-    help="Only include records with this attribute key"
+    "--attribute-key", "-attr", help="Only include records with this attribute key"
 )
 @click.option(
     "--attribute-values",
@@ -1096,12 +993,11 @@ def _query_gtf(*args, **kwargs):
     query_gtf(*args, **kwargs)
 
 
-@utils.command("make-expression-bedfile", short_help="Create expression BED from quantification")
+@utils.command(
+    "make-expression-bedfile", short_help="Create expression BED from quantification"
+)
 @click.argument(
-    "quantitation_file",
-    type=click.File('r'),
-    default=sys.stdin,
-    metavar="QUANT_FILE"
+    "quantitation_file", type=click.File("r"), default=sys.stdin, metavar="QUANT_FILE"
 )
 @click.option(
     "-o",
@@ -1146,3 +1042,22 @@ def _make_quant_file(
                                              -o expression.bed --join-on gene_id
     """
     make_expression_bedfile(quantitation_file, output, gtf_file, join_on)
+
+
+@utils.command("download-gex-annotation", short_help="Create GEX annotation BED file")
+@click.option(
+    "-gtf",
+    "--gtf-file",
+    type=click.Path(exists=True),
+    default=None,
+    help="GTF file for gene annotation (default: downloads MANE GTF)",
+)
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(writable=True),
+    default=None,
+    help="Output BED file for GEX annotation (default: gex_annotation.bed)",
+)
+def _make_annotation_bedfile(gtf_file=None, output=None):
+    make_annotation_bedfile(gtf_file, output)

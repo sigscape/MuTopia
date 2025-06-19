@@ -43,6 +43,24 @@ def flatten_tensor_for_update(fn):
     return wrapper
 
 
+def purge_zeros(fn):
+    @wraps(fn)
+    def wrapper(*args):
+        likelihood, weights = args[-3], args[-2]
+        nonzero_idx = weights > 0.0
+        # if the elements are mostly non-zero, don't bother subsetting
+        if np.sum(nonzero_idx)/len(weights) > 0.5:
+            return fn(*args)
+        else:
+            return fn(
+                *args[:-3],
+                np.ascontiguousarray(likelihood[..., nonzero_idx]),
+                np.ascontiguousarray(weights[nonzero_idx]),
+                *args[-1:],
+            )
+    return wrapper
+
+
 """
 Mixture model inference functions
 """
@@ -108,6 +126,7 @@ def _update_step(
 
 
 @flatten_tensor_for_update
+@purge_zeros
 @njit(
     "float32[::1](int64, float32, bool, float32[::1], float32[::1], float32[:,:], float32[:,:], float32[:,::1], float32[::1], float32[::1])",
     nogil=True,
@@ -202,28 +221,27 @@ class MixtureModelBase(LocalsModel):
         self.dtype = dtype
         self.GT = MixtureInterface()
 
-
     def _get_sample_init_fn(self, dataset):
         mixture_kw = self._get_mixture_kw(dataset)
         return partial(
             self._init_locals_sample,
             **mixture_kw,
         )
-    
+
     @staticmethod
-    def _init_locals_sample(sample,*, alpha, tau, **_):
+    def _init_locals_sample(sample, *, alpha, tau, **_):
 
         N = sample.X.sum().data.item()
-        
-        prior = tau[:,None] * alpha[None,:]  # D x K
-        p_hat = prior/prior.sum(axis=1, keepdims=True)  # normalize
+
+        prior = tau[:, None] * alpha[None, :]  # D x K
+        p_hat = prior / prior.sum(axis=1, keepdims=True)  # normalize
 
         output_shape = p_hat.shape
         concentration = p_hat.ravel() * 1000
         # Sample from Dirichlet distribution and scale by N
         Nk = np.random.dirichlet(concentration) * N
 
-        return Nk.reshape(output_shape) # G*D*K
+        return Nk.reshape(output_shape)  # G*D*K
 
     def _get_mixture_kw(self, dataset):
         raise NotImplementedError()

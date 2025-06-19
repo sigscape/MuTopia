@@ -3,41 +3,34 @@ from pydantic import BaseModel, Field
 from ..utils import FeatureType
 from ..ingestion import FileType
 
+
 class URLConfig(BaseModel):
     celltype: Optional[str] = Field(None, description="Name of the data source")
     file: str = Field(..., description="URL to the data source")
-    
+
     def __str__(self) -> str:
         return f"{self.source}: {self.file}"
+
 
 class FeatureConfig(BaseModel):
     normalization: str = Field(..., description="Type of normalization to apply")
     column: Optional[int] = Field(
-        4, 
-        description="Column number to use from input file (if applicable)"
-    ) 
-    group: Optional[str] = Field(
-        "all",
-        description="Group name for the feature"
+        4, description="Column number to use from input file (if applicable)"
     )
-    null: Optional[str] = Field(
-        None,
-        description="Value to use for null values"
-    )
+    group: Optional[str] = Field("all", description="Group name for the feature")
+    null: Optional[str] = Field(None, description="Value to use for null values")
     classes: Optional[List[str]] = Field(
-        None,
-        description="List of classes for the feature"
+        None, description="List of classes for the feature"
     )
     files: List[URLConfig] = Field(
-        ..., 
-        description="Mapping of source names to files for feature data"
+        ..., description="Mapping of source names to files for feature data"
     )
-    
+
     @property
     def file_type(self) -> FileType:
         """Determine file type from the first file's extension"""
         return FileType.from_extension(self.files[0].file)
-    
+
     def validate_extension(self) -> None:
         """Validate that the file type supports the chosen normalization"""
         file_type = self.file_type
@@ -47,7 +40,7 @@ class FeatureConfig(BaseModel):
                 f"Normalization {norm_type} not allowed for file type {file_type}. "
                 f"Allowed normalizations: {file_type.allowed_normalizations}"
             )
-    
+
     def model_post_init(self, *args, **kwargs) -> None:
         """Validate after model initialization"""
         super().model_post_init(*args, **kwargs)
@@ -61,15 +54,11 @@ class GTensorConfig(BaseModel):
     blacklist: str = Field(..., description="Path to blacklist file")
     fasta: str = Field(..., description="Path to FASTA file")
     region_size: int = Field(..., description="Size of regions")
-    min_region_size : Optional[int] = Field(
-        100,
-        description="Minimum size of regions"
-    )
+    min_region_size: Optional[int] = Field(100, description="Minimum size of regions")
     features: Dict[str, FeatureConfig] = Field(
-        ..., 
-        description="Dictionary of features to process"
+        ..., description="Dictionary of features to process"
     )
-    
+
     @property
     def bed_cuts(self) -> list[tuple[str, str]]:
         """Get list of BED files to be cut during GTensor creation"""
@@ -77,4 +66,4 @@ class GTensorConfig(BaseModel):
         for name, feature in self.features.items():
             if feature.file_type == FileType.BED:
                 cuts.extend((name, conf.file) for conf in feature.files)
-        return cuts 
+        return cuts

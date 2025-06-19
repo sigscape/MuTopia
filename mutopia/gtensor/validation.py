@@ -3,6 +3,7 @@ from collections import defaultdict
 from numpy import issubdtype
 from ..utils import FeatureType, logger, str_wrapped_list
 
+
 def check_dims(dataset, model_state):
 
     rm_dim = dims_except_for(
