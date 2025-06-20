@@ -1,5 +1,6 @@
 import numpy as np
 import xarray as xr
+from pandas import DataFrame
 import matplotlib.pyplot as plt
 from tqdm import trange
 from functools import partial
@@ -12,14 +13,14 @@ from .optim import fit_model
 from .model_components import *
 from .latent_var_models import *
 from .factor_model import FactorModel
-from ..utils import *
+from ..mixture_model import *
+from ..utils import logger, ParContext, diverging_palette, parallel_map
 from ..plot.coef_matrix_plot import _plot_interaction_matrix
 from ..gtensor import *
-from ..mixture_model import *
+from ..gtensor.validation import check_corpus, check_dims
 from ..dtypes import get_mode_config
 
 # interfaces
-from .gtensor_interface import GtensorInterface as CS
 from ..mixture_model.mixture_interface import MixtureInterface as MIX
 
 """
@@ -28,8 +29,10 @@ and provides the high-level interface for interacting with the model.
 This is the entry point for the user to interact with and annotate data.
 """
 
+
 class DenseSharedMixtureModel(DenseMixtureModel, SharedExposuresMixtureModel):
     pass
+
 
 class SparseSharedMixtureModel(SparseMixtureModel, SharedExposuresMixtureModel):
     pass
@@ -84,6 +87,7 @@ class TopographyModel(ABC, BaseEstimator):
         eval_every=10,
         verbose=0,
         time_limit=None,
+        full_normalizers=False,
         test_chroms=("chr1",),
     ):
         """Initialize the signature model.
@@ -181,8 +185,8 @@ class TopographyModel(ABC, BaseEstimator):
         >>> # Annotate contributions of each component to the data
         >>> annotated_data = model.annot_contributions(train_data)
         >>>
-        >>> # Visualize the first signature
-        >>> model.plot_signature(0)
+        >>> # Visualize the first component
+        >>> model.plot_component(0)
         """
 
         self.num_components = num_components
@@ -230,7 +234,7 @@ class TopographyModel(ABC, BaseEstimator):
         self.verbose = verbose
         self.time_limit = time_limit
         self.shared_exposures = shared_exposures
-
+        self.full_normalizers = full_normalizers
 
     @property
     def modality(self):
@@ -329,23 +333,18 @@ class TopographyModel(ABC, BaseEstimator):
     def _init_locals_model(
         self,
         train_datasets,
-        test_datasets,
         random_state,
     ):
 
         is_sparse = train_datasets[0].X.is_sparse()
-        if not all(
-            corpus.X.is_sparse() == is_sparse
-            for corpus in train_datasets + test_datasets
-        ):
+        if not all(corpus.X.is_sparse() == is_sparse for corpus in train_datasets):
             raise ValueError(
                 "All corpuses must be either sparse or dense - mixing is not allowed!"
             )
 
         is_mixture = MIX.is_mixture_corpus(train_datasets[0])
         if not all(
-            MIX.is_mixture_corpus(corpus) == is_mixture
-            for corpus in train_datasets + test_datasets
+            MIX.is_mixture_corpus(corpus) == is_mixture for corpus in train_datasets
         ):
             raise ValueError(
                 "All corpuses must be either multi-source or single-source - mixing is not allowed!"
@@ -355,7 +354,9 @@ class TopographyModel(ABC, BaseEstimator):
             logger.warning("** Inferring mixture of epigenomes model **")
 
         if is_mixture:
-            locals_model = SparseSharedMixtureModel if is_sparse else DenseSharedMixtureModel
+            locals_model = (
+                SparseSharedMixtureModel if is_sparse else DenseSharedMixtureModel
+            )
         else:
             locals_model = LDAUpdateSparse if is_sparse else LDAUpdateDense
 
@@ -381,6 +382,26 @@ class TopographyModel(ABC, BaseEstimator):
                 )
             )
         )
+
+    def init_model(self, train_datasets):
+
+        random_state = np.random.RandomState(self.seed)
+
+        self.locals_model_ = self._init_locals_model(
+            train_datasets,
+            random_state,
+        )
+        # borrow the GT from the locals model
+        self.GT = self.locals_model_.GT
+
+        self.factor_model_ = self._init_factor_model(
+            train_datasets,
+            random_state,
+            self.GT,
+            **self.get_params(),
+        )
+
+        return self
 
     def fit(
         self,
@@ -420,40 +441,33 @@ class TopographyModel(ABC, BaseEstimator):
         - locals_model_ : The fitted locals model
         - test_scores_ : Performance metrics on test datasets
         """
-        if not isinstance(train_datasets, Iterable):
+        if not isinstance(train_datasets, (tuple, list)):
             train_datasets = (train_datasets,)
         self._modality = train_datasets[0].attrs["dtype"]
 
-        if test_datasets is None or (isinstance(test_datasets, Iterable) and len(test_datasets) == 0):
+        if not isinstance(test_datasets, (tuple, list)):
+            test_datasets = (test_datasets,)
+        elif test_datasets is None or (
+            isinstance(test_datasets, (tuple, list)) and len(test_datasets) == 0
+        ):
             logger.info("Splitting train/test partitions...")
             train_datasets, test_datasets = self._train_test_split(train_datasets)
-        elif not isinstance(test_datasets, Iterable):
-            test_datasets = (test_datasets,)
+
+        try:
+            self.factor_model_, self.locals_model_
+        except AttributeError:
+            # initialize the models if not already done
+            self.init_model(train_datasets)
 
         random_state = np.random.RandomState(self.seed)
-
-        locals_model = self._init_locals_model(
-            train_datasets,
-            test_datasets,
-            random_state,
-        )
-        # borrow the GT from the locals model
-        self.GT = locals_model.GT
-
-        factor_model = self._init_factor_model(
-            train_datasets,
-            random_state,
-            self.GT,
-            **self.get_params(),
-        )
 
         (self.factor_model_, self.locals_model_, self.test_scores_) = fit_model(
             self.GT,
             train_datasets,
             test_datasets,
             random_state,
-            factor_model,
-            locals_model,
+            self.factor_model_,
+            self.locals_model_,
             **self.get_params(),
         )
 
@@ -552,11 +566,7 @@ class TopographyModel(ABC, BaseEstimator):
 
         logger.info("Setting up dataset state ...")
 
-        dataset = self.GT.init_state(
-            dataset,
-            self.factor_model_,
-            self.locals_model_
-        )
+        dataset = self.GT.init_state(dataset, self.factor_model_, self.locals_model_)
 
         with ParContext(1) as par:
             self.GT.update_state(
@@ -588,9 +598,10 @@ class TopographyModel(ABC, BaseEstimator):
 
         dump(self, path)
 
-    def plot_signature(self, component, *select, normalization="global", **kwargs):
+    def plot_component(self, component, *select, normalization="global", **kwargs):
         """
-        Plots the signature for a given component.
+        Visualize a given component.
+
         Parameters
         ----------
         component : int or str
@@ -598,7 +609,7 @@ class TopographyModel(ABC, BaseEstimator):
         *select : str, optional
             Mesoscale selection strings to plot. If none are provided, defaults to ["Baseline"].
         normalization : {global, weighted, none}, default="global"
-            The normalization method to use for the signature.
+            The normalization method to use for the component.
         **kwargs : dict
             Additional keyword arguments to pass to the underlying plot method.
         Returns
@@ -607,7 +618,7 @@ class TopographyModel(ABC, BaseEstimator):
             The resulting plot object returned by the modality's plot method.
         Notes
         -----
-        This method retrieves the component by name or index, formats the signature using the factor model,
+        This method retrieves the component by name or index, formats the component using the factor model,
         and delegates the actual plotting to the modality's plot method.
         """
 
@@ -617,7 +628,7 @@ class TopographyModel(ABC, BaseEstimator):
         component = self._get_k(component)
 
         return self.modality.plot(
-            self.factor_model_.format_signature(component, normalization=normalization),
+            self.factor_model_.format_component(component, normalization=normalization),
             *select,
             **kwargs,
         )
@@ -663,7 +674,7 @@ class TopographyModel(ABC, BaseEstimator):
 
         component = self._get_k(component)
 
-        signatures = self.factor_model_.format_signature(
+        signatures = self.factor_model_.format_component(
             component, normalization=normalization
         )
         n_rows = len(signatures.mesoscale_state)
@@ -697,7 +708,7 @@ class TopographyModel(ABC, BaseEstimator):
 
         for i, states in enumerate(state_groups.values()):
             ax = fig.add_subplot(gs0[i, : len(states)])
-            self.plot_signature(
+            self.plot_component(
                 component,
                 *states,
                 ax=ax,
@@ -763,7 +774,7 @@ class TopographyModel(ABC, BaseEstimator):
             interactions.drop_sel(context="Shared effect")
         ).to_pandas()
 
-        signature = self.factor_model_.format_signature(
+        signature = self.factor_model_.format_component(
             component, normalization=normalization
         )
 
@@ -801,7 +812,7 @@ class TopographyModel(ABC, BaseEstimator):
         show : bool, default=True
             If True, displays the figure. If False, returns the figure object.
         **kwargs
-            Additional keyword arguments passed to plot_signature method.
+            Additional keyword arguments passed to plot_component method.
 
         Returns
         -------
@@ -827,7 +838,7 @@ class TopographyModel(ABC, BaseEstimator):
 
         for k in range(self.n_components):
             _ax = np.ravel(ax)[k]
-            self.plot_signature(k, ax=_ax, normalization=normalization, **kwargs)
+            self.plot_component(k, ax=_ax, normalization=normalization, **kwargs)
             _ax.set_ylabel(self.component_names[k], fontsize=8)
 
         for _ax in np.ravel(ax)[self.n_components :]:
@@ -842,6 +853,7 @@ class TopographyModel(ABC, BaseEstimator):
         self,
         dataset,
         threads=1,
+        key="contributions",
     ):
         """
         Calculate and add component contributions to a dataset.
@@ -851,18 +863,23 @@ class TopographyModel(ABC, BaseEstimator):
 
         Parameters
         ----------
-        dataset : xarray.Dataset or str
-            Dataset or name of dataset to analyze
+        dataset : xarray.Dataset
+            Dataset to analyze and annotate with contributions
         threads : int, default=1
             Number of parallel threads to use for computation
-        verbose : int, default=0
-            Verbosity level for parallel computation
+        key : str, default="contributions"
+            Name of the variable to store contributions in the dataset
 
         Returns
         -------
         xarray.Dataset
             The input dataset with the calculated contributions added as a new variable
-            with dimensions ('sample', 'component')
+            with the specified key name and dimensions ('sample', 'component')
+
+        Notes
+        -----
+        If the dataset does not have corpus state initialized, this method will
+        automatically set it up using setup_corpus().
         """
 
         self._check_corpus(dataset)
@@ -871,30 +888,63 @@ class TopographyModel(ABC, BaseEstimator):
             dataset = self.setup_corpus(dataset)
 
         contributions = self.locals_model_.predict(
-            dataset, 
+            dataset,
             self.factor_model_,
             threads=threads,
         )
 
-        dataset = dataset.mutate( 
-            lambda ds : (
-                ds.assign_coords({
-                    "component": self.component_names,
-                    "source" : self.GT.list_sources(dataset),
-                }).assign({
-                    "contributions": contributions,
-                })
+        dataset = dataset.mutate(
+            lambda ds: (
+                ds.assign_coords(
+                    {
+                        "component": self.component_names,
+                        "source": self.GT.list_sources(dataset),
+                    }
+                ).assign(
+                    {
+                        key: contributions,
+                    }
+                )
             )
         )
 
-        logger.info('Added key to dataset: "contributions"')
+        logger.info(f'Added key to dataset: "{key}"')
         return dataset
 
     def annot_component_distributions(
         self,
         dataset,
         threads=1,
+        key="component_distributions",
     ):
+        """
+        Calculate and add component distributions to a dataset.
+
+        This method computes the probability distributions for each component across
+        genomic contexts and adds them as new variables to the dataset.
+
+        Parameters
+        ----------
+        dataset : xarray.Dataset
+            Dataset to analyze and annotate with component distributions
+        threads : int, default=1
+            Number of parallel threads to use for computation
+        key : str, default="component_distributions"
+            Name of the variable to store distributions in the dataset.
+            Per-locus distributions will be stored with the name "{key}_locus"
+
+        Returns
+        -------
+        xarray.Dataset
+            The input dataset with the calculated component distributions added as new variables:
+            - key: Full distributions with dimensions ('source', 'component', ...)
+            - {key}_locus: Per-locus distributions normalized by region length
+
+        Notes
+        -----
+        If the dataset does not have corpus state initialized, this method will
+        automatically set it up using setup_corpus().
+        """
         self._check_corpus(dataset)
 
         if not self.GT.has_corpusstate(dataset):
@@ -913,29 +963,62 @@ class TopographyModel(ABC, BaseEstimator):
                     ],
                     dim="source",
                 )
-                .transpose("source", "component", ...)\
+                .transpose("source", "component", ...)
                 .assign_coords(source=self.GT.list_sources(dataset))
                 .pipe(
-                    lambda X : np.exp(X - X.max(skipna=True)).fillna(0.0).astype(np.float32)
+                    lambda X: np.exp(X - X.max(skipna=True))
+                    .fillna(0.0)
+                    .astype(np.float32)
                 )
             )
 
-        dataset["component_distributions"] = X
+        dataset[key] = X
 
-        dataset["component_locus_distributions"] = (
-            (X * self.GT.get_freqs(dataset)).sum(dim=dims_except_for(X.dims, "source", "locus", "component"))
+        dataset[f"{key}_locus"] = (
+            (X * self.GT.get_freqs(dataset)).sum(
+                dim=dims_except_for(X.dims, "source", "locus", "component")
+            )
             / self.GT.get_regions(dataset).length
         ).astype(np.float32)
 
-        logger.info('Added key: "component_distributions"')
-        logger.info('Added key: "component_locus_distributions"')
+        logger.info(f'Added key: "{key}"')
+        logger.info(f'Added key: "{key}_locus"')
         return dataset
 
     def annot_marginal_prediction(
         self,
         dataset,
         threads=1,
+        key="predicted_marginal",
     ):
+        """
+        Calculate and add marginal predictions to a dataset.
+
+        This method computes marginal mutation rate predictions by marginalizing over
+        component distributions weighted by their contributions.
+
+        Parameters
+        ----------
+        dataset : xarray.Dataset
+            Dataset to analyze and annotate with marginal predictions
+        threads : int, default=1
+            Number of parallel threads to use for computation
+        key : str, default="predicted_marginal"
+            Name of the variable to store marginal predictions in the dataset.
+            Per-locus marginal predictions will be stored with the name "{key}_locus"
+
+        Returns
+        -------
+        xarray.Dataset
+            The input dataset with marginal predictions added as new variables:
+            - key: Marginal mutation rate predictions
+            - {key}_locus: Per-locus marginal predictions normalized by region length
+
+        Notes
+        -----
+        This method requires 'component_distributions' and 'contributions' to be present
+        in the dataset. If they are missing, they will be calculated automatically.
+        """
         self._check_corpus(dataset, enforce_sample=False)
 
         if not self.GT.has_corpusstate(dataset):
@@ -951,24 +1034,24 @@ class TopographyModel(ABC, BaseEstimator):
         except KeyError:
             dataset = self.annot_contributions(dataset, threads)
 
-        marginal_exposures = dataset["contributions"].sum(dim="sample").data
-       
+        marginal_exposures = self.GT.fetch_locals(dataset).sum(dim="sample")
+
         marginal = self.factor_model_._log_marginalize_mutrate(
             np.log(dataset["component_distributions"]), marginal_exposures
         )
 
-        dataset["predicted_marginal"] = (
+        dataset[key] = (
             np.exp(marginal - marginal.max(skipna=True)).fillna(0.0).astype(np.float32)
         )
-        dataset["predicted_locus_marginal"] = (
+        dataset[f"{key}_locus"] = (
             (np.exp(marginal) * dataset.regions.context_frequencies).sum(
                 dim=dims_except_for(marginal.dims, "source", "locus")
             )
             / dataset.regions.length
         ).astype(np.float32)
 
-        logger.info('Added key: "predicted_marginal"')
-        logger.info('Added key: "predicted_locus_marginal"')
+        logger.info(f'Added key: "{key}"')
+        logger.info(f'Added key: "{key}_locus"')
 
         return dataset
 
@@ -980,7 +1063,49 @@ class TopographyModel(ABC, BaseEstimator):
         scan=False,
         n_samples=2000,
         seed=42,
+        key="SHAP_values",
     ):
+        """
+        Calculate and add SHAP values to explain component predictions.
+
+        This method uses SHAP (SHapley Additive exPlanations) to compute feature
+        importance values for understanding how genomic features contribute to
+        component predictions.
+
+        Parameters
+        ----------
+        dataset : xarray.Dataset
+            Dataset to analyze and annotate with SHAP values
+        *components : int or str
+            Component indices or names to calculate SHAP values for. If none provided,
+            calculates for all components.
+        threads : int, default=1
+            Number of parallel threads to use for computation
+        scan : bool, default=False
+            If True, calculates SHAP values for all loci. If False, subsamples loci.
+        n_samples : int, default=2000
+            Number of loci to subsample when scan=False
+        seed : int, default=42
+            Random seed for reproducible subsampling
+        key : str, default="SHAP_values"
+            Name of the variable to store SHAP values in the dataset
+
+        Returns
+        -------
+        xarray.Dataset
+            The input dataset with SHAP values added as a new variable with the specified
+            key name and dimensions ('shap_component', 'locus' or 'shap_locus', 'shap_features')
+
+        Raises
+        ------
+        ImportError
+            If the SHAP library is not installed
+
+        Notes
+        -----
+        This method requires the SHAP library to be installed. Install with:
+        pip install shap
+        """
 
         try:
             import shap
@@ -994,14 +1119,22 @@ class TopographyModel(ABC, BaseEstimator):
 
         if not scan:
             subset_loci = np.random.RandomState(seed).choice(
-                dataset.locus.size, max(n_samples, 1500), replace=False
+                dataset.locus.size, max(n_samples, 50), replace=False
             )
             subset = dataset.isel(locus=subset_loci)
         else:
             subset = dataset
 
+        n_loci = subset.sizes["locus"]
+        n_sources = self.GT.n_sources(subset)
         locus_model = self.factor_model_.models["theta_model"]
-        X = locus_model._fetch_feature_matrix(subset)
+
+        X = np.vstack(
+            [
+                locus_model._fetch_feature_matrix(subset)
+                for _, subset in self.GT.expand_datasets(subset)
+            ]
+        )
 
         background_idx = np.random.RandomState(0).choice(
             len(X), size=min(1000, len(X)), replace=False
@@ -1033,12 +1166,13 @@ class TopographyModel(ABC, BaseEstimator):
             )
         )
 
-        with ParContext(threads) as par:
-            shap_matrix = np.array(
-                list(par(delayed(_component_shap)(k) for k in use_components))
+        shap_matrix = np.array(
+            parallel_map(
+                (partial(_component_shap, k) for k in use_components), threads=threads
             )
+        )
 
-        features = dataset.state.coords["feature"].data
+        features = dataset.coords["feature"].data
         coords = {
             "shap_features": features,
             "shap_component": [self.component_names[k] for k in use_components],
@@ -1047,49 +1181,79 @@ class TopographyModel(ABC, BaseEstimator):
         if not scan:
             coords["shap_locus"] = subset.locus.data
 
-        dataset["SHAP_values"] = xr.DataArray(
+        shap_matrix = shap_matrix.reshape((len(use_components), n_sources, n_loci, -1))
+
+        dataset[key] = xr.DataArray(
             shap_matrix,
-            dims=("shap_component", "locus" if scan else "shap_locus", "shap_features"),
+            dims=(
+                "shap_component",
+                "source",
+                "locus" if scan else "shap_locus",
+                "shap_features",
+            ),
             coords=coords,
         )
 
-        logger.info('Added key: "SHAP_values"')
+        logger.info(f'Added key: "{key}"')
         return dataset
 
-    def score(
-        self,
-        dataset,
-        exposures=None,
-        threads=1,
-    ):
-        self._check_corpus(dataset)
+    def format_component(self, component, normalization="global"):
+        """
+        Format and flatten a component pattern for a given component.
 
-        if not self.GT.has_corpusstate(dataset):
-            dataset = self.setup_corpus(dataset)
+        Parameters
+        ----------
+        component : int or str
+            The component index or name to format
+        normalization : str, default="global"
+            The normalization method to apply to the component
 
-        with ParContext(threads) as par:
-            return self.locals_model_.deviance(
-                self.factor_model_,
-                (dataset,),
-                exposures_fn=(
-                    using_exposures_from(dataset) if exposures is None else exposures
-                ),
-                par_context=par,
-            ).item()
-
-    def format_signature(self, component, normalization="global"):
+        Returns
+        -------
+        xarray.DataArray
+            The flattened component data for the specified component
+        """
 
         component = self._get_k(component)
 
         return self.modality._flatten_observations(
-            self.factor_model_.format_signature(component, normalization=normalization)
+            self.factor_model_.format_component(component, normalization=normalization)
         )
 
     @property
     def alpha_(self):
         return self.locals_model_.alpha
 
-    def execel_report(self, dataset, output):
+    def excel_report(self, dataset, output, normalization="global"):
+        """
+        Generate a comprehensive Excel report with model results.
+
+        This method creates an Excel file containing signature data, sample contributions,
+        and SHAP values (if available) across multiple worksheets.
+
+        Parameters
+        ----------
+        dataset : xarray.Dataset
+            Dataset containing the model results to export
+        output : str
+            Output file path for the Excel report
+
+        Raises
+        ------
+        ImportError
+            If openpyxl is not installed for Excel writing support
+
+        Notes
+        -----
+        The Excel file will contain the following sheets:
+        - Signature_{name}: Normalized signature data for each component
+        - Sample_contributions: Component contributions per sample (if available)
+        - SHAP_transformed_features: SHAP feature data (if available)
+        - SHAP_original_features: Original feature data for SHAP (if available)
+        - SHAP_values_{component}: SHAP values for each component (if available)
+
+        Requires openpyxl to be installed: pip install openpyxl
+        """
 
         try:
             from pandas import ExcelWriter
@@ -1104,7 +1268,7 @@ class TopographyModel(ABC, BaseEstimator):
 
             for sig in self.component_names:
                 (
-                    renorm(self.format_signature(sig))
+                    renorm(self.format_component(sig, normalization=normalization))
                     .to_pandas()
                     .T.to_excel(
                         writer,
@@ -1114,7 +1278,10 @@ class TopographyModel(ABC, BaseEstimator):
 
             if hasattr(dataset, "contributions"):
                 (
-                    dataset.contributions.to_pandas().to_excel(
+                    dataset.contributions.stack(observations=("source", "component"))
+                    .transpose("sample", ...)
+                    .to_pandas()
+                    .to_excel(
                         writer,
                         sheet_name="Sample_contributions",
                     )

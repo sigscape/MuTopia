@@ -1,5 +1,6 @@
 from numba import njit
 from numba.core.errors import NumbaPerformanceWarning
+from functools import wraps, partial
 import warnings
 
 warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
@@ -39,6 +40,24 @@ def flatten_tensor_for_update(fn):
             *args[-1:],
         )
 
+    return wrapper
+
+
+def purge_zeros(fn):
+    @wraps(fn)
+    def wrapper(*args):
+        likelihood, weights = args[-3], args[-2]
+        nonzero_idx = weights > 0.0
+        # if the elements are mostly non-zero, don't bother subsetting
+        if np.sum(nonzero_idx)/len(weights) > 0.5:
+            return fn(*args)
+        else:
+            return fn(
+                *args[:-3],
+                np.ascontiguousarray(likelihood[..., nonzero_idx]),
+                np.ascontiguousarray(weights[nonzero_idx]),
+                *args[-1:],
+            )
     return wrapper
 
 
@@ -107,6 +126,7 @@ def _update_step(
 
 
 @flatten_tensor_for_update
+@purge_zeros
 @njit(
     "float32[::1](int64, float32, bool, float32[::1], float32[::1], float32[:,:], float32[:,:], float32[:,::1], float32[::1], float32[::1])",
     nogil=True,
@@ -201,24 +221,27 @@ class MixtureModelBase(LocalsModel):
         self.dtype = dtype
         self.GT = MixtureInterface()
 
-    def prepare_corpusstate(self, dataset):
-
-        n_observations = np.array(
-            [sample.X.sum().data.item() for _, sample in self.GT.iter_samples(dataset)]
+    def _get_sample_init_fn(self, dataset):
+        mixture_kw = self._get_mixture_kw(dataset)
+        return partial(
+            self._init_locals_sample,
+            **mixture_kw,
         )
 
-        n_observations = DataArray(
-            n_observations,
-            dims=("sample",),
-        )
+    @staticmethod
+    def _init_locals_sample(sample, *, alpha, tau, **_):
 
-        return dict(
-            topic_compositions=DataArray(
-                self.init_locals(len(n_observations)),
-                dims=("component", "sample"),
-            ),
-            n_observations=n_observations,
-        )
+        N = sample.X.sum().data.item()
+
+        prior = tau[:, None] * alpha[None, :]  # D x K
+        p_hat = prior / prior.sum(axis=1, keepdims=True)  # normalize
+
+        output_shape = p_hat.shape
+        concentration = p_hat.ravel() * 1000
+        # Sample from Dirichlet distribution and scale by N
+        Nk = np.random.dirichlet(concentration) * N
+
+        return Nk.reshape(output_shape)  # G*D*K
 
     def _get_mixture_kw(self, dataset):
         raise NotImplementedError()

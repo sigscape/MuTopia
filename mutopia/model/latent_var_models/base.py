@@ -5,13 +5,11 @@ from numba import njit, vectorize, objmode
 import numpy as np
 from numba.extending import get_cython_function_address
 import ctypes
-from functools import wraps
-
-from ...utils import logger, ParContext, parallel_map, parallel_gen
+from functools import wraps, partial
+from ...utils import logger, parallel_map, parallel_gen
 from ._dirichlet_update import update_alpha
-from ..model_components.base import _svi_update_fn, PrimitiveModel
+from ..model_components.base import _svi_update_fn
 from ..gtensor_interface import GtensorInterface
-from ...gtensor import CorpusInterface, SampleCorpusFusion
 
 
 """
@@ -81,29 +79,36 @@ functype = ctypes.CFUNCTYPE(ctypes.c_double, ctypes.c_double)
 
 psi = functype(addr)
 
+
 @vectorize(["double(double)"])
 def psivec(x):
     return psi(x)
+
 
 @njit("float32[:](float32[:])", nogil=True)
 def psivec32(x):
     return psivec(x).astype(np.float32)
 
+
 @njit("float32(float32)", nogil=True)
 def psi32(x):
     return np.float32(psi(x))
+
 
 gammaln = functype(
     get_cython_function_address("scipy.special.cython_special", "gammaln")
 )
 
+
 @njit("float32(float32)", nogil=True)
 def gammaln32(x):
     return np.float32(gammaln(x))
 
+
 @vectorize(["double(double)"])
 def gammalnvec(x):
     return gammaln(x)
+
 
 @njit("float32[:](float32[:])", nogil=True)
 def gammalnvec32(x):
@@ -115,10 +120,7 @@ def exp_log_dirichlet_expectation(alpha):
     return np.exp(psivec(alpha) - psi(np.sum(alpha))).astype(np.float32)
 
 
-@njit(
-    "float32(float32[::1], float32[::1])",
-    nogil=True
-)
+@njit("float32(float32[::1], float32[::1])", nogil=True)
 def dirichlet_bound(alpha, x):
 
     logE_x = np.log(exp_log_dirichlet_expectation(x))
@@ -210,6 +212,8 @@ def calc_local_variables(
 """
 Annealed importance sampling (AIS) for marginal likelihood estimation
 """
+
+
 @njit(nogil=True)
 def categorical_draw(logits):
     logits = np.exp(logits - logits.max())
@@ -397,11 +401,13 @@ def AIS_marginal_ll(
     )
 
 
-def random_locals(random_state, n_components):
-    def init_locals(dataset, sample_name):
-        return random_state.gamma(100.0, 1.0 / 100.0, size=(n_components,))
+def _just_next_Nk(Nks):
+    i = iter(Nks)
 
-    return init_locals
+    def _next_Nk(*args, **kw):
+        return next(i)
+
+    return _next_Nk
 
 
 class LocalsModel:
@@ -506,37 +512,32 @@ class LocalsModel:
         return sstats
 
     def _predict(self, dataset, factor_model, threads=1):
-        
+
         old_iters = self.estep_iterations
         self.estep_iterations = 10000
 
-        subsample_rate = (
-            self.GT.get_freqs(dataset).sum().item()
-            / factor_model.get_genome_size(dataset)
-        )
+        Nk = self.init_locals(dataset)
 
         update_fns = self._get_update_fns(
             dataset,
             factor_model,
-            exposures_fn=random_locals(
-                np.random.RandomState(1776),
-                self.n_components * self.GT.n_sources(dataset),
-            ),
-            locus_subsample=subsample_rate,
+            exposures_fn=_just_next_Nk(Nk),
         )
 
         update_fns = tqdm(
             update_fns,
             total=len(dataset.list_samples()),
             ncols=100,
-            desc='Estimating contributions'
+            desc="Estimating contributions",
         )
 
-        Nks = np.array([stats["Nk"] for stats in parallel_map(update_fns, threads=threads)])
+        Nks = np.array(
+            [stats["Nk"] for stats in parallel_map(update_fns, threads=threads)]
+        )
 
         self.estep_iterations = old_iters
         return Nks
-    
+
     def predict(
         self,
         dataset,
@@ -545,15 +546,8 @@ class LocalsModel:
     ):
         Nks = self._predict(dataset, factor_model=factor_model, threads=threads)
         n_sources = self.GT.n_sources(dataset)
-        Nks = (
-            Nks
-            .reshape((-1, n_sources, self.n_components))
-            .transpose((1,0,2))
-        )
-        return DataArray(
-            Nks,
-            dims=("source","sample","component")
-        )
+        Nks = Nks.reshape((-1, n_sources, self.n_components)).transpose((1, 0, 2))
+        return DataArray(Nks, dims=("source", "sample", "component"))
 
     def score(
         self,
@@ -608,15 +602,40 @@ class LocalsModel:
     ):
         raise NotImplementedError
 
+    def _get_sample_init_fn(self, dataset):
+        return partial(
+            self.random_state.gamma,
+            100.0,
+            1.0 / 100.0,
+            size=(self.n_components,),
+        )
+
+    def init_locals(self, dataset):
+
+        init_fn = self._get_sample_init_fn(dataset)
+
+        return self.to_contig(
+            np.array([init_fn(sample) for _, sample in self.GT.iter_samples(dataset)])
+        )
+
+    def prepare_corpusstate(self, dataset):
+        return dict(
+            topic_compositions=DataArray(
+                self.init_locals(dataset),
+                dims=("sample", "source", "component"),
+            ),
+        )
+
     ##
     # M-step functionality to satisfy the PrimModel interface
     ##
-    def init_locals(self, n_samples):
+    """def init_locals(self, n_samples):
         return self.random_state.gamma(
             100.0,
             1.0 / 100.0,
             size=(self.n_components, n_samples),
         ).astype(self.dtype)
+
 
     def prepare_corpusstate(self, dataset):
 
@@ -645,7 +664,7 @@ class LocalsModel:
                 weighted_ploidy,
                 dims=("locus",),
             ),
-        )
+        )"""
 
     @staticmethod
     def reduce_sparse_sstats(

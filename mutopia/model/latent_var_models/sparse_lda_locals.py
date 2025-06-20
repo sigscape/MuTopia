@@ -7,6 +7,25 @@ from .base import *
 import warnings
 
 
+class WrapsFactorModel:
+    """
+    A bit of a clunky hack - we need to temporarily spoof the get_normalizers
+    method on the factor model to return the normalizers
+    for a specific dataset. For SNVs, this is necessary to make the loss work
+    for some reason?
+    """
+
+    def __init__(self, factor_model, normalizers):
+        self.factor_model = factor_model
+        self.normalizers = normalizers
+
+    def __getattr__(self, name):
+        return getattr(self.factor_model, name)
+
+    def get_normalizers(self, dataset):
+        return self.normalizers[self.factor_model.GT.get_name(dataset)]
+
+
 @njit(
     "Tuple((float32, float32))(float32[::1], float32[::1,:], float32[::1], float32, float32[::1], int64)",
     nogil=True,
@@ -290,6 +309,13 @@ class LDAUpdateSparse(LocalsModel):
         par_context=None,
     ):
 
+        _, norms = factor_model.get_exp_offsets_dict((dataset,))
+
+        factor_model = WrapsFactorModel(
+            factor_model,
+            norms,
+        )
+
         context_sum = np.sum(self.GT.get_freqs(dataset).data)
 
         # 1. figure out the missing dimensions
@@ -320,100 +346,3 @@ class LDAUpdateSparse(LocalsModel):
         model.reduce_sparse_sstats(
             carry[self.GT.get_name(dataset)], dataset, **sample_sstats
         )
-
-    ##
-    # The modeling functionality to satisfy the LocalModel interface is completed.
-    # The below functions extend functionality for Gibb's sampling.
-    ##
-    def posterior_assign_sample(
-        self,
-        sample,
-        dataset,
-        factor_model,
-        alpha=None,
-        steps=5000,
-        warmup=1000,
-        seed=42,
-    ):
-
-        if alpha is None:
-            alpha = self.alpha[self.GT.get_name(dataset)]
-
-        sample_dict = self._convert_sample(sample)
-        weights = self._get_weights(sample)
-
-        conditional_likelihood = self._conditional_observation_likelihood(
-            dataset,
-            factor_model,
-            logsafe=False,  # we want the actual likelihood, don't remove the max for numerical stability
-            sample_dict=sample_dict,
-        )
-
-        p_z, Nks = gibbs_sample_posterior(
-            alpha,
-            conditional_likelihood,
-            weights,
-            steps=steps,
-            warmup=warmup,
-            seed=seed,
-            quiet=True,
-        )
-
-        return p_z, Nks
-
-    def marginal_ll_sample(
-        self,
-        dataset,
-        sample,
-        factor_model,
-        alpha,
-        steps=100000,
-        seed=42,
-    ):
-        # marginalize out Nk, and just return the mutation annotations.
-        # For panel and exome data, there may be too few mutations to
-        # infer anything useful from Nk. We'll lower the variance of estimation
-        # instead and just marginalize it out.
-        sample_dict = self._convert_sample(sample)
-        weights = self._get_weights(sample)
-
-        conditional_likelihood = self._conditional_observation_likelihood(
-            dataset,
-            factor_model,
-            logsafe=False,  # we want the actual likelihood, don't remove the max for numerical stability
-            sample_dict=sample_dict,
-        )
-
-        return AIS_marginal_ll(
-            alpha,
-            conditional_likelihood,
-            sample_dict["weights"],
-            steps=steps,
-            seed=seed,
-        )
-
-    def _get_marginal_ll_fns(
-        self,
-        dataset,
-        factor_model,
-        alpha=None,
-        steps=100000,
-        seed=42,
-    ):
-
-        alpha = self.alpha[self.GT.get_name(dataset)] if alpha is None else alpha
-
-        marginal_ll_fns = (
-            partial(
-                self.marginal_ll_sample,
-                dataset,
-                sample,
-                factor_model,
-                alpha=alpha,
-                steps=steps,
-                seed=seed,
-            )
-            for (_, sample) in self.GT.iter_samples(dataset)
-        )
-
-        return marginal_ll_fns

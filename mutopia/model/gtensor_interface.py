@@ -4,10 +4,9 @@ This interface is meant to be used by the model, which should not depend on the 
 structure of the datasets.
 """
 
-import xarray as xr
 from ..gtensor import *
 from ..utils import parallel_gen
-import numpy as np
+from numpy import asfortranarray, ascontiguousarray, float32
 from functools import partial
 
 
@@ -110,6 +109,10 @@ class GtensorInterface:
         return dataset["Regions/context_frequencies"]
 
     @classmethod
+    def get_region_lengths(cls, dataset):
+        return dataset["Regions/length"]
+
+    @classmethod
     def get_features(cls, dataset):
         return dataset.sections["Features"]
 
@@ -142,12 +145,9 @@ class GtensorInterface:
         gamma = (
             cls.fetch_val(dataset, "topic_compositions")
             .sel(sample=sample_name)
-            .transpose("component", ...)
-            .data
+            .transpose(..., "component")
+            .data.ravel()
         )
-
-        if len(gamma.shape) > 1:
-            gamma = gamma[:, 0]
 
         return gamma
 
@@ -163,3 +163,29 @@ class GtensorInterface:
         return lambda dataset, sample_name: cls.fetch_topic_compositions(
             corpus_dict[cls.get_name(dataset)], sample_name
         )
+
+    @classmethod
+    def get_genome_size(cls, dataset):
+        return cls.get_region_lengths(dataset).sum().item()
+
+    @classmethod
+    def prepare_data(cls, dataset):
+
+        dataset["Regions/context_frequencies"] = dataset[
+            "Regions/context_frequencies"
+        ].transpose(..., "locus")
+
+        dataset["Regions/context_frequencies"].data = asfortranarray(
+            dataset["Regions/context_frequencies"].data,
+            dtype=float32,
+        )
+
+        dataset["Regions/exposures"].data = ascontiguousarray(
+            dataset["Regions/exposures"],
+            dtype=float32,
+        )
+
+        if hasattr(dataset, "ploidy"):
+            dataset["ploidy"].data.data = dataset["ploidy"].data.data.astype(float32)
+
+        return dataset

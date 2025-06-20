@@ -52,7 +52,7 @@ class FactorModel:
         }
 
         self._genome_size = {
-            name : self.GT.get_freqs(dataset).sum().item()
+            name: self.GT.get_genome_size(dataset)
             for name, dataset in self.GT.expand_datasets(*datasets)
         }
 
@@ -107,8 +107,14 @@ class FactorModel:
             lambda x, y: x.union(y.requires_dims), self.models.values(), set(["sample"])
         )
 
-    def get_normalizers(self, dataset):
-        return self._normalizers[self.GT.get_name(dataset)]
+    def get_normalizers(self, dataset, genome_size=None):
+
+        if genome_size is None:
+            genome_size = self.GT.get_genome_size(dataset)
+
+        return self._normalizers[self.GT.get_name(dataset)] - np.log(
+            genome_size / self.get_genome_size(dataset)
+        )
 
     def get_genome_size(self, dataset):
         return self._genome_size[self.GT.get_name(dataset)]
@@ -164,7 +170,11 @@ class FactorModel:
     @staticmethod
     def _log_marginalize_mutrate(log_mutrate_tensor, exposures):
 
-        def logsafe_matmul(y, log_x):
+        def logsafe_matmul(log_x, y):
+
+            y = y.ravel()
+            log_x = log_x.reshape(*log_x.shape[:-2], -1)
+
             alpha = log_x.max()
             return alpha + np.log(
                 np.dot(np.nan_to_num(np.exp(log_x - alpha), nan=0.0, copy=False), y)
@@ -175,9 +185,9 @@ class FactorModel:
 
             return xr.apply_ufunc(
                 logsafe_matmul,
-                exposures,
                 log_mutrate_tensor,
-                input_core_dims=[[], ["source", "component"]],
+                exposures,
+                input_core_dims=[["source", "component"], ["source", "component"]],
             )
 
     def _log_component_posterior(self, log_mutrate_tensor, exposures):
@@ -277,20 +287,31 @@ class FactorModel:
             return (-logsumexp(log_mutation_rate.data), exp_offsets)
 
     def update_normalizers(
-        self, normalizers, learning_rate=1.0, subsample_rate=1.0
+        self, datasets, normalizers, learning_rate=1.0, subsample_rate=1.0
     ):
-        for name, norms in normalizers.items():
+        genome_size = self.GT.get_genome_size(datasets[0])
+
+        for name, ds in self.GT.expand_datasets(*datasets):
+
             curr = self._normalizers[name]
+
             self._normalizers[name][:] = _svi_update_fn(
-                curr, np.log(subsample_rate or 1.0) + norms, learning_rate
+                curr,
+                np.log(genome_size / self.get_genome_size(ds)) + normalizers[name],
+                learning_rate,
             )
 
-    def format_signature(self, k, normalization="global"):
+    def init_normalizers(self, datasets, par_context=None):
+        _, self._normalizers = self.get_exp_offsets_dict(
+            datasets, par_context=par_context
+        )
+
+    def format_component(self, k, normalization="global"):
         return np.exp(
             reduce(
                 lambda x, y: x + y,
                 (
-                    model.format_signature(k, normalization=normalization)
+                    model.format_component(k, normalization=normalization)
                     for model in self.models.values()
                 ),
             )

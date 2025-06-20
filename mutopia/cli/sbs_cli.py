@@ -1,18 +1,16 @@
-import mutopia as mu
+from mutopia import load_model
+from mutopia.model import GtensorInterface as CS
+from mutopia import SBS
 from mutopia.modalities._sbs_clustering import *
 from mutopia.gtensor import disk_interface as disk
 from ..genome_utils.bed12_utils import stream_bed12
 import click
 from functools import partial
-from typing import *
-
-SBS = mu.SBS
-
+from typing import Union
 
 @click.group("SBS commands")
 def sbs():
     pass
-
 
 @sbs.command("background-rate")
 @click.argument("vcf_files", nargs=-1)
@@ -182,7 +180,7 @@ def annotate(
     locus_coords = disk.read_coords(dataset)["locus"]
 
     corpus = disk.load_dataset(dataset, with_samples=False, with_state=True)
-    model = mu.load_model(model)
+    model = load_model(model)
 
     fasta = fasta or attrs["fasta_file"]
     if not os.path.exists(fasta):
@@ -190,7 +188,7 @@ def annotate(
             f"No such file exists: {fasta}, provide a valid fasta file using the `--fasta/-fa` argument."
         )
 
-    if not mu.model.CS.has_corpusstate(corpus):
+    if not CS.has_corpusstate(corpus):
         raise ValueError(
             f'The provided G-Tensor is not annotated. Please run `mutopia predict <model> {corpus.attrs["filename"]}` with a trained model to annotate the corpus.'
         )
@@ -309,7 +307,7 @@ def marginal_ll(
     **ingest_kwargs,
 ):
 
-    model: mu.model.Model = mu.load_model(model)
+    model = load_model(model)
     # parse the alpha
     if not alpha is None:
         try:
@@ -330,7 +328,7 @@ def marginal_ll(
             f"No such file exists: {fasta}, provide a valid fasta file using the `--fasta/-fa` argument."
         )
 
-    if not mu.model.CS.has_corpusstate(corpus):
+    if not CS.has_corpusstate(corpus):
         raise ValueError(
             f'The provided G-Tensor is not annotated. Please run `mutopia predict <model> {corpus.attrs["filename"]}` with a trained model to annotate the corpus.'
         )
@@ -339,7 +337,7 @@ def marginal_ll(
     num_regions = sum(1 for _ in stream_bed12(regions_file))
 
     logger.info("Ingesting mutations ...")
-    _, sample = mu.SBS.ingest_uncollaposed(
+    _, sample = SBS.ingest_uncollaposed(
         sample_file,
         **ingest_kwargs,
         fasta_file=fasta,

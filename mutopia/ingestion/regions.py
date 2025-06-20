@@ -57,18 +57,21 @@ def _make_fixed_size_windows(
 
 def stream_bedfile(bedfile):
 
-    with (open if not bedfile.endswith(".gz") else gzopen)(bedfile, "rt") as f:
-        for line in f:
-            if line.startswith("#"):
-                continue
-            cols = line.strip().split("\t")
-            if len(cols) < 3:
-                raise ValueError(f"Bedfile {bedfile} must have at least 3 columns")
-            feature = "1" if len(cols) == 3 else cols[3]
-            chrom, start, end = cols[:3]
-            start = int(start)
-            end = int(end)
-            yield chrom, start, end, feature
+    try:
+        with (open if not bedfile.endswith(".gz") else gzopen)(bedfile, "rt") as f:
+            for line in f:
+                if line.startswith("#"):
+                    continue
+                cols = line.strip().split("\t")
+                if len(cols) < 3:
+                    raise ValueError(f"Bedfile {bedfile} must have at least 3 columns")
+                feature = "1" if len(cols) == 3 else cols[3]
+                chrom, start, end = cols[:3]
+                start = int(start)
+                end = int(end)
+                yield chrom, start, end, feature
+    except Exception as e:
+        raise ValueError(f"Error reading bedfile {bedfile}: {str(e)}") from e
 
 
 @dataclass

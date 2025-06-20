@@ -184,7 +184,10 @@ class AsCSR(BaseAccessor):
 @xr.register_dataarray_accessor("asdense")
 class AsCSR(BaseAccessor):
     def __call__(self):
-        self._xrds.data = self._xrds.data.todense()
+        try:
+            self._xrds.data = self._xrds.data.todense()
+        except AttributeError:
+            pass
         return self._xrds
 
 
@@ -255,3 +258,18 @@ class Section(BaseAccessor):
     def __iter__(self):
         for section in self.groups.keys():
             yield section, self[section]
+
+
+@xr.register_dataarray_accessor("sum_except")
+class SumExcept(BaseAccessor):
+    def __call__(self, *dims):
+        """
+        Sums the dataset along all dimensions except the specified ones.
+        """
+        if not len(dims) > 0:
+            raise ValueError("Provide at least one dimension to exclude from summation")
+
+        return self._xrds.sum(
+            dim=[d for d in self._xrds.dims if d not in dims],
+            skipna=True,
+        )

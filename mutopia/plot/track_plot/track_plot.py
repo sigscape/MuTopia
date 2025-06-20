@@ -1,207 +1,81 @@
+"""
+Genome track plotting utilities for visualizing genomic data.
+
+This module provides functions for creating genome browser-style visualizations
+with multiple data tracks including line plots, heatmaps, and genomic annotations.
+"""
+
 import numpy as np
+from pandas import read_csv
 import matplotlib.pyplot as plt
-import os
-from typing import Iterable
 from functools import partial
-from xarray import DataArray
+from xarray import DataArray, Dataset
 from scipy.cluster.hierarchy import linkage, optimal_leaf_ordering, leaves_list
-from numpy._core._multiarray_umath import _array_converter
 from functools import cache
-from ..genome_utils.bed12_utils import unstack_regions
-from ..utils import borrow_kwargs, logger, diverging_palette, categorical_palette
-from ..gtensor.gtensor import slice_regions, get_regions_filename
+from dataclasses import dataclass
+from typing import Callable, Union, Iterable
+
+from ...genome_utils.bed12_utils import unstack_regions
+from ...utils import borrow_kwargs, logger, diverging_palette, parse_region
+from ...gtensor.gtensor import slice_regions, get_regions_filename
+from .transforms import (
+    _moving_average,
+    _xarr_op,
+)
 
 plt.rc("axes", linewidth=0.75)
 
 
-def passthrough(data):
-    def _passthrough(*args, **kwargs):
-        return data
+def _wraps_err(fn):
+    def _inner(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            logger.error(f"Error in plotting function {fn.__name__}: {e}")
+            raise e
 
-    return _passthrough
-
-
-def pipeline(*fns):
-
-    def _pipeline(data):
-        for fn in fns:
-            data = fn(data)
-        return data
-
-    return _pipeline
+    return _inner
 
 
-def acc(var_name, **sel):
-    def _accessor(dataset):
-        return dataset[var_name].sel(**sel).transpose(..., "locus")
-
-    return _accessor
-
-
-def feature_matrix(*feature_names):
-    """
-    Accessor function to retrieve multiple features from a dataset.
-
-    Parameters:
-    - feature_names: Names of the features to access.
-
-    Returns:
-    A function that retrieves the specified features from the dataset.
-    """
-
-    if len(feature_names) == 1 and isinstance(feature_names[0], Iterable):
-        feature_names = list(feature_names[0])
-
-    def _accessor(dataset):
-
-        fnames = (
-            list(feature_names)
-            if len(feature_names) > 0
-            else [
-                name
-                for name, arr in dataset.sections["Features"].items()
-                if np.issubdtype(arr.dtype, np.number)
-            ]
-        )
-
-        feature_matrix = DataArray(
-            np.vstack([dataset.sections["Features"][name].values for name in fnames]),
-            dims=("feature", "locus"),
-            coords={"feature": fnames, "locus": dataset.coords["locus"].values},
-            name="Features",
-        )
-
-        return feature_matrix.squeeze()
-
-    return _accessor
-
-
-def _xarr_op(fn):
-    def run_fn(x):
-        conv = _array_converter(x)
-        out = fn(x)
-        return conv.wrap(out)
-
-    return run_fn
-
-
-def _moving_average(bin_width, arr, alpha=10):
-
-    if bin_width is None:
-        weights = np.ones(alpha) / alpha
-        ema = np.convolve(arr, weights, mode="same")
-    else:
-        # Fix moving average rate to weighted average rate to use sum(bin width * rate)/ (total bin width)
-        window = np.ones(alpha)
-        weighted_sum = np.convolve(arr * bin_width, window, mode="same")
-        total_weight = np.convolve(bin_width, window, mode="same")
-
-        # Compute the weighted moving average
-        ema = weighted_sum / total_weight
-
-    return ema
-
-
-def clip(min_quantile=0.0, max_quantile=1.0):
-    def _clip(arr):
-        return np.clip(
-            arr, np.nanquantile(arr, min_quantile), np.nanquantile(arr, max_quantile)
-        )
-
-    return _xarr_op(_clip)
-
-
-def renorm(x):
-    return x / np.nansum(x)
-
-
-def apply_rows(fn):
-    return partial(np.apply_along_axis, fn, 1)
+__all__ = [
+    "make_view",
+    "plot_views",
+    "stack_plots",
+    "scale_bar",
+    "xaxis_plot",
+    "spacer",
+    "ideogram",
+    "line_plot",
+    "fill_plot",
+    "bar_plot",
+    "scatterplot",
+    "heatmap_plot",
+    "categorical_plot",
+    "custom_plot",
+]
 
 
 def _get_optimal_row_order(data, **kwargs):
+
+    if (~np.isfinite(data)).any():
+        logger.warning(
+            "Data contains NaN or infinite values. Filling with zeros for clustering."
+        )
+        data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+
     return leaves_list(optimal_leaf_ordering(linkage(data, **kwargs), data))
 
 
-def gene_track(
-    gtf,
-    label="Genes",
-    all_labels_inside=False,
-    style="flybase",
-    fontsize=5,
-    ax_fn=lambda ax: ax.spines["bottom"].set_visible(False),
-    **kw,
-):
-    return static_track(
-        "GtfTrack",
-        gtf,
-        label=label,
-        all_labels_inside=all_labels_inside,
-        style=style,
-        fontsize=fontsize,
-        ax_fn=ax_fn,
-        **kw,
-    )
-
-
-class _GenomeView:
-
-    def __init__(
-        self,
-        *,
-        dataset,
-        chrom,
-        start,
-        end,
-        plot_kw,
-    ):
-        self.dataset = dataset
-        self.chrom = chrom
-        self.start = start
-        self.end = end
-        self._plot_kw = plot_kw
-
-    def __call__(self, configuration, width=7):
-        return self._plot(configuration(self), width=width)
-
-    def _plot(self, plotting_fns, width=7):
-
-        track_names = [
-            fn.track_name for fn in plotting_fns if not fn.track_name is None
-        ]
-        if not len(track_names) == len(set(track_names)):
-            raise ValueError(
-                "If supplied, track names must be unique. "
-                f"Found duplicates in {track_names}"
-            )
-
-        fig, ax = plt.subplots(
-            len(plotting_fns),
-            1,
-            figsize=(width, sum(track.height for track in plotting_fns)),
-            height_ratios=[track.height for track in plotting_fns],
-            gridspec_kw={"hspace": 0.1},
-            sharex=True,
-        )
-
-        if len(plotting_fns) == 1:
-            ax = [ax]
-
-        axs = {}
-
-        kw = {
-            "dataset": self.dataset,
-            "chrom": self.chrom,
-            "fig": fig,
-            **self._plot_kw,
-        }
-
-        for i, (_ax, fn) in enumerate(zip(ax, plotting_fns)):
-            axs[fn.track_name if not fn.track_name is None else i] = fn(_ax, **kw)
-            _ax.set(xlim=(self.start, self.end))
-
-        ax[0].set_title(f"{self.chrom}:{self.start}-{self.end}", fontsize=9, loc="left")
-        return axs
+@dataclass
+class GenomeView:
+    chrom: str
+    interval: tuple[int, int]
+    dataset: Dataset
+    title: str
+    n_regions: int
+    starts: np.ndarray[int]
+    ends: np.ndarray[int]
+    idxs: np.ndarray[int]
 
     def smooth(self, alpha=10):
         smooth_fn = partial(
@@ -212,10 +86,42 @@ class _GenomeView:
 
         return _xarr_op(smooth_fn)
 
+    def renorm(self, x):
+        return x / np.nansum(x) * self.n_regions
 
-def make_view(dataset, *, chrom, start, end):
 
-    dataset = slice_regions(dataset, chrom, start, end)
+def make_view(dataset, region=None, title=None):
+    """
+    Create a GenomeView for a specific genomic region.
+
+    Parameters
+    ----------
+    dataset
+        Input genomic dataset
+    chrom : str
+        Chromosome identifier (e.g., 'chr1', 'chrX')
+    start : int
+        Start genomic coordinate (0-based)
+    end : int
+        End genomic coordinate (exclusive)
+
+    Returns
+    -------
+    GenomeView
+        Configured genome view object
+    """
+
+    if region is None:
+        chroms = set(dataset["Regions/chrom"].values)
+        if len(chroms) > 1:
+            raise ValueError(
+                "Chromosome must be specified when dataset contains multiple chromosomes."
+            )
+        chrom = chroms.pop()
+    else:
+        chrom = parse_region(region)[0]
+        dataset = slice_regions(dataset, region)
+
     n_regions = dataset.coords["locus"].size
 
     _, starts, ends, idxs = unstack_regions(
@@ -224,20 +130,91 @@ def make_view(dataset, *, chrom, start, end):
         np.arange(n_regions),
     )
 
-    plot_kw = dict(
-        start=starts,
-        end=ends,
-        idx=idxs,
-        check_len=n_regions,
+    start = min(starts)
+    end = max(ends)
+
+    return GenomeView(
+        chrom=chrom,
+        interval=(start, end),
+        dataset=dataset,
+        starts=starts,
+        ends=ends,
+        idxs=idxs,
+        n_regions=n_regions,
+        title=str(title) if not title is None else f"{chrom}:{start}-{end}",
     )
 
-    return _GenomeView(
-        dataset=dataset,
-        chrom=chrom,
-        start=start,
-        end=end,
-        plot_kw=plot_kw,
+
+def plot_views(
+    configuration: Callable,
+    views: Union[GenomeView, Iterable[GenomeView]],
+    width: float = 7,
+    gridpsec_kw: dict = {"hspace": 0.1, "wspace": 0.1},
+    *args,
+    **kwargs,
+):
+
+    if not isinstance(views, Iterable):
+        views = [views]
+
+    configurations = [configuration(view, *args, **kwargs) for view in views]
+
+    tracks = configurations[0]
+    n_rows = len(tracks)
+    n_cols = len(views)
+
+    track_names = [fn.track_name for fn in tracks if not fn.track_name is None]
+
+    if not len(track_names) == len(set(track_names)):
+        raise ValueError(
+            "If supplied, track names must be unique. "
+            f"Found duplicates in {track_names}"
+        )
+
+    fig, ax = plt.subplots(
+        n_rows,
+        n_cols,
+        figsize=(width, sum(track.height for track in tracks)),
+        height_ratios=[track.height for track in tracks],
+        gridspec_kw=gridpsec_kw,
+        sharex="col",
+        sharey="row",
     )
+
+    if n_cols == 1:
+        ax = np.array(ax).reshape((n_rows, 1))
+
+    if len(tracks) == 1:
+        ax = [ax]
+
+    for j, (view, tracks) in enumerate(zip(views, configurations)):
+        for i, (_ax, fn) in enumerate(zip(ax[:, j], tracks)):
+
+            fn(
+                _ax,
+                fig=fig,
+                dataset=view.dataset,
+                chrom=view.chrom,
+                start=view.starts,
+                end=view.ends,
+                idx=view.idxs,
+                check_len=view.n_regions,
+            )
+
+            if j > 0:
+                _ax.set_ylabel("")
+
+            if j < n_cols - 1:
+                try:
+                    _ax.get_legend().remove()
+                except AttributeError:
+                    pass
+
+            _ax.set(xlim=view.interval)
+
+        ax[0, j].set_title(view.title, fontsize=9, loc="left")
+
+    return ax
 
 
 def _set_axlabel(ax, label):
@@ -259,6 +236,29 @@ def _clean_ax(ax, axlabel=None, yticks=False):
 def stack_plots(
     *plotting_fns, height=1, label=None, legend=True, name=None, ax_fn=lambda x: x
 ):
+    """
+    Combine multiple plotting functions into a single track.
+
+    Parameters
+    ----------
+    *plotting_fns
+        Variable number of plotting functions to stack
+    height : float, default 1
+        Track height in figure units
+    label : str, optional
+        Track label for y-axis
+    legend : bool, default True
+        Whether to show legend
+    name : str, optional
+        Track name for referencing
+    ax_fn : callable
+        Function to apply final customizations to axes
+
+    Returns
+    -------
+    callable
+        Combined plotting function
+    """
 
     def _plot(ax, **kwargs):
 
@@ -281,6 +281,25 @@ def stack_plots(
 
 
 def scale_bar(length=10000, height=0.1, name=None, label=None):
+    """
+    Create a scale bar track showing genomic distance.
+
+    Parameters
+    ----------
+    length : int, default 10000
+        Length of scale bar in base pairs
+    height : float, default 0.1
+        Track height in figure units
+    name : str, optional
+        Track name
+    label : str, optional
+        Track label
+
+    Returns
+    -------
+    callable
+        Scale bar plotting function
+    """
 
     def _plot(ax, *, dataset, chrom, start, end, idx, check_len, fig):
 
@@ -316,6 +335,21 @@ def scale_bar(length=10000, height=0.1, name=None, label=None):
 
 
 def xaxis_plot(height=0.1, name=None):
+    """
+    Create a track showing genomic coordinates on x-axis.
+
+    Parameters
+    ----------
+    height : float, default 0.1
+        Track height in figure units
+    name : str, optional
+        Track name
+
+    Returns
+    -------
+    callable
+        X-axis plotting function
+    """
 
     def _plot(ax, *, dataset, chrom, start, end, idx, check_len, fig):
         ax.tick_params(
@@ -338,6 +372,21 @@ def xaxis_plot(height=0.1, name=None):
 
 
 def spacer(height=0.1, name=None):
+    """
+    Create an empty spacer track.
+
+    Parameters
+    ----------
+    height : float, default 0.1
+        Spacer height in figure units
+    name : str, optional
+        Track name
+
+    Returns
+    -------
+    callable
+        Spacer plotting function
+    """
 
     def _plot(ax, *args, **kwargs):
         ax.axis("off")
@@ -349,7 +398,6 @@ def spacer(height=0.1, name=None):
 
 
 def _check_flat_input(vals, check_len):
-
     if isinstance(vals, (tuple, list)):
         vals = np.array(vals)
 
@@ -365,8 +413,37 @@ def _name_or_none(x):
     return str(x.name).replace("_", " ") if hasattr(x, "name") else None
 
 
+@cache
+def _read_ideogram(cytobands_file):
+    return read_csv(
+        cytobands_file,
+        sep="\t",
+        header=None,
+        names=["chrom", "start", "end", "band", "stain"],
+    )
+
+
 @borrow_kwargs(plt.Rectangle)
-def ideogram(cytobands, height=0.15, name=None, **kwargs):
+def ideogram(cytobands_file, height=0.15, name=None, **kwargs):
+    """
+    Create an ideogram track showing chromosome bands.
+
+    Parameters
+    ----------
+    cytobands : pandas.DataFrame
+        DataFrame with columns 'chrom', 'start', 'end', 'band', 'stain'
+    height : float, default 0.15
+        Track height in figure units
+    name : str, optional
+        Track name
+    **kwargs
+        Additional arguments passed to plt.Rectangle
+
+    Returns
+    -------
+    callable
+        Ideogram plotting function
+    """
 
     color_lookup = {
         "gneg": "lightgrey",
@@ -378,6 +455,8 @@ def ideogram(cytobands, height=0.15, name=None, **kwargs):
         "gvar": (0.8, 0.8, 0.8),
         "stalk": (0.9, 0.9, 0.9),
     }
+
+    cytobands = _read_ideogram(cytobands_file)
 
     def _plot(ax, *, chrom, **kw):
 
@@ -423,6 +502,36 @@ def line_plot(
     ax_fn=lambda x: x,
     **kwargs,
 ):
+    """
+    Create a line plot track for continuous genomic data.
+
+    Parameters
+    ----------
+    accessor : callable
+        Function to extract data from dataset
+    label : str, optional
+        Track label
+    height : float, default 1
+        Track height in figure units
+    yticks : bool, default False
+        Whether to show y-axis ticks
+    fill : bool, default False
+        Whether to fill area under the line
+    name : str, optional
+        Track name for referencing
+    color : str, default "#acacacff"
+        Line color
+    ax_fn : callable
+        Function for additional axis customization
+    **kwargs
+        Additional arguments passed to plt.plot
+
+    Returns
+    -------
+    callable
+        Line plot function
+    """
+
     def _plot(ax, *, dataset, chrom, start, end, idx, check_len, fig):
 
         vals = _check_flat_input(accessor(dataset), check_len)
@@ -462,6 +571,34 @@ def fill_plot(
     ax_fn=lambda x: x,
     **kwargs,
 ):
+    """
+    Create a filled area plot track.
+
+    Parameters
+    ----------
+    accessor : callable
+        Function to extract data from dataset
+    label : str, optional
+        Track label
+    height : float, default 1
+        Track height in figure units
+    yticks : bool, default False
+        Whether to show y-axis ticks
+    name : str, optional
+        Track name
+    color : str, default "#acacacff"
+        Fill color
+    ax_fn : callable
+        Function for additional axis customization
+    **kwargs
+        Additional arguments passed to plt.fill_between
+
+    Returns
+    -------
+    callable
+        Fill plot function
+    """
+
     def _plot(ax, *, dataset, chrom, start, end, idx, check_len, fig):
 
         vals = _check_flat_input(accessor(dataset), check_len)
@@ -496,6 +633,33 @@ def bar_plot(
     color="#acacacff",  # Ensure color is used below or remove this line if unnecessary
     **kwargs,
 ):
+    """
+    Create a bar plot track for discrete genomic data.
+
+    Parameters
+    ----------
+    accessor : callable
+        Function to extract data from dataset
+    label : str, optional
+        Track label
+    height : float, default 1
+        Track height in figure units
+    yticks : bool, default False
+        Whether to show y-axis ticks
+    name : str, optional
+        Track name
+    ax_fn : callable
+        Function for additional axis customization
+    color : str or array-like, default "#acacacff"
+        Bar color(s)
+    **kwargs
+        Additional arguments passed to plt.bar
+
+    Returns
+    -------
+    callable
+        Bar plot function
+    """
 
     def _plot(ax, *, dataset, chrom, start, end, idx, check_len, fig):
 
@@ -535,6 +699,33 @@ def scatterplot(
     ax_fn=lambda x: x,
     **kwargs,
 ):
+    """
+    Create a scatter plot track for point data.
+
+    Parameters
+    ----------
+    accessor : callable
+        Function to extract data from dataset
+    label : str, optional
+        Track label
+    height : float, default 1
+        Track height in figure units
+    yticks : bool, default False
+        Whether to show y-axis ticks
+    c : str or array-like, optional
+        Point colors
+    name : str, optional
+        Track name
+    ax_fn : callable
+        Function for additional axis customization
+    **kwargs
+        Additional arguments passed to plt.scatter
+
+    Returns
+    -------
+    callable
+        Scatter plot function
+    """
 
     def _plot(ax, *, dataset, chrom, start, end, idx, check_len, fig):
 
@@ -575,6 +766,41 @@ def heatmap_plot(
     ax_fn=lambda x: x,
     **kwargs,
 ):
+    """
+    Create a heatmap track for matrix data.
+
+    Parameters
+    ----------
+    accessor : callable
+        Function to extract 2D data from dataset
+    palette : str or colormap, default diverging_palette
+        Color palette for heatmap
+    label : str, optional
+        Track label
+    yticks : bool, default True
+        Whether to show y-axis tick labels
+    height : float, default 1
+        Track height in figure units
+    row_cluster : bool, default False
+        Whether to cluster rows hierarchically
+    cluster_kw : dict, default {}
+        Keyword arguments for clustering
+    name : str, optional
+        Track name
+    cbar : bool, default True
+        Whether to show colorbar
+    cbar_kw : dict, default {}
+        Keyword arguments for colorbar
+    ax_fn : callable
+        Function for additional axis customization
+    **kwargs
+        Additional arguments passed to plt.pcolormesh
+
+    Returns
+    -------
+    callable
+        Heatmap plotting function
+    """
 
     def _check_size(expected, x):
         if not len(x.shape) == 2:
@@ -673,6 +899,35 @@ def categorical_plot(
     ax_fn=lambda x: x,
     **kwargs,
 ):
+    """
+    Create a categorical data track with colored rectangles.
+
+    Parameters
+    ----------
+    accessor : callable
+        Function to extract categorical data from dataset
+    order : list, optional
+        Order of categories for display
+    label : str, optional
+        Track label
+    height : float, default 1
+        Track height in figure units
+    palette : str or list, default "tab10"
+        Color palette name or list of colors
+    edgecolor : str, optional
+        Edge color for rectangles
+    name : str, optional
+        Track name
+    ax_fn : callable
+        Function for additional axis customization
+    **kwargs
+        Additional arguments passed to plt.Rectangle
+
+    Returns
+    -------
+    callable
+        Categorical plot function
+    """
 
     def _plot(ax, *, dataset, chrom, start, end, idx, check_len, fig):
 
@@ -730,6 +985,23 @@ def categorical_plot(
 
 
 def custom_plot(fn, height=1, name=None):
+    """
+    Create a custom plotting track from a user-defined function.
+
+    Parameters
+    ----------
+    fn : callable
+        Custom plotting function that takes an axes object
+    height : float, default 1
+        Track height in figure units
+    name : str, optional
+        Track name
+
+    Returns
+    -------
+    callable
+        Custom plot function
+    """
 
     def _plot(ax, *args, **kwargs):
         return fn(ax)
@@ -745,6 +1017,28 @@ def _load_track_data(
     file,
     **properties,
 ):
+    """
+    Load track data using pygenometracks.
+
+    Parameters
+    ----------
+    track_type : str
+        Type of track (e.g., 'GtfTrack', 'BedTrack')
+    file : str
+        Path to data file
+    **properties
+        Additional track properties
+
+    Returns
+    -------
+    Track object from pygenometracks
+
+    Raises
+    ------
+    ImportError
+        If pygenometracks is not installed
+    """
+
     try:
         from pygenometracks import tracks
     except ImportError:
@@ -773,6 +1067,33 @@ def static_track(
     ax_fn=lambda x: x,
     **properties,
 ):
+    """
+    Create a static track using pygenometracks.
+
+    Parameters
+    ----------
+    track_type : str
+        Type of track (e.g., 'GtfTrack', 'BedTrack', 'BigwigTrack')
+    file : str
+        Path to the data file
+    height : float, default 1
+        Track height in figure units
+    name : str, optional
+        Track name
+    label : str, optional
+        Track label
+    yticks : bool, default False
+        Whether to show y-axis ticks
+    ax_fn : callable
+        Function for additional axis customization
+    **properties
+        Additional properties passed to the track
+
+    Returns
+    -------
+    callable
+        Static track plotting function
+    """
 
     track = _load_track_data(
         track_type,

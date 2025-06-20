@@ -1,2 +1,2 @@
-from .signature_plot import plot_signature
-from .track_plot import *
+from .signature_plot import plot_component
+from .track_plot.track_plot import *

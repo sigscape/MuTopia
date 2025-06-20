@@ -1,13 +1,9 @@
-import sparse
 import numpy as np
-from pandas import DataFrame
-from xarray import DataArray
 from joblib import Parallel, delayed
 from contextlib import contextmanager
 from enum import Enum
 import inspect
 from functools import wraps
-from collections import defaultdict
 import logging
 import subprocess
 from gzip import open as gzopen
@@ -46,6 +42,7 @@ def timer_wrapper(func, name=None):
 
 
 class FeatureType(Enum):
+    GEX = "gex"
     LOG1P_CPM = "log1p_cpm"
     MESOSCALE = "mesoscale"
     STRAND = "strand"
@@ -59,6 +56,7 @@ class FeatureType(Enum):
     @classmethod
     def continuous_types(cls):
         return (
+            FeatureType.GEX,
             FeatureType.LOG1P_CPM,
             FeatureType.POWER,
             FeatureType.MINMAX,
@@ -202,3 +200,25 @@ def stream_subprocess_output(process):
         yield line
 
     close_process(process)
+
+
+# Parse regions into a list of (chrom, start, end) tuples
+def parse_region(region):
+    region = str(region).strip()
+
+    if ":" in region:
+        # Format: chr:start-end
+        chrom, pos = region.split(":", 1)
+        if "-" in pos:
+            start, end = map(lambda x: int(x.replace(",", "")), pos.split("-", 1))
+        else:
+            # Handle case like "chr1:1000" (no end specified)
+            start = int(pos)
+            end = np.inf
+    else:
+        # Format: chr (entire chromosome)
+        chrom = region
+        start = 0
+        end = np.inf
+
+    return (chrom, start, end)

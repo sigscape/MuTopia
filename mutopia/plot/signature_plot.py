@@ -84,5 +84,5 @@ def _plot_linear_signature(
 
 
 @borrow_kwargs(_plot_linear_signature)
-def plot_signature(signature, **kw):
+def plot_component(signature, **kw):
     return signature.modality().plot(signature, **kw)

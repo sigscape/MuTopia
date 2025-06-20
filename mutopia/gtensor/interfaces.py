@@ -1,17 +1,16 @@
 import os
 import mutopia.gtensor.disk_interface as disk
-from copy import copy
+
+__all__ = [
+    "CorpusInterface",
+    "LazySampleLoader",
+    "LazySlicer",
+    "SampleCorpusFusion",
+    "DifferentSamples",
+]
 
 
 class CorpusInterface:
-    """
-    Sometimes, we'd like to drop something else into the EM step
-    instead of a G-Tensor corpus. If the object implements the
-    following interface (and the outputs are the expected type), it will work.
-
-    Note, we don't need to copy "features", "varm" etc.
-    because those elements are not used in the EM step.
-    """
 
     __slots__ = ("_corpus",)
 
@@ -144,6 +143,9 @@ class LazySlicer(CorpusInterface):
         if hasattr(sliced, "X"):
             sliced = sliced.drop_vars("X", errors="ignore")
 
+        if hasattr(sliced, "ploidy") and not keep_features:
+            sliced["ploidy"] = sliced["ploidy"].asdense()
+
         if not keep_features:
             sliced = sliced.drop_vars(corpus.sections.groups["Features"])
 
@@ -218,6 +220,15 @@ class DifferentSamples(CorpusInterface):
 
     def list_samples(self):
         return self._samples
+
+    def fetch_sample(self, sample_name):
+        if sample_name not in self._samples:
+            raise KeyError(f"Sample {sample_name} not found in the corpus.")
+        return self._corpus.fetch_sample(sample_name)
+
+    def iter_samples(self):
+        for sample_name in self.list_samples():
+            yield self.fetch_sample(sample_name)
 
 
 class TransformerInterface(CorpusInterface):

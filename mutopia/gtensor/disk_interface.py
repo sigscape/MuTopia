@@ -23,6 +23,8 @@ def retry_until_write(func, n_tries=1000, sleep=1):
         for t in range(n_tries):
             try:
                 return func(*args, **kwargs)
+            except FileNotFoundError as err:
+                raise err from None
             except OSError:
                 if t > 10:
                     logger.warning(
@@ -275,7 +277,7 @@ def write_sample(
             group=f"/raw/ploidy/{sample_name}",
             mode="a",
             encoding={
-                "data": {"dtype" : "float32"},
+                "data": {"dtype": "float32"},
                 "indices": {"dtype": "uint32"},
             },
             **WRITE_KW,
@@ -321,9 +323,32 @@ def rm_sample(
 ##
 #
 ##
-
-
 def write_dataset(dataset, filename, bar=False):
+    """Write a dataset to a NetCDF file.
+
+    Writes a dataset to a NetCDF file, handling special variables, sections, and samples.
+    Sparse variables are not supported and will raise an error.
+
+    Parameters
+    ----------
+    dataset : xarray.Dataset
+        The dataset to write to disk. Should have a structure compatible with the expected
+        format, including potential sections and samples.
+    filename : str
+        Path to the output NetCDF file.
+    bar : bool, default=False
+        Whether to display a progress bar when writing samples.
+
+    Raises
+    ------
+    ValueError
+        If any section contains sparse variables.
+
+    Notes
+    -----
+    Special variables like 'X' and 'ploidy' are handled separately from other variables.
+    Section names containing '/' in variable names will have them replaced with '.'.
+    """
 
     special_vars = [v for v in ["X", "ploidy"] if v in dataset.data_vars]
 
