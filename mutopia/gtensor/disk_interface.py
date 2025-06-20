@@ -270,12 +270,12 @@ def write_sample(
 
     if hasattr(sample, "ploidy"):
 
-        (sample.ploidy.sparse_to_coo().to_netcdf)(
+        sample.ploidy.sparse_to_coo().to_netcdf(
             filename,
             group=f"/raw/ploidy/{sample_name}",
             mode="a",
             encoding={
-                **encoding,
+                "data": {"dtype" : "float32"},
                 "indices": {"dtype": "uint32"},
             },
             **WRITE_KW,
