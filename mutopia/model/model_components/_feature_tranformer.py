@@ -1,4 +1,5 @@
 from sklearn import set_config
+from ._glm_compiled import njit
 
 set_config(enable_metadata_routing=True)
 
@@ -306,17 +307,33 @@ class CPMTransformer(BaseEstimator, TransformerMixin, OneToOneFeatureMixin):
     def transform(self, X):
         return X / self.normalizers_ * 1e6
 
-class DuplicatesToNaNTransformer(BaseEstimator, TransformerMixin, OneToOneFeatureMixin):
+@njit("float32[:](float32[:])")
+def _mask_contiguous_duplicates(arr):
+    if  len(arr) == 0:
+        return arr
     
+    masked = arr.copy()
+    for i in range(1, len(arr)):
+        if arr[i] == arr[i-1]:
+            masked[i] = np.nan
+    return masked
+
+class ContiguousDuplicatesToNanTransformer:
     def fit(self, X, y=None):
         self.n_features_in_ = X.shape[1]
-        return self
-    
-    def transform(self, X):
-        df = pd.DataFrame(X)
-        df = df.mask(df.duplicated(keep='first'), other=np.nan)
-        return df.to_numpy()
-    
+        if not isinstance(X, pd.DataFrame):
+            raise ValueError("Input must be a pandas DataFrame")
+        X = X.apply(
+            lambda col : _mask_contiguous_duplicates(col.values.astype(np.float32, copy=False)),
+            axis=0
+        )
+        return super().fit(X, y)
+
+class MaskedCPM(ContiguousDuplicatesToNanTransformer, CPMTransformer):
+    pass
+
+class MaskedStandardScaler(ContiguousDuplicatesToNanTransformer, StandardScaler):
+    pass
 
 def log1p_cpm():
     return Pipeline(
@@ -327,6 +344,14 @@ def log1p_cpm():
         ]
     )
 
+def gex_pipeline():
+    return Pipeline(
+        [
+            ("cpm", MaskedCPM()),
+            ("log1p", FunctionTransformer(np.log1p, feature_names_out="one-to-one")),
+            ("standardize", MaskedStandardScaler()),
+        ]
+    )
 
 def get_normalizing_transformer(
     feature_names_in,
@@ -345,6 +370,7 @@ def get_normalizing_transformer(
 
     return ColumnTransformer(
         [
+            ("gex", gex_pipeline(), type_dict[FeatureType.GEX]),
             ("log1p_cpm", log1p_cpm(), type_dict[FeatureType.LOG1P_CPM]),
             ("power", log1p_cpm(), type_dict[FeatureType.POWER]),
             ("minmax", MinMaxScaler(), type_dict[FeatureType.MINMAX]),

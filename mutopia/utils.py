@@ -42,6 +42,7 @@ def timer_wrapper(func, name=None):
 
 
 class FeatureType(Enum):
+    GEX = "gex"
     LOG1P_CPM = "log1p_cpm"
     MESOSCALE = "mesoscale"
     STRAND = "strand"
@@ -55,6 +56,7 @@ class FeatureType(Enum):
     @classmethod
     def continuous_types(cls):
         return (
+            FeatureType.GEX,
             FeatureType.LOG1P_CPM,
             FeatureType.POWER,
             FeatureType.MINMAX,
