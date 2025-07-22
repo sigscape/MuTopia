@@ -143,7 +143,7 @@ def iterative_update(
     weights,
     Nk,  # move gamma to the end so we can curry the function
 ):
-    for _ in range(iters):  # inner e-step loop
+    for t in range(iters):  # inner e-step loop
 
         old_Nk = Nk.copy()
         Nk = _update_step(
@@ -156,11 +156,12 @@ def iterative_update(
             weights,
             Nk,
         )
-
-        if (np.abs(Nk - old_Nk) / np.sum(Nk)).sum() < tol:
+        # check convergence
+        check_tol = (np.abs(Nk - old_Nk) / np.sum(Nk)).sum()
+        if check_tol < tol:
             break
 
-    return Nk
+    return Nk #, t, check_tol
 
 
 @reshape_output

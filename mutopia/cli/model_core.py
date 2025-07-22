@@ -104,69 +104,7 @@ def train_model(
         model.save(output)
 
     return best_score
-
-
-def create_optimization_study(
-    study_name: str,
-    dataset: List[Tuple[str, str]],
-    min_components: int,
-    max_components: int,
-    seed: int = 0,
-    save_model: bool = False,
-    output_dir: str = ".",
-    extensive: int = 0,
-    test_chroms: List[str] = ["chr1"],
-    **model_kw,
-):
-    """
-    Create a hyperparameter optimization study.
-
-    Parameters
-    ----------
-    study_name : str
-        Name for the optimization study
-    dataset : List[Tuple[str, str]]
-        List of (train, test) dataset file pairs
-    min_components : int
-        Minimum number of components to explore
-    max_components : int
-        Maximum number of components to explore
-    seed : int, default 0
-        Random seed for reproducibility
-    save_model : bool, default False
-        Whether to save models from trials
-    output_dir : str, default "."
-        Directory for output files
-    extensive : int, default 0
-        Level of extensive hyperparameter search
-    test_chroms : List[str], default ["chr1"]
-        Chromosomes for testing
-    **model_kw
-        Fixed model parameters
-    """
-    if not len(dataset) > 0:
-        raise ValueError("At least one training/testing dataset pair is required")
-
-    # Filter out None values from model parameters
-    model_kw = {k: v for k, v in model_kw.items() if v is not None}
-
-    # Split into train and test paths
-    train, test = list(zip(*dataset))
-
-    # Create the study
-    mu.tune.create_study(
-        train=train,
-        test=test,
-        eval_every=5,
-        min_components=min_components,
-        max_components=max_components,
-        study_name=study_name,
-        seed=seed,
-        save_model=save_model,
-        output_dir=output_dir,
-        extensive=extensive,
-        **model_kw,
-    )
+    
 
 
 def run_optimization_trial(**kw):

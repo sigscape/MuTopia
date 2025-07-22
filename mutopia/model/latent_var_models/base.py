@@ -178,7 +178,8 @@ def iterative_update(
             Nk,
         )
 
-        if (np.abs(Nk - old_Nk) / np.sum(old_Nk)).sum() < tol:
+        check_tol = (np.abs(Nk - old_Nk) / np.sum(old_Nk)).sum()
+        if check_tol < tol:
             break
 
     return Nk

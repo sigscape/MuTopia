@@ -2,7 +2,7 @@ import click
 from tabulate import tabulate
 from typing import *
 import numpy as np
-
+from mutopia.tuning import create_study
 from . import model_core
 
 
@@ -509,7 +509,7 @@ def study():
     default=["chr1"],
     help="Chromosomes to reserve for testing (remaining chromosomes used for training)",
 )
-def create_study(
+def _create_study(
     study_name: str,
     *,
     dataset: List[Tuple[str, str]] = [],
@@ -552,6 +552,7 @@ def create_study(
         )
 
     model_kw = {k: v for k, v in model_kw.items() if v is not None}
+
     click.echo(f"Fixing parameters: ")
     click.echo(
         tabulate(
@@ -564,7 +565,7 @@ def create_study(
     train, test = list(zip(*dataset))
 
     try:
-        model_core.create_optimization_study(
+        create_study(
             train=train,
             test=test,
             eval_every=5,
@@ -575,7 +576,6 @@ def create_study(
             save_model=save_model,
             output_dir=output_dir,
             extensive=extensive,
-            test_chroms=test_chroms,
             **model_kw,
         )
         click.echo(f"Successfully created optimization study: {study_name}")
