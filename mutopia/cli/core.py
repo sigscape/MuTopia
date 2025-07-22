@@ -346,9 +346,11 @@ def add_sample(
         ploidy = make_continuous_features_bed(
             copy_number,
             regions_file,
-            null=2.0,
+            null=2,
         )
+
         ploidy = ploidy / 2 - 1  # normalize for diploid and center around 0
+        
         ploidy = COO(ploidy)
 
         sample = xr.Dataset(
@@ -358,7 +360,7 @@ def add_sample(
             }
         )
     else:
-        sample = X
+        sample = xr.Dataset({"X": X,})
 
     disk.write_sample(
         dataset,

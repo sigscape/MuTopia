@@ -272,7 +272,7 @@ def write_sample(
 
     if hasattr(sample, "ploidy"):
 
-        (sample.ploidy.sparse_to_coo().to_netcdf)(
+        sample.ploidy.sparse_to_coo().to_netcdf(
             filename,
             group=f"/raw/ploidy/{sample_name}",
             mode="a",
