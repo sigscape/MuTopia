@@ -55,6 +55,7 @@ def check_structure(dataset):
     for key in required_vars:
         if not hasattr(dataset, "Regions/" + key):
             raise ValueError(f'The dataset is missing the "{key}" node.')
+        
 
 
 def check_sample_data(dataset, dtype):

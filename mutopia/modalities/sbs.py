@@ -49,13 +49,15 @@ def _get_args(k, corpus):
         corpus.sections["Regions"].exposures.data,
         contig_f32(
             np.exp(corpus.sections["State"].log_locus_distribution)
-            .sel(component=k)
+            .isel(component=k)
             .data
         ),
-        np.exp(corpus.sections["State"].log_context_distribution)
-        .sel(component=k)
-        .transpose(..., "context")
-        .data,
+        (
+            np.exp(corpus.sections["State"].log_context_distribution)
+            .isel(component=k)
+            .transpose(..., "context")
+            .data
+        ),
         corpus.sections["State"].mesoscale_idx.data.T,
     )
 

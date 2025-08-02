@@ -35,6 +35,7 @@ __all__ = [
     "list_sources",
     "fetch_source",
     "get_explanation",
+    "get_shap_summary",
     "equal_size_quantiles",
     "slice_regions",
     "annot_empirical_marginal",
@@ -492,9 +493,14 @@ def get_explanation(dataset, component):
 
         shap_df = (
             shap_values.sel(shap_component=component)
-            .to_pandas()
-            .melt(ignore_index=False, var_name="feature", value_name="value")
+            .to_dataframe()
             .reset_index()
+            .rename(columns={
+                "shap_component": "component",
+                locus_dim: "locus",
+                "shap_features": "feature",
+                "SHAP_values": "value",
+            })
         )
 
         # handle this case to remove the convolution
@@ -503,10 +509,8 @@ def get_explanation(dataset, component):
                 ":", expand=True, n=1
             ).rename(columns={0: "feature", 1: "convolution"})
 
-        locus_dim = "locus" if "locus" in shap_df.columns else "shap_locus"
-
         shap_df = (
-            shap_df.groupby(["feature", locus_dim])["value"].sum().unstack().fillna(0).T
+            shap_df.groupby(["feature", "locus"])["value"].sum().unstack().fillna(0).T
         )
 
         data = (
@@ -558,6 +562,57 @@ def get_explanation(dataset, component):
     )
 
     return expl
+
+
+def get_shap_summary(data) -> DataFrame:
+    """Generate a summary of SHAP values for the specified components."""
+    shap_values = data["SHAP_values"]
+    locus_dim = "locus" if "locus" in shap_values.dims else "shap_locus"
+    
+    shap_values = (
+        shap_values
+        .to_dataframe()
+        .reset_index()
+        .rename(columns={
+            "shap_component": "component",
+            locus_dim: "locus",
+            "shap_features": "feature",
+            "SHAP_values": "shap_value",
+        })
+    )
+    shap_values = shap_values.merge(
+        data["State/locus_features"]
+        .sel(locus=shap_values.locus.unique())
+        .to_dataframe()
+        .reset_index()
+        .rename(columns={"State/locus_features": "feature_value"}),
+        on=["locus", "feature"],
+        how="inner",
+    )
+
+    effect_size = (
+        shap_values.groupby(["component", "feature"])["shap_value"]
+        .apply(lambda x: np.quantile(np.abs(x), 0.97))
+        .rename("effect_size")
+    )
+
+    def nan_corr(x, y):
+        """Compute correlation, ignoring NaNs."""
+        mask = ~np.isnan(x) & ~np.isnan(y)
+        if np.sum(mask) < 2:
+            return np.nan
+        return np.corrcoef(x[mask], y[mask])[0, 1]
+
+    correlation = (
+        shap_values.groupby(["component", "feature"])
+        [["shap_value", "feature_value"]]
+        .apply(lambda x: nan_corr(x["shap_value"], x["feature_value"]))
+        .rename("correlation")
+    )
+
+    component_summary = effect_size.to_frame().join(correlation).reset_index()
+
+    return component_summary
 
 
 def equal_size_quantiles(dataset, var_name, n_bins=10, key=None):

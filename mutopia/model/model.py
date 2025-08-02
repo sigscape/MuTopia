@@ -445,7 +445,7 @@ class TopographyModel(ABC, BaseEstimator):
             train_datasets = (train_datasets,)
         self._modality = train_datasets[0].attrs["dtype"]
 
-        if not isinstance(test_datasets, (tuple, list)):
+        if not isinstance(test_datasets, (tuple, list)) and not test_datasets is None:
             test_datasets = (test_datasets,)
         elif test_datasets is None or (
             isinstance(test_datasets, (tuple, list)) and len(test_datasets) == 0
@@ -545,6 +545,9 @@ class TopographyModel(ABC, BaseEstimator):
         check_corpus(dataset)
         if enforce_sample:
             check_dims(dataset, self.factor_model_)
+
+        dataset["Regions/exposures"] = dataset["Regions/exposures"].astype(np.float32, copy=False)
+        dataset["Regions/context_frequencies"] = dataset["Regions/context_frequencies"].astype(np.float32, copy=False)
 
     def setup_corpus(self, dataset):
         """

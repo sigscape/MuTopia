@@ -11,6 +11,17 @@ from ._dirichlet_update import update_alpha
 from ..model_components.base import _svi_update_fn
 from ..gtensor_interface import GtensorInterface
 
+def delayed(fn, *args, **kwargs):
+    """
+    A decorator to delay the execution of a function until it is called.
+    This is useful for functions that are expensive to compute and should
+    only be executed when needed.
+    """
+    run = partial(fn, *args, **kwargs)
+    @wraps(fn)
+    def wrapper(*wargs, **wkwargs):
+        return run()
+    return wrapper
 
 """
 Numba only works with 2D arrays, not arbitrary tensors. Luckily,
@@ -604,12 +615,7 @@ class LocalsModel:
         raise NotImplementedError
 
     def _get_sample_init_fn(self, dataset):
-        return partial(
-            self.random_state.gamma,
-            100.0,
-            1.0 / 100.0,
-            size=(self.n_components,),
-        )
+        return delayed(self.random_state.gamma, 100.0, 1.0 / 100.0, size=(self.n_components,),)
 
     def init_locals(self, dataset):
 
@@ -622,50 +628,10 @@ class LocalsModel:
     def prepare_corpusstate(self, dataset):
         return dict(
             topic_compositions=DataArray(
-                self.init_locals(dataset),
+                self.init_locals(dataset)[:, None, :].astype(self.dtype),
                 dims=("sample", "source", "component"),
             ),
         )
-
-    ##
-    # M-step functionality to satisfy the PrimModel interface
-    ##
-    """def init_locals(self, n_samples):
-        return self.random_state.gamma(
-            100.0,
-            1.0 / 100.0,
-            size=(self.n_components, n_samples),
-        ).astype(self.dtype)
-
-
-    def prepare_corpusstate(self, dataset):
-
-        n_observations = np.array(
-            [sample.X.sum().data.item() for _, sample in self.GT.iter_samples(dataset)]
-        )
-
-        if hasattr(dataset, "ploidy"):
-            weighted_ploidy = (
-                (n_observations / n_observations.sum())
-                @ dataset["ploidy"].transpose("sample", "locus").data
-            ) + 1
-        else:
-            weighted_ploidy = np.ones(dataset.sizes["locus"], dtype=self.dtype)
-
-        return dict(
-            topic_compositions=DataArray(
-                self.init_locals(len(n_observations)),
-                dims=("component", "sample"),
-            ),
-            n_observations = DataArray(
-                n_observations,
-                dims=("sample",),
-            ),
-            weighted_ploidy=DataArray(
-                weighted_ploidy,
-                dims=("locus",),
-            ),
-        )"""
 
     @staticmethod
     def reduce_sparse_sstats(
@@ -698,11 +664,12 @@ class LocalsModel:
                 .transpose("sample", ...)
                 .data
             )
+            Nks = np.squeeze(Nks, axis=1)
 
             alpha0 = self.alpha[name]
 
             self.alpha[name] = _svi_update_fn(
-                alpha0, update_alpha(alpha0, np.array(Nks)), learning_rate
+                alpha0, update_alpha(alpha0, Nks).astype(self.dtype), learning_rate
             )
 
         return self

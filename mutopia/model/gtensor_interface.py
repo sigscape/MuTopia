@@ -189,3 +189,11 @@ class GtensorInterface:
             dataset["ploidy"].data.data = dataset["ploidy"].data.data.astype(float32)
 
         return dataset
+
+    @classmethod
+    def fetch_locals(cls, dataset):
+        """
+        Fetch local topic compositions for a given sample from the dataset.
+        This is a wrapper around fetch_topic_compositions to maintain compatibility.
+        """
+        return cls.fetch_val(dataset, "topic_compositions")
