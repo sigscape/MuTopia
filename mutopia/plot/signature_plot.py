@@ -2,8 +2,8 @@ from math import sqrt
 from itertools import chain
 import matplotlib.pyplot as plt
 from matplotlib import ticker
-from ..utils import borrow_kwargs
-
+import xarray as xr
+from ..gtensor import fetch_component
 
 def _plot_linear_signature(
     xlabels,
@@ -83,6 +83,101 @@ def _plot_linear_signature(
     return ax
 
 
-@borrow_kwargs(_plot_linear_signature)
-def plot_component(signature, **kw):
-    return signature.modality().plot(signature, **kw)
+def plot_component(signature : xr.DataArray, *select, **kw):
+    """
+    Plot a component of a signature using its modality's plotting method.
+
+    This function serves as a convenience wrapper that calls the appropriate plotting
+    method based on the signature's modality. If no selection is provided, it defaults
+    to plotting the "Baseline" component.
+
+    Parameters
+    ----------
+    signature : xr.DataArray
+        The signature data array to plot. Must have a modality method that returns
+        an object with a plot method.
+    *select : str, optional
+        Variable number of string arguments specifying which components to select
+        for plotting. If no arguments are provided, defaults to ["Baseline"].
+    **kw : dict, optional
+        Additional keyword arguments passed to the underlying plot method.
+
+    Returns
+    -------
+    object
+        The return value from the modality's plot method, typically a matplotlib
+        figure or axes object.
+
+    Examples
+    --------
+    >>> plot_component(signature_data)  # Plots baseline component
+    >>> plot_component(signature_data, "Component1", "Component2")  # Plots specific components
+    >>> plot_component(signature_data, "Baseline", figsize=(10, 6))  # With additional kwargs
+    """
+    if len(select) == 0:
+        select = ["Baseline"]
+    return signature.modality().plot(signature, *select, **kw)
+
+
+def plot_signature_panel(
+    dataset,
+    ncols=4,
+    width=3.5,
+    height=1.25,
+    show=True,
+    **kwargs,
+):
+    """
+    Create a panel of signature plots for all components in the model.
+
+    Parameters
+    ----------
+    ncols : int, default=3
+        Number of columns in the panel.
+    normalization : str, default="global"
+        Normalization method for the signatures.
+    width : float, default=3.5
+        Width of each subplot in inches.
+    height : float, default=1.25
+        Height of each subplot in inches.
+    show : bool, default=True
+        If True, displays the figure. If False, returns the figure object.
+    **kwargs
+        Additional keyword arguments passed to plot_component method.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure, optional
+        The figure object containing the panel of signatures. Only returned if show=False.
+
+    Notes
+    -----
+    This method creates a grid of subplots, each displaying one signature component.
+    The number of rows is calculated based on ncols and the number of components.
+    Component names are displayed as y-axis labels.
+    """
+    import numpy as np
+
+    K = len(dataset.coords["component"])
+    component_names = dataset.coords["component"].values
+    nrows = int(np.ceil(K / ncols))
+
+    fig, ax = plt.subplots(
+        nrows,
+        ncols,
+        figsize=(width * ncols, height * nrows),
+        gridspec_kw={"hspace": 0.5, "wspace": 0.25},
+    )
+
+    for k in range(K):
+        _ax = np.ravel(ax)[k]
+        plot_component(fetch_component(dataset, k), ax=_ax, **kwargs)
+        _ax.set_ylabel(component_names[k], fontsize=8)
+
+    for _ax in np.ravel(ax)[K:]:
+        _ax.axis("off")
+
+    if show:
+        plt.show()
+    else:
+        return fig

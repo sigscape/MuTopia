@@ -11,13 +11,14 @@ import numpy as np
 from typing import Union, List
 from numpy.typing import NDArray
 from pandas import IntervalIndex, Index, Interval, DataFrame
-from ..utils import logger
-from ..genome_utils.bed12_utils import unstack_regions as _unstack_regions
 from functools import reduce
 import os
 from tqdm import tqdm
-from .interfaces import *
 import mutopia.gtensor.disk_interface as disk
+
+from ..utils import logger
+from ..genome_utils.bed12_utils import unstack_regions as _unstack_regions
+from .interfaces import *
 from ..utils import parse_region
 
 __all__ = [
@@ -45,6 +46,11 @@ __all__ = [
     "unstack_regions",
     "mutate_method",
     "BED_COLS",
+    "fetch_component",
+    "fetch_interactions",
+    "fetch_shared_effects",
+    "rename_components",
+    "excel_report",
 ]
 
 BED_COLS = [
@@ -896,7 +902,7 @@ def unstack_regions(dataset):
 
 def fetch_features(
     dataset: xr.Dataset,
-    *feature_names: Union[str, List[str], tuple, set],
+    *feature_names: str,
     source: Union[str, None] = None,
 ):
     """
@@ -949,6 +955,15 @@ def fetch_features(
         )
     ]
 
+    #Reorder features to match the order in feature_names
+    if len(feature_names) > 0:
+        fnames = sorted(
+            fnames,
+            key=lambda x: feature_names.index(os.path.basename(x))
+            if os.path.basename(x) in feature_names
+            else len(feature_names),
+        )
+
     features = [os.path.basename(name) for name in fnames]
     sources = [os.path.dirname(name) for name in fnames]
 
@@ -965,3 +980,204 @@ def fetch_features(
     )
 
     return feature_matrix.squeeze()
+
+
+class ComponentWrapper:
+
+    def __init__(self, dataset):
+        if not "component" in dataset.coords:
+            raise ValueError("Dataset does not contain 'component' coordinate.")
+        
+        self.dataset = dataset
+
+    def _get_k(self, component_name):
+        if isinstance(component_name, int):
+            return component_name
+        try:
+            return list(self.dataset.coords['component'].values).index(component_name)
+        except ValueError:
+            raise ValueError(f"Component {component_name} not found in model.")
+
+    @property
+    def n_components(self):
+        return len(self.dataset.coords['component'].values)
+    
+    @property
+    def component_names(self):
+        return list(self.dataset.coords['component'].values)
+    
+    def get_spectrum(self, idx : Union[str, int]) -> xr.DataArray:
+        k = self._get_k(idx)
+        return self.dataset["Spectra/spectra"].isel(component=k)
+
+    def get_interactions(self, idx : Union[str, int]) -> xr.DataArray:
+        k = self._get_k(idx)
+        return self.dataset["Spectra/interactions"].isel(component=k)
+
+    def get_shared_effects(self, idx : Union[str, int]) -> xr.DataArray:
+        return self.dataset["Spectra/shared_effects"].isel(component=self._get_k(idx))
+
+
+def rename_components(dataset : xr.Dataset, names: List[str]):
+    """
+    Rename the components of the model and update the dataset coordinates accordingly.
+
+    Parameters
+    ----------
+    dataset : xarray.Dataset
+        The dataset containing model components to be renamed.
+    names : typing.List[str]
+        New names for the components. Must have the same length as the number of components in the model.
+
+    Returns
+    -------
+    xarray.Dataset
+        The dataset with updated component names in coordinates.
+
+    Raises
+    ------
+    ValueError
+        If the number of provided names doesn't match the number of components.
+    KeyError
+        If some components in the dataset's "shap_component" coordinate don't match the model components.
+
+    Notes
+    -----
+    This method also updates the internal _component_names attribute of the model.
+    """
+    components = ComponentWrapper(dataset)
+    if not len(names) == components.n_components:
+        raise ValueError("The number of names must match the number of components")
+
+    name_map = dict(zip(components.component_names, names))
+    new_coords = {"component": names}
+
+    if "shap_component" in dataset.coords:
+        try:
+            new_coords["shap_component"] = [
+                name_map[c] for c in dataset.coords["shap_component"].data
+            ]
+        except KeyError:
+            raise KeyError(
+                "Some components in dataset do not match the model components. Just delete the SHAP_values and try again."
+            )
+
+    dataset = dataset.assign_coords(new_coords)
+    return dataset
+
+
+def fetch_component(dataset, component_name : Union[str, int]) -> xr.DataArray:
+    components = ComponentWrapper(dataset)
+    spectrum = components.get_spectrum(component_name)
+    spectrum.attrs["dtype"] = dataset.attrs["dtype"]
+    return spectrum
+
+def fetch_interactions(dataset, component_name : Union[str, int]) -> xr.DataArray:
+    components = ComponentWrapper(dataset)
+    interactions = components.get_interactions(component_name)
+    interactions.attrs["dtype"] = dataset.attrs["dtype"]
+    return interactions
+
+def fetch_shared_effects(dataset, component_name : Union[str, int]) -> xr.DataArray:
+    components = ComponentWrapper(dataset)
+    shared_effects = components.get_shared_effects(component_name)
+    shared_effects.attrs["dtype"] = dataset.attrs["dtype"]
+    return shared_effects
+
+def excel_report(self, dataset, output, normalization="global"):
+    """
+    Generate a comprehensive Excel report with model results.
+
+    This method creates an Excel file containing signature data, sample contributions,
+    and SHAP values (if available) across multiple worksheets.
+
+    Parameters
+    ----------
+    dataset : xarray.Dataset
+        Dataset containing the model results to export
+    output : str
+        Output file path for the Excel report
+
+    Raises
+    ------
+    ImportError
+        If openpyxl is not installed for Excel writing support
+
+    Notes
+    -----
+    The Excel file will contain the following sheets:
+    - Signature_{name}: Normalized signature data for each component
+    - Sample_contributions: Component contributions per sample (if available)
+    - SHAP_transformed_features: SHAP feature data (if available)
+    - SHAP_original_features: Original feature data for SHAP (if available)
+    - SHAP_values_{component}: SHAP values for each component (if available)
+
+    Requires openpyxl to be installed: pip install openpyxl
+    """
+
+    try:
+        from pandas import ExcelWriter
+    except ImportError:
+        raise ImportError(
+            "openpyxl is required to save excel reports, install with `pip install openpyxl`"
+        )
+
+    renorm = lambda x: x / x.sum() * 1000
+
+    with ExcelWriter(output) as writer:
+
+        for sig in self.component_names:
+            (
+                renorm(self.format_component(sig, normalization=normalization))
+                .to_pandas()
+                .T.to_excel(
+                    writer,
+                    sheet_name=f"Signature_{sig}",
+                )
+            )
+
+        if hasattr(dataset, "contributions"):
+            (
+                dataset.contributions.stack(observations=("source", "component"))
+                .transpose("sample", ...)
+                .to_pandas()
+                .to_excel(
+                    writer,
+                    sheet_name="Sample_contributions",
+                )
+            )
+
+        if hasattr(dataset, "SHAP_values"):
+
+            shap_components = dataset.SHAP_values.coords["shap_component"].values
+            expl = get_explanation(dataset, shap_components[0])
+
+            DataFrame(
+                expl.data,
+                columns=expl.feature_names,
+            ).to_excel(
+                writer,
+                sheet_name="SHAP_transformed_features",
+                index=False,
+            )
+
+            display_data = expl.display_data.copy()
+            display_data.columns = expl.feature_names
+            display_data.to_excel(
+                writer,
+                sheet_name="SHAP_original_features",
+                index=False,
+            )
+
+            for component in shap_components:
+
+                expl = get_explanation(dataset, component)
+
+                DataFrame(
+                    expl.values,
+                    columns=expl.feature_names,
+                ).to_excel(
+                    writer,
+                    sheet_name="SHAP_values_{}".format(component),
+                    index=False,
+                )

@@ -167,7 +167,7 @@ class ModeConfig(ABC):
             if len(select) == 0:
                 raise ValueError("No signatures selected. Check the `select` argument.")
 
-            pl_signatures = list(signature.sel(mesoscale_state=select).data)
+            pl_signatures = list(signature.sel(genome_state=select).data)
 
             if sig_names and not len(select) == len(sig_names):
                 raise ValueError(

@@ -615,12 +615,10 @@ class LocalsModel:
         raise NotImplementedError
 
     def _get_sample_init_fn(self, dataset):
-        return delayed(self.random_state.gamma, 100.0, 1.0 / 100.0, size=(self.n_components,),)
+        return delayed(self.random_state.gamma, 100.0, 1.0 / 100.0, size=(1, self.n_components,),)
 
     def init_locals(self, dataset):
-
         init_fn = self._get_sample_init_fn(dataset)
-
         return self.to_contig(
             np.array([init_fn(sample) for _, sample in self.GT.iter_samples(dataset)])
         )
@@ -628,7 +626,7 @@ class LocalsModel:
     def prepare_corpusstate(self, dataset):
         return dict(
             topic_compositions=DataArray(
-                self.init_locals(dataset)[:, None, :].astype(self.dtype),
+                self.init_locals(dataset).astype(self.dtype),
                 dims=("sample", "source", "component"),
             ),
         )

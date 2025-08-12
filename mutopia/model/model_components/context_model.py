@@ -449,16 +449,16 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
 
         return DataArray(
             signature,
-            dims=("context", "mesoscale_state"),
+            dims=("context", "genome_state"),
             coords={
                 "context": self.context_names,
-                "mesoscale_state": ["Baseline"] + self.get_mesoscale_feature_names(),
+                "genome_state": ["Baseline"] + self.get_mesoscale_feature_names(),
             },
         )
 
     def get_baseline_summary(self, k):
         return self.format_component(k, normalization="none").sel(
-            mesoscale_state="Baseline"
+            genome_state="Baseline"
         )
 
     def get_interaction_summary(self, k):
@@ -466,15 +466,31 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         c = self.context_transformer.n_states + 1
         r = self.mesoscale_transformer.n_coefs
 
-        return DataArray(
-            data=self.coefs_[k][-r * c :].reshape((c, r)).T,
-            dims=("feature", "context"),
+        interaction_matrix = self.coefs_[k][-r * c :].reshape((c, r)).T
+        interaction_matrix = np.vstack([
+            np.zeros((1, c), dtype=self.dtype),
+            interaction_matrix
+        ])
+
+        interactions = DataArray(
+            data=interaction_matrix[:, 1:],
+            dims=("genome_state", "context"),
             coords={
-                "feature": self.get_mesoscale_feature_names(),
-                "context": ["Shared effect"] + self.context_names,
+                "context": self.context_names,
+                "genome_state": ["Baseline"] + self.get_mesoscale_feature_names(),
             },
         )
 
+        shared_effects = DataArray(
+            data=interaction_matrix[:,0],
+            dims=("genome_state"),
+            coords={
+                "genome_state": ["Baseline"] + self.get_mesoscale_feature_names(),
+            }
+        )
+
+        return (interactions, shared_effects)
+    
 
 class UnstrandedContextModel(StrandedContextModel, SparseDataBase):
 

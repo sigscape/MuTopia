@@ -1,7 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+from functools import partial
+from typing import Union
 from ..utils import diverging_palette
+from ..gtensor import fetch_interactions, fetch_component, fetch_shared_effects
 
 
 def _plot_interaction_matrix(
@@ -19,7 +22,7 @@ def _plot_interaction_matrix(
         width_ratios=[0.22, 7, 0.1],
         height_ratios=[1, plot_height - 1],
         wspace=0.05,
-        hspace=0.1,
+        hspace=0.25,
     )
 
     if gridspec is None:
@@ -94,3 +97,65 @@ def _plot_interaction_matrix(
     cbar.ax.tick_params(labelsize=8)
 
     return gs
+
+
+
+def plot_interaction_matrix(
+    dataset,
+    component : Union[str, int],
+    palette=diverging_palette,
+    gridspec=None,
+    **kw,
+):
+    """
+    Generate a visualization of component interactions.
+
+    This method creates a plot showing the interaction matrix for a specified component.
+    It displays shared effects and context-specific interactions for genomic signatures.
+
+    Parameters
+    ----------
+    dataset : xr.DataSet
+        The dataset containing the interactions to visualize.
+    component : int or str
+        The component index or identifier to visualize.
+    palette : function, optional
+        A color palette function to use for visualization, defaults to diverging_palette.
+    normalization : str, optional
+        Method for normalizing the signature values.
+    **kw : dict
+        Additional keyword arguments passed to the underlying plotting function.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The figure object containing the visualization of the interaction matrix.
+
+    Notes
+    -----
+    The interaction matrix shows how the component behaves across different contexts,
+    highlighting both shared effects and context-specific variations.
+    """
+    interactions = (
+        fetch_interactions(dataset, component)
+        .drop_sel(genome_state="Baseline")
+    )
+    dtype = interactions.modality()
+    interactions = dtype._flatten_observations(interactions).to_pandas()
+
+    shared_effects = (
+        fetch_shared_effects(dataset, component)
+        .drop_sel(genome_state="Baseline")
+        .to_pandas()
+    )
+    
+    signature = fetch_component(dataset, component)
+
+    return _plot_interaction_matrix(
+        partial(dtype.plot, signature, "Baseline"),
+        interactions,
+        shared_effects,  # .iloc[:,0],
+        palette=palette,
+        gridspec=gridspec,
+        **kw,
+    )

@@ -318,11 +318,4 @@ class FactorModel:
         )
 
     def format_interactions(self, k):
-        return reduce(
-            lambda x, y: x + y,
-            (
-                model.get_interaction_summary(k)
-                for model in self.models.values()
-                if hasattr(model, "get_interaction_summary")
-            ),
-        )
+        return self.models['context_model'].get_interaction_summary(k)

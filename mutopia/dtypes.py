@@ -1,4 +1,4 @@
-from xarray import register_dataset_accessor
+from xarray import register_dataset_accessor, register_dataarray_accessor
 import importlib.util
 import sys
 import os
@@ -46,6 +46,7 @@ def get_mode(dataset):
 
 
 @register_dataset_accessor("modality")
+@register_dataarray_accessor("modality")
 class ModalityAccessor:
     def __init__(self, xrds):
         self._xrds = xrds

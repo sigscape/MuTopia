@@ -203,7 +203,7 @@ class LDAUpdateSparse(LocalsModel):
         )
 
         alpha = np.ascontiguousarray(self.alpha[self.GT.get_name(dataset)])
-        Nk = np.ascontiguousarray(Nk, dtype=self.dtype)
+        Nk = np.ascontiguousarray(Nk.ravel(), dtype=self.dtype)
 
         args = (
             alpha,

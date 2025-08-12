@@ -474,6 +474,10 @@ class TopographyModel(ABC, BaseEstimator):
         return self
 
     @property
+    def alpha_(self):
+        return self.locals_model_.alpha
+    
+    @property
     def n_components(self):
         return self.num_components
 
@@ -484,68 +488,10 @@ class TopographyModel(ABC, BaseEstimator):
         except AttributeError:
             return ["M{}".format(i) for i in range(0, self.n_components)]
 
-    def _get_k(self, component_name):
-        if isinstance(component_name, int):
-            return component_name
-
-        try:
-            return self.component_names.index(component_name)
-        except ValueError:
-            raise ValueError(f"Component {component_name} not found in model.")
-
-    def rename_components(self, dataset, names: List[str]):
-        """
-        Rename the components of the model and update the dataset coordinates accordingly.
-
-        Parameters
-        ----------
-        dataset : xarray.Dataset
-            The dataset containing model components to be renamed.
-        names : typing.List[str]
-            New names for the components. Must have the same length as the number of components in the model.
-
-        Returns
-        -------
-        xarray.Dataset
-            The dataset with updated component names in coordinates.
-
-        Raises
-        ------
-        ValueError
-            If the number of provided names doesn't match the number of components.
-        KeyError
-            If some components in the dataset's "shap_component" coordinate don't match the model components.
-
-        Notes
-        -----
-        This method also updates the internal _component_names attribute of the model.
-        """
-        if not len(names) == self.n_components:
-            raise ValueError("The number of names must match the number of components")
-
-        name_map = dict(zip(self.component_names, names))
-        new_coords = {"component": names}
-
-        if "shap_component" in dataset.coords:
-            try:
-                new_coords["shap_component"] = [
-                    name_map[c] for c in dataset.coords["shap_component"].data
-                ]
-            except KeyError:
-                raise KeyError(
-                    "Some components in dataset do not match the model components. Just delete the SHAP_values and try again."
-                )
-
-        dataset = dataset.assign_coords(new_coords)
-        self._component_names = names
-
-        return dataset
-
     def _check_corpus(self, dataset, enforce_sample=True):
         check_corpus(dataset)
-        if enforce_sample:
-            check_dims(dataset, self.factor_model_)
-
+        #if enforce_sample:
+        #    check_dims(dataset, self.factor_model_)
         dataset["Regions/exposures"] = dataset["Regions/exposures"].astype(np.float32, copy=False)
         dataset["Regions/context_frequencies"] = dataset["Regions/context_frequencies"].astype(np.float32, copy=False)
 
@@ -601,257 +547,49 @@ class TopographyModel(ABC, BaseEstimator):
 
         dump(self, path)
 
-    def plot_component(self, component, *select, normalization="global", **kwargs):
-        """
-        Visualize a given component.
+    def annot_components(self, dataset : xr.Dataset):
 
-        Parameters
-        ----------
-        component : int or str
-            The component index or name to plot.
-        *select : str, optional
-            Mesoscale selection strings to plot. If none are provided, defaults to ["Baseline"].
-        normalization : {global, weighted, none}, default="global"
-            The normalization method to use for the component.
-        **kwargs : dict
-            Additional keyword arguments to pass to the underlying plot method.
-        Returns
-        -------
-        matplotlib.figure.Figure or other plot object
-            The resulting plot object returned by the modality's plot method.
-        Notes
-        -----
-        This method retrieves the component by name or index, formats the component using the factor model,
-        and delegates the actual plotting to the modality's plot method.
-        """
-
-        if len(select) == 0:
-            select = ["Baseline"]
-
-        component = self._get_k(component)
-
-        return self.modality.plot(
-            self.factor_model_.format_component(component, normalization=normalization),
-            *select,
-            **kwargs,
+        spectra = xr.concat(
+            [
+                self.factor_model_.format_component(component)
+                for component in range(self.n_components)
+            ],
+            dim="component",
         )
 
-    def signature_report(
-        self,
-        component,
-        normalization="global",
-        width=5.25,
-        height=2.0,
-        show=True,
-    ):
-        """
-        Generate a comprehensive report for a specific signature component.
+        interactions, shared_effects = list(zip(*
+            [
+                self.factor_model_.format_interactions(component)
+                for component in range(self.n_components)
+            ]
+        ))
 
-        This method creates a figure with signature plots for mesoscale states and an interaction matrix
-        for the specified component, providing a visual representation of the signature's characteristics.
-
-        Parameters
-        ----------
-        component : int or str
-            The signature component to visualize. Can be an integer index or a string identifier.
-        normalization : str, default="global"
-            The normalization method to use for the signatures.
-        width : float, default=5.25
-            The base width of the figure in inches. The actual figure width may be adjusted based on the number of states.
-        height : float, default=2.0
-            The base height per signature group in inches.
-        show : bool, default=True
-            Whether to display the figure immediately.
-
-        Returns
-        -------
-        matplotlib.figure.Figure
-            The generated figure containing signature plots and interaction matrix.
-
-        Notes
-        -----
-        The report organizes mesoscale states into groups based on their prefix (before the colon),
-        and displays them in separate rows. For singleton state groups (except Baseline),
-        the Baseline state is automatically added as a reference.
-        """
-
-        component = self._get_k(component)
-
-        signatures = self.factor_model_.format_component(
-            component, normalization=normalization
-        )
-        n_rows = len(signatures.mesoscale_state)
-
-        state_groups = defaultdict(list)
-        for state in signatures.mesoscale_state.values:
-            state_groups[state.split(":")[0]].append(state)
-
-        for k, v in state_groups.items():
-            if not k == "Baseline" and len(v) == 1:
-                state_groups[k].append("Baseline")
-
-        max_n_states = max(map(len, state_groups.values()))
-        n_sigs = len(state_groups)
-        fig = plt.figure(figsize=(max(width * max_n_states, 10), height * n_sigs + 3))
-
-        gs = fig.add_gridspec(
-            2,
-            1,
-            height_ratios=[height * n_sigs, 1 + 0.35 * n_rows],
-            hspace=0.1,
-        )
-
-        gs0 = gs[0].subgridspec(
-            n_sigs + 1,
-            max_n_states,
-            hspace=0.75,
-            wspace=0.5,
-            width_ratios=[3] + [1] * (max_n_states - 1),
-        )
-
-        for i, states in enumerate(state_groups.values()):
-            ax = fig.add_subplot(gs0[i, : len(states)])
-            self.plot_component(
-                component,
-                *states,
-                ax=ax,
-            )
-
-        self.plot_interaction_matrix(
-            component,
-            gridspec=gs[1],
-            normalization=normalization,
-        )
-
-        fig.suptitle(f"Signature {component} report", fontsize=12, y=0.95)
-
-        if show:
-            plt.show()
-
-        return fig
-
-    def plot_interaction_matrix(
-        self,
-        component,
-        palette=diverging_palette,
-        gridspec=None,
-        normalization="global",
-        **kw,
-    ):
-        """
-        Generate a visualization of component interactions.
-
-        This method creates a plot showing the interaction matrix for a specified component.
-        It displays shared effects and context-specific interactions for genomic signatures.
-
-        Parameters
-        ----------
-        component : int or str
-            The component index or identifier to visualize.
-        palette : function, optional
-            A color palette function to use for visualization, defaults to diverging_palette.
-        normalization : str, optional
-            Method for normalizing the signature values.
-        **kw : dict
-            Additional keyword arguments passed to the underlying plotting function.
-
-        Returns
-        -------
-        matplotlib.figure.Figure
-            The figure object containing the visualization of the interaction matrix.
-
-        Notes
-        -----
-        The interaction matrix shows how the component behaves across different contexts,
-        highlighting both shared effects and context-specific variations.
-        """
-
-        component = self._get_k(component)
-
-        flatten = partial(self.modality._flatten_observations)
-
-        interactions = self.factor_model_.format_interactions(component)
-
-        shared_effects = interactions.sel(context="Shared effect").to_pandas()
-        interactions = flatten(
-            interactions.drop_sel(context="Shared effect")
-        ).to_pandas()
-
-        signature = self.factor_model_.format_component(
-            component, normalization=normalization
-        )
-
-        return _plot_interaction_matrix(
-            partial(self.modality.plot, signature, "Baseline"),
+        interactions = xr.concat(
             interactions,
-            shared_effects,  # .iloc[:,0],
-            palette=palette,
-            gridspec=gridspec,
-            **kw,
+            dim="component",
         )
 
-    def signature_panel(
-        self,
-        ncols=4,
-        normalization="global",
-        width=3.5,
-        height=1.25,
-        show=True,
-        **kwargs,
-    ):
-        """
-        Create a panel of signature plots for all components in the model.
-
-        Parameters
-        ----------
-        ncols : int, default=3
-            Number of columns in the panel.
-        normalization : str, default="global"
-            Normalization method for the signatures.
-        width : float, default=3.5
-            Width of each subplot in inches.
-        height : float, default=1.25
-            Height of each subplot in inches.
-        show : bool, default=True
-            If True, displays the figure. If False, returns the figure object.
-        **kwargs
-            Additional keyword arguments passed to plot_component method.
-
-        Returns
-        -------
-        fig : matplotlib.figure.Figure, optional
-            The figure object containing the panel of signatures. Only returned if show=False.
-
-        Notes
-        -----
-        This method creates a grid of subplots, each displaying one signature component.
-        The number of rows is calculated based on ncols and the number of components.
-        Component names are displayed as y-axis labels.
-        """
-
-        K = self.n_components
-        nrows = int(np.ceil(K / ncols))
-
-        fig, ax = plt.subplots(
-            nrows,
-            ncols,
-            figsize=(width * ncols, height * nrows),
-            gridspec_kw={"hspace": 0.5, "wspace": 0.25},
+        shared_effects = xr.concat(
+            shared_effects,
+            dim="component",
         )
 
-        for k in range(self.n_components):
-            _ax = np.ravel(ax)[k]
-            self.plot_component(k, ax=_ax, normalization=normalization, **kwargs)
-            _ax.set_ylabel(self.component_names[k], fontsize=8)
-
-        for _ax in np.ravel(ax)[self.n_components :]:
-            _ax.axis("off")
-
-        if show:
-            plt.show()
-        else:
-            return fig
-
+        dataset = dataset.mutate(
+            lambda ds : (
+                ds.assign_coords(
+                    component=("component", self.component_names)
+                ).assign(
+                    {
+                        "Spectra/spectra" : spectra,
+                        "Spectra/interactions" : interactions,
+                        "Spectra/shared_effects" : shared_effects
+                    }
+                )
+            )
+        )
+        logger.info("Added keys to dataset: Spectra/spectra, Spectra/interactions, Spectra/shared_effects")
+        return dataset
+    
     def annot_contributions(
         self,
         dataset,
@@ -1047,10 +785,10 @@ class TopographyModel(ABC, BaseEstimator):
             np.exp(marginal - marginal.max(skipna=True)).fillna(0.0).astype(np.float32)
         )
         dataset[f"{key}_locus"] = (
-            (np.exp(marginal) * dataset.regions.context_frequencies).sum(
+            (np.exp(marginal) * dataset["Regions/context_frequencies"]).sum(
                 dim=dims_except_for(marginal.dims, "source", "locus")
             )
-            / dataset.regions.length
+            / dataset["Regions/length"]
         ).astype(np.float32)
 
         logger.info(f'Added key: "{key}"')
@@ -1159,14 +897,9 @@ class TopographyModel(ABC, BaseEstimator):
             return np.squeeze(shaps)
 
         use_components = list(
-            map(
-                self._get_k,
-                (
-                    components
-                    if not len(components) == 0
-                    else list(range(self.n_components))
-                ),
-            )
+            components
+            if not len(components) == 0
+            else list(range(self.n_components))
         )
 
         shap_matrix = np.array(
@@ -1200,127 +933,40 @@ class TopographyModel(ABC, BaseEstimator):
         logger.info(f'Added key: "{key}"')
         return dataset
 
-    def format_component(self, component, normalization="global"):
+    def annot_data(self, dataset, threads=1):
         """
-        Format and flatten a component pattern for a given component.
+        Annotate a dataset with comprehensive model analysis information.
 
-        Parameters
-        ----------
-        component : int or str
-            The component index or name to format
-        normalization : str, default="global"
-            The normalization method to apply to the component
+        This method applies a series of annotation functions to enrich the dataset with
+        various types of model-derived insights including component analysis, contribution
+        calculations, SHAP values, component distributions, and marginal predictions.
 
-        Returns
-        -------
-        xarray.DataArray
-            The flattened component data for the specified component
+        Args:
+            dataset: The input dataset to be annotated with model analysis information.
+            threads (int, optional): Number of threads to use for parallel processing
+                in annotation functions that support multithreading. Defaults to 1.
+
+        Returns:
+            The annotated dataset containing the original data plus all computed
+            annotations from the applied annotation functions.
+
+        Note:
+            The annotation functions are applied sequentially in the following order:
+            1. Component annotations
+            2. Contribution annotations
+            3. SHAP value annotations
+            4. Component distribution annotations
+            5. Marginal prediction annotations
         """
+        _annot_fns = [
+            partial(self.annot_contributions, threads=threads),
+            partial(self.annot_SHAP_values, threads=threads),
+            partial(self.annot_component_distributions, threads=threads),
+            partial(self.annot_marginal_prediction, threads=threads),
+            self.annot_components,
+        ]
 
-        component = self._get_k(component)
+        for fn in _annot_fns:
+            dataset = fn(dataset)
 
-        return self.modality._flatten_observations(
-            self.factor_model_.format_component(component, normalization=normalization)
-        )
-
-    @property
-    def alpha_(self):
-        return self.locals_model_.alpha
-
-    def excel_report(self, dataset, output, normalization="global"):
-        """
-        Generate a comprehensive Excel report with model results.
-
-        This method creates an Excel file containing signature data, sample contributions,
-        and SHAP values (if available) across multiple worksheets.
-
-        Parameters
-        ----------
-        dataset : xarray.Dataset
-            Dataset containing the model results to export
-        output : str
-            Output file path for the Excel report
-
-        Raises
-        ------
-        ImportError
-            If openpyxl is not installed for Excel writing support
-
-        Notes
-        -----
-        The Excel file will contain the following sheets:
-        - Signature_{name}: Normalized signature data for each component
-        - Sample_contributions: Component contributions per sample (if available)
-        - SHAP_transformed_features: SHAP feature data (if available)
-        - SHAP_original_features: Original feature data for SHAP (if available)
-        - SHAP_values_{component}: SHAP values for each component (if available)
-
-        Requires openpyxl to be installed: pip install openpyxl
-        """
-
-        try:
-            from pandas import ExcelWriter
-        except ImportError:
-            raise ImportError(
-                "openpyxl is required to save excel reports, install with `pip install openpyxl`"
-            )
-
-        renorm = lambda x: x / x.sum() * 1000
-
-        with ExcelWriter(output) as writer:
-
-            for sig in self.component_names:
-                (
-                    renorm(self.format_component(sig, normalization=normalization))
-                    .to_pandas()
-                    .T.to_excel(
-                        writer,
-                        sheet_name=f"Signature_{sig}",
-                    )
-                )
-
-            if hasattr(dataset, "contributions"):
-                (
-                    dataset.contributions.stack(observations=("source", "component"))
-                    .transpose("sample", ...)
-                    .to_pandas()
-                    .to_excel(
-                        writer,
-                        sheet_name="Sample_contributions",
-                    )
-                )
-
-            if hasattr(dataset, "SHAP_values"):
-
-                shap_components = dataset.SHAP_values.coords["shap_component"].values
-                expl = get_explanation(dataset, shap_components[0])
-
-                DataFrame(
-                    expl.data,
-                    columns=expl.feature_names,
-                ).to_excel(
-                    writer,
-                    sheet_name="SHAP_transformed_features",
-                    index=False,
-                )
-
-                display_data = expl.display_data.copy()
-                display_data.columns = expl.feature_names
-                display_data.to_excel(
-                    writer,
-                    sheet_name="SHAP_original_features",
-                    index=False,
-                )
-
-                for component in shap_components:
-
-                    expl = get_explanation(dataset, component)
-
-                    DataFrame(
-                        expl.values,
-                        columns=expl.feature_names,
-                    ).to_excel(
-                        writer,
-                        sheet_name="SHAP_values_{}".format(component),
-                        index=False,
-                    )
+        return dataset

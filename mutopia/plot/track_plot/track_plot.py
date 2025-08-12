@@ -551,6 +551,7 @@ def line_plot(
             ax.fill_between(
                 x, np.repeat(vals[idx], 2), color=color, **kwargs, alpha=0.2
             )
+            ax.set_ylim(bottom=0.)
 
         _clean_ax(ax, axlabel=label or _name_or_none(vals), yticks=yticks)
         return ax_fn(ax)
