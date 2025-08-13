@@ -589,6 +589,7 @@ class TopographyModel(ABC, BaseEstimator):
         )
         logger.info("Added keys to dataset: Spectra/spectra, Spectra/interactions, Spectra/shared_effects")
         return dataset
+        
     
     def annot_contributions(
         self,

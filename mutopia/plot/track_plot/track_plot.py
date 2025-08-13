@@ -6,6 +6,7 @@ with multiple data tracks including line plots, heatmaps, and genomic annotation
 """
 
 import numpy as np
+import pandas as pd
 from pandas import read_csv
 import matplotlib.pyplot as plt
 from functools import partial
@@ -52,6 +53,7 @@ __all__ = [
     "heatmap_plot",
     "categorical_plot",
     "custom_plot",
+    "reorder_df",
 ]
 
 
@@ -65,6 +67,9 @@ def _get_optimal_row_order(data, **kwargs):
 
     return leaves_list(optimal_leaf_ordering(linkage(data, **kwargs), data))
 
+def reorder_df(df : 'pd.DataFrame') -> 'pd.DataFrame':
+    optimal_order = _get_optimal_row_order(df.values)
+    return df.iloc[optimal_order]
 
 @dataclass
 class GenomeView:
@@ -148,9 +153,9 @@ def make_view(dataset, region=None, title=None):
 def plot_views(
     configuration: Callable,
     views: Union[GenomeView, Iterable[GenomeView]],
+    *args,
     width: float = 7,
     gridpsec_kw: dict = {"hspace": 0.1, "wspace": 0.1},
-    *args,
     **kwargs,
 ):
 

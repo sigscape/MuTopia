@@ -17,6 +17,8 @@ def plot_shap_summary(
     feature_order=None,
     component_order=None,
     ax=None,
+    cbar=True,
+    max_size=1000,
 ):
 
     from scipy.cluster.hierarchy import linkage, leaves_list
@@ -91,8 +93,7 @@ def plot_shap_summary(
     scatter = ax.scatter(
         x=x.flatten(),
         y=y.flatten(),
-        s=effect_size_pivot.values.flatten()
-        * scale,  # Scale size for visibility
+        s=np.minimum(effect_size_pivot.values.flatten(), max_size) * scale,
         c=correlation_pivot.values.flatten(),
         cmap=cmap,
         vmin=-1,
@@ -117,15 +118,16 @@ def plot_shap_summary(
     ax.tick_params(axis="x", which="both", length=0)
     ax.tick_params(axis="y", which="both", length=0)
 
-    # Create legends for both color and size
-    cbar = fig.colorbar(scatter, ax=ax, shrink=max(0.5, 2 / figsize[1]))
-    cbar.set_label("Feature-SHAP\nCorrelation", fontsize=9)
-    cbar.set_ticks([-1, 0, 1])
-    # Reduce the thickness of the colorbar ticks
-    cbar.ax.tick_params(width=0.5)
-    cbar.outline.set_linewidth(0.5)
+    if cbar:
+        # Create legends for both color and size
+        cbar = fig.colorbar(scatter, ax=ax, shrink=max(0.5, 2 / figsize[1]))
+        cbar.set_label("Feature-SHAP\nCorrelation", fontsize=9)
+        cbar.set_ticks([-1, 0, 1])
+        # Reduce the thickness of the colorbar ticks
+        cbar.ax.tick_params(width=0.5)
+        cbar.outline.set_linewidth(0.5)
 
-    ax.set(ylim=(-0.5, components.size - 0.5))
+    ax.set(ylim=(-0.5, components.size - 0.5), xlim=(-0.5, features.size - 0.5))
     for spine in ax.spines.values():
         spine.set_visible(False)
     plt.tight_layout()
