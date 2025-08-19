@@ -102,17 +102,15 @@ def read_continuous_file(
             f"File type {file_type} not supported for continuous feature ingestion."
         )
 
-    if not FeatureType(normalization) in file_type.allowed_normalizations:
+    featuretype = FeatureType(normalization)
+    if not (featuretype in file_type.allowed_normalizations):
         raise ValueError(
             f"Normalization {normalization} not supported for file type {file_type}"
         )
 
     corpus_attrs = disk.read_attrs(dataset)
 
-    feature_vals = file_type.get_ingestion_fn(
-        is_distance_feature=False,
-        is_discrete_feature=False,
-    )(
+    feature_vals = file_type.get_ingestion_fn(featuretype)(
         ingest_file,
         disk.fetch_regions_path(dataset),
         genome_file=corpus_attrs["genome_file"],

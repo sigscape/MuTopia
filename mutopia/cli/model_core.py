@@ -9,15 +9,9 @@ import mutopia as mu
 from mutopia.gtensor import *
 from mutopia.dtypes import get_mode
 from mutopia.tuning import _run_trial_cli
-from mutopia.model import GtensorInterface as CS
 import mutopia.gtensor.disk_interface as disk
 from ..utils import logger
-
-import numpy as np
-import os
-from typing import List, Tuple, Union, Optional
-import matplotlib
-import matplotlib.backends.backend_pdf
+from typing import List, Optional
 
 
 '''def setup_bootstrap(train_corpuses, test_corpuses, seed):
