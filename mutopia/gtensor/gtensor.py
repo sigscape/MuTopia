@@ -46,6 +46,7 @@ __all__ = [
     "unstack_regions",
     "mutate_method",
     "BED_COLS",
+    "list_components",
     "fetch_component",
     "fetch_interactions",
     "fetch_shared_effects",
@@ -1065,24 +1066,24 @@ def rename_components(dataset : xr.Dataset, names: List[str]):
     dataset = dataset.assign_coords(new_coords)
     return dataset
 
+def _fetch_component_data(dataset, component_name: Union[str, int], fetch_fn) -> xr.DataArray:
+    components = ComponentWrapper(dataset)
+    d = getattr(components, fetch_fn)(component_name)
+    d.attrs["dtype"] = dataset.attrs["dtype"]
+    return d
+
+def list_components(dataset) -> List[str]:
+    components = ComponentWrapper(dataset)
+    return components.component_names
 
 def fetch_component(dataset, component_name : Union[str, int]) -> xr.DataArray:
-    components = ComponentWrapper(dataset)
-    spectrum = components.get_spectrum(component_name)
-    spectrum.attrs["dtype"] = dataset.attrs["dtype"]
-    return spectrum
+    return _fetch_component_data(dataset, component_name, "get_spectrum")
 
 def fetch_interactions(dataset, component_name : Union[str, int]) -> xr.DataArray:
-    components = ComponentWrapper(dataset)
-    interactions = components.get_interactions(component_name)
-    interactions.attrs["dtype"] = dataset.attrs["dtype"]
-    return interactions
+    return _fetch_component_data(dataset, component_name, "get_interactions")
 
 def fetch_shared_effects(dataset, component_name : Union[str, int]) -> xr.DataArray:
-    components = ComponentWrapper(dataset)
-    shared_effects = components.get_shared_effects(component_name)
-    shared_effects.attrs["dtype"] = dataset.attrs["dtype"]
-    return shared_effects
+    return _fetch_component_data(dataset, component_name, "get_shared_effects")
 
 def excel_report(self, dataset, output, normalization="global"):
     """

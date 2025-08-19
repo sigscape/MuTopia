@@ -4,14 +4,12 @@ Genome track plotting utilities for visualizing genomic data.
 This module provides functions for creating genome browser-style visualizations
 with multiple data tracks including line plots, heatmaps, and genomic annotations.
 """
-
 import numpy as np
 import pandas as pd
 from pandas import read_csv
 import matplotlib.pyplot as plt
 from functools import partial
 from xarray import DataArray, Dataset
-from scipy.cluster.hierarchy import linkage, optimal_leaf_ordering, leaves_list
 from functools import cache
 from dataclasses import dataclass
 from typing import Callable, Union, Iterable
@@ -22,8 +20,8 @@ from ...gtensor.gtensor import slice_regions, get_regions_filename
 from .transforms import (
     _moving_average,
     _xarr_op,
+    _get_optimal_row_order,
 )
-
 plt.rc("axes", linewidth=0.75)
 
 
@@ -36,7 +34,6 @@ def _wraps_err(fn):
             raise e
 
     return _inner
-
 
 __all__ = [
     "make_view",
@@ -53,23 +50,15 @@ __all__ = [
     "heatmap_plot",
     "categorical_plot",
     "custom_plot",
-    "reorder_df",
+    "text_banner",
+    "center_at_zero",
 ]
 
+def center_at_zero(ax):
+    ax.spines["bottom"].set_visible(False)
+    ax.axhline(0, color="k", linewidth=0.75)
+    return ax
 
-def _get_optimal_row_order(data, **kwargs):
-
-    if (~np.isfinite(data)).any():
-        logger.warning(
-            "Data contains NaN or infinite values. Filling with zeros for clustering."
-        )
-        data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
-
-    return leaves_list(optimal_leaf_ordering(linkage(data, **kwargs), data))
-
-def reorder_df(df : 'pd.DataFrame') -> 'pd.DataFrame':
-    optimal_order = _get_optimal_row_order(df.values)
-    return df.iloc[optimal_order]
 
 @dataclass
 class GenomeView:
@@ -285,7 +274,7 @@ def stack_plots(
     return _plot
 
 
-def scale_bar(length=10000, height=0.1, name=None, label=None):
+def scale_bar(length=10000, height=0.1, name=None, label=None, scale="kb"):
     """
     Create a scale bar track showing genomic distance.
 
@@ -306,6 +295,17 @@ def scale_bar(length=10000, height=0.1, name=None, label=None):
         Scale bar plotting function
     """
 
+    scale_dict = {
+        "bp": 1,
+        "kb": 1_000,
+        "mb": 1_000_000,
+    }
+
+    if not scale in scale_dict:
+        raise ValueError(f"Unknown scale: {scale}, must be one of {list(scale_dict.keys())}")
+
+    annotation = f"{int(length) // scale_dict[scale]:d} {scale.title()}"
+    
     def _plot(ax, *, dataset, chrom, start, end, idx, check_len, fig):
 
         end = start[-1]
@@ -317,7 +317,7 @@ def scale_bar(length=10000, height=0.1, name=None, label=None):
         ax.text(
             end - length / 2,
             0.45,
-            f"{int(length//1000)} kb",
+            annotation,
             fontsize=7,
             ha="center",
             va="bottom",
@@ -395,6 +395,21 @@ def spacer(height=0.1, name=None):
 
     def _plot(ax, *args, **kwargs):
         ax.axis("off")
+        return ax
+
+    _plot.height = height
+    _plot.track_name = name
+    return _plot
+
+
+def text_banner(label, height=0.3, name=None):
+
+    def _plot(ax, *, start, end, **_):
+        start = start[0]; end=end[-1]
+        ax.text(start + (end - start) / 2, 0.0, label, ha="center", va="bottom", fontsize=9)
+        for spine in ["left", "right", "top"]:
+            ax.spines[spine].set_visible(False)
+        ax.set(yticks=[], xticks=[])
         return ax
 
     _plot.height = height

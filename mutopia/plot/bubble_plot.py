@@ -6,7 +6,7 @@ from ..gtensor import get_shap_summary
 
 def _l2_normalize(x):
     """L2 normalize the input array."""
-    norm = np.linalg.norm(x, axis=1, keepdims=True)
+    norm = np.linalg.norm(x, keepdims=True)
     return x / norm if norm.all() else x
 
 def plot_shap_summary(
@@ -19,6 +19,8 @@ def plot_shap_summary(
     ax=None,
     cbar=True,
     max_size=1000,
+    linewidth=0.5,
+    **scatter_kw,
 ):
 
     from scipy.cluster.hierarchy import linkage, leaves_list
@@ -98,8 +100,9 @@ def plot_shap_summary(
         cmap=cmap,
         vmin=-1,
         vmax=1,
-        linewidth=0.5,
+        linewidth=linewidth,
         edgecolor="black",
+        **scatter_kw,
     )
 
     ax.grid(color="lightgrey", linestyle="--", linewidth=0.5)
@@ -127,7 +130,7 @@ def plot_shap_summary(
         cbar.ax.tick_params(width=0.5)
         cbar.outline.set_linewidth(0.5)
 
-    ax.set(ylim=(-0.5, components.size - 0.5), xlim=(-0.5, features.size - 0.5))
+    ax.set(ylim=(-1, components.size), xlim=(-0.5, features.size))
     for spine in ax.spines.values():
         spine.set_visible(False)
     plt.tight_layout()

@@ -7,7 +7,7 @@ from mutopia.utils import (
     FeatureType,
     diverging_palette,
     categorical_palette,
-    using_exposures_from,
+    plot_presets,
 )
 import mutopia.mixture_model as mm
 from mutopia.modalities import SBS

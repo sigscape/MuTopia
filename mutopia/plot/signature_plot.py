@@ -13,6 +13,7 @@ def _plot_linear_signature(
     height=1.25,
     width=5.25,
     plot_kw={},
+    label_xaxis=True,
     **signatures,
 ):
 
@@ -62,12 +63,12 @@ def _plot_linear_signature(
         ylim=(0, 1.1),
         yticks=[],
     )
-
+    
     n_sections = len(xlabels) + 1
     ax.xaxis.set_major_locator(ticker.LinearLocator(n_sections))
     ax.xaxis.set_minor_locator(ticker.LinearLocator(2 * n_sections - 1))
     ax.xaxis.set_major_formatter(ticker.NullFormatter())
-    ax.xaxis.set_minor_formatter(ticker.FuncFormatter(lambda x, pos: xlabels[pos]))
+    ax.xaxis.set_minor_formatter(ticker.FuncFormatter(lambda x, pos: xlabels[pos] if label_xaxis else ""))
     ax.tick_params(axis="x", which="minor", tick1On=False, tick2On=False, labelsize=7)
 
     if len(signatures) > 1:

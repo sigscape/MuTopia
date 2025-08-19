@@ -2,7 +2,6 @@ from enum import Enum
 from .features import *
 from ..utils import FeatureType
 
-
 class FileType(Enum):
     BIGWIG = "bigwig"
     BEDGRAPH = "bedgraph"
@@ -18,6 +17,7 @@ class FileType(Enum):
             return (
                 FeatureType.MESOSCALE,
                 FeatureType.CATEGORICAL,
+                FeatureType.STRAND,
                 *FeatureType.continuous_types(),
             )
 
@@ -34,16 +34,16 @@ class FileType(Enum):
         else:
             raise ValueError(f"Unknown extension: {filename}")
 
-    def get_ingestion_fn(self, is_distance_feature=False, is_discrete_feature=False):
+    def get_ingestion_fn(self, featuretype: FeatureType):
         if self == FileType.BIGWIG:
             return make_continous_features_bigwig
         elif self == FileType.BEDGRAPH:
             return make_continous_features_bedgraph
         elif self == FileType.BED:
-            if is_distance_feature:
-                return make_distance_features
-            elif is_discrete_feature:
+            if featuretype == FeatureType.CATEGORICAL:
                 return make_discrete_features
+            elif featuretype == FeatureType.STRAND:
+                return make_strand_features
             else:
                 return make_continuous_features_bed
         else:

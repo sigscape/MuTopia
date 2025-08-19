@@ -1,7 +1,8 @@
-from .track_plot import static_track
+import numpy as np
 import mutopia.plot.track_plot as tr
 from mutopia.utils import categorical_palette
-from functools import partial
+from .track_plot import static_track
+from .transforms import TopographyTransformer
 
 def gene_annotation_track(
     gtf,
@@ -58,7 +59,7 @@ def marginal_observed_vs_expected(
     legend=True,
     height=1,
     empirical_kw={"alpha": 0.5, "s": 0.1, "color": "lightgrey"},
-    predicted_kw={"color": "black", "dashes": (1, 1), "alpha": 0.5, "linewidth": 0.75},
+    predicted_kw={"color": categorical_palette[1], "dashes": (1, 1), "alpha": 0.5, "linewidth": 0.75},
 ):
     return tr.stack_plots(
         tr.scatterplot(
@@ -101,63 +102,71 @@ def component_rates(
     ]
 
 
-def _get_topography(
-    dataset,
-    vmin=-3,
-    vmax=3,
-    mutation_order=['C>G', 'C>A','T>A','T>C','T>G','C>T'],
-):
-    import pandas as pd
-    from sklearn.preprocessing import StandardScaler
-    import numpy as np
-
-    topograph = (
-        dataset['predicted_marginal']/dataset['predicted_marginal_locus']
-    ).stack(observation=('context','configuration')).transpose('locus',...).to_pandas().T
-    
-    topograph = pd.DataFrame(
-        np.clip(
-            StandardScaler().fit_transform( 
-                np.log(topograph).values.reshape(96, -1).T
-            ), 
-            vmin, vmax,
-        ).T.reshape(192, -1),
-        index=topograph.index,
-        columns=topograph.columns
+def _topography_ax_fn(ax, transformer: TopographyTransformer):
+    return (
+        ax.grid(True, axis='y', linestyle='-', linewidth=0.4, color="white"),
+        ax.set_yticks(np.arange(0, len(transformer.ordering_), 16), minor=False),
+        ax.set_yticks(np.arange(8, len(transformer.ordering_), 16), minor=True),
+        ax.set_yticklabels([]),
+        ax.set_yticklabels(transformer.labels[::-1], minor=True, ha="right"),
+        ax.tick_params(axis='y', which='minor', labelsize=7),
+        ax.tick_params(axis='y', which='major', length=0)
     )
-    
-    mutation = topograph.index.get_level_values('context').str.slice(2,5)
-    topograph['mutation'] = mutation
-    topograph = topograph.reset_index().set_index(['configuration','mutation','context'])
-
-    context_order=[]
-    for mutation_type in mutation_order:
-        df=topograph.loc['C/T-centered', mutation_type]
-        context_order.extend(tr.reorder_df(df).index.values)
-    
-    topography_order = [
-        (center, context)
-        for center in ['C/T-centered', 'A/G-centered']
-        for context in (context_order[::-1] if center == 'C/T-centered' else context_order)
-    ]
-    
-    return topograph.droplevel(1).loc[topography_order].values
 
 
 def topography(
-    vmin=-3,
-    vmax=3,
+    transformer : TopographyTransformer,
     palette="Greys",
     yticks=False,
     label='Predicted\ntopography',
-    **kw,
+    vmin=-3, 
+    vmax=3,
+    height=1.5,
+    **heatmap_kw,
 ):
     return tr.heatmap_plot(
-        partial(_get_topography, vmin=vmin, vmax=vmax),
+        transformer.transform,
         palette=palette,
         yticks=yticks,
         label=label,
-        **kw,
+        vmin=vmin, 
+        vmax=vmax,
+        height=height,
+        ax_fn = lambda ax: _topography_ax_fn(ax, transformer),
+        **heatmap_kw,
+    )
+
+
+def empirical_topography(
+    transformer : TopographyTransformer,
+    palette="Greys",
+    label='Empirical\ntopography',
+    height=1.5,
+    quantile_cutoff=0.999,
+    topography_kw = {"vmin": -3, "vmax": 3, "cbar": False},
+    **heatmap_kw,
+):
+    def _get_heatmap(dataset):
+        matrix = transformer._fetch_matrix("empirical_marginal", dataset)
+        x = matrix[transformer.ordering_].values.T
+        return np.clip(x, a_min=None, a_max=np.quantile(x, quantile_cutoff))
+
+    return tr.stack_plots(
+        tr.heatmap_plot(
+            _get_heatmap,
+            palette=palette,
+            zorder=1,
+            **heatmap_kw,
+        ),
+        topography(
+            transformer, 
+            palette=palette,
+            zorder=0,
+            alpha=0.15,
+            **topography_kw,
+        ),
+        label=label,
+        height=height,
     )
 
 
@@ -167,6 +176,7 @@ def gene_expression_track(
     linewidth=0.5,
     label="Gene\nexpression",
     color="lightgrey",
+    height=1,
     log1p=True,
 ):
     import numpy as np
@@ -186,4 +196,52 @@ def gene_expression_track(
         ),
         label=label,
         color=color,
+        height=height
+    )
+
+
+def order_components(dataset):
+    component_order = (
+        tr.pipeline(
+            tr.select("component_distributions_locus"),
+            tr.apply_rows(tr.renorm),
+            lambda x: x.to_pandas(),
+            tr.reorder_df,
+        )(dataset)
+        .index.values
+    )
+    return component_order
+
+
+def component_rate_summary(
+    view,
+    *,
+    ideogram,
+    scalebar_size=int(1e7),
+    scalebar_scale="mb",
+    pred_smooth=20,
+    empirical_smooth=10,
+    legend=True,
+    pred_kw={"color": categorical_palette[1], "dashes": (1, 1), "alpha": 1, "linewidth": 0.75},
+    component_smooth=30,
+    component_order=None
+):
+    component_order = (
+        order_components(view.dataset)
+        if component_order is None
+        else component_order
+    )
+
+    return (
+        tr.scale_bar(scalebar_size, scale=scalebar_scale),
+        tr.ideogram(ideogram, height=0.1),
+        tr.tracks.marginal_observed_vs_expected(
+            view, 
+            smooth=empirical_smooth,
+            pred_smooth=pred_smooth,
+            predicted_kw=pred_kw,
+            legend=legend
+        ),
+        tr.spacer(0.1),
+        *tr.tracks.component_rates(view, *component_order, smooth=component_smooth)
     )

@@ -60,7 +60,7 @@ def plot_signature_report(
         gs = fig.add_gridspec(
             3,
             1,
-            height_ratios=[height * n_sigs + 1, 1.5, 2.5 + 0.35 * n_rows],
+            height_ratios=[height * n_sigs + 2, 1.5, 2.5 + 0.35 * n_rows],
             hspace=0.35,
         )
 

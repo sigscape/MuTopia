@@ -13,20 +13,24 @@ def _plot_interaction_matrix(
     shared_effects: pd.Series,
     palette=diverging_palette,
     gridspec=None,
+    title=None,
+    base_height=1.5,
+    heatmap_row_height=0.25,
+    width=10,
 ):
 
     n_rows, _ = interaction_matrix.shape
-    plot_height = 1 + 0.35 * n_rows
+    plot_height = base_height + heatmap_row_height * n_rows
 
     gs_kw = dict(
         width_ratios=[0.22, 7, 0.1],
-        height_ratios=[1, plot_height - 1],
+        height_ratios=[base_height, plot_height - base_height],
         wspace=0.05,
         hspace=0.25,
     )
 
     if gridspec is None:
-        fig = plt.figure(figsize=(10, plot_height))
+        fig = plt.figure(figsize=(width, plot_height))
         gs = plt.GridSpec(2, 3, **gs_kw)
     else:
         fig = plt.gcf()
@@ -35,7 +39,7 @@ def _plot_interaction_matrix(
     base_ax = fig.add_subplot(gs[0, 1])
     signature_plot_fn(ax=base_ax)
     base_ax.set_ylabel(
-        "Base\nmutation ", rotation=0, labelpad=0.1, fontsize=8, ha="right", va="center"
+        title or "Base \nrates ", rotation=0, labelpad=0.1, fontsize=8, ha="right", va="center"
     )
     base_ax.set_xticklabels([])
 
@@ -105,6 +109,7 @@ def plot_interaction_matrix(
     component : Union[str, int],
     palette=diverging_palette,
     gridspec=None,
+    title=None,
     **kw,
 ):
     """
@@ -152,10 +157,11 @@ def plot_interaction_matrix(
     signature = fetch_component(dataset, component)
 
     return _plot_interaction_matrix(
-        partial(dtype.plot, signature, "Baseline"),
+        partial(dtype.plot, signature, "Baseline", label_xaxis=False),
         interactions,
         shared_effects,  # .iloc[:,0],
         palette=palette,
         gridspec=gridspec,
+        title=title,
         **kw,
     )

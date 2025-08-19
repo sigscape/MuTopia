@@ -22,9 +22,13 @@ def make_continous_features_bigwig(
         # with open(regions.name, "w") as r:
         #    subprocess.check_call(["cut", "-f", "1-4", regions_file], stdout=r)
 
-        subprocess.check_output(
-            ["bigWigAverageOverBed", bigwig_file, regions_file, bed.name]
-        )
+        try:
+            subprocess.check_output(
+                ["bigWigAverageOverBed", bigwig_file, regions_file, bed.name],
+                stderr=subprocess.STDOUT
+            )
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"bigWigAverageOverBed failed: {e.output.decode()}")
 
         with open(bed.name, "r") as bed:
             data = map(lambda s: s.strip().split("\t"), bed)
@@ -176,6 +180,7 @@ def make_discrete_features(
     column=4,
     null="None",
     class_priority=None,
+    **kw,
 ):
     check_regions_file(regions_file)
 
@@ -259,6 +264,7 @@ def make_strand_features(
     regions_file,
     *,
     column=4,
+    **kw,
 ):
     vals, _ = make_discrete_features(
         bed_file,

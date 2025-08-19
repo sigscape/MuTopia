@@ -2,7 +2,8 @@ from functools import partial
 import numpy as np
 from mutopia.gtensor import fetch_features
 from numpy._core._multiarray_umath import _array_converter
-
+from scipy.cluster.hierarchy import linkage, optimal_leaf_ordering, leaves_list
+import warnings
 
 def _xarr_op(fn):
     """
@@ -236,6 +237,10 @@ def renorm(x):
     return x / np.nansum(x)
 
 
+def minmax_scale(x):
+    return (x - np.nanmin(x)) / (np.nanmax(x) - np.nanmin(x))
+
+
 def apply_rows(fn):
     """
     Create function to apply operation along rows (axis=1).
@@ -252,3 +257,102 @@ def apply_rows(fn):
     """
 
     return partial(np.apply_along_axis, fn, 1)
+
+
+def _get_optimal_row_order(data, **kwargs):
+
+    if (~np.isfinite(data)).any():
+        warnings.warn(
+            "Data contains NaN or infinite values. Filling with zeros for clustering."
+        )
+        data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+
+    return leaves_list(optimal_leaf_ordering(linkage(data, **kwargs), data))
+
+
+def reorder_df(df):
+    optimal_order = _get_optimal_row_order(df.values)
+    return df.iloc[optimal_order]
+
+
+class TopographyTransformer:
+    def __init__(
+        self,
+        mutation_order=['C>G', 'C>A', 'T>A', 'T>C', 'T>G', 'C>T'],
+        data_key="predicted_marginal",
+    ):
+        self.data_key = data_key
+        self.mutation_order = mutation_order
+
+    @staticmethod
+    def _fetch_matrix(data_key, dataset):
+        topography_matrix = (
+            np.log(dataset[data_key] / dataset['predicted_marginal_locus'])
+            .stack(observation=('context', 'configuration'))
+            .transpose(..., 'locus')
+            .to_pandas()
+        )
+
+        mutation = topography_matrix.index.get_level_values('context').str.slice(2,5)
+        topography_matrix['mutation'] = mutation
+        topography_matrix = (
+            topography_matrix
+            .reset_index()
+            .set_index(['configuration','mutation','context'])
+        )
+        return topography_matrix.T
+    
+    @staticmethod
+    def _transform(topography_matrix, mu : np.ndarray, std : np.ndarray):
+        return (topography_matrix - mu) / std
+
+    def _get_order(self, topography_matrix):
+        topography_matrix = topography_matrix.T
+        context_order=[]
+        for mutation_type in self.mutation_order:
+            df=topography_matrix.loc['C/T-centered', mutation_type]
+            context_order.extend(reorder_df(df).index.values)
+        
+        topography_order = [
+            (configuration, context[2:5], context)
+            for configuration in ['C/T-centered', 'A/G-centered']
+            for context in (context_order[::-1] if configuration == 'C/T-centered' else context_order)
+        ]
+        return topography_order
+    
+    def _axis_labels_from_order(self, ordering):
+        complement = {"A" : "T", "C" : "G", "T" : "A", "G" : "C"}
+        def _get_label(configuration, mutation):
+            l,r = mutation.split(">")
+            if configuration=="A/G-centered":
+                return f"{complement[l]}>{complement[r]}"
+            return mutation
+
+        labels = [
+            _get_label(configuration, mutation)
+            for configuration, mutation, _ in ordering[8::16]
+        ]
+
+        return labels
+    
+    @property
+    def labels(self):
+        return self.labels_
+
+    def fit(self, dataset):
+        x = self._fetch_matrix(self.data_key, dataset)
+
+        self.mean_ = np.nanmean(x, axis=0)
+        self.std_ = np.nanstd(x, axis=0)
+
+        self.ordering_ = self._get_order(
+            self._transform(x, self.mean_, self.std_)
+        )
+        self.labels_ = self._axis_labels_from_order(self.ordering_)
+        
+        return self
+
+    def transform(self, dataset):
+        x = self._fetch_matrix(self.data_key, dataset)
+        x = self._transform(x, self.mean_, self.std_)
+        return x[self.ordering_].T.values

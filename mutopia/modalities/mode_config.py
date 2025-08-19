@@ -199,6 +199,7 @@ class ModeConfig(ABC):
         width=5.25,
         height=1.25,
         ax=None,
+        label_xaxis=True,
         **kwargs,
     ):
 
@@ -231,6 +232,7 @@ class ModeConfig(ABC):
             height=height,
             width=width,
             ax=ax,
+            label_xaxis=label_xaxis,
             **dict(zip(sig_names, pl_signatures)),
         )
 

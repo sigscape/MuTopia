@@ -323,7 +323,7 @@ def rm_sample(
 ##
 #
 ##
-def write_dataset(dataset, filename, bar=False):
+def write_dataset(dataset, filename, bar=True):
     """Write a dataset to a NetCDF file.
 
     Writes a dataset to a NetCDF file, handling special variables, sections, and samples.
