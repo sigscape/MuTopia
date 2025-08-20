@@ -21,12 +21,11 @@ categorical_palette = ["#427aa1ff", "#e07a5fff", "#acacacff", "#83c5beff"]
 def plot_presets():
     import matplotlib.pyplot as plt
     plt.rcParams.update({
-        'font.family': 'sans-serif',
-        'font.sans-serif': ['Helvetica', 'Tahoma', 'DejaVu Sans', 'Lucida Grande', 'Verdana'],
-        'font.weight': 'light',
-        'axes.labelweight': 'light',
-        'axes.titleweight': 'light',
-        'figure.titleweight': 'light',
+        'font.family': 'Helvetica',
+        'font.weight': 'ultralight',
+        'axes.labelweight': 'ultralight',
+        'axes.titleweight': 'ultralight',
+        'figure.titleweight': 'ultralight',
         'xtick.labelsize': 'medium',
         'ytick.labelsize': 'medium',
         'axes.linewidth': 0.5,

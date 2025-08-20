@@ -130,8 +130,8 @@ def plot_shap_summary(
         cbar.ax.tick_params(width=0.5)
         cbar.outline.set_linewidth(0.5)
 
-    ax.set(ylim=(-1, components.size), xlim=(-0.5, features.size))
+    ax.set(ylim=(-1, components.size), xlim=(-1, features.size))
     for spine in ax.spines.values():
         spine.set_visible(False)
-    plt.tight_layout()
+    
     return ax

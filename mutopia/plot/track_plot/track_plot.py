@@ -11,8 +11,9 @@ import matplotlib.pyplot as plt
 from functools import partial
 from xarray import DataArray, Dataset
 from functools import cache
-from dataclasses import dataclass
-from typing import Callable, Union, Iterable
+from dataclasses import dataclass, asdict
+from typing import Callable, Optional, Union, Iterable
+from matplotlib.gridspec import GridSpec
 
 from ...genome_utils.bed12_utils import unstack_regions
 from ...utils import borrow_kwargs, logger, diverging_palette, parse_region
@@ -25,19 +26,10 @@ from .transforms import (
 plt.rc("axes", linewidth=0.75)
 
 
-def _wraps_err(fn):
-    def _inner(*args, **kwargs):
-        try:
-            return fn(*args, **kwargs)
-        except Exception as e:
-            logger.error(f"Error in plotting function {fn.__name__}: {e}")
-            raise e
-
-    return _inner
-
 __all__ = [
     "make_view",
-    "plot_views",
+    "plot_view",
+    "columns",
     "stack_plots",
     "scale_bar",
     "xaxis_plot",
@@ -54,6 +46,17 @@ __all__ = [
     "center_at_zero",
 ]
 
+
+def genome_plot(fn):
+    def _inner(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            logger.error(f"Error in plotting function {fn.__name__}: {e}")
+            raise e
+
+    return _inner
+
 def center_at_zero(ax):
     ax.spines["bottom"].set_visible(False)
     ax.axhline(0, color="k", linewidth=0.75)
@@ -65,11 +68,11 @@ class GenomeView:
     chrom: str
     interval: tuple[int, int]
     dataset: Dataset
-    title: str
+    title: Optional[str]
     n_regions: int
-    starts: np.ndarray[int]
-    ends: np.ndarray[int]
-    idxs: np.ndarray[int]
+    start: np.ndarray[np.int64]
+    end: np.ndarray[np.int64]
+    idx: np.ndarray[np.int64]
 
     def smooth(self, alpha=10):
         smooth_fn = partial(
@@ -131,32 +134,46 @@ def make_view(dataset, region=None, title=None):
         chrom=chrom,
         interval=(start, end),
         dataset=dataset,
-        starts=starts,
-        ends=ends,
-        idxs=idxs,
+        start=starts,
+        end=ends,
+        idx=idxs,
         n_regions=n_regions,
-        title=str(title) if not title is None else f"{chrom}:{start}-{end}",
+        title=title,
     )
 
 
-def plot_views(
-    configuration: Callable,
-    views: Union[GenomeView, Iterable[GenomeView]],
+def plot_view(
+    configuration,
+    view,
     *args,
     width: float = 7,
     gridpsec_kw: dict = {"hspace": 0.1, "wspace": 0.1},
+    width_ratios=None,
     **kwargs,
 ):
 
-    if not isinstance(views, Iterable):
-        views = [views]
+    def list_if_not(x):
+        return x if isinstance(x, Iterable) else [x]
 
-    configurations = [configuration(view, *args, **kwargs) for view in views]
+    def get_n_cols(track):
+        return getattr(track, "num_columns", 1)
 
-    tracks = configurations[0]
+    tracks = list_if_not(configuration(view, *args, **kwargs))
+
+    tracks = [
+        track_fn 
+        for track in tracks 
+        for track_fn in list_if_not(track)
+    ]
+
     n_rows = len(tracks)
-    n_cols = len(views)
-
+    n_cols = max(get_n_cols(track) for track in tracks)
+    
+    if not all([get_n_cols(track) == n_cols for track in tracks]):
+        raise ValueError(
+            f"All tracks must have the same number of columns. Found: {[get_n_cols(track) for track in tracks]}"
+        )
+    
     track_names = [fn.track_name for fn in tracks if not fn.track_name is None]
 
     if not len(track_names) == len(set(track_names)):
@@ -165,50 +182,29 @@ def plot_views(
             f"Found duplicates in {track_names}"
         )
 
-    fig, ax = plt.subplots(
-        n_rows,
-        n_cols,
+    fig, axes = plt.subplots(
+        nrows=n_rows,
+        ncols=n_cols,
         figsize=(width, sum(track.height for track in tracks)),
-        height_ratios=[track.height for track in tracks],
         gridspec_kw=gridpsec_kw,
+        height_ratios=[track.height for track in tracks],
+        width_ratios=width_ratios,
+        squeeze=False,
         sharex="col",
-        sharey="row",
     )
+    axes = list_if_not(axes)
 
-    if n_cols == 1:
-        ax = np.array(ax).reshape((n_rows, 1))
+    for row_num, track in enumerate(tracks):
+        ax = axes[row_num, 0] if n_cols==1 else axes[row_num, :]
+        track(
+            ax,
+            fig=fig,
+            **asdict(view),
+        )
 
-    if len(tracks) == 1:
-        ax = [ax]
-
-    for j, (view, tracks) in enumerate(zip(views, configurations)):
-        for i, (_ax, fn) in enumerate(zip(ax[:, j], tracks)):
-
-            fn(
-                _ax,
-                fig=fig,
-                dataset=view.dataset,
-                chrom=view.chrom,
-                start=view.starts,
-                end=view.ends,
-                idx=view.idxs,
-                check_len=view.n_regions,
-            )
-
-            if j > 0:
-                _ax.set_ylabel("")
-
-            if j < n_cols - 1:
-                try:
-                    _ax.get_legend().remove()
-                except AttributeError:
-                    pass
-
-            _ax.set(xlim=view.interval)
-
-        ax[0, j].set_title(view.title, fontsize=9, loc="left")
-
-    return ax
+    if hasattr(view, 'title') and view.title:
+        fig.suptitle(view.title, fontsize=9, ha="left", x=0.02)
+    return fig
 
 
 def _set_axlabel(ax, label):
@@ -274,6 +270,21 @@ def stack_plots(
     return _plot
 
 
+def columns(*plotting_fns, height=1, name=None):
+
+    def _plot(axes, *args, **kwargs):
+        for i, plot_fn in enumerate(plotting_fns):
+            if not plot_fn is Ellipsis:
+                plot_fn(axes[i], *args, **kwargs)
+            else:
+                axes[i].axis("off")
+
+    _plot.height = height
+    _plot.track_name = name
+    _plot.num_columns = len(plotting_fns)
+    return _plot
+
+
 def scale_bar(length=10000, height=0.1, name=None, label=None, scale="kb"):
     """
     Create a scale bar track showing genomic distance.
@@ -306,7 +317,7 @@ def scale_bar(length=10000, height=0.1, name=None, label=None, scale="kb"):
 
     annotation = f"{int(length) // scale_dict[scale]:d} {scale.title()}"
     
-    def _plot(ax, *, dataset, chrom, start, end, idx, check_len, fig):
+    def _plot(ax,*, interval, start, end, **kw):
 
         end = start[-1]
 
@@ -330,6 +341,7 @@ def scale_bar(length=10000, height=0.1, name=None, label=None, scale="kb"):
         ax.set(
             yticks=[],
             xticks=[],
+            xlim=interval
         )
 
         return ax
@@ -356,7 +368,7 @@ def xaxis_plot(height=0.1, name=None):
         X-axis plotting function
     """
 
-    def _plot(ax, *, dataset, chrom, start, end, idx, check_len, fig):
+    def _plot(ax,*, interval, **kw):
         ax.tick_params(
             axis="x",
             top=True,
@@ -369,6 +381,7 @@ def xaxis_plot(height=0.1, name=None):
         ax.spines["bottom"].set_visible(False)
         ax.spines["left"].set_visible(False)
         ax.set(yticks=[])
+        ax.set_xlim(interval)
         return ax
 
     _plot.height = height
@@ -402,14 +415,13 @@ def spacer(height=0.1, name=None):
     return _plot
 
 
-def text_banner(label, height=0.3, name=None):
+def text_banner(label, height=0.15, name=None):
 
     def _plot(ax, *, start, end, **_):
         start = start[0]; end=end[-1]
-        ax.text(start + (end - start) / 2, 0.0, label, ha="center", va="bottom", fontsize=9)
-        for spine in ["left", "right", "top"]:
-            ax.spines[spine].set_visible(False)
-        ax.set(yticks=[], xticks=[])
+        ax.text(0.5, 0.1, label, ha="center", va="bottom", fontsize=9, transform=ax.transAxes)
+        ax.axhline(0.1, color="k", linewidth=0.5)
+        ax.axis("off")
         return ax
 
     _plot.height = height
@@ -417,11 +429,11 @@ def text_banner(label, height=0.3, name=None):
     return _plot
 
 
-def _check_flat_input(vals, check_len):
+def _check_flat_input(vals, n_regions):
     if isinstance(vals, (tuple, list)):
         vals = np.array(vals)
 
-    if not len(vals) == check_len:
+    if not len(vals) == n_regions:
         raise ValueError(
             "vals and must have one entry per region in the provided dataset."
         )
@@ -444,6 +456,7 @@ def _read_ideogram(cytobands_file):
 
 
 @borrow_kwargs(plt.Rectangle)
+@genome_plot
 def ideogram(cytobands_file, height=0.15, name=None, **kwargs):
     """
     Create an ideogram track showing chromosome bands.
@@ -478,7 +491,7 @@ def ideogram(cytobands_file, height=0.15, name=None, **kwargs):
 
     cytobands = _read_ideogram(cytobands_file)
 
-    def _plot(ax, *, chrom, **kw):
+    def _plot(ax, *, interval, chrom, **kw):
 
         cytobands_df = cytobands[cytobands.chrom == chrom]
 
@@ -503,6 +516,7 @@ def ideogram(cytobands_file, height=0.15, name=None, **kwargs):
             ylim=(0, 1),
             xticks=[],
         )
+        ax.set_xlim(interval)
         return ax
 
     _plot.height = height
@@ -511,6 +525,7 @@ def ideogram(cytobands_file, height=0.15, name=None, **kwargs):
 
 
 @borrow_kwargs(plt.plot)
+@genome_plot
 def line_plot(
     accessor,
     label=None,
@@ -552,9 +567,9 @@ def line_plot(
         Line plot function
     """
 
-    def _plot(ax, *, dataset, chrom, start, end, idx, check_len, fig):
+    def _plot(ax, *, dataset, start, end, idx, n_regions, **kw):
 
-        vals = _check_flat_input(accessor(dataset), check_len)
+        vals = _check_flat_input(accessor(dataset), n_regions)
 
         x = np.empty((start.size + end.size,), dtype=start.dtype)
         x[0::2] = start
@@ -582,6 +597,7 @@ def line_plot(
 
 
 @borrow_kwargs(plt.fill_between)
+@genome_plot
 def fill_plot(
     accessor,
     label=None,
@@ -620,9 +636,9 @@ def fill_plot(
         Fill plot function
     """
 
-    def _plot(ax, *, dataset, chrom, start, end, idx, check_len, fig):
+    def _plot(ax, *, dataset, start, end, idx, n_regions, **kw):
 
-        vals = _check_flat_input(accessor(dataset), check_len)
+        vals = _check_flat_input(accessor(dataset), n_regions)
 
         x = np.empty((start.size + end.size,), dtype=start.dtype)
         x[0::2] = start
@@ -644,6 +660,7 @@ def fill_plot(
 
 
 @borrow_kwargs(plt.bar)
+@genome_plot
 def bar_plot(
     accessor,
     label=None,
@@ -682,9 +699,9 @@ def bar_plot(
         Bar plot function
     """
 
-    def _plot(ax, *, dataset, chrom, start, end, idx, check_len, fig):
+    def _plot(ax, *, dataset, start, end, idx, n_regions, **kw):
 
-        vals = _check_flat_input(accessor(dataset), check_len)
+        vals = _check_flat_input(accessor(dataset), n_regions)
 
         center = start + (end - start) / 2
         width = end - start
@@ -710,6 +727,7 @@ def bar_plot(
 
 
 @borrow_kwargs(plt.scatter)
+@genome_plot
 def scatterplot(
     accessor,
     label=None,
@@ -748,9 +766,9 @@ def scatterplot(
         Scatter plot function
     """
 
-    def _plot(ax, *, dataset, chrom, start, end, idx, check_len, fig):
+    def _plot(ax, *, dataset, start, end, idx, n_regions, **kw):
 
-        vals = _check_flat_input(accessor(dataset), check_len)
+        vals = _check_flat_input(accessor(dataset), n_regions)
 
         ax.scatter(
             start + (end - start) / 2,
@@ -773,10 +791,11 @@ def scatterplot(
 
 
 @borrow_kwargs(plt.pcolormesh)
+@genome_plot
 def heatmap_plot(
     accessor,
     palette=diverging_palette,
-    label=None,
+    label: Optional[str]=None,
     yticks=True,
     height=1,
     row_cluster=False,
@@ -837,7 +856,7 @@ def heatmap_plot(
 
         return x
 
-    def _plot(ax, *, dataset, chrom, start, end, idx, check_len, fig):
+    def _plot(ax, *, dataset, start, end, idx, n_regions, fig, **kw):
 
         matrix = accessor(dataset)
         axlabel = label or _name_or_none(matrix)
@@ -847,7 +866,7 @@ def heatmap_plot(
                 "The passed matrix must be a numpy array, or xarray DataArray."
             )
 
-        matrix = _check_size(check_len, matrix)
+        matrix = _check_size(n_regions, matrix)
 
         row_labels = []
         if isinstance(matrix, DataArray):
@@ -909,6 +928,7 @@ def heatmap_plot(
 
 
 @borrow_kwargs(plt.Rectangle)
+@genome_plot
 def categorical_plot(
     accessor,
     order=None,
@@ -950,9 +970,9 @@ def categorical_plot(
         Categorical plot function
     """
 
-    def _plot(ax, *, dataset, chrom, start, end, idx, check_len, fig):
+    def _plot(ax, *, dataset, start, end, idx, n_regions, **kw):
 
-        vals = _check_flat_input(accessor(dataset), check_len)
+        vals = _check_flat_input(accessor(dataset), n_regions)
 
         categories = order or (
             vals.attrs["classes"][1:]
@@ -1122,7 +1142,7 @@ def static_track(
         **properties,
     )
 
-    def _plot(ax, *, dataset, chrom, start, end, idx, check_len, fig):
+    def _plot(ax, *, chrom, start, end, **kw):
 
         track.plot(
             ax,
