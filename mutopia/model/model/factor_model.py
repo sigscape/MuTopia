@@ -1,7 +1,3 @@
-from .model_components import *
-from .model_components.base import _svi_update_fn
-from .latent_var_models import *
-from ..utils import parallel_map, parallel_gen
 import numpy as np
 import warnings
 from functools import partial
@@ -10,6 +6,10 @@ from scipy.special import logsumexp
 from functools import reduce
 from collections import defaultdict
 import xarray as xr
+from mutopia.utils import parallel_map, parallel_gen
+from .model_components import *
+from .model_components.base import _svi_update_fn
+from .latent_var_models import *
 from .gtensor_interface import GtensorInterface
 
 
@@ -318,4 +318,4 @@ class FactorModel:
         )
 
     def format_interactions(self, k):
-        return self.models['context_model'].get_interaction_summary(k)
+        return self.models["context_model"].get_interaction_summary(k)

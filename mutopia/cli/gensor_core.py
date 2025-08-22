@@ -1,22 +1,20 @@
 import click
-from typing import *
+from typing import Optional, Union, List
 from functools import partial
 import os
 import numpy as np
 import xarray as xr
-import mutopia.ingestion as ingest
-from mutopia.gtensor import *
-import mutopia.gtensor.disk_interface as disk
-from ..modalities import ModeConfig
-from ..gtensor import *
-from ..genome_utils.bed12_utils import stream_bed12
-from ..utils import FeatureType, logger
-from ..dtypes import get_mode_config
-from ..ingestion import make_continuous_features_bed
 from sparse import COO
 import netCDF4 as nc
 from shutil import copyfile
-from ..ingestion import gene_features
+
+import mutopia.ingestion as ingest
+import mutopia.gtensor.disk_interface as disk
+from mutopia.gtensor import *
+from mutopia.genome_utils.bed12_utils import stream_bed12
+from mutopia.utils import FeatureType, logger
+from mutopia.gtensor.dtypes import get_mode_config
+from mutopia.modalities import ModeConfig
 
 
 def create_gtensor(
@@ -63,9 +61,9 @@ def create_gtensor(
     gtensor = GTensor(
         modality,
         name=name,
-        chrom=chrom,
-        start=start,
-        end=end,
+        chrom=list(chrom),
+        start=list(start),
+        end=list(end),
         context_frequencies=context_freqs,
         dtype=dtype,
     )
@@ -341,14 +339,14 @@ def add_sample(
     )
 
     if not copy_number is None:
-        ploidy = make_continuous_features_bed(
+        ploidy = ingest.make_continuous_features_bed(
             copy_number,
             regions_file,
-            null=2,
+            null="2",
         )
 
         ploidy = ploidy / 2 - 1  # normalize for diploid and center around 0
-        
+
         ploidy = COO(ploidy)
 
         sample = xr.Dataset(
@@ -358,7 +356,11 @@ def add_sample(
             }
         )
     else:
-        sample = xr.Dataset({"X": X,})
+        sample = xr.Dataset(
+            {
+                "X": X,
+            }
+        )
 
     disk.write_sample(
         dataset,
@@ -392,7 +394,7 @@ def convert_gtensor(
     output_regions_file = output + ".regions.bed"
     copyfile(input_regions_file, output_regions_file)
 
-    modality = get_mode_config(dtype)
+    modality: ModeConfig = get_mode_config(dtype)
 
     context_freqs = modality.get_context_frequencies(
         regions_file=output_regions_file,
@@ -580,7 +582,7 @@ def make_annotation_bedfile(gtf_file: str = None, output=None):
 def make_expression_bedfile(
     quantitation_file: str,
     output_file,
-    gtf_file: str = None,
+    gtf_file: Optional[str] = None,
     join_on: str = "gene_id",
 ):
 

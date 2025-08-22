@@ -1,9 +1,6 @@
 from math import sqrt
 from itertools import chain
-import matplotlib.pyplot as plt
-from matplotlib import ticker
-import xarray as xr
-from ..gtensor import fetch_component
+
 
 def _plot_linear_signature(
     xlabels,
@@ -16,6 +13,8 @@ def _plot_linear_signature(
     label_xaxis=True,
     **signatures,
 ):
+    import matplotlib.pyplot as plt
+    from matplotlib import ticker
 
     plot_kw = dict(
         width=1,
@@ -63,12 +62,14 @@ def _plot_linear_signature(
         ylim=(0, 1.1),
         yticks=[],
     )
-    
+
     n_sections = len(xlabels) + 1
     ax.xaxis.set_major_locator(ticker.LinearLocator(n_sections))
     ax.xaxis.set_minor_locator(ticker.LinearLocator(2 * n_sections - 1))
     ax.xaxis.set_major_formatter(ticker.NullFormatter())
-    ax.xaxis.set_minor_formatter(ticker.FuncFormatter(lambda x, pos: xlabels[pos] if label_xaxis else ""))
+    ax.xaxis.set_minor_formatter(
+        ticker.FuncFormatter(lambda x, pos: xlabels[pos] if label_xaxis else "")
+    )
     ax.tick_params(axis="x", which="minor", tick1On=False, tick2On=False, labelsize=7)
 
     if len(signatures) > 1:
@@ -84,7 +85,7 @@ def _plot_linear_signature(
     return ax
 
 
-def plot_component(signature : xr.DataArray, *select, **kw):
+def plot_component(signature, *select, **kw):
     """
     Plot a component of a signature using its modality's plotting method.
 
@@ -158,6 +159,8 @@ def plot_signature_panel(
     Component names are displayed as y-axis labels.
     """
     import numpy as np
+    import matplotlib.pyplot as plt
+    from mutopia.gtensor import fetch_component
 
     K = len(dataset.coords["component"])
     component_names = dataset.coords["component"].values

@@ -1,9 +1,6 @@
 import click
 from tabulate import tabulate
-from typing import *
-import numpy as np
-from mutopia.tuning import create_study
-from . import model_core
+from typing import List, Tuple, Union
 
 
 @click.group("Model training")
@@ -219,13 +216,6 @@ def model():
     help="Maximum training time in seconds (training stops when limit reached)",
 )
 @click.option(
-    "--bootstrap",
-    "-b",
-    type=click.IntRange(0, np.iinfo(np.int32).max),
-    default=None,
-    help="Random seed for bootstrapping training and test datasets",
-)
-@click.option(
     "--test-chroms",
     "-test",
     multiple=True,
@@ -239,7 +229,6 @@ def train(
     train_corpuses: List[str],
     time_profile: bool = False,
     lazy: bool = False,
-    bootstrap: Union[int, None] = None,
     test_chroms: List[str] = ["chr1"],
     **model_kw,
 ):
@@ -286,13 +275,14 @@ def train(
         file=click.get_text_stream("stderr"),
     )
 
+    from .model_core import train_model
+
     try:
-        best_score = model_core.train_model(
+        best_score = train_model(
             train_corpuses=train_corpuses,
             output=output,
             time_profile=time_profile,
             lazy=lazy,
-            bootstrap=bootstrap,
             test_chroms=test_chroms,
             **model_kw,
         )
@@ -545,6 +535,8 @@ def _create_study(
                             --min-components 8 --max-components 12 \\
                             --locus-model-type linear --empirical-bayes
     """
+    from mutopia.model.tuning import create_study
+
     if not len(dataset) > 0:
         raise click.exceptions.BadOptionUsage(
             "train-corpuses",
@@ -623,8 +615,10 @@ def run_trial(**kw):
         # Run with lazy loading for large datasets
         model study run my_study --lazy --threads 4
     """
+    from .model_core import run_optimization_trial
+
     try:
-        model_core.run_optimization_trial(**kw)
+        run_optimization_trial(**kw)
         click.echo("Trial completed successfully")
     except Exception as e:
         raise click.ClickException(f"Trial execution failed: {str(e)}")
@@ -645,8 +639,10 @@ def dashboard(
         # Launch dashboard for study monitoring
         model study dashboard my_study
     """
+    from .model_core import launch_optimization_dashboard
+
     try:
-        model_core.launch_optimization_dashboard(study_name)
+        launch_optimization_dashboard(study_name)
         click.echo(f"Dashboard launched for study: {study_name}")
     except Exception as e:
         raise click.ClickException(f"Failed to launch dashboard: {str(e)}")
@@ -678,8 +674,10 @@ def summary(
         # Export results to CSV file
         model study summary my_study --output results.csv
     """
+    from .model_core import get_study_summary
+
     try:
-        trials = model_core.get_study_summary(study_name)
+        trials = get_study_summary(study_name)
         trials = trials.sort_values("value", ascending=False, na_position="last")
         sel_cols = ["number", "value", "state"]
 
@@ -763,8 +761,10 @@ def retrain(
         # Retrain with different random seed for ensemble
         model study retrain my_study 42 model_v2.pkl --seed 999 --lazy
     """
+    from .model_core import retrain_trial
+
     try:
-        model_core.retrain_trial(
+        retrain_trial(
             study_name=study_name,
             trial_number=trial_number,
             output=output,
@@ -793,27 +793,31 @@ def list_studies():
         # List all studies
         model study ls
     """
+    from .model_core import list_optimization_studies
+
     try:
         click.echo("Available studies:")
-        studies = model_core.list_optimization_studies()
+        studies = list_optimization_studies()
         if studies:
             click.echo("\n".join(studies))
         else:
             click.echo("No studies found.")
     except Exception as e:
         raise click.ClickException(f"Failed to list studies: {str(e)}")
-    
 
-@model.command("annot")
+
+@model.command("annot", short_help="Annotate dataset using trained model")
 @click.argument("model", type=click.Path(exists=True), metavar="MODEL_FILE")
 @click.argument("dataset", type=click.Path(exists=True), metavar="DATASET_FILE")
 @click.argument("output", type=click.Path(writable=True), metavar="OUTPUT_FILE")
 def annot(
-    model : str,
-    dataset : str,
-    output : str,
+    model: str,
+    dataset: str,
+    output: str,
 ):
-    model_core.annot(model, dataset, output)
+    from .model_core import annot
+
+    annot(model, dataset, output)
 
 
 @model.group("tools")
@@ -876,8 +880,10 @@ def simulate_from_model(
         # Reproducible simulation with specific seed
         model tools simulate model.pkl template.nc sim_data.nc --seed 12345
     """
+    from .model_core import simulate_from_model
+
     try:
-        model_core.simulate_from_model(
+        simulate_from_model(
             model_path=model,
             dataset_path=dataset,
             output_path=output,

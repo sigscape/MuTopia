@@ -2,8 +2,8 @@ from xarray import DataArray
 import numpy as np
 from functools import partial
 import warnings
+from mutopia.gtensor import match_dims
 from ..model_components.base import _svi_update_fn
-from ...gtensor import match_dims
 from .base import *
 
 logsafe_exp_transform = lambda x: np.nan_to_num(

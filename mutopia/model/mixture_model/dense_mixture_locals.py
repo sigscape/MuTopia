@@ -99,7 +99,7 @@ class DenseMixtureModel(LDAUpdateDense):
             Nk,
         )
 
-        #logger.debug(f"t: {t}, tol: {tol}")
+        # logger.debug(f"t: {t}, tol: {tol}")
 
         Nk = _svi_update_fn(Nk, map_estimate, learning_rate)
 

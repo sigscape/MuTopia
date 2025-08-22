@@ -1,20 +1,8 @@
+from mutopia.utils import plot_presets
 import mutopia.gtensor as gt
-import mutopia.model as model
 import mutopia.plot as pl
-import mutopia.tuning as tune
-import mutopia.tools as tl
-from mutopia.utils import (
-    FeatureType,
-    diverging_palette,
-    categorical_palette,
-    plot_presets,
-)
-import mutopia.mixture_model as mm
-from mutopia.modalities import SBS
-from mutopia.dtypes import get_mode, MODALITIES
+import mutopia.modalities
 from joblib import load as load_model
-import mutopia.feature_preprocessing as fp
 
-MODALITIES.append(SBS)
 
-__version__ = "1.0.0a5"
+__version__ = "1.0.0a6"

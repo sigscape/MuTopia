@@ -4,8 +4,8 @@ import os
 import click
 from functools import cache
 
-from ..utils import FeatureType, logger
-from ..gtensor.disk_interface import (
+from mutopia.utils import FeatureType, logger
+from mutopia.gtensor.disk_interface import (
     NoFeaturesError,
     NoSamplesError,
     list_features,
@@ -14,13 +14,14 @@ from ..gtensor.disk_interface import (
 from .pipeline_config import GTensorConfig
 from urllib.parse import urlparse
 import shutil
-from .core import (
+from mutopia.cli.gensor_core import (
     create_gtensor,
     add_continuous_feature,
     add_strand_feature,
     add_discrete_feature,
-    add_sample
+    add_sample,
 )
+
 
 @cache
 def load_config(config_path: str) -> GTensorConfig:
@@ -103,7 +104,7 @@ class DownloadTask(luigi.Task):
 
         # Create downloads directory if it doesn't exist
         os.makedirs("downloads", exist_ok=True)
-        
+
         # Download to a temporary file first
         with tempfile.NamedTemporaryFile(delete=True) as temp_file:
             temp_path = temp_file.name
@@ -113,7 +114,7 @@ class DownloadTask(luigi.Task):
                     for chunk in r.iter_content(chunk_size=8192):
                         if chunk:
                             temp_file.write(chunk)
-                
+
                 # If download successful, move temp file to final location
                 shutil.move(temp_path, self.download_path)
 
@@ -132,14 +133,14 @@ class ExistingFileTask(luigi.Task):
 
     def output(self):
         return luigi.LocalTarget(self.path)
-    
+
 
 def url_or_file_task(file):
 
     def _is_url(path: str) -> bool:
         """Check if a path is a URL"""
         parsed = urlparse(path)
-        return parsed.scheme in ('http', 'https', 'ftp', 'ftps')
+        return parsed.scheme in ("http", "https", "ftp", "ftps")
 
     return DownloadTask(file) if _is_url(file) else ExistingFileTask(file)
 
@@ -154,13 +155,10 @@ class CreateGTensorTask(luigi.Task):
     def output(self):
         config = load_config(self.config_path)
         return luigi.LocalTarget(f"{config.name}.nc")
-    
+
     def requires(self):
         config = load_config(self.config_path)
-        return {
-            k: url_or_file_task(v)
-            for k, v in config.bed_cuts
-        }
+        return {k: url_or_file_task(v) for k, v in config.bed_cuts}
 
     def run(self):
         c = load_config(self.config_path)
@@ -201,7 +199,7 @@ class IngestFeatureTask(luigi.Task):
 
         requirements = {
             "gtensor": CreateGTensorTask(config_path=self.config_path),
-            "file": url_or_file_task(file)
+            "file": url_or_file_task(file),
         }
         return requirements
 
@@ -245,15 +243,19 @@ class IngestFeatureTask(luigi.Task):
 
 
 class IngestSampleTask(luigi.Task):
-    
-    config_path = luigi.Parameter(description="Path to GTensor configuration file", significant=True)
-    sample_id = luigi.Parameter(description="ID of the sample to ingest", significant=True)
+
+    config_path = luigi.Parameter(
+        description="Path to GTensor configuration file", significant=True
+    )
+    sample_id = luigi.Parameter(
+        description="ID of the sample to ingest", significant=True
+    )
 
     def requires(self):
         config = load_config(self.config_path)
         return {
             "gtensor": CreateGTensorTask(config_path=self.config_path),
-            "file": url_or_file_task(config.samples[self.sample_id].file)
+            "file": url_or_file_task(config.samples[self.sample_id].file),
         }
 
     def output(self):
@@ -271,12 +273,14 @@ class IngestSampleTask(luigi.Task):
 
         params = config.sample_params.model_dump()
         params.update(sample_config.model_dump())
-        params.update({
-            "dataset": gtensor_path,
-            "sample_file": file_path,
-            "fasta" : config.fasta,
-            "sample_id" : self.sample_id,
-        })
+        params.update(
+            {
+                "dataset": gtensor_path,
+                "sample_file": file_path,
+                "fasta": config.fasta,
+                "sample_id": self.sample_id,
+            }
+        )
         params.pop("file", None)  # Remove file as it's not needed here
         print(params)
         add_sample(**params)

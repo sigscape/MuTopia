@@ -6,10 +6,11 @@ import numpy as np
 from numba.extending import get_cython_function_address
 import ctypes
 from functools import wraps, partial
-from ...utils import logger, parallel_map, parallel_gen
+from mutopia.utils import logger, parallel_map, parallel_gen
 from ._dirichlet_update import update_alpha
 from ..model_components.base import _svi_update_fn
 from ..gtensor_interface import GtensorInterface
+
 
 def delayed(fn, *args, **kwargs):
     """
@@ -18,10 +19,13 @@ def delayed(fn, *args, **kwargs):
     only be executed when needed.
     """
     run = partial(fn, *args, **kwargs)
+
     @wraps(fn)
     def wrapper(*wargs, **wkwargs):
         return run()
+
     return wrapper
+
 
 """
 Numba only works with 2D arrays, not arbitrary tensors. Luckily,
@@ -615,7 +619,15 @@ class LocalsModel:
         raise NotImplementedError
 
     def _get_sample_init_fn(self, dataset):
-        return delayed(self.random_state.gamma, 100.0, 1.0 / 100.0, size=(1, self.n_components,),)
+        return delayed(
+            self.random_state.gamma,
+            100.0,
+            1.0 / 100.0,
+            size=(
+                1,
+                self.n_components,
+            ),
+        )
 
     def init_locals(self, dataset):
         init_fn = self._get_sample_init_fn(dataset)

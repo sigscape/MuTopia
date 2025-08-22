@@ -8,9 +8,11 @@ import click
 from functools import partial
 from typing import Union
 
+
 @click.group("SBS commands")
 def sbs():
     pass
+
 
 @sbs.command("background-rate")
 @click.argument("vcf_files", nargs=-1)

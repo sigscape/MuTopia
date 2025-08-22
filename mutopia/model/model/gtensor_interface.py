@@ -4,10 +4,10 @@ This interface is meant to be used by the model, which should not depend on the 
 structure of the datasets.
 """
 
-from ..gtensor import *
-from ..utils import parallel_gen
 from numpy import asfortranarray, ascontiguousarray, float32
 from functools import partial
+from mutopia.gtensor import CorpusInterface
+from mutopia.utils import parallel_gen
 
 
 class GtensorInterface:

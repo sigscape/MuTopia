@@ -1,9 +1,20 @@
 import sparse
 import xarray as xr
 import typing
-from xarray.core.formatting_html import *
+from xarray.core.formatting_html import (
+    _get_indexes_dict,
+    _obj_repr,
+    escape,
+    dim_section,
+    datavar_section,
+    coord_section,
+    index_section,
+    attr_section,
+)
 from xarray.core.formatting_html import _get_indexes_dict, _obj_repr
 from collections import defaultdict
+
+__all__ = []  # spoof we don't want anything in the namespace!
 
 
 def _get_section(var_name, raw=False):

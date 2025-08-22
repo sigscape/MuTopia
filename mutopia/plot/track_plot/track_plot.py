@@ -4,25 +4,24 @@ Genome track plotting utilities for visualizing genomic data.
 This module provides functions for creating genome browser-style visualizations
 with multiple data tracks including line plots, heatmaps, and genomic annotations.
 """
+
 import numpy as np
-import pandas as pd
-from pandas import read_csv
 import matplotlib.pyplot as plt
 from functools import partial
 from xarray import DataArray, Dataset
 from functools import cache
 from dataclasses import dataclass, asdict
-from typing import Callable, Optional, Union, Iterable
-from matplotlib.gridspec import GridSpec
+from typing import Optional, Iterable
 
-from ...genome_utils.bed12_utils import unstack_regions
-from ...utils import borrow_kwargs, logger, diverging_palette, parse_region
-from ...gtensor.gtensor import slice_regions, get_regions_filename
+from mutopia.utils import borrow_kwargs, logger, parse_region
+from mutopia.palettes import diverging_palette
+
 from .transforms import (
     _moving_average,
     _xarr_op,
     _get_optimal_row_order,
 )
+
 plt.rc("axes", linewidth=0.75)
 
 
@@ -57,6 +56,7 @@ def genome_plot(fn):
 
     return _inner
 
+
 def center_at_zero(ax):
     ax.spines["bottom"].set_visible(False)
     ax.axhline(0, color="k", linewidth=0.75)
@@ -70,9 +70,9 @@ class GenomeView:
     dataset: Dataset
     title: Optional[str]
     n_regions: int
-    start: np.ndarray[np.int64]
-    end: np.ndarray[np.int64]
-    idx: np.ndarray[np.int64]
+    start: np.ndarray
+    end: np.ndarray
+    idx: np.ndarray
 
     def smooth(self, alpha=10):
         smooth_fn = partial(
@@ -107,6 +107,9 @@ def make_view(dataset, region=None, title=None):
     GenomeView
         Configured genome view object
     """
+
+    from mutopia.genome_utils.bed12_utils import unstack_regions
+    from mutopia.gtensor.gtensor import slice_regions, get_regions_filename
 
     if region is None:
         chroms = set(dataset["Regions/chrom"].values)
@@ -160,20 +163,16 @@ def plot_view(
 
     tracks = list_if_not(configuration(view, *args, **kwargs))
 
-    tracks = [
-        track_fn 
-        for track in tracks 
-        for track_fn in list_if_not(track)
-    ]
+    tracks = [track_fn for track in tracks for track_fn in list_if_not(track)]
 
     n_rows = len(tracks)
     n_cols = max(get_n_cols(track) for track in tracks)
-    
+
     if not all([get_n_cols(track) == n_cols for track in tracks]):
         raise ValueError(
             f"All tracks must have the same number of columns. Found: {[get_n_cols(track) for track in tracks]}"
         )
-    
+
     track_names = [fn.track_name for fn in tracks if not fn.track_name is None]
 
     if not len(track_names) == len(set(track_names)):
@@ -195,14 +194,14 @@ def plot_view(
     axes = list_if_not(axes)
 
     for row_num, track in enumerate(tracks):
-        ax = axes[row_num, 0] if n_cols==1 else axes[row_num, :]
+        ax = axes[row_num, 0] if n_cols == 1 else axes[row_num, :]
         track(
             ax,
             fig=fig,
             **asdict(view),
         )
 
-    if hasattr(view, 'title') and view.title:
+    if hasattr(view, "title") and view.title:
         fig.suptitle(view.title, fontsize=9, ha="left", x=0.02)
     return fig
 
@@ -313,11 +312,13 @@ def scale_bar(length=10000, height=0.1, name=None, label=None, scale="kb"):
     }
 
     if not scale in scale_dict:
-        raise ValueError(f"Unknown scale: {scale}, must be one of {list(scale_dict.keys())}")
+        raise ValueError(
+            f"Unknown scale: {scale}, must be one of {list(scale_dict.keys())}"
+        )
 
     annotation = f"{int(length) // scale_dict[scale]:d} {scale.title()}"
-    
-    def _plot(ax,*, interval, start, end, **kw):
+
+    def _plot(ax, *, interval, start, end, **kw):
 
         end = start[-1]
 
@@ -338,11 +339,7 @@ def scale_bar(length=10000, height=0.1, name=None, label=None, scale="kb"):
         for spine in ax.spines.values():
             spine.set_visible(False)
 
-        ax.set(
-            yticks=[],
-            xticks=[],
-            xlim=interval
-        )
+        ax.set(yticks=[], xticks=[], xlim=interval)
 
         return ax
 
@@ -368,7 +365,7 @@ def xaxis_plot(height=0.1, name=None):
         X-axis plotting function
     """
 
-    def _plot(ax,*, interval, **kw):
+    def _plot(ax, *, interval, **kw):
         ax.tick_params(
             axis="x",
             top=True,
@@ -418,8 +415,17 @@ def spacer(height=0.1, name=None):
 def text_banner(label, height=0.15, name=None):
 
     def _plot(ax, *, start, end, **_):
-        start = start[0]; end=end[-1]
-        ax.text(0.5, 0.1, label, ha="center", va="bottom", fontsize=9, transform=ax.transAxes)
+        start = start[0]
+        end = end[-1]
+        ax.text(
+            0.5,
+            0.1,
+            label,
+            ha="center",
+            va="bottom",
+            fontsize=9,
+            transform=ax.transAxes,
+        )
         ax.axhline(0.1, color="k", linewidth=0.5)
         ax.axis("off")
         return ax
@@ -447,6 +453,8 @@ def _name_or_none(x):
 
 @cache
 def _read_ideogram(cytobands_file):
+    from pandas import read_csv
+
     return read_csv(
         cytobands_file,
         sep="\t",
@@ -455,7 +463,6 @@ def _read_ideogram(cytobands_file):
     )
 
 
-@borrow_kwargs(plt.Rectangle)
 @genome_plot
 def ideogram(cytobands_file, height=0.15, name=None, **kwargs):
     """
@@ -586,7 +593,7 @@ def line_plot(
             ax.fill_between(
                 x, np.repeat(vals[idx], 2), color=color, **kwargs, alpha=0.2
             )
-            ax.set_ylim(bottom=0.)
+            ax.set_ylim(bottom=0.0)
 
         _clean_ax(ax, axlabel=label or _name_or_none(vals), yticks=yticks)
         return ax_fn(ax)
@@ -795,7 +802,7 @@ def scatterplot(
 def heatmap_plot(
     accessor,
     palette=diverging_palette,
-    label: Optional[str]=None,
+    label: Optional[str] = None,
     yticks=True,
     height=1,
     row_cluster=False,

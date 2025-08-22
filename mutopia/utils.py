@@ -1,47 +1,44 @@
-import numpy as np
-from joblib import Parallel, delayed
 from contextlib import contextmanager
 from enum import Enum
-import inspect
 from functools import wraps
 import logging
-import subprocess
-from gzip import open as gzopen
-import time
-from matplotlib.colors import LinearSegmentedColormap
-
-# Create a custom diverging colormap
-diverging_palette = LinearSegmentedColormap.from_list(
-    "custom_diverging",
-    ["#427aa1ff", "#FAFAFA", "#e07a5fff"],  # White or a neutral color at center
-)
-
-categorical_palette = ["#427aa1ff", "#e07a5fff", "#acacacff", "#83c5beff"]
-
-def plot_presets():
-    import matplotlib.pyplot as plt
-    plt.rcParams.update({
-        'font.family': 'Helvetica',
-        'font.weight': 'ultralight',
-        'axes.labelweight': 'ultralight',
-        'axes.titleweight': 'ultralight',
-        'figure.titleweight': 'ultralight',
-        'xtick.labelsize': 'medium',
-        'ytick.labelsize': 'medium',
-        'axes.linewidth': 0.5,
-    })
-
-@contextmanager
-def safe_read(filename):
-    yield gzopen(filename, "rt") if filename.endswith(".gz") else open(filename, "r")
-
+from joblib import Parallel, delayed
 
 logger = logging.getLogger(" Mutopia")
 logging.basicConfig(level=logging.INFO)
 logger.setLevel(logging.INFO)
 
 
+def plot_presets():
+    import matplotlib.pyplot as plt
+
+    plt.rcParams.update(
+        {
+            "font.family": "Helvetica",
+            "font.weight": "ultralight",
+            "axes.labelweight": "ultralight",
+            "axes.titleweight": "ultralight",
+            "figure.titleweight": "ultralight",
+            "xtick.labelsize": "medium",
+            "ytick.labelsize": "medium",
+            "axes.linewidth": 0.5,
+        }
+    )
+
+
+@contextmanager
+def safe_read(filename):
+    from gzip import open as gzopen
+
+    with (
+        gzopen(filename, "rt") if filename.endswith(".gz") else open(filename, "r")
+    ) as f:
+        yield f
+
+
 def timer_wrapper(func, name=None):
+
+    import time
 
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -83,6 +80,8 @@ class FeatureType(Enum):
 
     @property
     def allowed_dtypes(self):
+        import numpy as np
+
         if self in (FeatureType.MESOSCALE, FeatureType.CATEGORICAL):
             return (str, np.str_, int, np.int_)
         elif self == FeatureType.STRAND:
@@ -94,6 +93,8 @@ class FeatureType(Enum):
 
     @property
     def save_dtype(self):
+        import numpy as np
+
         if self in (FeatureType.MESOSCALE, FeatureType.CATEGORICAL):
             return np.str_
         elif self == FeatureType.STRAND:
@@ -150,6 +151,8 @@ def using_priors_from(model_state):
 
 def borrow_kwargs(*borrow_sigs):
 
+    import inspect
+
     def decorator(func):
 
         # start the signature with the incipient function
@@ -192,6 +195,8 @@ def borrow_kwargs(*borrow_sigs):
 
 def close_process(process):
 
+    import subprocess
+
     if not process.stdout is None:
         process.stdout.close()
     process.wait()
@@ -226,11 +231,11 @@ def parse_region(region):
         else:
             # Handle case like "chr1:1000" (no end specified)
             start = int(pos)
-            end = np.inf
+            end = float("inf")
     else:
         # Format: chr (entire chromosome)
         chrom = region
         start = 0
-        end = np.inf
+        end = float("inf")
 
     return (chrom, start, end)

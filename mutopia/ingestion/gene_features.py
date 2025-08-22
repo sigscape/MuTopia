@@ -1,6 +1,3 @@
-import pandas as pd
-import subprocess
-
 def download_gtf(output):
     import urllib.request
     import os
@@ -25,6 +22,9 @@ def download_gtf(output):
 
 
 def make_annotation(gtf, output):
+
+    import subprocess
+
     subprocess.check_call(
         (
             "gtensor utils query-gtf "
@@ -42,6 +42,8 @@ def join_quantitation(
     quantitation_file,
     join_on="gene_id",
 ):
+
+    import pandas as pd
 
     # read and reformate the quantification file
     gene_annotation = pd.read_csv(

@@ -1,10 +1,7 @@
 import click
 import sys
-from typing import List, Union
-from ..utils import FeatureType
-from .core import *
-from .pipeline_tasks import run_pipeline
-from ..ingestion.gtf_parsing import query_gtf
+from typing import List, Union, Optional
+from mutopia.utils import FeatureType
 
 
 @click.group("G-tensor commands")
@@ -43,6 +40,8 @@ def _run_pipeline(*args, **kwargs):
     The pipeline can ingest various genomic data formats (BED, BigWig, etc.)
     and create structured G-Tensor datasets with features and samples.
     """
+    from .pipeline_tasks import run_pipeline
+
     run_pipeline(*args, **kwargs)
 
 
@@ -90,6 +89,8 @@ def _slice_loci(*args, **kwargs):
     Example:
         gtensor slice input.nc output.nc -r chr1 1000 2000 -r chr2 5000 6000
     """
+    from .gensor_core import slice_gtensor
+
     slice_gtensor(*args, **kwargs)
 
 
@@ -181,6 +182,8 @@ def _create_gtensor(*args, **kwargs):
         gtensor create -n "MyDataset" -o dataset.nc -dtype sbs \\
                       -g genome.sizes -v blacklist.bed -fa reference.fa
     """
+    from .gensor_core import create_gtensor
+
     create_gtensor(*args, **kwargs)
 
 
@@ -222,6 +225,8 @@ def _convert_gtensor(
     Example:
         gtensor convert input_sbs.nc output_indel.nc -dtype indel -fa reference.fa
     """
+    from .gensor_core import convert_gtensor
+
     convert_gtensor(input, output, dtype, fasta_file)
 
 
@@ -251,6 +256,8 @@ def _set_attrs(
     Example:
         gtensor set-attr dataset.nc -set experiment_name "ChIP-seq" -set genome_build "hg38"
     """
+    from .gensor_core import set_gtensor_attrs
+
     set_gtensor_attrs(dataset, attrs)
 
 
@@ -269,6 +276,8 @@ def _info(dataset):
     Example:
         gtensor info my_dataset.nc
     """
+    from .gensor_core import get_gtensor_info
+
     info = get_gtensor_info(dataset)
 
     click.echo(f"Num features: {info['n_features']}")
@@ -324,6 +333,8 @@ def _add_locus_offsets(
     Example:
         gtensor offsets add dataset.nc mappability.bed --column 5
     """
+    from .gensor_core import add_locus_offsets_to_gtensor
+
     add_locus_offsets_to_gtensor(dataset, offsets_file, column)
 
 
@@ -343,6 +354,8 @@ def _rm_locus_offsets(
     Example:
         gtensor offsets rm dataset.nc
     """
+    from .gensor_core import remove_locus_offsets_from_gtensor
+
     remove_locus_offsets_from_gtensor(dataset)
 
 
@@ -425,6 +438,8 @@ def _add_continuous_feature(*args, **kwargs):
     Example:
         gtensor feature add continuous dataset.nc chipseq.bw -name H3K4me3 -norm log1p_cpm
     """
+    from .gensor_core import add_continuous_feature
+
     add_continuous_feature(*args, **kwargs)
 
 
@@ -493,6 +508,8 @@ def _add_discrete_feature(*args, **kwargs):
         gtensor feature add discrete dataset.nc chromhmm.bed -name ChromState \\
                           Promoter Enhancer Quiescent --mesoscale
     """
+    from .gensor_core import add_discrete_feature
+
     add_discrete_feature(*args, **kwargs)
 
 
@@ -541,6 +558,8 @@ def _add_strand_feature(*args, **kwargs):
     Example:
         gtensor feature add strand dataset.nc genes.bed -name GeneStrand -col 6
     """
+    from .gensor_core import add_strand_feature
+
     add_strand_feature(*args, **kwargs)
 
 
@@ -593,6 +612,8 @@ def _add_vector_feature(*args, **kwargs):
     Example:
         gtensor feature add vector dataset.nc accessibility.txt -name ATAC_signal
     """
+    from .gensor_core import add_vector_feature
+
     add_vector_feature(*args, **kwargs)
 
 
@@ -612,6 +633,8 @@ def _list_features(
     Example:
         gtensor feature ls dataset.nc
     """
+    from .gensor_core import list_gtensor_features
+
     feature_info = list_gtensor_features(dataset)
 
     if len(feature_info) == 0:
@@ -658,6 +681,8 @@ def _rm_features(
     Example:
         gtensor feature rm dataset.nc old_feature1 old_feature2
     """
+    from .gensor_core import remove_gtensor_features
+
     remove_gtensor_features(dataset, feature_names)
     for feature_name in feature_names:
         click.echo(f"Removed feature: {feature_name}")
@@ -700,6 +725,8 @@ def _edit_feature(
     Example:
         gtensor feature edit dataset.nc my_feature -g regulatory -norm zscore
     """
+    from .gensor_core import edit_gtensor_feature
+
     edit_gtensor_feature(dataset, feature_name, group, normalization)
 
 
@@ -811,6 +838,8 @@ def _add_sample(*args, **kwargs):
         gtensor sample add dataset.nc sample.vcf -id SAMPLE_001 \\
                           -m mutation_rates.bed --cluster
     """
+    from .gensor_core import add_sample
+
     add_sample(*args, **kwargs)
 
 
@@ -833,6 +862,8 @@ def _rm_samples(
     Example:
         gtensor sample rm dataset.nc SAMPLE_001 SAMPLE_002
     """
+    from .gensor_core import remove_gtensor_samples
+
     remove_gtensor_samples(dataset, sample_names)
     for sample_name in sample_names:
         click.echo(f"Removed sample: {sample_name}")
@@ -851,6 +882,8 @@ def _list_samples(dataset: str):
     Example:
         gtensor sample ls dataset.nc
     """
+    from .gensor_core import list_gtensor_samples
+
     samples = list_gtensor_samples(dataset)
 
     if len(samples) == 0:
@@ -869,42 +902,6 @@ def utils():
     utilities for preparing data for G-Tensor ingestion.
     """
     pass
-
-
-@utils.command("linearize-beds", short_help="Linearize overlapping BED regions")
-@click.argument(
-    "bed_files",
-    type=click.Path(exists=True),
-    nargs=-1,
-    required=True,
-    metavar="BED_FILE...",
-)
-@click.option(
-    "--max-region-size",
-    type=click.IntRange(1, 1000000),
-    default=25000,
-    help="Maximum size for output regions in base pairs",
-)
-def _linearize_beds(
-    bed_files: List[str],
-    max_region_size: int = 25000,
-):
-    """
-    Convert overlapping BED files into non-overlapping linear regions.
-
-    BED_FILE... are one or more BED files to process.
-
-    This utility resolves overlapping genomic regions by splitting them
-    into non-overlapping segments. This is useful for preparing annotation
-    files for G-Tensor ingestion when multiple features overlap.
-
-    The output files will have the same names as input files with
-    '.linearized' added before the extension.
-
-    Example:
-        gtensor utils linearize-beds annotations.bed genes.bed
-    """
-    linearize_bed_files(bed_files, max_region_size)
 
 
 @utils.command("query-gtf", short_help="Query and filter GTF/GFF files")
@@ -990,6 +987,8 @@ def _query_gtf(*args, **kwargs):
                                 --attribute-values protein_coding \\
                                 --as-regions
     """
+    from mutopia.ingestion.gtf_parsing import query_gtf
+
     query_gtf(*args, **kwargs)
 
 
@@ -1021,7 +1020,7 @@ def _query_gtf(*args, **kwargs):
 def _make_quant_file(
     output,
     quantitation_file: str,
-    gtf_file: str = None,
+    gtf_file: Optional[str] = None,
     join_on="gene_id",
 ):
     """
@@ -1041,6 +1040,8 @@ def _make_quant_file(
         gtensor utils make-expression-bedfile sample1.quant sample2.quant \\
                                              -o expression.bed --join-on gene_id
     """
+    from .gensor_core import make_expression_bedfile
+
     make_expression_bedfile(quantitation_file, output, gtf_file, join_on)
 
 
@@ -1060,4 +1061,6 @@ def _make_quant_file(
     help="Output BED file for GEX annotation (default: gex_annotation.bed)",
 )
 def _make_annotation_bedfile(gtf_file=None, output=None):
+    from .gensor_core import make_annotation_bedfile
+
     make_annotation_bedfile(gtf_file, output)

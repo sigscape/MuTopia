@@ -1,9 +1,19 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
-from ..utils import safe_read
 from itertools import starmap, chain
 from numpy import array
+from contextlib import contextmanager
 from .fancy_iterators import streaming_local_sort, sorted_iterator
+
+
+@contextmanager
+def safe_read(filename):
+    from gzip import open as gzopen
+
+    with (
+        gzopen(filename, "rt") if filename.endswith(".gz") else open(filename, "r")
+    ) as f:
+        yield f
 
 
 def stream_sort_bed(data, buffer_len=1000):

@@ -49,7 +49,7 @@ def purge_zeros(fn):
         likelihood, weights = args[-3], args[-2]
         nonzero_idx = weights > 0.0
         # if the elements are mostly non-zero, don't bother subsetting
-        if np.sum(nonzero_idx)/len(weights) > 0.5:
+        if np.sum(nonzero_idx) / len(weights) > 0.5:
             return fn(*args)
         else:
             return fn(
@@ -58,6 +58,7 @@ def purge_zeros(fn):
                 np.ascontiguousarray(weights[nonzero_idx]),
                 *args[-1:],
             )
+
     return wrapper
 
 
@@ -161,7 +162,7 @@ def iterative_update(
         if check_tol < tol:
             break
 
-    return Nk #, t, check_tol
+    return Nk  # , t, check_tol
 
 
 @reshape_output

@@ -19,15 +19,15 @@ import numpy as np
 from sklearn.base import clone, OneToOneFeatureMixin
 from collections import defaultdict
 from sklearn.base import BaseEstimator, TransformerMixin
-from functools import reduce
-from ..gtensor_interface import GtensorInterface as CS
-from ...utils import FeatureType, logger, str_wrapped_list
-from .base import get_feature_classes
+from mutopia.utils import FeatureType, logger, str_wrapped_list
 from mutopia.genome_utils.fancy_iterators import (
     streaming_groupby,
     repeat_first,
     repeat_last,
 )
+from functools import reduce
+from ..gtensor_interface import GtensorInterface as CS
+from .base import get_feature_classes
 
 
 def get_feature_interaction_group_idxs(
@@ -307,16 +307,18 @@ class CPMTransformer(BaseEstimator, TransformerMixin, OneToOneFeatureMixin):
     def transform(self, X):
         return X / self.normalizers_ * 1e6
 
+
 @njit("float32[:](float32[:])")
 def _mask_contiguous_duplicates(arr):
-    if  len(arr) == 0:
+    if len(arr) == 0:
         return arr
-    
+
     masked = arr.copy()
     for i in range(1, len(arr)):
-        if arr[i] == arr[i-1]:
+        if arr[i] == arr[i - 1]:
             masked[i] = np.nan
     return masked
+
 
 class ContiguousDuplicatesToNanTransformer:
     def fit(self, X, y=None):
@@ -324,16 +326,21 @@ class ContiguousDuplicatesToNanTransformer:
         if not isinstance(X, pd.DataFrame):
             raise ValueError("Input must be a pandas DataFrame")
         X = X.apply(
-            lambda col : _mask_contiguous_duplicates(col.values.astype(np.float32, copy=False)),
-            axis=0
+            lambda col: _mask_contiguous_duplicates(
+                col.values.astype(np.float32, copy=False)
+            ),
+            axis=0,
         )
         return super().fit(X, y)
+
 
 class MaskedCPM(ContiguousDuplicatesToNanTransformer, CPMTransformer):
     pass
 
+
 class MaskedStandardScaler(ContiguousDuplicatesToNanTransformer, StandardScaler):
     pass
+
 
 def log1p_cpm():
     return Pipeline(
@@ -344,6 +351,7 @@ def log1p_cpm():
         ]
     )
 
+
 def gex_pipeline():
     return Pipeline(
         [
@@ -352,6 +360,7 @@ def gex_pipeline():
             ("standardize", MaskedStandardScaler()),
         ]
     )
+
 
 def get_normalizing_transformer(
     feature_names_in,

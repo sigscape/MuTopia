@@ -1,13 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import pandas as pd
-from ..utils import diverging_palette
-from ..gtensor import get_shap_summary
+from mutopia.palettes import diverging_palette
+
 
 def _l2_normalize(x):
     """L2 normalize the input array."""
     norm = np.linalg.norm(x, keepdims=True)
     return x / norm if norm.all() else x
+
 
 def plot_shap_summary(
     data,
@@ -24,6 +24,7 @@ def plot_shap_summary(
 ):
 
     from scipy.cluster.hierarchy import linkage, leaves_list
+    from mutopia.gtensor import get_shap_summary
 
     """
     Generate a bubble heatmap for SHAP effect size and correlation.
@@ -91,7 +92,7 @@ def plot_shap_summary(
     # `hue` is for color (correlation)
     # `size` is for bubble size (effect_size)
     x, y = np.meshgrid(np.arange(features.size), np.arange(components.size))
-    
+
     scatter = ax.scatter(
         x=x.flatten(),
         y=y.flatten(),
@@ -133,5 +134,5 @@ def plot_shap_summary(
     ax.set(ylim=(-1, components.size), xlim=(-1, features.size))
     for spine in ax.spines.values():
         spine.set_visible(False)
-    
+
     return ax

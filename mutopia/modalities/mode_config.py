@@ -1,19 +1,16 @@
 import xarray as xr
+import os
 from abc import ABC, abstractmethod
-from sparse import SparseArray, COO
 import json
-import numpy as np
-from ..model import TopographyModel
-from ..plot.signature_plot import _plot_linear_signature
-from ..utils import categorical_palette
+from mutopia.palettes import categorical_palette
 
 
 class ModeConfig(ABC):
 
     MODE_ID = None
     PALETTE = None
-    X_LABELS = None
-    DATABASE = None
+    X_LABELS: list[str] = None
+    DATABASE: str = None
 
     @property
     def sizes(self):
@@ -30,20 +27,23 @@ class ModeConfig(ABC):
 
     @property
     @abstractmethod
-    def TopographyModel(self) -> TopographyModel:
+    def TopographyModel(self):
         raise NotImplementedError
 
     @property
     def available_components(self):
-        with open(self.DATABASE, "r") as f:
+        db_path = os.path.join(os.path.dirname(__file__), cls.DATABASE)
+        with open(db_path, "r") as f:
             database = json.load(f)
 
         return list(database.keys())
 
     @classmethod
     def load_components(cls, *init_components):
+        import numpy as np
 
-        with open(cls.DATABASE, "r") as f:
+        db_path = os.path.join(os.path.dirname(__file__), cls.DATABASE)
+        with open(db_path, "r") as f:
             database = json.load(f)
 
         comps = []
@@ -51,7 +51,7 @@ class ModeConfig(ABC):
             if not component in database:
                 raise ValueError(f"Component {component} not found in database")
 
-            comps.append([database[component][l] for l in cls().coords["context"]])
+            comps.append([database[component][l] for l in cls().coords["context"][1]])
 
         return xr.DataArray(
             np.array(comps, dtype=float),
@@ -90,6 +90,8 @@ class ModeConfig(ABC):
         raise NotImplementedError
 
     def _arr_to_xr(self, dim_sizes, coords, data):
+        from sparse import SparseArray, COO
+
         return xr.DataArray(
             COO(
                 coords,
@@ -117,6 +119,9 @@ class ModeConfig(ABC):
         signature,
         required_dims=[],
     ):
+
+        from sparse import SparseArray
+
         for dim in required_dims:
             if not dim in signature.dims:
                 raise ValueError(
@@ -202,6 +207,7 @@ class ModeConfig(ABC):
         label_xaxis=True,
         **kwargs,
     ):
+        from mutopia.plot.signature_plot import _plot_linear_signature
 
         signature = cls._flatten_observations(signature)
 

@@ -1,4 +1,11 @@
 import inspect
+from functools import partial
+import numpy as np
+from sklearn.linear_model import PoissonRegressor
+from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
+from sklearn.base import clone
+from xarray import DataArray
+from mutopia.gtensor import dims_except_for
 from .base import (
     get_corpus_intercepts,
     get_poisson_targets_weights,
@@ -8,8 +15,6 @@ from .base import (
     SparseDataBase,
     DenseDataBase,
 )
-from ...utils import str_wrapped_list
-from ...gtensor import dims_except_for
 from ..gtensor_interface import GtensorInterface as CS
 from ._hist_gbt import CustomHistGradientBooster
 from ._feature_tranformer import (
@@ -19,17 +24,6 @@ from ._feature_tranformer import (
     get_known_categories,
     StratifiedTransformer,
 )
-
-from functools import partial
-import numpy as np
-from sklearn.pipeline import Pipeline
-from sklearn.linear_model import PoissonRegressor
-from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
-from sklearn.base import clone
-from xarray import DataArray
-import logging
-
-logger = logging.getLogger(" Mutopia")
 
 
 class ThetaModel(RateModel, SparseDataBase, DenseDataBase):

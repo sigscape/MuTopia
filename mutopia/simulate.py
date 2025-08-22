@@ -4,7 +4,6 @@ from tqdm import tqdm
 from sparse import COO
 import xarray as xr
 import numpy as np
-from functools import reduce
 
 
 COMPLEMENT = {"A": "T", "T": "A", "G": "C", "C": "G"}

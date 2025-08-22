@@ -1,13 +1,14 @@
 from tqdm import trange
 from functools import partial
 from math import isnan
-from ..utils import logger, str_wrapped_list, timer_wrapper, ParContext
 import time
-from ..gtensor import (
+
+from mutopia.utils import logger, str_wrapped_list, timer_wrapper, ParContext
+from mutopia.gtensor import (
     DifferentSamples,
     LazySlicer,
 )
-from ..gtensor.validation import (
+from mutopia.gtensor.validation import (
     check_dims,
     check_corpus,
     check_feature_consistency,

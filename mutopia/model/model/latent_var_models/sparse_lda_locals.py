@@ -1,7 +1,7 @@
 import numpy as np
 from functools import partial, reduce
+from mutopia.gtensor import dims_except_for
 from ..model_components.base import _svi_update_fn
-from ...gtensor import dims_except_for
 from math import prod
 from .base import *
 import warnings

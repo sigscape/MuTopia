@@ -5,9 +5,9 @@ structure of the datasets.
 """
 
 import os
-from ..utils import parallel_gen
+from mutopia.utils import parallel_gen
+from mutopia.gtensor import CorpusInterface, mutate_method
 from ..model.gtensor_interface import GtensorInterface
-from ..gtensor import CorpusInterface, mutate_method
 import numpy as np
 from functools import partial
 from os import path

@@ -1,7 +1,6 @@
 from . import dims_except_for
 from collections import defaultdict
-from numpy import issubdtype
-from ..utils import FeatureType, logger, str_wrapped_list
+from mutopia.utils import FeatureType, logger, str_wrapped_list
 
 
 def check_dims(dataset, model_state):
@@ -55,7 +54,6 @@ def check_structure(dataset):
     for key in required_vars:
         if not hasattr(dataset, "Regions/" + key):
             raise ValueError(f'The dataset is missing the "{key}" node.')
-        
 
 
 def check_sample_data(dataset, dtype):
@@ -63,6 +61,7 @@ def check_sample_data(dataset, dtype):
 
 
 def check_feature(feature):
+    from numpy import issubdtype
 
     if not "normalization" in feature.attrs:
         raise ValueError("The feature is missing a normalization attribute.")

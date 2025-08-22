@@ -1,9 +1,9 @@
-from .sbs import SBSMode as _SBSMode
 from .mode_config import ModeConfig
+from .sbs.sbs import SBSMode
 
-SBS = _SBSMode()
+SBS = SBSMode()  # initialize the modality model
 
 __all__ = [
-    "SBS",
     "ModeConfig",
+    "SBS",
 ]

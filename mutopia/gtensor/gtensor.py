@@ -4,22 +4,20 @@ This module provides functionality for creating, manipulating, and analyzing gen
 including loading datasets, applying transformations, and generating explanations for model components.
 """
 
-from os import path
 import xarray as xr
-from pandas import concat as pd_concat
+
+xr.set_options(use_new_combine_kwarg_defaults=True)
+import pandas as pd
 import numpy as np
 from typing import Union, List
 from numpy.typing import NDArray
-from pandas import IntervalIndex, Index, Interval, DataFrame
 from functools import reduce
 import os
 from tqdm import tqdm
+from mutopia.utils import logger, parse_region
+from mutopia.genome_utils.bed12_utils import unstack_regions as _unstack_regions
 import mutopia.gtensor.disk_interface as disk
-
-from ..utils import logger
-from ..genome_utils.bed12_utils import unstack_regions as _unstack_regions
 from .interfaces import *
-from ..utils import parse_region
 
 __all__ = [
     "GTensor",
@@ -104,7 +102,7 @@ def GTensor(
         Structured dataset with regions, coordinates, and metadata
     """
 
-    locus_coords = Index(np.arange(len(chrom)))
+    locus_coords = pd.Index(np.arange(len(chrom)))
 
     shared_coords = {
         **modality.coords,
@@ -427,8 +425,8 @@ def fetch_source(dataset, source):
     state = groups.pop("State", [])
     features = groups.pop("Features", [])
 
-    use_features = [path.basename(v) for v in features if v.split("/")[1] == source]
-    use_state = [path.basename(v) for v in state if v.split("/")[1] == source]
+    use_features = [os.path.basename(v) for v in features if v.split("/")[1] == source]
+    use_state = [os.path.basename(v) for v in state if v.split("/")[1] == source]
 
     rename_map = {
         os.path.join("Features", source, v): os.path.join("Features", v)
@@ -502,12 +500,14 @@ def get_explanation(dataset, component):
             shap_values.sel(shap_component=component)
             .to_dataframe()
             .reset_index()
-            .rename(columns={
-                "shap_component": "component",
-                locus_dim: "locus",
-                "shap_features": "feature",
-                "SHAP_values": "value",
-            })
+            .rename(
+                columns={
+                    "shap_component": "component",
+                    locus_dim: "locus",
+                    "shap_features": "feature",
+                    "SHAP_values": "value",
+                }
+            )
         )
 
         # handle this case to remove the convolution
@@ -537,7 +537,7 @@ def get_explanation(dataset, component):
             .sel(locus=shap_df.index)
         )
 
-        display_data = DataFrame(
+        display_data = pd.DataFrame(
             [display_features[s].data for s in shap_df.columns],
             index=shap_df.columns,
         ).T
@@ -559,7 +559,7 @@ def get_explanation(dataset, component):
     else:
         shap_data = [_get_shap_from_source(dataset, component)]
 
-    shap_df, data, display_data = [pd_concat(x) for x in zip(*shap_data)]
+    shap_df, data, display_data = [pd.concat(x) for x in zip(*shap_data)]
 
     expl = shap.Explanation(
         shap_df.values,
@@ -571,21 +571,22 @@ def get_explanation(dataset, component):
     return expl
 
 
-def get_shap_summary(data) -> DataFrame:
+def get_shap_summary(data) -> pd.DataFrame:
     """Generate a summary of SHAP values for the specified components."""
     shap_values = data["SHAP_values"]
     locus_dim = "locus" if "locus" in shap_values.dims else "shap_locus"
-    
+
     shap_values = (
-        shap_values
-        .to_dataframe()
+        shap_values.to_dataframe()
         .reset_index()
-        .rename(columns={
-            "shap_component": "component",
-            locus_dim: "locus",
-            "shap_features": "feature",
-            "SHAP_values": "shap_value",
-        })
+        .rename(
+            columns={
+                "shap_component": "component",
+                locus_dim: "locus",
+                "shap_features": "feature",
+                "SHAP_values": "shap_value",
+            }
+        )
     )
     shap_values = shap_values.merge(
         data["State/locus_features"]
@@ -611,8 +612,7 @@ def get_shap_summary(data) -> DataFrame:
         return np.corrcoef(x[mask], y[mask])[0, 1]
 
     correlation = (
-        shap_values.groupby(["component", "feature"])
-        [["shap_value", "feature_value"]]
+        shap_values.groupby(["component", "feature"])[["shap_value", "feature_value"]]
         .apply(lambda x: nan_corr(x["shap_value"], x["feature_value"]))
         .rename("correlation")
     )
@@ -649,7 +649,7 @@ def equal_size_quantiles(dataset, var_name, n_bins=10, key=None):
     """
 
     bin_nums = np.arange(dataset.sizes["locus"])
-    sorted_vals = DataFrame(
+    sorted_vals = pd.DataFrame(
         {
             "length": dataset.sections["Regions"].length.values,
             "value": dataset[var_name].values,
@@ -718,9 +718,9 @@ def slice_regions(dataset, *regions, lazy=False):
     for chrom, start, end in parsed_regions:
         chrom_mask = ds_regions.chrom.values == chrom
         if np.any(chrom_mask):
-            interval_mask = IntervalIndex.from_arrays(
+            interval_mask = pd.IntervalIndex.from_arrays(
                 ds_regions.start.values[chrom_mask], ds_regions.end.values[chrom_mask]
-            ).overlaps(Interval(start, end))
+            ).overlaps(pd.Interval(start, end))
 
             # Update the overall mask
             regions_mask[chrom_mask] |= interval_mask
@@ -956,13 +956,15 @@ def fetch_features(
         )
     ]
 
-    #Reorder features to match the order in feature_names
+    # Reorder features to match the order in feature_names
     if len(feature_names) > 0:
         fnames = sorted(
             fnames,
-            key=lambda x: feature_names.index(os.path.basename(x))
-            if os.path.basename(x) in feature_names
-            else len(feature_names),
+            key=lambda x: (
+                feature_names.index(os.path.basename(x))
+                if os.path.basename(x) in feature_names
+                else len(feature_names)
+            ),
         )
 
     features = [os.path.basename(name) for name in fnames]
@@ -988,38 +990,38 @@ class ComponentWrapper:
     def __init__(self, dataset):
         if not "component" in dataset.coords:
             raise ValueError("Dataset does not contain 'component' coordinate.")
-        
+
         self.dataset = dataset
 
     def _get_k(self, component_name):
         if isinstance(component_name, int):
             return component_name
         try:
-            return list(self.dataset.coords['component'].values).index(component_name)
+            return list(self.dataset.coords["component"].values).index(component_name)
         except ValueError:
             raise ValueError(f"Component {component_name} not found in model.")
 
     @property
     def n_components(self):
-        return len(self.dataset.coords['component'].values)
-    
+        return len(self.dataset.coords["component"].values)
+
     @property
     def component_names(self):
-        return list(self.dataset.coords['component'].values)
-    
-    def get_spectrum(self, idx : Union[str, int]) -> xr.DataArray:
+        return list(self.dataset.coords["component"].values)
+
+    def get_spectrum(self, idx: Union[str, int]) -> xr.DataArray:
         k = self._get_k(idx)
         return self.dataset["Spectra/spectra"].isel(component=k)
 
-    def get_interactions(self, idx : Union[str, int]) -> xr.DataArray:
+    def get_interactions(self, idx: Union[str, int]) -> xr.DataArray:
         k = self._get_k(idx)
         return self.dataset["Spectra/interactions"].isel(component=k)
 
-    def get_shared_effects(self, idx : Union[str, int]) -> xr.DataArray:
+    def get_shared_effects(self, idx: Union[str, int]) -> xr.DataArray:
         return self.dataset["Spectra/shared_effects"].isel(component=self._get_k(idx))
 
 
-def rename_components(dataset : xr.Dataset, names: List[str]):
+def rename_components(dataset: xr.Dataset, names: List[str]):
     """
     Rename the components of the model and update the dataset coordinates accordingly.
 
@@ -1066,24 +1068,32 @@ def rename_components(dataset : xr.Dataset, names: List[str]):
     dataset = dataset.assign_coords(new_coords)
     return dataset
 
-def _fetch_component_data(dataset, component_name: Union[str, int], fetch_fn) -> xr.DataArray:
+
+def _fetch_component_data(
+    dataset, component_name: Union[str, int], fetch_fn
+) -> xr.DataArray:
     components = ComponentWrapper(dataset)
     d = getattr(components, fetch_fn)(component_name)
     d.attrs["dtype"] = dataset.attrs["dtype"]
     return d
 
+
 def list_components(dataset) -> List[str]:
     components = ComponentWrapper(dataset)
     return components.component_names
 
-def fetch_component(dataset, component_name : Union[str, int]) -> xr.DataArray:
+
+def fetch_component(dataset, component_name: Union[str, int]) -> xr.DataArray:
     return _fetch_component_data(dataset, component_name, "get_spectrum")
 
-def fetch_interactions(dataset, component_name : Union[str, int]) -> xr.DataArray:
+
+def fetch_interactions(dataset, component_name: Union[str, int]) -> xr.DataArray:
     return _fetch_component_data(dataset, component_name, "get_interactions")
 
-def fetch_shared_effects(dataset, component_name : Union[str, int]) -> xr.DataArray:
+
+def fetch_shared_effects(dataset, component_name: Union[str, int]) -> xr.DataArray:
     return _fetch_component_data(dataset, component_name, "get_shared_effects")
+
 
 def excel_report(self, dataset, output, normalization="global"):
     """
@@ -1153,7 +1163,7 @@ def excel_report(self, dataset, output, normalization="global"):
             shap_components = dataset.SHAP_values.coords["shap_component"].values
             expl = get_explanation(dataset, shap_components[0])
 
-            DataFrame(
+            pd.DataFrame(
                 expl.data,
                 columns=expl.feature_names,
             ).to_excel(
@@ -1174,7 +1184,7 @@ def excel_report(self, dataset, output, normalization="global"):
 
                 expl = get_explanation(dataset, component)
 
-                DataFrame(
+                pd.DataFrame(
                     expl.values,
                     columns=expl.feature_names,
                 ).to_excel(

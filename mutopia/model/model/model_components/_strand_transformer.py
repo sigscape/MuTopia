@@ -1,11 +1,9 @@
 import pandas as pd
 import numpy as np
 from scipy import sparse
-from itertools import product
-from itertools import product, repeat
-from itertools import chain
+from itertools import product, repeat, chain
 from sklearn.preprocessing import OneHotEncoder
-from ...utils import FeatureType, logger, str_wrapped_list
+from mutopia.utils import FeatureType, logger, str_wrapped_list
 from .base import idx_array_to_design, get_feature_classes
 from ..gtensor_interface import GtensorInterface as CS
 

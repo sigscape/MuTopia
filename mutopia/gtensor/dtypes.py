@@ -1,14 +1,13 @@
-from xarray import register_dataset_accessor, register_dataarray_accessor
-import importlib.util
 import sys
 import os
 from functools import cache
-
-MODALITIES = []
+from xarray import register_dataset_accessor, register_dataarray_accessor
 
 
 @cache
 def load_mode_config(filename):
+
+    import importlib.util
 
     module_path, class_name = filename.rsplit(":", 1)
 
@@ -28,9 +27,12 @@ def load_mode_config(filename):
 @cache
 def get_mode_config(mode_name: str):
 
-    for mode in MODALITIES:
-        if mode_name.upper() == mode.MODE_ID.upper():
-            return mode
+    import mutopia.modalities
+
+    try:
+        return getattr(mutopia.modalities, mode_name.upper())
+    except AttributeError:
+        pass
 
     try:
         return load_mode_config(mode_name)

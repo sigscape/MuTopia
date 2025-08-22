@@ -1,6 +1,8 @@
 from functools import partial, reduce
 import numpy as np
 from xarray import DataArray
+
+from mutopia.gtensor import dims_except_for
 from ._glm_compiled import (
     make_optimizer,
     setup_mixed_solver,
@@ -18,7 +20,6 @@ from .base import (
     DenseDataBase,
 )
 from ._strand_transformer import get_strand_transformer, DesignMatrixHelper
-from ...gtensor import dims_except_for
 
 
 class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
@@ -467,10 +468,9 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         r = self.mesoscale_transformer.n_coefs
 
         interaction_matrix = self.coefs_[k][-r * c :].reshape((c, r)).T
-        interaction_matrix = np.vstack([
-            np.zeros((1, c), dtype=self.dtype),
-            interaction_matrix
-        ])
+        interaction_matrix = np.vstack(
+            [np.zeros((1, c), dtype=self.dtype), interaction_matrix]
+        )
 
         interactions = DataArray(
             data=interaction_matrix[:, 1:],
@@ -482,15 +482,15 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         )
 
         shared_effects = DataArray(
-            data=interaction_matrix[:,0],
+            data=interaction_matrix[:, 0],
             dims=("genome_state"),
             coords={
                 "genome_state": ["Baseline"] + self.get_mesoscale_feature_names(),
-            }
+            },
         )
 
         return (interactions, shared_effects)
-    
+
 
 class UnstrandedContextModel(StrandedContextModel, SparseDataBase):
 

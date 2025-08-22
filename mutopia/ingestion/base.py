@@ -2,6 +2,7 @@ from enum import Enum
 from .features import *
 from ..utils import FeatureType
 
+
 class FileType(Enum):
     BIGWIG = "bigwig"
     BEDGRAPH = "bedgraph"

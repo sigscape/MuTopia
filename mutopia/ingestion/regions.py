@@ -1,8 +1,6 @@
-import os
 import subprocess
 import tempfile
 import sys
-from numpy import quantile
 from collections import Counter
 import typing
 from functools import partial, wraps
@@ -432,7 +430,11 @@ def make_regions(
         list(data)  # force evaluation - returns nothing
 
     q = (0.1, 0.25, 0.5, 0.75, 0.9)
+
+    from numpy import quantile
+
     windowsize_dist = quantile(window_sizes, q)
+
     print(
         f"""Window size report
 ----------------------

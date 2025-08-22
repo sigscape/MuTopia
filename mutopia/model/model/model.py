@@ -1,24 +1,20 @@
 import numpy as np
 import xarray as xr
-from pandas import DataFrame
-import matplotlib.pyplot as plt
-from tqdm import trange
 from functools import partial
-from joblib import dump, delayed
-from collections import defaultdict
+from joblib import dump
 from sklearn.base import BaseEstimator
 from abc import ABC, abstractmethod
-from typing import *
+
+from mutopia.utils import logger, ParContext, parallel_map
+from mutopia.gtensor import dims_except_for, train_test_split
+from mutopia.gtensor.validation import check_corpus
+from mutopia.gtensor.dtypes import get_mode_config
+
 from .optim import fit_model
 from .model_components import *
 from .latent_var_models import *
 from .factor_model import FactorModel
 from ..mixture_model import *
-from ..utils import logger, ParContext, diverging_palette, parallel_map
-from ..plot.coef_matrix_plot import _plot_interaction_matrix
-from ..gtensor import *
-from ..gtensor.validation import check_corpus, check_dims
-from ..dtypes import get_mode_config
 
 # interfaces
 from ..mixture_model.mixture_interface import MixtureInterface as MIX
@@ -476,7 +472,7 @@ class TopographyModel(ABC, BaseEstimator):
     @property
     def alpha_(self):
         return self.locals_model_.alpha
-    
+
     @property
     def n_components(self):
         return self.num_components
@@ -490,10 +486,14 @@ class TopographyModel(ABC, BaseEstimator):
 
     def _check_corpus(self, dataset, enforce_sample=True):
         check_corpus(dataset)
-        #if enforce_sample:
+        # if enforce_sample:
         #    check_dims(dataset, self.factor_model_)
-        dataset["Regions/exposures"] = dataset["Regions/exposures"].astype(np.float32, copy=False)
-        dataset["Regions/context_frequencies"] = dataset["Regions/context_frequencies"].astype(np.float32, copy=False)
+        dataset["Regions/exposures"] = dataset["Regions/exposures"].astype(
+            np.float32, copy=False
+        )
+        dataset["Regions/context_frequencies"] = dataset[
+            "Regions/context_frequencies"
+        ].astype(np.float32, copy=False)
 
     def setup_corpus(self, dataset):
         """
@@ -547,7 +547,7 @@ class TopographyModel(ABC, BaseEstimator):
 
         dump(self, path)
 
-    def annot_components(self, dataset : xr.Dataset):
+    def annot_components(self, dataset: xr.Dataset):
 
         spectra = xr.concat(
             [
@@ -557,12 +557,14 @@ class TopographyModel(ABC, BaseEstimator):
             dim="component",
         )
 
-        interactions, shared_effects = list(zip(*
-            [
-                self.factor_model_.format_interactions(component)
-                for component in range(self.n_components)
-            ]
-        ))
+        interactions, shared_effects = list(
+            zip(
+                *[
+                    self.factor_model_.format_interactions(component)
+                    for component in range(self.n_components)
+                ]
+            )
+        )
 
         interactions = xr.concat(
             interactions,
@@ -575,22 +577,21 @@ class TopographyModel(ABC, BaseEstimator):
         )
 
         dataset = dataset.mutate(
-            lambda ds : (
-                ds.assign_coords(
-                    component=("component", self.component_names)
-                ).assign(
+            lambda ds: (
+                ds.assign_coords(component=("component", self.component_names)).assign(
                     {
-                        "Spectra/spectra" : spectra,
-                        "Spectra/interactions" : interactions,
-                        "Spectra/shared_effects" : shared_effects
+                        "Spectra/spectra": spectra,
+                        "Spectra/interactions": interactions,
+                        "Spectra/shared_effects": shared_effects,
                     }
                 )
             )
         )
-        logger.info("Added keys to dataset: Spectra/spectra, Spectra/interactions, Spectra/shared_effects")
+        logger.info(
+            "Added keys to dataset: Spectra/spectra, Spectra/interactions, Spectra/shared_effects"
+        )
         return dataset
-        
-    
+
     def annot_contributions(
         self,
         dataset,
@@ -898,9 +899,7 @@ class TopographyModel(ABC, BaseEstimator):
             return np.squeeze(shaps)
 
         use_components = list(
-            components
-            if not len(components) == 0
-            else list(range(self.n_components))
+            components if not len(components) == 0 else list(range(self.n_components))
         )
 
         shap_matrix = np.array(

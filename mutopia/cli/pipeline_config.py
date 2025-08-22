@@ -49,16 +49,24 @@ class FeatureConfig(BaseModel):
 
 class SampleParams(BaseModel):
     chr_prefix: Optional[str] = Field("", description="Prefix for chromosome names")
-    pass_only: Optional[bool] = Field(True, description="Whether to only pass the sample through")
+    pass_only: Optional[bool] = Field(
+        True, description="Whether to only pass the sample through"
+    )
     weight_col: Optional[str] = Field(None, description="Column to use for weights")
-    mutation_rate_file: Optional[str] = Field(None, description="Path to mutation rate file")
-    skip_sort: Optional[bool] = Field(False, description="Whether to skip sorting the samples")
+    mutation_rate_file: Optional[str] = Field(
+        None, description="Path to mutation rate file"
+    )
+    skip_sort: Optional[bool] = Field(
+        False, description="Whether to skip sorting the samples"
+    )
     cluster: Optional[bool] = Field(True, description="Whether to cluster the samples")
 
 
 class SampleConfig(BaseModel):
     file: str = Field(..., description="Path to the sample file (e.g., VCF)")
-    sample_name: Optional[str] = Field(None, description="Name of the sample, for VCFs with multiple samples.")
+    sample_name: Optional[str] = Field(
+        None, description="Name of the sample, for VCFs with multiple samples."
+    )
     sample_weight: Optional[float] = Field(1.0, description="Weight of the sample")
     copy_number: Optional[str] = Field(None, description="Path to copy number file")
 
@@ -74,8 +82,12 @@ class GTensorConfig(BaseModel):
     features: Dict[str, FeatureConfig] = Field(
         ..., description="Dictionary of features to process"
     )
-    sample_params: Optional[SampleParams] = Field(SampleParams(), description="Default parameters for sample ingestion.")
-    samples: Optional[Dict[str, SampleConfig]] = Field({}, description="List of samples to process")
+    sample_params: Optional[SampleParams] = Field(
+        SampleParams(), description="Default parameters for sample ingestion."
+    )
+    samples: Optional[Dict[str, SampleConfig]] = Field(
+        {}, description="List of samples to process"
+    )
 
     @property
     def bed_cuts(self) -> list[tuple[str, str]]:
@@ -90,5 +102,5 @@ class GTensorConfig(BaseModel):
         """Validate after model initialization"""
         super().model_post_init(*args, **kwargs)
         for sample_id in self.samples.keys():
-            if '/' in sample_id:
+            if "/" in sample_id:
                 raise ValueError(f"Sample ID '{sample_id}' cannot contain slashes")

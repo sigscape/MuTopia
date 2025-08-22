@@ -1,16 +1,12 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
 from functools import partial
 from typing import Union
-from ..utils import diverging_palette
-from ..gtensor import fetch_interactions, fetch_component, fetch_shared_effects
+from mutopia.palettes import diverging_palette
 
 
 def _plot_interaction_matrix(
     signature_plot_fn,
-    interaction_matrix: pd.DataFrame,
-    shared_effects: pd.Series,
+    interaction_matrix,
+    shared_effects,
     palette=diverging_palette,
     gridspec=None,
     title=None,
@@ -18,6 +14,8 @@ def _plot_interaction_matrix(
     heatmap_row_height=0.25,
     width=10,
 ):
+    import numpy as np
+    import matplotlib.pyplot as plt
 
     n_rows, _ = interaction_matrix.shape
     plot_height = base_height + heatmap_row_height * n_rows
@@ -39,7 +37,12 @@ def _plot_interaction_matrix(
     base_ax = fig.add_subplot(gs[0, 1])
     signature_plot_fn(ax=base_ax)
     base_ax.set_ylabel(
-        title or "Base \nrates ", rotation=0, labelpad=0.1, fontsize=8, ha="right", va="center"
+        title or "Base \nrates ",
+        rotation=0,
+        labelpad=0.1,
+        fontsize=8,
+        ha="right",
+        va="center",
     )
     base_ax.set_xticklabels([])
 
@@ -103,10 +106,9 @@ def _plot_interaction_matrix(
     return gs
 
 
-
 def plot_interaction_matrix(
     dataset,
-    component : Union[str, int],
+    component: Union[str, int],
     palette=diverging_palette,
     gridspec=None,
     title=None,
@@ -141,9 +143,14 @@ def plot_interaction_matrix(
     The interaction matrix shows how the component behaves across different contexts,
     highlighting both shared effects and context-specific variations.
     """
-    interactions = (
-        fetch_interactions(dataset, component)
-        .drop_sel(genome_state="Baseline")
+    from mutopia.gtensor import (
+        fetch_interactions,
+        fetch_component,
+        fetch_shared_effects,
+    )
+
+    interactions = fetch_interactions(dataset, component).drop_sel(
+        genome_state="Baseline"
     )
     dtype = interactions.modality()
     interactions = dtype._flatten_observations(interactions).to_pandas()
@@ -153,7 +160,7 @@ def plot_interaction_matrix(
         .drop_sel(genome_state="Baseline")
         .to_pandas()
     )
-    
+
     signature = fetch_component(dataset, component)
 
     return _plot_interaction_matrix(

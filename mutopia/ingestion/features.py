@@ -4,8 +4,7 @@ import subprocess
 import tempfile
 from numpy import array
 import numpy as np
-from ..genome_utils.bed12_utils import check_regions_file
-from ..utils import safe_read
+from ..genome_utils.bed12_utils import check_regions_file, safe_read
 
 
 def make_continous_features_bigwig(
@@ -25,7 +24,7 @@ def make_continous_features_bigwig(
         try:
             subprocess.check_output(
                 ["bigWigAverageOverBed", bigwig_file, regions_file, bed.name],
-                stderr=subprocess.STDOUT
+                stderr=subprocess.STDOUT,
             )
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f"bigWigAverageOverBed failed: {e.output.decode()}")

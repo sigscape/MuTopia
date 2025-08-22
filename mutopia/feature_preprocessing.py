@@ -1,7 +1,7 @@
 from functools import wraps
 import subprocess
 import os
-from .utils import logger
+from mutopia.utils import logger
 
 
 def compose_config(
@@ -119,7 +119,7 @@ def command_step(cmd):
 @make_pipeline_fn
 def fetch_data(target, url):
     import requests
-    
+
     with requests.get(url, stream=True) as r:
         r.raise_for_status()
         os.makedirs("downloads", exist_ok=True)
