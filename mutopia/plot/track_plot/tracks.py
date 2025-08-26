@@ -155,26 +155,42 @@ def empirical_topography(
     label="Empirical\ntopography",
     height=1.5,
     quantile_cutoff=0.999,
-    topography_kw={"vmin": -3, "vmax": 3, "cbar": False},
-    **heatmap_kw,
+    s=0.01,
+    alpha=0.5,
+    topography_kw={"vmin": -3, "vmax": 3, "cbar": False, "alpha": 0.15},
+    **scatter_kw,
 ):
+    from scipy.sparse import coo_matrix, csc_matrix
+
     def _get_heatmap(dataset):
         matrix = transformer._fetch_matrix("empirical_marginal", dataset)
         x = matrix[transformer.ordering_].values.T
-        return np.clip(x, a_min=None, a_max=np.quantile(x, quantile_cutoff))
+        max_cut = np.quantile(x[np.isfinite(x)], quantile_cutoff)
+        x = np.nan_to_num(x, nan=0., neginf=0.)
+        x = np.clip(x, a_min=0., a_max=max_cut)
+        
+        x = coo_matrix(x)
+        x.eliminate_zeros()
+        return x
 
+    def _topography_scatter(ax, *, dataset, start, end, idx, interval, **kw):
+        matrix = _get_heatmap(dataset)
+        matrix = coo_matrix(csc_matrix(matrix)[:, idx]) # unroll the matrix
+
+        u = np.random.rand(len(matrix.data))
+        x = ((end - start)[matrix.col])*u + start[matrix.col]
+
+        ax.scatter(x, matrix.row, c=matrix.data, cmap="Greys", **scatter_kw, s=s)
+        ax.set_xlim(interval)
+
+        return ax
+    
     return tr.stack_plots(
-        tr.heatmap_plot(
-            _get_heatmap,
-            palette=palette,
-            zorder=1,
-            **heatmap_kw,
-        ),
+        _topography_scatter,
         topography(
             transformer,
             palette=palette,
             zorder=0,
-            alpha=0.15,
             **topography_kw,
         ),
         label=label,

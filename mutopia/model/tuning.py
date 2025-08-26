@@ -15,6 +15,13 @@ from optuna.storages import JournalStorage
 from optuna.storages.journal import JournalFileBackend
 from mutopia.utils import logger
 
+def _get_study_path(study_name):
+    #return os.path.join(
+    #    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    #    "{study_name}",
+    #)
+    return os.path.join("studies/", study_name)
+
 
 def _get_nfs_storage(study_name):
     """
@@ -30,40 +37,9 @@ def _get_nfs_storage(study_name):
     JournalStorage
         Optuna storage backend using journal file
     """
-
-    journal = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        f".journal.{study_name}.db",
-    )
-
+    journal = _get_study_path(study_name)
     storage = JournalStorage(JournalFileBackend(journal))
     return storage
-
-
-def list_studies():
-    """
-    List all available Optuna studies.
-
-    Searches for journal database files in the parent directory and extracts
-    study names from the file names.
-
-    Returns
-    -------
-    list of str
-        List of study names found in journal files
-    """
-
-    glob_script = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        ".journal.{study_name}.db",
-    )
-
-    journal_files = glob(glob_script.format(study_name="*"))
-
-    return [
-        os.path.basename(journal).removeprefix(".journal.").removesuffix(".db")
-        for journal in journal_files
-    ]
 
 
 def dashboard(study_name, storage=None):
@@ -167,6 +143,9 @@ def create_study(
     **model_kw
         Additional model parameters to store as study attributes
     """
+
+    if not os.path.exists("studies"):
+        os.makedirs("studies")
 
     if storage is None:
         storage = _get_nfs_storage(study_name)

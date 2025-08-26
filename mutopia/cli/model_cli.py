@@ -781,31 +781,6 @@ def retrain(
         raise click.ClickException(f"Retraining failed: {str(e)}")
 
 
-@study.command("ls", short_help="List all available optimization studies")
-def list_studies():
-    """
-    List all available hyperparameter optimization studies.
-
-    Shows the names of all studies that have been created and are available
-    for running trials, viewing results, or retraining models.
-
-    Examples:
-        # List all studies
-        model study ls
-    """
-    from .model_core import list_optimization_studies
-
-    try:
-        click.echo("Available studies:")
-        studies = list_optimization_studies()
-        if studies:
-            click.echo("\n".join(studies))
-        else:
-            click.echo("No studies found.")
-    except Exception as e:
-        raise click.ClickException(f"Failed to list studies: {str(e)}")
-
-
 @model.command("annot", short_help="Annotate dataset using trained model")
 @click.argument("model", type=click.Path(exists=True), metavar="MODEL_FILE")
 @click.argument("dataset", type=click.Path(exists=True), metavar="DATASET_FILE")

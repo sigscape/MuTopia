@@ -1,3 +1,3 @@
 from .track_plot import *
 from .transforms import *
-from .tracks import *
+import mutopia.plot.track_plot.tracks
