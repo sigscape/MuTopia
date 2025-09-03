@@ -10,20 +10,22 @@ from mutopia.gtensor import dims_except_for, train_test_split
 from mutopia.gtensor.validation import check_corpus
 from mutopia.gtensor.dtypes import get_mode_config
 
-from .optim import fit_model
-from .model_components import *
-from .latent_var_models import *
-from .factor_model import FactorModel
-from ..mixture_model import *
+from .model.optim import fit_model
+from .model.model_components import *
+from .model.latent_var_models import *
+from .model.factor_model import FactorModel
 
 # interfaces
-from ..mixture_model.mixture_interface import MixtureInterface as MIX
+from .mixture_model.mixture_interface import MixtureInterface as MIX
+from .mixture_model import DenseMixtureModel, SparseMixtureModel, SharedExposuresMixtureModel
 
 """
 The Model class is a wrapper around a trained model state object, 
 and provides the high-level interface for interacting with the model.
 This is the entry point for the user to interact with and annotate data.
 """
+
+__all__=["TopographyModel"]
 
 
 class DenseSharedMixtureModel(DenseMixtureModel, SharedExposuresMixtureModel):

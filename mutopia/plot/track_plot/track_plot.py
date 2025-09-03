@@ -38,6 +38,7 @@ __all__ = [
     "fill_plot",
     "bar_plot",
     "scatterplot",
+    "static_track",
     "heatmap_plot",
     "categorical_plot",
     "custom_plot",

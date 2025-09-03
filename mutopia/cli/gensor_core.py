@@ -187,6 +187,8 @@ def add_discrete_feature(
         class_priority=classes if len(classes) > 0 else None,
     )
 
+    logger.info("Found classes: " + ", ".join(['"{}"'.format(str(c)) for c in classes]))
+
     disk.write_feature(
         dataset,
         feature_vals,
@@ -552,19 +554,10 @@ def list_gtensor_samples(dataset: str) -> List[str]:
     return disk.list_samples(dataset)
 
 
-def linearize_bed_files(
-    bed_files: List[str],
-    max_region_size: int = 25000,
-):
-    """Linearize BED files."""
-    ingest.linearize_beds(
-        *bed_files,
-        max_region_size=max_region_size,
-    )
-
-
-def make_annotation_bedfile(gtf_file: str = None, output=None):
+def make_annotation_bedfile(gtf_file: Optional[str] = None, output: Optional[str] = None):
     """Create an expression bedfile from quantitation files."""
+
+    from mutopia.ingestion import gene_features
 
     gtf_file = gtf_file or "MANE.GRCh38.v1.3.ensembl_genomic.gtf"
     if not os.path.exists(gtf_file):
@@ -586,6 +579,8 @@ def make_expression_bedfile(
     join_on: str = "gene_id",
 ):
 
+    from mutopia.ingestion import gene_features
+    
     annotation_file = make_annotation_bedfile(gtf_file)
 
     quant = gene_features.join_quantitation(

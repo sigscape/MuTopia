@@ -5,8 +5,7 @@ including loading datasets, applying transformations, and generating explanation
 """
 
 import xarray as xr
-
-xr.set_options(use_new_combine_kwarg_defaults=True)
+#xr.set_options(use_new_combine_kwarg_defaults=True)
 import pandas as pd
 import numpy as np
 from typing import Union, List
@@ -940,21 +939,30 @@ def fetch_features(
     Features are filtered to include only those with numerical data types,
     since these can be stuck together in an xarray DataArray.
     """
+    from fnmatch import fnmatch
 
     fnames = [
         name
-        for name, arr in dataset.sections["Features"].items()
+        for name, _ in dataset.sections["Features"].items()
         if (
-            np.issubdtype(arr.dtype, np.number)
-            and (
-                name in feature_names
-                or os.path.basename(name) in feature_names
-                or len(feature_names) == 0
+            any(
+                fnmatch(name, pattern) or fnmatch(os.path.basename(name), pattern)
+                for pattern in feature_names
             )
-            and source is None
-            or os.path.dirname(name) == source
+            or len(feature_names) == 0
         )
+        and (source is None or fnmatch(os.path.dirname(name), source))
     ]
+
+    if not fnames:
+        raise ValueError("No matching features found.")
+
+    # Check that all features have inherit from same numpy data type (and so can be concatenated without unexpected type conversions)
+    dtypes = {dataset.sections["Features"][name].dtype for name in fnames}
+
+    check_dtype = lambda _dtype : all(np.issubdtype(dtype, _dtype) for dtype in dtypes)
+    if not (check_dtype(np.number) or check_dtype(np.str_)):
+        raise ValueError("All features must have a numeric data type.")
 
     # Reorder features to match the order in feature_names
     if len(feature_names) > 0:

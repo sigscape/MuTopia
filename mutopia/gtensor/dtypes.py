@@ -11,13 +11,11 @@ def load_mode_config(filename):
 
     module_path, class_name = filename.rsplit(":", 1)
 
-    if not os.path.exists(module_path):
-        raise FileNotFoundError(
-            f"No such file exists: {module_path}, cannot load mode config."
-        )
-
-    spec = importlib.util.spec_from_file_location("modality", module_path)
+    spec = importlib.util.find_spec(module_path)
+    if spec is None:
+        raise ImportError(f"No module named '{module_path}'")
     module = importlib.util.module_from_spec(spec)
+    
     sys.modules["modality"] = module
     spec.loader.exec_module(module)
 

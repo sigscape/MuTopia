@@ -182,6 +182,7 @@ def make_discrete_features(
     **kw,
 ):
     check_regions_file(regions_file)
+    null = str(null)
 
     def _resolve_class_priority(vals, _class_priority):
         vals = set(vals).difference({null})

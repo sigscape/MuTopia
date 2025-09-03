@@ -5,8 +5,8 @@ from ..ingestion import FileType
 
 
 class URLConfig(BaseModel):
-    celltype: Optional[str] = Field(None, description="Name of the data source")
     file: str = Field(..., description="URL to the data source")
+    celltype: Optional[str] = Field(None, description="Name of the data source")
 
     def __str__(self) -> str:
         return f"{self.celltype}: {self.file}"
@@ -14,17 +14,17 @@ class URLConfig(BaseModel):
 
 class FeatureConfig(BaseModel):
     normalization: str = Field(..., description="Type of normalization to apply")
+    classes: List[str] = Field(
+        [], description="List of classes for the feature"
+    )
+    sources: Union[List[URLConfig], List[str]] = Field(
+        ..., description="List of URLConfig objects or URLs for feature data"
+    )
     column: Optional[int] = Field(
         4, description="Column number to use from input file (if applicable)"
     )
     group: Optional[str] = Field("all", description="Group name for the feature")
     null: Optional[str] = Field(None, description="Value to use for null values")
-    classes: Optional[List[str]] = Field(
-        None, description="List of classes for the feature"
-    )
-    sources: Union[List[URLConfig], List[str]] = Field(
-        ..., description="List of URLConfig objects or URLs for feature data"
-    )
 
     @property
     def file_type(self) -> FileType:
@@ -43,8 +43,10 @@ class FeatureConfig(BaseModel):
 
     def model_post_init(self, *args, **kwargs) -> None:
         """Validate after model initialization"""
-        super().model_post_init(*args, **kwargs)
+        # convert all sources to URL configs
+        self.sources = [URLConfig(file=src) if isinstance(src, str) else src for src in self.sources]
         self.validate_extension()
+        super().model_post_init(*args, **kwargs)
 
 
 class SampleParams(BaseModel):

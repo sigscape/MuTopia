@@ -116,6 +116,16 @@ def command_step(cmd):
     return make_pipeline_fn(inner)
 
 
+def branch(condition, if_true, if_false):
+    def inner(target, input, **kwargs):
+        if condition(input):
+            return if_true(target, input, **kwargs)
+        else:
+            return if_false(target, input, **kwargs)
+
+    return make_pipeline_fn(inner)
+
+
 @make_pipeline_fn
 def fetch_data(target, url):
     import requests
