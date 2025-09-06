@@ -36,6 +36,7 @@ __all__ = [
     "get_shap_summary",
     "equal_size_quantiles",
     "slice_regions",
+    "slice_samples",
     "annot_empirical_marginal",
     "make_mixture_dataset",
     "match_dims",
@@ -673,6 +674,11 @@ def equal_size_quantiles(dataset, var_name, n_bins=10, key=None):
     logger.info("Added key: " + key)
 
     return dataset
+
+
+def slice_samples(dataset, samples: List[str]):
+    d = mutate(lambda d: d.sel(sample=list(samples)) if len(samples) > 0 else d)(dataset)
+    return DifferentSamples(d, samples)
 
 
 def slice_regions(dataset, *regions, lazy=False):

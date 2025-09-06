@@ -382,6 +382,23 @@ def slice_gtensor(
     disk.write_dataset(dataset, output, bar=True)
 
 
+def slice_samples(
+    dataset: str,
+    output: str,
+    sample_id_file: str,
+):
+    """Slice a G-Tensor by sample names."""
+    with open(sample_id_file) as f:
+        sample_names = [line.strip() for line in f if len(line.strip()) > 0]
+
+    if not len(sample_names) > 0:
+        raise click.BadParameter("Must provide at least one sample name.")
+
+    d = lazy_load(dataset)
+    d = interfaces.DifferentSamples(d, sample_names)
+    disk.write_dataset(d, output, bar=True)
+
+
 def convert_gtensor(
     input: str,
     output: str,

@@ -69,14 +69,34 @@ def _train_test_split(*args, **kwargs):
     Example:
         gtensor split my_dataset.nc chr21 chr22 --min-region-size 100
     """
+    from .gensor_core import train_test_split
     train_test_split(*args, **kwargs)
 
 
-@gtensor_cli.command("slice", short_help="Extract genomic regions from a G-Tensor")
+@gtensor_cli.command("slice-samples")
+@click.argument("dataset", type=click.Path(exists=True), metavar="DATASET")
+@click.argument("output", type=click.Path(writable=True), metavar="OUTPUT")
+@click.argument("sample_id_file", type=click.Path(exists=True, dir_okay=False), metavar="SAMPLE_ID_FILE")
+def _slice_samples(*args, **kwargs):
+    """
+    Extract specific samples from a G-Tensor dataset into a new file.
+
+    DATASET is the input G-Tensor file.
+    OUTPUT is the output path for the sliced G-Tensor.
+    SAMPLE_ID_FILE is a text file with one sample ID per line to extract.
+
+    Example:
+        gtensor slice-samples input.nc output.nc sample_ids.txt
+    """
+    from .gensor_core import slice_samples
+    slice_samples(*args, **kwargs)
+
+
+@gtensor_cli.command("slice-regions", short_help="Extract genomic regions from a G-Tensor")
 @click.argument("dataset", type=click.Path(exists=True), metavar="DATASET")
 @click.argument("output", type=click.Path(writable=True), metavar="OUTPUT")
 @click.argument("query_regions", type=str, nargs=-1, metavar="REGIONS...")
-def _slice_loci(*args, **kwargs):
+def _slice_regions(*args, **kwargs):
     """
     Extract specific genomic regions from a G-Tensor dataset.
 
@@ -87,10 +107,9 @@ def _slice_loci(*args, **kwargs):
     chromosome (string), start position (int), end position (int).
 
     Example:
-        gtensor slice input.nc output.nc -r chr1 1000 2000 -r chr2 5000 6000
+        gtensor slice input.nc output.nc chr1:1000-20000 chr2
     """
     from .gensor_core import slice_gtensor
-
     slice_gtensor(*args, **kwargs)
 
 

@@ -229,8 +229,9 @@ class FetchSample(BaseAccessor):
 
 @xr.register_dataset_accessor("iter_samples")
 class FetchSample(BaseAccessor):
-    def __call__(self):
-        for sample_name in self._xrds.list_samples():
+    def __call__(self, subset=None):
+        load_samples = subset or self._xrds.list_samples()
+        for sample_name in load_samples:
             yield self._xrds.fetch_sample(sample_name)
 
 
