@@ -417,6 +417,45 @@ def list_sources(dataset):
 
 
 def fetch_source(dataset, source):
+    """
+    Extract and restructure data for a specific source from a multi-source dataset.
+
+    This function filters and reorganizes a dataset to contain only data relevant to a 
+    specified source, while maintaining shared features and state variables that are 
+    common across all sources.
+
+    Parameters
+    ----------
+    dataset : xarray.Dataset
+        The input dataset containing data from multiple sources, organized with 
+        hierarchical variable names (e.g., "Features/source/variable", "State/source/variable").
+    source : str
+        The name of the source to extract data for. Must be present in the dataset.
+
+    Returns
+    -------
+    xarray.Dataset
+        A new dataset containing:
+        - Source-specific features and state variables (with paths flattened)
+        - Shared features and state variables (common to all sources)
+        - Other data variables from the original dataset
+        - Updated name attribute reflecting the source
+        - Source dimension removed if present
+
+    Raises
+    ------
+    ValueError
+        If the specified source is not found in the dataset.
+
+    Notes
+    -----
+    The function performs the following transformations:
+    1. Validates that the source exists in the dataset
+    2. Separates source-specific and shared variables from Features and State groups
+    3. Creates a rename mapping to flatten source-specific variable paths
+    4. Combines source-specific, shared, and other variables into a new dataset
+    5. Updates dataset attributes and coordinates while removing source dimension
+    """
     sources = list_sources(dataset)
     if not source in sources:
         raise ValueError(f"Source {source} not found in dataset")
@@ -767,14 +806,16 @@ def annot_empirical_marginal(dataset, key="empirical_marginal"):
     """
     todense = lambda x: x.asdense() if x.is_sparse() else x
     coo_or_dense = lambda x: x.ascoo() if x.is_sparse() else x
+    reduce_samples = list(dataset.list_samples()[1:])
 
     X_emp = reduce(
         lambda x, y: x + y,
         (
-            coo_or_dense(dataset.fetch_sample(sample_name).X)
-            for sample_name in tqdm(
-                dataset.list_samples()[1:],
+            coo_or_dense(sample.X)
+            for sample in tqdm(
+                dataset.iter_samples(subset=reduce_samples),
                 desc="Reducing samples",
+                total=len(reduce_samples),
             )
         ),
         todense(dataset.fetch_sample(dataset.list_samples()[0]).X),
@@ -1079,7 +1120,7 @@ def rename_components(dataset: xr.Dataset, names: List[str]):
                 "Some components in dataset do not match the model components. Just delete the SHAP_values and try again."
             )
 
-    dataset = dataset.assign_coords(new_coords)
+    dataset = dataset.mutate(lambda ds : ds.assign_coords(new_coords))
     return dataset
 
 

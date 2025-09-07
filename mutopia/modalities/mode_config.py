@@ -2,6 +2,7 @@ import xarray as xr
 import os
 from abc import ABC, abstractmethod
 import json
+from typing import Dict, Tuple
 from mutopia.palettes import categorical_palette
 
 
@@ -13,16 +14,16 @@ class ModeConfig(ABC):
     DATABASE: str = None
 
     @property
-    def sizes(self):
-        return {k: len(v) for k, v in self.coords.items()}
+    def sizes(self) -> Dict[str, int]:
+        return {k: len(v[1]) for k, v in self.coords.items()}
 
     @property
-    def dims(self):
+    def dims(self) -> Tuple[str, ...]:
         return tuple(self.coords.keys())
 
     @property
     @abstractmethod
-    def coords(self) -> dict:
+    def coords(self) -> Dict[str, Tuple[str, list]]:
         raise NotImplementedError
 
     @property
@@ -38,11 +39,10 @@ class ModeConfig(ABC):
 
         return list(database.keys())
 
-    @classmethod
-    def load_components(cls, *init_components):
+    def load_components(self, *init_components):
         import numpy as np
 
-        db_path = os.path.join(os.path.dirname(__file__), cls.DATABASE)
+        db_path = os.path.join(os.path.dirname(__file__), self.DATABASE)
         with open(db_path, "r") as f:
             database = json.load(f)
 
@@ -51,11 +51,18 @@ class ModeConfig(ABC):
             if not component in database:
                 raise ValueError(f"Component {component} not found in database")
 
-            comps.append([database[component][l] for l in cls().coords["context"][1]])
+            comps.append([database[component][l] for l in self.coords["context"][1]])
 
         return xr.DataArray(
             np.array(comps, dtype=float),
             dims=("component", "context"),
+            coords={
+                "context": ("context", self.coords["context"][1]),
+                "component": ("component", list(init_components)),
+            },
+            attrs={
+                "dtype" : self.MODE_ID,
+            }
         )
 
     @classmethod

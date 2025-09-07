@@ -559,38 +559,44 @@ class TopographyModel(ABC, BaseEstimator):
             dim="component",
         )
 
-        interactions, shared_effects = list(
-            zip(
-                *[
-                    self.factor_model_.format_interactions(component)
-                    for component in range(self.n_components)
-                ]
+        if not self.factor_model_.has_interactions:
+            component_xrs = {"Spectra/spectra": spectra}
+        else:
+            interactions, shared_effects = list(
+                zip(
+                    *[
+                        self.factor_model_.format_interactions(component)
+                        for component in range(self.n_components)
+                    ]
+                )
             )
-        )
 
-        interactions = xr.concat(
-            interactions,
-            dim="component",
-        )
+            interactions = xr.concat(
+                interactions,
+                dim="component",
+            )
 
-        shared_effects = xr.concat(
-            shared_effects,
-            dim="component",
-        )
+            shared_effects = xr.concat(
+                shared_effects,
+                dim="component",
+            )
+
+            component_xrs = {
+                "Spectra/spectra": spectra,
+                "Spectra/interactions": interactions,
+                "Spectra/shared_effects": shared_effects,
+            }
+        
 
         dataset = dataset.mutate(
             lambda ds: (
                 ds.assign_coords(component=("component", self.component_names)).assign(
-                    {
-                        "Spectra/spectra": spectra,
-                        "Spectra/interactions": interactions,
-                        "Spectra/shared_effects": shared_effects,
-                    }
+                    **component_xrs
                 )
             )
         )
         logger.info(
-            "Added keys to dataset: Spectra/spectra, Spectra/interactions, Spectra/shared_effects"
+            "Added keys to dataset: " + ", ".join(component_xrs.keys())
         )
         return dataset
 
@@ -809,6 +815,7 @@ class TopographyModel(ABC, BaseEstimator):
         n_samples=2000,
         seed=42,
         key="SHAP_values",
+        source=None,
     ):
         """
         Calculate and add SHAP values to explain component predictions.
@@ -852,6 +859,9 @@ class TopographyModel(ABC, BaseEstimator):
         pip install shap
         """
 
+        if self.GT.is_mixture_corpus(dataset) and source is None:
+            raise ValueError("If you're working with a mixture corpus, you must choose a 'source' celltype from which to annotate SHAP values")
+
         try:
             import shap
         except ImportError:
@@ -871,15 +881,12 @@ class TopographyModel(ABC, BaseEstimator):
             subset = dataset
 
         n_loci = subset.sizes["locus"]
-        n_sources = self.GT.n_sources(subset)
         locus_model = self.factor_model_.models["theta_model"]
 
-        X = np.vstack(
-            [
-                locus_model._fetch_feature_matrix(subset)
-                for _, subset in self.GT.expand_datasets(subset)
-            ]
-        )
+        if self.GT.is_mixture_corpus(dataset):
+            subset = self.GT.fetch_source(subset, source)
+
+        X = locus_model._fetch_feature_matrix(subset)
 
         background_idx = np.random.RandomState(0).choice(
             len(X), size=min(1000, len(X)), replace=False
@@ -919,13 +926,12 @@ class TopographyModel(ABC, BaseEstimator):
         if not scan:
             coords["shap_locus"] = subset.locus.data
 
-        shap_matrix = shap_matrix.reshape((len(use_components), n_sources, n_loci, -1))
+        shap_matrix = shap_matrix.reshape((len(use_components), n_loci, -1))
 
         dataset[key] = xr.DataArray(
             shap_matrix,
             dims=(
                 "shap_component",
-                "source",
                 "locus" if scan else "shap_locus",
                 "shap_features",
             ),
@@ -960,12 +966,15 @@ class TopographyModel(ABC, BaseEstimator):
             4. Component distribution annotations
             5. Marginal prediction annotations
         """
+        from mutopia.gtensor import annot_empirical_marginal
+        
         _annot_fns = [
-            partial(self.annot_contributions, threads=threads),
+            self.annot_components,
             partial(self.annot_SHAP_values, threads=threads),
+            partial(self.annot_contributions, threads=threads),
             partial(self.annot_component_distributions, threads=threads),
             partial(self.annot_marginal_prediction, threads=threads),
-            self.annot_components,
+            annot_empirical_marginal,
         ]
 
         for fn in _annot_fns:

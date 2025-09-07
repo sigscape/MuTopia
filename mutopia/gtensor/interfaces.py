@@ -203,7 +203,7 @@ class DifferentSamples(CorpusInterface):
 
     def __init__(self, corpus, samples):
         self._corpus = corpus
-        self._samples = samples
+        self._samples = list(samples)
 
     def list_samples(self):
         return self._samples

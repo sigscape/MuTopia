@@ -19,7 +19,7 @@ def load_mode_config(filename):
     sys.modules["modality"] = module
     spec.loader.exec_module(module)
 
-    return getattr(module, class_name)()
+    return getattr(module, class_name)
 
 
 @cache

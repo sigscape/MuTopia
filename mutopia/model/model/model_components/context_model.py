@@ -443,8 +443,8 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         signature = self._calc_lambda(k, encoding_matrix)
 
         # check if self._comp_context_distribution is a matrix, if it's not, skip
-        if len(self._comp_context_distribution.shape)<1:
-            normalization="none"
+        if len(self._comp_context_distribution.shape) < 2:
+            normalization = "none"
 
         if normalization == "weighted":
             signature += np.log(self._comp_context_distribution[k, :])[:, None]
@@ -465,11 +465,18 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         return self.format_component(k, normalization="none").sel(
             genome_state="Baseline"
         )
+    
+    @property
+    def has_interactions(self) -> bool:
+        return self.mesoscale_transformer.n_coefs > 0
 
     def get_interaction_summary(self, k):
 
         c = self.context_transformer.n_states + 1
         r = self.mesoscale_transformer.n_coefs
+
+        if r <= 0:
+            raise ValueError("No interactions!")
 
         interaction_matrix = self.coefs_[k][-r * c :].reshape((c, r)).T
         interaction_matrix = np.vstack(

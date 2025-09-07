@@ -316,6 +316,10 @@ class FactorModel:
                 ),
             )
         )
+    
+    @property
+    def has_interactions(self) -> bool:
+        return self.models["context_model"].has_interactions
 
     def format_interactions(self, k):
         return self.models["context_model"].get_interaction_summary(k)

@@ -116,8 +116,6 @@ def plot_spectrum(signature, *select, **kw):
     >>> plot_component(signature_data, "Component1", "Component2")  # Plots specific components
     >>> plot_component(signature_data, "Baseline", figsize=(10, 6))  # With additional kwargs
     """
-    if len(select) == 0:
-        select = ["Baseline"]
     return signature.modality().plot(signature, *select, **kw)
 
 
