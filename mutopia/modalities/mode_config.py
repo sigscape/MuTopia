@@ -32,7 +32,7 @@ class ModeConfig(ABC):
 
     @property
     def available_components(self):
-        db_path = os.path.join(os.path.dirname(__file__), cls.DATABASE)
+        db_path = os.path.join(os.path.dirname(__file__), self.DATABASE)
         with open(db_path, "r") as f:
             database = json.load(f)
 

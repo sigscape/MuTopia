@@ -434,14 +434,6 @@ def _load_dense(group, **kwargs):
     )
 
 
-def _backend_load_sample(dset, sample_name, coo=False):
-
-    X_group = dset.groups["raw"]["X"][sample_name]
-    X = (_load_sparse if _is_sparse_coo(X_group) else _load_dense)(X_group, coo=coo)
-
-    return xr.Dataset({"X": X}).assign_coords({"sample": sample_name})
-
-
 def _load_sample_ploidy(dset, sample_name, n_loci):
     try:
         ploidy_group = dset.groups["raw"]["ploidy"][sample_name]
@@ -455,6 +447,15 @@ def _load_sample_ploidy(dset, sample_name, n_loci):
         ploidy = _load_sparse(ploidy_group, coo=True, name="ploidy")
 
     return ploidy
+
+
+def _backend_load_sample(dset, sample_name, coo=False,):
+
+    X_group = dset.groups["raw"]["X"][sample_name]
+    X = (_load_sparse if _is_sparse_coo(X_group) else _load_dense)(X_group, coo=coo)
+    n_loci = X.sizes["locus"]
+    ploidy = _load_sample_ploidy(dset, sample_name, n_loci)
+    return xr.Dataset({"X": X, "ploidy": ploidy}).assign_coords({"sample": sample_name})
 
 
 def _load_ploidy_matrix(filename, sample_names):
@@ -532,7 +533,7 @@ def _pack_samples(samples):
     return samples
 
 
-def load_dataset(filename, with_samples=True, with_state=True):
+def load_dataset(filename, with_samples=True, with_state=True, verbose=False):
 
     def open_ds(**kw):
         with retry_until_write(xr.open_dataset)(filename, engine="netcdf4", **kw) as ds:
@@ -572,15 +573,18 @@ def load_dataset(filename, with_samples=True, with_state=True):
 
         dataset = dataset.merge(section)
 
+        if verbose:
+            logger.info(f"Loaded section {section_name} with {len(section.data_vars)} vars.")
+
     ## load the samples
     try:
         sample_names = _list_sample_names(filename)
         dataset = dataset.assign_coords({"sample": sample_names})
 
-        ploidy = _load_ploidy_matrix(filename, sample_names)
-        dataset = dataset.merge(ploidy)
-
         if with_samples:
+            ploidy = _load_ploidy_matrix(filename, sample_names)
+            dataset = dataset.merge(ploidy)
+
             samples = _pack_samples(
                 list(yield_samples(filename, *sample_names, coo=True))
             )

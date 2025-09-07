@@ -148,12 +148,12 @@ class MixtureInterface(GtensorInterface):
         return dataset
 
     @classmethod
-    def fetch_topic_compositions(self, dataset, sample_name):
+    def fetch_topic_compositions(cls, dataset, sample_name):
         """
         Fetch topic compositions for a given sample from the dataset.
         """
         gamma = (
-            self.fetch_val(dataset, "topic_compositions")
+            cls.fetch_val(dataset, "topic_compositions")
             .sel(sample=sample_name)
             .transpose("source", "component")
             .data

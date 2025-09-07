@@ -102,16 +102,18 @@ class LazySampleLoader(CorpusInterface):
         except NoVars:
             return disk.load_sample(self._get_filename(), sample_name)
 
-    def iter_samples(self):
+    def iter_samples(self, subset=None):
 
         sample_vars = [
             k for k, v in self._corpus.data_vars.items() if "sample" in v.dims
         ]
         has_sample_vars = len(sample_vars) > 0
 
+        load_samples = subset or self.list_samples()
+
         for sample_name, data in zip(
-            self.list_samples(),
-            disk.yield_samples(self._get_filename(), *self.list_samples()),
+            load_samples,
+            disk.yield_samples(self._get_filename(), *load_samples),
         ):
             if has_sample_vars:
                 yield self._corpus[sample_vars].sel(sample=sample_name).merge(data)
@@ -168,8 +170,8 @@ class LazySlicer(CorpusInterface):
         else:
             return self.isel(**self._apply_slices)
 
-    def iter_samples(self):
-        for sample in self._base_corpus.iter_samples():
+    def iter_samples(self, subset=None):
+        for sample in self._base_corpus.iter_samples(subset=subset):
             yield sample.isel(**self._apply_slices)
 
 
@@ -195,21 +197,6 @@ class SampleCorpusFusion(CorpusInterface):
         yield self._sample
 
 
-class BootstrapCorpus(CorpusInterface):
-
-    def __init__(self, corpus, random_state):
-        self._corpus = corpus
-
-        self._sample = random_state.choice(
-            corpus.list_samples(),
-            size=len(corpus.list_samples()),
-            replace=True,
-        )
-
-    def list_samples(self):
-        return self._sample
-
-
 class DifferentSamples(CorpusInterface):
 
     __slots__ = ("_corpus", "_samples")
@@ -226,9 +213,8 @@ class DifferentSamples(CorpusInterface):
             raise KeyError(f"Sample {sample_name} not found in the corpus.")
         return self._corpus.fetch_sample(sample_name)
 
-    def iter_samples(self):
-        for sample_name in self.list_samples():
-            yield self.fetch_sample(sample_name)
+    def iter_samples(self, subset=None):
+        yield from self._corpus.iter_samples(subset=subset or self._samples)
 
 
 class TransformerInterface(CorpusInterface):
