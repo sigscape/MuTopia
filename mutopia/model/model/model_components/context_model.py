@@ -442,6 +442,10 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         # C x S
         signature = self._calc_lambda(k, encoding_matrix)
 
+        # check if self._comp_context_distribution is a matrix, if it's not, skip
+        if len(self._comp_context_distribution.shape)<1:
+            normalization="none"
+
         if normalization == "weighted":
             signature += np.log(self._comp_context_distribution[k, :])[:, None]
 

@@ -38,7 +38,7 @@ def plot_signature_report(
     """
     import matplotlib.pyplot as plt
     from collections import defaultdict
-    from .signature_plot import plot_component
+    from .signature_plot import plot_spectrum
     from .coef_matrix_plot import plot_interaction_matrix
     from ..gtensor import fetch_component
     from .bubble_plot import plot_shap_summary
@@ -74,7 +74,7 @@ def plot_signature_report(
 
     for i, states in enumerate(state_groups.values()):
         ax = fig.add_subplot(gs0[i, : len(states)])
-        plot_component(
+        plot_spectrum(
             signatures,
             *states,
             ax=ax,

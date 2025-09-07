@@ -549,11 +549,11 @@ class TopographyModel(ABC, BaseEstimator):
 
         dump(self, path)
 
-    def annot_components(self, dataset: xr.Dataset):
+    def annot_components(self, dataset: xr.Dataset, normalization="global"):
 
         spectra = xr.concat(
             [
-                self.factor_model_.format_component(component)
+                self.factor_model_.format_component(component, normalization=normalization)
                 for component in range(self.n_components)
             ],
             dim="component",

@@ -285,7 +285,7 @@ def mega_summary(
 ):
 
     import seaborn as sns
-    from mutopia.plot import plot_component, plot_shap_summary
+    from mutopia.plot import plot_spectrum, plot_shap_summary
     from mutopia.gtensor import fetch_component
 
     feature_order = [
@@ -338,7 +338,7 @@ def mega_summary(
         ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
 
     def _plot_component(comp_name, ax):
-        ax = plot_component(fetch_component(dataset, comp_name), ax=ax)
+        ax = plot_spectrum(fetch_component(dataset, comp_name), ax=ax)
         ax.set_ylabel(
             comp_name, fontsize=9, rotation=0, labelpad=10, va="center", ha="right"
         )
