@@ -42,6 +42,7 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         *,
         n_components: int,
         random_state,
+        **kw, # to allow subclasses to add more parameters
     ):
         super().__init__(*corpuses)
 
@@ -253,12 +254,16 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
 
 class LinearThetaModel(ThetaModel):
 
-    categorical_encoder = (OneHotEncoder(sparse_output=False, drop="first"),)
+    categorical_encoder = partial(OneHotEncoder, sparse_output=False, drop="first", 
+                                  feature_name_combiner=lambda fname, cat: f"{fname}:{cat}")
 
     def __init__(self, corpuses, l2_regularization=0.1, **kw):
         super().__init__(
             corpuses, model_kw={"l2_regularization": l2_regularization}, **kw
         )
+
+    def _check_input(self, X):
+        return X
 
     def _make_model(self, *, l2_regularization, **kw):
         return PoissonRegressor(
@@ -268,70 +273,63 @@ class LinearThetaModel(ThetaModel):
             fit_intercept=False,
         )
 
-    """def _make_design_matrix(self, *corpuses):
-        
-        design_matrix = self._get_design_matrix(*corpuses)
+    def _predict(self, k, corpus, from_scratch=False, X=None, check_input=True):
+
+        if X is None:
+            X = self._fetch_feature_matrix(corpus)
+
+        # Create the design matrix with intercepts
+        intercept_design = self._get_intercept_design(corpus)
+        X_with_intercepts = np.hstack([np.nan_to_num(X, nan=0), intercept_design.toarray()])
+
+        return np.log(self.rate_models[k].predict(X_with_intercepts))
+
+    def partial_fit(self, k, sstats, exp_offsets, corpuses, learning_rate=1.0):
+
+        #intercept_idx = self._get_intercept_idx(*corpuses)
         X = self._fetch_feature_matrix(*corpuses)
-
-        X = np.hstack([np.nan_to_num(X, nan=0), design_matrix.toarray()])
-
-        return X"""
-
-    def _predict(self, k, corpus, from_scratch=False):
-
-        X = self._make_design_matrix(corpus)
-
-        return np.log(self.rate_models[k].predict(X))
-
-    def partial_fit(
-        self,
-        sstats,
-        k,
-        corpuses,
-        log_mutation_rates,
-        learning_rate=1.0,
-    ):
-
-        X = self._make_design_matrix(*corpuses)
+        
+        # Create the design matrix with intercepts
+        intercept_design = self._get_intercept_design(*corpuses)
+        X_with_intercepts = np.hstack([np.nan_to_num(X, nan=0), intercept_design.toarray()])
 
         (y, sample_weights, lograte_prediction) = self._get_targets(
-            k, sstats, corpuses, log_mutation_rates
+            k, sstats, exp_offsets, corpuses
         )
 
-        # store the current model state (ignore the intercept fits)
+        # store the current model state
         try:
             old_coef = self.rate_models[k].coef_.copy()
         except AttributeError:
-            old_coef = np.zeros(X.shape[1])
+            old_coef = np.zeros(X_with_intercepts.shape[1])
 
-        # update the model with the new suffstats
-        self.rate_models[k].fit(
-            X,
-            y,
-            sample_weight=sample_weights,
-        )
+        def update_model():
+            # update the model with the new suffstats
+            self.rate_models[k].fit(
+                X_with_intercepts,
+                y,
+                sample_weight=sample_weights,
+            )
 
-        # merge the new model state with the old
-        self.rate_models[k].coef_ = _svi_update_fn(
-            old_coef, self.rate_models[k].coef_, learning_rate
-        )
+            # merge the new model state with the old using SVI update
+            self.rate_models[k].coef_ = _svi_update_fn(
+                old_coef, self.rate_models[k].coef_, learning_rate
+            )
 
-        return self
+        yield update_model
 
 
 class GBTThetaModel(ThetaModel):
 
     categorical_encoder = partial(
         OrdinalEncoder,
-        max_categories=254,
         dtype=np.float32,
     )
 
     @classmethod
     def list_params(cls):
-        return list(
-            set(super().list_params() + inspect.getfullargspec(cls.__init__).args[1:])
-        )
+        # Get parameters from the current class's __init__ method
+        return list(inspect.getfullargspec(cls.__init__).args[1:])  # exclude 'self'
 
     def __init__(
         self,
