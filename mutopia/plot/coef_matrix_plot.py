@@ -1,6 +1,13 @@
+from __future__ import annotations
+
 from functools import partial
-from typing import Union
+from typing import Any, Optional, Union, TYPE_CHECKING
 from mutopia.palettes import diverging_palette
+
+if TYPE_CHECKING:
+    from matplotlib.figure import Figure
+    from matplotlib.gridspec import GridSpec
+    from mutopia.gtensor.gtensor import GTensorDataset
 
 
 def _plot_interaction_matrix(
@@ -8,11 +15,11 @@ def _plot_interaction_matrix(
     interaction_matrix,
     shared_effects,
     palette=diverging_palette,
-    gridspec=None,
-    title=None,
-    base_height=1.5,
-    heatmap_row_height=0.25,
-    width=10,
+    gridspec: Optional["GridSpec"] = None,
+    title: Optional[str] = None,
+    base_height: float = 1.5,
+    heatmap_row_height: float = 0.25,
+    width: float = 10,
 ):
     import numpy as np
     import matplotlib.pyplot as plt
@@ -107,13 +114,13 @@ def _plot_interaction_matrix(
 
 
 def plot_interaction_matrix(
-    dataset,
+    dataset: "GTensorDataset",
     component: Union[str, int],
     palette=diverging_palette,
-    gridspec=None,
-    title=None,
-    **kw,
-):
+    gridspec: Optional["GridSpec"] = None,
+    title: Optional[str] = None,
+    **kw: Any,
+) -> "GridSpec":
     """
     Generate a visualization of component interactions.
 
@@ -122,21 +129,23 @@ def plot_interaction_matrix(
 
     Parameters
     ----------
-    dataset : xr.DataSet
-        The dataset containing the interactions to visualize.
+    dataset : GTensorDataset
+        Dataset containing the interactions to visualize.
     component : int or str
         The component index or identifier to visualize.
     palette : function, optional
         A color palette function to use for visualization, defaults to diverging_palette.
-    normalization : str, optional
-        Method for normalizing the signature values.
+    gridspec : matplotlib.gridspec.GridSpec, optional
+        GridSpec to draw into; when None, a new Figure is created and used.
+    title : str, optional
+        Label for the base-rate row.
     **kw : dict
-        Additional keyword arguments passed to the underlying plotting function.
+        Extra keyword arguments forwarded to the modality plot function.
 
     Returns
     -------
-    matplotlib.figure.Figure
-        The figure object containing the visualization of the interaction matrix.
+    matplotlib.gridspec.GridSpec
+        The sub-GridSpec used for the interaction plot layout.
 
     Notes
     -----

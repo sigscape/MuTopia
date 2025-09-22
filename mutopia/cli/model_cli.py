@@ -244,7 +244,7 @@ def train(
         
         # Advanced training with regularization and custom parameters
         model train data.nc -k 10 -o model.pkl --context-reg 0.1 \\
-                    --locus-model-type linear --l2-regularization 0.01 \\
+                    --l2-regularization 0.01 \\
                     --test-chroms chr1 chr2 --threads 8
         
         # Training with feature convolution and empirical Bayes

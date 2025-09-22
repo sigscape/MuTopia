@@ -6,6 +6,7 @@ from mutopia.utils import logger
 from mutopia.model.model import (
     StrandedContextModel,
     GBTThetaModel,
+    LinearThetaModel,
     FactorModel,
     DiagonalEncoder,
 )
@@ -202,7 +203,7 @@ class SBSModel(TopographyModel):
             max_iter=max_iter,
         )
 
-        theta_model = (GBTThetaModel)(
+        theta_model = (GBTThetaModel if not locus_model_type=="linear" else LinearThetaModel)(
             GT.to_datasets(*train_corpuses),
             init_variance=init_variance_theta,
             n_components=num_components,

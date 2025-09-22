@@ -284,8 +284,8 @@ def train_test_split(
             "Either check to make sure the corpus contains the contigs you provided, or try using a smaller min-region-size."
         )
 
-    train = LazySlicer(LazySampleLoader(dataset), locus=train_mask)
-    test = LazySlicer(LazySampleLoader(dataset), locus=test_mask)
+    train = LocusSlice(LazySampleLoader(dataset), locus=train_mask)
+    test = LocusSlice(LazySampleLoader(dataset), locus=test_mask)
 
     disk.write_dataset(train, outprefix + ".train.nc", bar=True)
     disk.write_dataset(test, outprefix + ".test.nc", bar=True)
@@ -395,7 +395,7 @@ def slice_samples(
         raise click.BadParameter("Must provide at least one sample name.")
 
     d = lazy_load(dataset)
-    d = interfaces.DifferentSamples(d, sample_names)
+    d = interfaces.SampleSlice(d, sample_names)
     disk.write_dataset(d, output, bar=True)
 
 

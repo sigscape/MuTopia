@@ -194,8 +194,6 @@ def _create_gtensor(*args, **kwargs):
     
     The modality (--dtype) determines what type of genomic variations will be analyzed:
     - 'sbs': Single base substitutions 
-    - 'indel': Insertions and deletions
-    - Other modalities as defined in your configuration
     
     Example:
         gtensor create -n "MyDataset" -o dataset.nc -dtype sbs \\
@@ -273,7 +271,7 @@ def _set_attrs(
     This command allows you to add new attributes or modify existing ones.
 
     Example:
-        gtensor set-attr dataset.nc -set experiment_name "ChIP-seq" -set genome_build "hg38"
+        gtensor set-attr dataset.nc -set fasta_file "path/to/fasta.fa"
     """
     from .gensor_core import set_gtensor_attrs
 

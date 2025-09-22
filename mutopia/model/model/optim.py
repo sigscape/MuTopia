@@ -5,8 +5,8 @@ import time
 
 from mutopia.utils import logger, str_wrapped_list, timer_wrapper, ParContext
 from mutopia.gtensor import (
-    DifferentSamples,
-    LazySlicer,
+    SampleSlice,
+    LocusSlice,
 )
 from mutopia.gtensor.validation import (
     check_dims,
@@ -205,14 +205,14 @@ def slice_generator(
                 )
             )
 
-            dataset = DifferentSamples(
+            dataset = SampleSlice(
                 dataset,
                 new_samples,
             )
 
         if not locus_subsample is None:
 
-            dataset = LazySlicer(
+            dataset = LocusSlice(
                 dataset,
                 keep_features=False,
                 locus=random_state.choice(

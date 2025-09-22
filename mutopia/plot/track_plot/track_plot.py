@@ -1,19 +1,20 @@
-"""
-Genome track plotting utilities for visualizing genomic data.
-
-This module provides functions for creating genome browser-style visualizations
-with multiple data tracks including line plots, heatmaps, and genomic annotations.
-"""
-
+from __future__ import annotations
 import numpy as np
 import matplotlib.pyplot as plt
 from functools import partial
 from xarray import DataArray, Dataset
 from functools import cache
 from dataclasses import dataclass, asdict
-from typing import Optional, Iterable
+from typing import Any, Callable, Optional, Iterable, Sequence, TYPE_CHECKING
 
-from mutopia.utils import borrow_kwargs, logger, parse_region
+if TYPE_CHECKING:
+    from matplotlib.axes import Axes
+    from matplotlib.figure import Figure
+    from matplotlib.colors import Colormap
+    from matplotlib.gridspec import GridSpec
+    from mutopia.gtensor.gtensor import GTensorDataset
+
+from mutopia.utils import logger, parse_region
 from mutopia.palettes import diverging_palette
 
 from .transforms import (
@@ -47,18 +48,19 @@ __all__ = [
 ]
 
 
-def genome_plot(fn):
-    def _inner(*args, **kwargs):
-        try:
-            return fn(*args, **kwargs)
-        except Exception as e:
-            logger.error(f"Error in plotting function {fn.__name__}: {e}")
-            raise e
+def center_at_zero(ax: "Axes") -> "Axes":
+    """
+    Center the y-axis of the plot at zero.
 
-    return _inner
-
-
-def center_at_zero(ax):
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        The axes to modify.
+    
+    Returns
+    -------
+    matplotlib.axes.Axes
+    """
     ax.spines["bottom"].set_visible(False)
     ax.axhline(0, color="k", linewidth=0.75)
     return ax
@@ -75,7 +77,7 @@ class GenomeView:
     end: np.ndarray
     idx: np.ndarray
 
-    def smooth(self, alpha=10):
+    def smooth(self, alpha: float = 10) -> Callable[[DataArray], DataArray]:
         smooth_fn = partial(
             _moving_average,
             self.dataset.sections["Regions"].length.values,
@@ -84,29 +86,37 @@ class GenomeView:
 
         return _xarr_op(smooth_fn)
 
-    def renorm(self, x):
+    def renorm(self, x: np.ndarray) -> np.ndarray:
         return x / np.nansum(x) * self.n_regions
 
 
-def make_view(dataset, region=None, title=None):
+def make_view(
+    dataset: "GTensorDataset",
+    region: Optional[str] = None,
+    title: Optional[str] = None,
+) -> GenomeView:
     """
     Create a GenomeView for a specific genomic region.
 
     Parameters
     ----------
-    dataset
-        Input genomic dataset
-    chrom : str
-        Chromosome identifier (e.g., 'chr1', 'chrX')
-    start : int
-        Start genomic coordinate (0-based)
-    end : int
-        End genomic coordinate (exclusive)
+    dataset : GTensorDataset
+        Input genomic dataset (or interface) containing Regions coordinates.
+    region : str, optional
+        Region spec like "chr1:100000-200000". If None and dataset has a single
+        chromosome, the full range for that chromosome is used.
+    title : str, optional
+        Optional figure title used by plot_view.
 
     Returns
     -------
     GenomeView
-        Configured genome view object
+        Configured genome view object.
+
+    Examples
+    --------
+    >>> import mutopia.plot.track_plot as tr
+    >>> view = tr.make_view(ds, region="chr1:1_000_000-1_200_000", title="chr1 slice")
     """
 
     from mutopia.genome_utils.bed12_utils import unstack_regions
@@ -147,14 +157,43 @@ def make_view(dataset, region=None, title=None):
 
 
 def plot_view(
-    configuration,
-    view,
-    *args,
+    configuration: Callable[..., Any],
+    view: GenomeView,
+    *args: Any,
     width: float = 7,
     gridpsec_kw: dict = {"hspace": 0.1, "wspace": 0.1},
-    width_ratios=None,
-    **kwargs,
-):
+    width_ratios: Optional[Sequence[float]] = None,
+    **kwargs: Any,
+) -> "Figure":
+    """
+    Render a genome view using a configuration of track functions.
+
+    Parameters
+    ----------
+    configuration : callable
+        A function that takes the GenomeView and returns one or more track
+        callables (e.g., line_plot(...), heatmap_plot(...)).
+    view : GenomeView
+        The genome view produced by make_view.
+    width : float, default 7
+        Figure width in inches.
+    gridpsec_kw : dict, optional
+        GridSpec kwargs for inter-row/column spacing.
+    width_ratios : sequence of float, optional
+        Relative column widths for multi-column layouts.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The rendered figure.
+
+    Examples
+    --------
+    >>> import mutopia.plot.track_plot as tr
+    >>> view = tr.make_view(ds, region="chr1:1_000_000-1_100_000")
+    >>> cfg = lambda v: tr.line_plot(tr.select("Regions/length"), label="Length")
+    >>> fig = tr.plot_view(cfg, view)
+    """
 
     def list_if_not(x):
         return x if isinstance(x, Iterable) else [x]
@@ -224,8 +263,13 @@ def _clean_ax(ax, axlabel=None, yticks=False):
 
 
 def stack_plots(
-    *plotting_fns, height=1, label=None, legend=True, name=None, ax_fn=lambda x: x
-):
+    *plotting_fns: Callable[..., Any],
+    height: float = 1,
+    label: Optional[str] = None,
+    legend: bool = True,
+    name: Optional[str] = None,
+    ax_fn: Callable[["Axes"], "Axes"] = lambda x: x,
+) -> Callable[..., "Axes"]:
     """
     Combine multiple plotting functions into a single track.
 
@@ -247,7 +291,17 @@ def stack_plots(
     Returns
     -------
     callable
-        Combined plotting function
+        Combined plotting function.
+
+    Examples
+    --------
+    >>> import mutopia.plot.track_plot as tr
+    >>> cfg = lambda v: tr.stack_plots(
+    ...     tr.line_plot(tr.select("Regions/length"), label="Length"),
+    ...     tr.line_plot(tr.select("Regions/exposures"), label="Exposure"),
+    ...     label="Tracks"
+    ... )
+    >>> fig = tr.plot_view(cfg, tr.make_view(ds, region="chr1:1-1_000_000"))
     """
 
     def _plot(ax, **kwargs):
@@ -270,7 +324,45 @@ def stack_plots(
     return _plot
 
 
-def columns(*plotting_fns, height=1, name=None):
+def columns(
+    *plotting_fns: Callable[..., Any],
+    height: float = 1,
+    name: Optional[str] = None,
+) -> Callable[..., Any]:
+    """
+    Create a multi-column track container.
+
+    Use this to lay out multiple plotting tracks side-by-side within a
+    single row. Pass plotting callables for each column. Use ``...``
+    (Ellipsis) to leave a blank column in the layout.
+
+    Parameters
+    ----------
+    *plotting_fns : callable | Ellipsis
+        Plotting callables to place in each column (e.g.,
+        ``line_plot(...)``, ``heatmap_plot(...)``). Use ``...`` to skip a column.
+    height : float, default 1
+        Track row height in figure units.
+    name : str, optional
+        Optional track name for referencing.
+
+    Returns
+    -------
+    callable
+        A plotting callable that receives an array of Axes for the row and
+        draws each column.
+
+    Examples
+    --------
+    >>> import mutopia.plot.track_plot as tr
+    >>> view = tr.make_view(ds, region="chr1:1_000_000-1_100_000")
+    >>> cfg = lambda v: tr.columns(
+    ...     tr.line_plot(tr.select("Regions/length"), label="Length"),
+    ...     ...,  # leave middle column blank
+    ...     tr.bar_plot(tr.select("Regions/exposures"), label="Exposure"),
+    ... )
+    >>> fig = tr.plot_view(cfg, view, width_ratios=[1, 0.6, 1.2])
+    """
 
     def _plot(axes, *args, **kwargs):
         for i, plot_fn in enumerate(plotting_fns):
@@ -285,7 +377,13 @@ def columns(*plotting_fns, height=1, name=None):
     return _plot
 
 
-def scale_bar(length=10000, height=0.1, name=None, label=None, scale="kb"):
+def scale_bar(
+    length: float = 10000,
+    height: float = 0.1,
+    name: Optional[str] = None,
+    label: Optional[str] = None,
+    scale: str = "kb",
+) -> Callable[["Axes"], "Axes"]:
     """
     Create a scale bar track showing genomic distance.
 
@@ -303,7 +401,13 @@ def scale_bar(length=10000, height=0.1, name=None, label=None, scale="kb"):
     Returns
     -------
     callable
-        Scale bar plotting function
+        Scale bar plotting function.
+
+    Examples
+    --------
+    >>> import mutopia.plot.track_plot as tr
+    >>> cfg = lambda v: tr.scale_bar(length=100_000, scale="kb")
+    >>> fig = tr.plot_view(cfg, tr.make_view(ds, region="chr1:1-2_000_000"))
     """
 
     scale_dict = {
@@ -349,7 +453,7 @@ def scale_bar(length=10000, height=0.1, name=None, label=None, scale="kb"):
     return _plot
 
 
-def xaxis_plot(height=0.1, name=None):
+def xaxis_plot(height: float = 0.1, name: Optional[str] = None) -> Callable[..., "Axes"]:
     """
     Create a track showing genomic coordinates on x-axis.
 
@@ -363,7 +467,13 @@ def xaxis_plot(height=0.1, name=None):
     Returns
     -------
     callable
-        X-axis plotting function
+        X-axis plotting function.
+
+    Examples
+    --------
+    >>> import mutopia.plot.track_plot as tr
+    >>> cfg = lambda v: tr.xaxis_plot()
+    >>> fig = tr.plot_view(cfg, tr.make_view(ds, region="chr1:1-2_000_000"))
     """
 
     def _plot(ax, *, interval, **kw):
@@ -387,21 +497,27 @@ def xaxis_plot(height=0.1, name=None):
     return _plot
 
 
-def spacer(height=0.1, name=None):
+def spacer(height: float = 0.1, name: Optional[str] = None) -> Callable[..., "Axes"]:
     """
-    Create an empty spacer track.
+    Insert an empty spacer track to separate other tracks.
 
     Parameters
     ----------
     height : float, default 0.1
-        Spacer height in figure units
+        Spacer height in figure units.
     name : str, optional
-        Track name
+        Optional track name.
 
     Returns
     -------
     callable
-        Spacer plotting function
+        Plotting callable that renders an empty row.
+
+    Examples
+    --------
+    >>> import mutopia.plot.track_plot as tr
+    >>> cfg = lambda v: (tr.line_plot(tr.select("Regions/length")), tr.spacer(0.25))
+    >>> _ = tr.plot_view(cfg, tr.make_view(ds, region="chr1:1-2_000_000"))
     """
 
     def _plot(ax, *args, **kwargs):
@@ -413,7 +529,30 @@ def spacer(height=0.1, name=None):
     return _plot
 
 
-def text_banner(label, height=0.15, name=None):
+def text_banner(label: str, height: float = 0.15, name: Optional[str] = None) -> Callable[..., "Axes"]:
+    """
+    Create a simple text banner track with a horizontal rule.
+
+    Parameters
+    ----------
+    label : str
+        Text to display centered across the track.
+    height : float, default 0.15
+        Track height in figure units.
+    name : str, optional
+        Optional track name.
+
+    Returns
+    -------
+    callable
+        Plotting callable for use inside a plot_view configuration.
+
+    Examples
+    --------
+    >>> import mutopia.plot.track_plot as tr
+    >>> cfg = lambda v: tr.text_banner("My Region")
+    >>> _ = tr.plot_view(cfg, tr.make_view(ds, region="chr1:1-2_000_000"))
+    """
 
     def _plot(ax, *, start, end, **_):
         start = start[0]
@@ -464,8 +603,13 @@ def _read_ideogram(cytobands_file):
     )
 
 
-@genome_plot
-def ideogram(cytobands_file, height=0.15, name=None, **kwargs):
+
+def ideogram(
+    cytobands_file: str,
+    height: float = 0.15,
+    name: Optional[str] = None,
+    **kwargs: Any,
+) -> Callable[..., "Axes"]:
     """
     Create an ideogram track showing chromosome bands.
 
@@ -483,7 +627,13 @@ def ideogram(cytobands_file, height=0.15, name=None, **kwargs):
     Returns
     -------
     callable
-        Ideogram plotting function
+        Ideogram plotting function.
+
+    Examples
+    --------
+    >>> import mutopia.plot.track_plot as tr
+    >>> cfg = lambda v: tr.ideogram("/path/to/cytoBand.txt.gz")
+    >>> fig = tr.plot_view(cfg, tr.make_view(ds, region="chr1:1-5_000_000"))
     """
 
     color_lookup = {
@@ -532,19 +682,17 @@ def ideogram(cytobands_file, height=0.15, name=None, **kwargs):
     return _plot
 
 
-@borrow_kwargs(plt.plot)
-@genome_plot
 def line_plot(
-    accessor,
-    label=None,
-    height=1,
-    yticks=False,
-    fill=False,
-    name=None,
-    color="#acacacff",
-    ax_fn=lambda x: x,
-    **kwargs,
-):
+    accessor: Callable[[Dataset], np.ndarray | DataArray | Sequence[float]],
+    label: Optional[str] = None,
+    height: float = 1,
+    yticks: bool = False,
+    fill: bool = False,
+    name: Optional[str] = None,
+    color: str = "#acacacff",
+    ax_fn: Callable[["Axes"], "Axes"] = lambda x: x,
+    **kwargs: Any,
+) -> Callable[..., "Axes"]:
     """
     Create a line plot track for continuous genomic data.
 
@@ -572,7 +720,13 @@ def line_plot(
     Returns
     -------
     callable
-        Line plot function
+        Line plot function.
+
+    Examples
+    --------
+    >>> import mutopia.plot.track_plot as tr
+    >>> cfg = lambda v: tr.line_plot(tr.select("Regions/length"), label="Length")
+    >>> fig = tr.plot_view(cfg, tr.make_view(ds, region="chr1:1-1_000_000"))
     """
 
     def _plot(ax, *, dataset, start, end, idx, n_regions, **kw):
@@ -604,18 +758,16 @@ def line_plot(
     return _plot
 
 
-@borrow_kwargs(plt.fill_between)
-@genome_plot
 def fill_plot(
-    accessor,
-    label=None,
-    height=1,
-    yticks=False,
-    name=None,
-    color="#acacacff",
-    ax_fn=lambda x: x,
-    **kwargs,
-):
+    accessor: Callable[[Dataset], np.ndarray | DataArray | Sequence[float]],
+    label: Optional[str] = None,
+    height: float = 1,
+    yticks: bool = False,
+    name: Optional[str] = None,
+    color: str = "#acacacff",
+    ax_fn: Callable[["Axes"], "Axes"] = lambda x: x,
+    **kwargs: Any,
+) -> Callable[..., "Axes"]:
     """
     Create a filled area plot track.
 
@@ -641,7 +793,13 @@ def fill_plot(
     Returns
     -------
     callable
-        Fill plot function
+        Fill plot function.
+
+    Examples
+    --------
+    >>> import mutopia.plot.track_plot as tr
+    >>> cfg = lambda v: tr.fill_plot(tr.select("Regions/length"), label="Length")
+    >>> fig = tr.plot_view(cfg, tr.make_view(ds, region="chr1:1-1_000_000"))
     """
 
     def _plot(ax, *, dataset, start, end, idx, n_regions, **kw):
@@ -667,18 +825,16 @@ def fill_plot(
     return _plot
 
 
-@borrow_kwargs(plt.bar)
-@genome_plot
 def bar_plot(
-    accessor,
-    label=None,
-    height=1,
-    yticks=False,
-    name=None,
-    ax_fn=lambda x: x,
-    color="#acacacff",  # Ensure color is used below or remove this line if unnecessary
-    **kwargs,
-):
+    accessor: Callable[[Dataset], np.ndarray | DataArray | Sequence[float]],
+    label: Optional[str] = None,
+    height: float = 1,
+    yticks: bool = False,
+    name: Optional[str] = None,
+    ax_fn: Callable[["Axes"], "Axes"] = lambda x: x,
+    color: str | Sequence[str] | None = "#acacacff",
+    **kwargs: Any,
+) -> Callable[..., "Axes"]:
     """
     Create a bar plot track for discrete genomic data.
 
@@ -704,7 +860,13 @@ def bar_plot(
     Returns
     -------
     callable
-        Bar plot function
+        Bar plot function.
+
+    Examples
+    --------
+    >>> import mutopia.plot.track_plot as tr
+    >>> cfg = lambda v: tr.bar_plot(tr.select("Regions/length"), label="Length")
+    >>> fig = tr.plot_view(cfg, tr.make_view(ds, region="chr1:1-1_000_000"))
     """
 
     def _plot(ax, *, dataset, start, end, idx, n_regions, **kw):
@@ -734,18 +896,16 @@ def bar_plot(
     return _plot
 
 
-@borrow_kwargs(plt.scatter)
-@genome_plot
 def scatterplot(
-    accessor,
-    label=None,
-    height=1,
-    yticks=False,
-    c=None,
-    name=None,
-    ax_fn=lambda x: x,
-    **kwargs,
-):
+    accessor: Callable[[Dataset], np.ndarray | DataArray | Sequence[float]],
+    label: Optional[str] = None,
+    height: float = 1,
+    yticks: bool = False,
+    c: str | Sequence[str] | None = None,
+    name: Optional[str] = None,
+    ax_fn: Callable[["Axes"], "Axes"] = lambda x: x,
+    **kwargs: Any,
+) -> Callable[..., "Axes"]:
     """
     Create a scatter plot track for point data.
 
@@ -771,7 +931,13 @@ def scatterplot(
     Returns
     -------
     callable
-        Scatter plot function
+        Scatter plot function.
+
+    Examples
+    --------
+    >>> import mutopia.plot.track_plot as tr
+    >>> cfg = lambda v: tr.scatterplot(tr.select("Regions/length"), label="Length")
+    >>> fig = tr.plot_view(cfg, tr.make_view(ds, region="chr1:1-1_000_000"))
     """
 
     def _plot(ax, *, dataset, start, end, idx, n_regions, **kw):
@@ -798,22 +964,20 @@ def scatterplot(
     return _plot
 
 
-@borrow_kwargs(plt.pcolormesh)
-@genome_plot
 def heatmap_plot(
-    accessor,
-    palette=diverging_palette,
+    accessor: Callable[[Dataset], np.ndarray | DataArray],
+    palette: "Colormap" | str = diverging_palette,
     label: Optional[str] = None,
-    yticks=True,
-    height=1,
-    row_cluster=False,
-    cluster_kw={},
-    name=None,
-    cbar=True,
-    cbar_kw={},
-    ax_fn=lambda x: x,
-    **kwargs,
-):
+    yticks: bool = True,
+    height: float = 1,
+    row_cluster: bool = False,
+    cluster_kw: dict = {},
+    name: Optional[str] = None,
+    cbar: bool = True,
+    cbar_kw: dict = {},
+    ax_fn: Callable[["Axes"], "Axes"] = lambda x: x,
+    **kwargs: Any,
+) -> Callable[..., "Axes"]:
     """
     Create a heatmap track for matrix data.
 
@@ -847,7 +1011,13 @@ def heatmap_plot(
     Returns
     -------
     callable
-        Heatmap plotting function
+        Heatmap plotting function.
+
+    Examples
+    --------
+    >>> import mutopia.plot.track_plot as tr
+    >>> cfg = lambda v: tr.heatmap_plot(tr.select("Some/Matrix"), label="Matrix")
+    >>> fig = tr.plot_view(cfg, tr.make_view(ds, region="chr1:1-1_000_000"))
     """
 
     def _check_size(expected, x):
@@ -935,19 +1105,17 @@ def heatmap_plot(
     return _plot
 
 
-@borrow_kwargs(plt.Rectangle)
-@genome_plot
 def categorical_plot(
-    accessor,
-    order=None,
-    label=None,
-    height=1,
-    palette="tab10",
-    edgecolor=None,
-    name=None,
-    ax_fn=lambda x: x,
-    **kwargs,
-):
+    accessor: Callable[[Dataset], Sequence[Any] | DataArray | np.ndarray],
+    order: Optional[Sequence[Any]] = None,
+    label: Optional[str] = None,
+    height: float = 1,
+    palette: str | Sequence[str] = "tab10",
+    edgecolor: Optional[str] = None,
+    name: Optional[str] = None,
+    ax_fn: Callable[["Axes"], "Axes"] = lambda x: x,
+    **kwargs: Any,
+) -> Callable[..., "Axes"]:
     """
     Create a categorical data track with colored rectangles.
 
@@ -975,7 +1143,13 @@ def categorical_plot(
     Returns
     -------
     callable
-        Categorical plot function
+        Categorical plot function.
+
+    Examples
+    --------
+    >>> import mutopia.plot.track_plot as tr
+    >>> cfg = lambda v: tr.categorical_plot(tr.select("Regions/chrom"))
+    >>> fig = tr.plot_view(cfg, tr.make_view(ds, region="chr1:1-1_000_000"))
     """
 
     def _plot(ax, *, dataset, start, end, idx, n_regions, **kw):
@@ -1033,7 +1207,11 @@ def categorical_plot(
     return _plot
 
 
-def custom_plot(fn, height=1, name=None):
+def custom_plot(
+    fn: Callable[["Axes"], Any],
+    height: float = 1,
+    name: Optional[str] = None,
+) -> Callable[..., "Axes"]:
     """
     Create a custom plotting track from a user-defined function.
 
@@ -1049,7 +1227,7 @@ def custom_plot(fn, height=1, name=None):
     Returns
     -------
     callable
-        Custom plot function
+        Custom plot function.
     """
 
     def _plot(ax, *args, **kwargs):
@@ -1062,9 +1240,9 @@ def custom_plot(fn, height=1, name=None):
 
 @cache
 def _load_track_data(
-    track_type,
-    file,
-    **properties,
+    track_type: str,
+    file: str,
+    **properties: Any,
 ):
     """
     Load track data using pygenometracks.
@@ -1107,15 +1285,15 @@ def _load_track_data(
 
 
 def static_track(
-    track_type,
-    file,
-    height=1,
-    name=None,
-    label=None,
-    yticks=False,
-    ax_fn=lambda x: x,
-    **properties,
-):
+    track_type: str,
+    file: str,
+    height: float = 1,
+    name: Optional[str] = None,
+    label: Optional[str] = None,
+    yticks: bool = False,
+    ax_fn: Callable[["Axes"], "Axes"] = lambda x: x,
+    **properties: Any,
+) -> Callable[..., "Axes"]:
     """
     Create a static track using pygenometracks.
 
@@ -1141,7 +1319,13 @@ def static_track(
     Returns
     -------
     callable
-        Static track plotting function
+        Static track plotting function.
+
+    Examples
+    --------
+    >>> import mutopia.plot.track_plot as tr
+    >>> cfg = lambda v: tr.static_track("BigWigTrack", "/path/to/signal.bw", title="Signal")
+    >>> fig = tr.plot_view(cfg, tr.make_view(ds, region="chr1:1-1_000_000"))
     """
 
     track = _load_track_data(

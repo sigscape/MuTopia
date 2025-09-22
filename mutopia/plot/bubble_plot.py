@@ -1,6 +1,14 @@
+from __future__ import annotations
+
+from typing import Any, Iterable, Optional, Sequence, TYPE_CHECKING
+
 import numpy as np
 import matplotlib.pyplot as plt
 from mutopia.palettes import diverging_palette
+
+if TYPE_CHECKING:
+    from matplotlib.axes import Axes
+    from mutopia.gtensor.gtensor import GTensorDataset
 
 
 def _l2_normalize(x):
@@ -10,17 +18,18 @@ def _l2_normalize(x):
 
 
 def plot_shap_summary(
-    data,
+    data: "GTensorDataset",
+    source: Optional[str] = None,
     cmap=diverging_palette,
-    figsize=(8, 5),
-    scale=100,
-    feature_order=None,
-    component_order=None,
-    ax=None,
-    cbar=True,
-    max_size=1000,
-    linewidth=0.5,
-    **scatter_kw,
+    figsize: Sequence[float] = (8, 5),
+    scale: float = 100,
+    feature_order: Optional[Sequence[str]] = None,
+    component_order: Optional[Sequence[str]] = None,
+    ax: Optional["Axes"] = None,
+    cbar: bool = True,
+    max_size: float = 1000,
+    linewidth: float = 0.5,
+    **scatter_kw: Any,
 ):
 
     from scipy.cluster.hierarchy import linkage, leaves_list
@@ -28,8 +37,40 @@ def plot_shap_summary(
 
     """
     Generate a bubble heatmap for SHAP effect size and correlation.
+
+    Parameters
+    ----------
+    data : GTensorDataset
+        Dataset or handle from which SHAP summaries are derived.
+    source : str, optional
+        Source variable name to summarize; if None, use default.
+    cmap : Colormap or callable, default=diverging_palette
+        Colormap or palette function for correlation coloring.
+    figsize : (float, float), default=(8, 5)
+        Figure size in inches.
+    scale : float, default=100
+        Scale factor for bubble areas.
+    feature_order : sequence of str, optional
+        Explicit order of features (columns); if None, clustered order is used.
+    component_order : sequence of str, optional
+        Explicit order of components (rows); if None, clustered order is used.
+    ax : matplotlib.axes.Axes, optional
+        Axes to draw on; if None, a new figure and axes are created.
+    cbar : bool, default=True
+        Whether to draw a colorbar.
+    max_size : float, default=1000
+        Maximum bubble size cap before scaling.
+    linewidth : float, default=0.5
+        Bubble edge line width.
+    **scatter_kw
+        Extra keyword args passed to ``ax.scatter``.
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+        The axes containing the rendered bubble heatmap.
     """
-    component_summary = get_shap_summary(data)
+    component_summary = get_shap_summary(data, source=source)
 
     # Pivot the data for the heatmap
     effect_size_pivot = component_summary.pivot(

@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import numpy as np
 from functools import reduce
 from itertools import chain
 from collections import Counter
+from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple
 from tqdm import tqdm
 from pyfaidx import Fasta
 import xarray as xr
@@ -30,6 +33,32 @@ MUTOPIA_TO_COSMIC_IDX = np.array(
 
 
 class SBSMode(ModeConfig):
+    """
+    SBS (single base substitution) modality configuration.
+
+    This ``ModeConfig`` defines the coordinate system, palettes, and data ingestion
+    utilities used for SBS analyses. It provides helpers to:
+
+    - build coordinate labels used across datasets (``coords``)
+    - fetch the modality-specific TopographyModel class (``TopographyModel``)
+    - compute reference context frequencies from genome sequence and regions
+      (``get_context_frequencies``)
+    - ingest observations from VCF files into the expected sparse xarray layout
+      (``ingest_observations`` / ``ingest_uncollaposed``)
+
+    Attributes
+    ----------
+    MODE_ID : str
+        Stable modality identifier (``"sbs"``).
+    MUTOPIA_TO_COSMIC_IDX : np.ndarray
+        Mapping index to align Mutopia context ordering to COSMIC ordering.
+    PALETTE : list[tuple[float, float, float]]
+        RGB colors for the 96 SBS categories (in Mutopia order).
+    X_LABELS : list[str]
+        Mutation class labels (e.g., ``"C>A"``) used for display.
+    DATABASE : str
+        Path inside the package data for default SBS signature definitions.
+    """
 
     MODE_ID = "sbs"
     MUTOPIA_TO_COSMIC_IDX = MUTOPIA_TO_COSMIC_IDX
@@ -38,7 +67,14 @@ class SBSMode(ModeConfig):
     DATABASE = "sbs/musical_sbs.json"
 
     @property
-    def coords(self):
+    def coords(self) -> Mapping[str, Tuple[str, List[str]]]:
+        """Coordinate names and labels used by this modality.
+
+        Returns
+        -------
+        Mapping[str, tuple[str, list[str]]]
+            A mapping from coordinate key to a pair of (dimension name, labels).
+        """
         return {
             "clustered": ("clustered", ["no", "yes"]),
             "configuration": ("configuration", CONFIGURATIONS),
@@ -47,12 +83,30 @@ class SBSMode(ModeConfig):
         }
 
     @property
-    def TopographyModel(self):
+    def TopographyModel(self) -> Any:
+        """Return the modality-specific TopographyModel class.
+
+        Notes
+        -----
+        Imported lazily to avoid import cycles at module import time.
+        """
         from .model import SBSModel
         return SBSModel
 
     @classmethod
-    def _flatten_observations(cls, signature):
+    def _flatten_observations(cls, signature: xr.DataArray) -> xr.DataArray:
+        """Flatten an SBS signature to the canonical layout ordered by COSMIC.
+
+        Parameters
+        ----------
+        signature : xarray.DataArray
+            Signature tensor with a ``context`` coordinate at least.
+
+        Returns
+        -------
+        xarray.DataArray
+            Reindexed DataArray with contexts ordered as ``COSMIC_SORT_ORDER``.
+        """
         signature = (
             super()._flatten_observations(signature).sel(context=COSMIC_SORT_ORDER)
         )
@@ -63,10 +117,26 @@ class SBSMode(ModeConfig):
     def get_context_frequencies(
         cls,
         *,
-        regions_file,
-        fasta_file,
-        **kw,
-    ):
+        regions_file: str,
+        fasta_file: str,
+        **kw: Any,
+    ) -> xr.DataArray:
+        """Compute trinucleotide context frequencies for each region.
+
+        Parameters
+        ----------
+        regions_file : str
+            BED12 file containing segmented regions of interest.
+        fasta_file : str
+            Reference FASTA file path.
+
+        Returns
+        -------
+        xarray.DataArray
+            Array with dims (``configuration``, ``context``, ``locus``) giving
+            normalized counts for each trinucleotide context per region, with
+            strand pairing applied via the two configurations.
+        """
 
         def _get_window_seq(fasta_object, chrom, start, end):
             return fasta_object[chrom][max(start - 1, 0) : end + 1].seq.upper()
@@ -130,22 +200,59 @@ class SBSMode(ModeConfig):
 
     def ingest_observations(
         self,
-        vcf_file,
-        chr_prefix="",
-        pass_only=True,
-        weight_col=None,
-        mutation_rate_file=None,
-        sample_weight=None,
-        sample_name=None,
-        skip_sort=False,
-        cluster=True,
+        vcf_file: str,
+        chr_prefix: str = "",
+        pass_only: bool = True,
+        weight_col: str | None = None,
+        mutation_rate_file: str | None = None,
+        sample_weight: float | None = None,
+        sample_name: str | None = None,
+        skip_sort: bool = False,
+        cluster: bool = True,
         *,
-        locus_dim,
-        locus_coords,
-        regions_file,
-        fasta_file,
-        **kw,
-    ):
+        locus_dim: int,
+        locus_coords: Sequence[int],
+        regions_file: str,
+        fasta_file: str,
+        **kw: Any,
+    ) -> xr.DataArray:
+        """Ingest a VCF into a sparse SBS observation tensor.
+
+        Parameters
+        ----------
+        vcf_file : str
+            Path to VCF file with somatic variants.
+        chr_prefix : str, optional
+            Chromosome prefix to add/remove for matching, by default "".
+        pass_only : bool, optional
+            Keep only PASS variants, by default True.
+        weight_col : str, optional
+            Optional INFO/FORMAT field to use as a weight.
+        mutation_rate_file : str, optional
+            Optional per-locus mutation rate file for weighting.
+        sample_weight : float, optional
+            Global sample weight to apply.
+        sample_name : str, optional
+            Override sample name.
+        skip_sort : bool, optional
+            Assume VCF is already sorted, by default False.
+        cluster : bool, optional
+            Flag to mark clustered/unclustered dimension, by default True.
+        locus_dim : int
+            Total number of loci across regions.
+        locus_coords : Sequence[int]
+            Indices mapping variants to locus positions.
+        regions_file : str
+            BED12 regions used to aggregate variants.
+        fasta_file : str
+            Reference genome FASTA file.
+
+        Returns
+        -------
+        xarray.DataArray
+            Sparse COO-backed array with dims (``clustered``, ``configuration``,
+            ``context``, ``locus``).
+        """
         _, coords, weights = featurize_mutations(
             vcf_file,
             regions_file,
@@ -173,14 +280,38 @@ class SBSMode(ModeConfig):
 
     def ingest_uncollaposed(
         self,
-        vcf_file,
+        vcf_file: str,
         *,
-        locus_dim,
-        locus_coords,
-        regions_file,
-        fasta_file,
-        **ingest_kw,
-    ):
+        locus_dim: int,
+        locus_coords: Sequence[int],
+        regions_file: str,
+        fasta_file: str,
+        **ingest_kw: Any,
+    ) -> Tuple[List[str], xr.DataArray]:
+        """Ingest VCF and return variant IDs alongside the observation tensor.
+
+        This variant of ingestion keeps the per-variant identifiers, useful for
+        downstream lookups or joins.
+
+        Parameters
+        ----------
+        vcf_file : str
+            Path to VCF file with somatic variants.
+        locus_dim : int
+            Total number of loci across regions.
+        locus_coords : Sequence[int]
+            Indices mapping variants to locus positions.
+        regions_file : str
+            BED12 regions used to aggregate variants.
+        fasta_file : str
+            Reference genome FASTA file.
+
+        Returns
+        -------
+        tuple[list[str], xarray.DataArray]
+            Variant identifiers and the sparse COO-backed observation tensor
+            with dims (``clustered``, ``configuration``, ``context``, ``locus``).
+        """
 
         mut_ids, coords, weights = featurize_mutations(
             vcf_file,

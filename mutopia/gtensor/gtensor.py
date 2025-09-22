@@ -1,14 +1,22 @@
 """
-GTensor module for genomic tensor analysis.
+The GTensor module for genomic tensor analysis.
 This module provides functionality for creating, manipulating, and analyzing genomic tensors,
 including loading datasets, applying transformations, and generating explanations for model components.
+
+GTensors are hierarchical, multi-dimensional arrays designed to represent complex genomic data structures.
+They are sliceable along multiple dimensions, and support lazy loading for memory efficiency.
+
+Use the Gtensor CLI tool to interact with and build GTensor datasets from the command line - the 
+python API is mostly intended for analysis and visualization.
 """
+
+from __future__ import annotations
 
 import xarray as xr
 #xr.set_options(use_new_combine_kwarg_defaults=True)
 import pandas as pd
 import numpy as np
-from typing import Union, List
+from typing import Union, List, Any, Callable, Optional, Iterable, TYPE_CHECKING
 from numpy.typing import NDArray
 from functools import reduce
 import os
@@ -16,7 +24,22 @@ from tqdm import tqdm
 from mutopia.utils import logger, parse_region
 from mutopia.genome_utils.bed12_utils import unstack_regions as _unstack_regions
 import mutopia.gtensor.disk_interface as disk
-from .interfaces import *
+from .interfaces import (
+    CorpusInterface,
+    LazySampleLoader,
+    LocusSlice,
+    SampleSlice,
+)
+if TYPE_CHECKING:
+    import shap
+
+GTensorDataset = Union[
+    xr.Dataset,
+    CorpusInterface,
+    LazySampleLoader,
+    LocusSlice,
+    SampleSlice,
+]
 
 __all__ = [
     "GTensor",
@@ -58,9 +81,8 @@ BED_COLS = [
     "Regions/end",
 ]
 
-
 def GTensor(
-    modality,
+    modality: Any,
     *,
     name: str,
     chrom: List[str],
@@ -68,8 +90,8 @@ def GTensor(
     end: List[int],
     context_frequencies: xr.DataArray,
     exposures: Union[None, NDArray[np.number]] = None,
-    dtype=None,
-):
+    dtype: Any = None,
+) -> GTensorDataset:
     """
     Create a GTensor dataset for genomic tensor analysis.
 
@@ -134,7 +156,7 @@ def GTensor(
     )
 
 
-def apply_to_samples(data, func, bar=True):
+def apply_to_samples(data: GTensorDataset, func: Callable, bar: bool = True) -> GTensorDataset:
     """
     Apply a function to each sample in a dataset with parallel processing.
 
@@ -144,7 +166,7 @@ def apply_to_samples(data, func, bar=True):
 
     Parameters
     ----------
-    data : object
+    data : GTensorDataset
         Input dataset or data loader containing samples to process
     func : callable
         Function to apply to each sample. Should accept a dataset slice and
@@ -154,7 +176,7 @@ def apply_to_samples(data, func, bar=True):
 
     Returns
     -------
-    xr.Dataset
+    GTensorDataset
         Dataset containing the concatenated results from all sample applications
     """
 
@@ -174,7 +196,7 @@ def apply_to_samples(data, func, bar=True):
     )
 
 
-def mutate(func):
+def mutate(func: Callable) -> Callable:
     """
     Decorator function to modify a dataset in place.
 
@@ -200,7 +222,7 @@ def mutate(func):
     return wrapper
 
 
-def mutate_method(func):
+def mutate_method(func: Callable) -> Callable:
     """
     Decorator function to modify a dataset in place for class methods.
 
@@ -226,7 +248,11 @@ def mutate_method(func):
     return wrapper
 
 
-def load_dataset(dataset, with_samples=True, with_state=True):
+def load_dataset(
+    dataset: Union[str, os.PathLike],
+    with_samples: bool = True,
+    with_state: bool = True,
+) -> GTensorDataset:
     """
     Load a dataset from disk with configurable loading options.
 
@@ -244,7 +270,7 @@ def load_dataset(dataset, with_samples=True, with_state=True):
 
     Returns
     -------
-    LazySampleLoader or CorpusInterface
+    GTensorDataset
         Loaded dataset interface. Returns LazySampleLoader if with_samples=False,
         otherwise returns CorpusInterface
     """
@@ -253,7 +279,9 @@ def load_dataset(dataset, with_samples=True, with_state=True):
     )
 
 
-def train_test_split(dataset, *test_chroms: Union[str, List[str]], lazy=False):
+def train_test_split(
+    dataset: GTensorDataset, *test_chroms: Union[str, List[str]], lazy: bool = False
+) -> tuple[GTensorDataset, GTensorDataset]:
     """
     Split a dataset into training and testing sets based on chromosomes.
 
@@ -263,7 +291,7 @@ def train_test_split(dataset, *test_chroms: Union[str, List[str]], lazy=False):
 
     Parameters
     ----------
-    dataset : xr.Dataset
+    dataset : GTensorDataset
         Input dataset to split
     *test_chroms : Union[str, List[str]]
         Chromosome names to reserve for the test set. Can be provided as
@@ -274,7 +302,7 @@ def train_test_split(dataset, *test_chroms: Union[str, List[str]], lazy=False):
 
     Returns
     -------
-    tuple[CorpusInterface or LazySlicer, CorpusInterface or LazySlicer]
+    tuple[GTensorDataset, GTensorDataset]
         Training and testing dataset interfaces
 
     Raises
@@ -300,8 +328,8 @@ def train_test_split(dataset, *test_chroms: Union[str, List[str]], lazy=False):
             "The dataset is lazy, so the train/test split will be lazy as well. "
             "This may cause latency issues on systems with slow file IO."
         )
-        train = LazySlicer(dataset, locus=~test_mask)
-        test = LazySlicer(dataset, locus=test_mask)
+        train = LocusSlice(dataset, locus=~test_mask)
+        test = LocusSlice(dataset, locus=test_mask)
 
         drop_vars = (
             dataset.sections.groups["Features"] + dataset.sections.groups["Regions"]
@@ -318,7 +346,7 @@ def train_test_split(dataset, *test_chroms: Union[str, List[str]], lazy=False):
     return train, test
 
 
-def lazy_load(dataset):
+def lazy_load(dataset: Union[str, os.PathLike]) -> GTensorDataset:
     """
     Load a dataset lazily without samples or state information.
 
@@ -332,13 +360,13 @@ def lazy_load(dataset):
 
     Returns
     -------
-    LazySampleLoader
+    GTensorDataset
         Lazy dataset interface that loads data on demand
     """
     return load_dataset(dataset, with_samples=False, with_state=False)
 
 
-def eager_load(dataset):
+def eager_load(dataset: Union[str, os.PathLike]) -> GTensorDataset:
     """
     Load a dataset eagerly with samples but without state information.
 
@@ -352,13 +380,15 @@ def eager_load(dataset):
 
     Returns
     -------
-    CorpusInterface
+    GTensorDataset
         Eager dataset interface with samples loaded into memory
     """
     return load_dataset(dataset, with_samples=True, with_state=False)
 
 
-def lazy_train_test_load(dataset, *test_chroms):
+def lazy_train_test_load(
+    dataset: Union[str, os.PathLike], *test_chroms: str
+) -> tuple[GTensorDataset, GTensorDataset]:
     """
     Load a dataset and perform lazy train/test split by chromosomes.
 
@@ -380,7 +410,9 @@ def lazy_train_test_load(dataset, *test_chroms):
     return train_test_split(lazy_load(dataset), *test_chroms, lazy=True)
 
 
-def eager_train_test_load(dataset, *test_chroms):
+def eager_train_test_load(
+    dataset: Union[str, os.PathLike], *test_chroms: str
+) -> tuple[GTensorDataset, GTensorDataset]:
     """
     Load a dataset and perform eager train/test split by chromosomes.
 
@@ -402,21 +434,21 @@ def eager_train_test_load(dataset, *test_chroms):
     return train_test_split(eager_load(dataset), *test_chroms, lazy=False)
 
 
-def num_sources(dataset):
+def num_sources(dataset: GTensorDataset) -> int:
     return len(list_sources(dataset))
 
 
-def is_mixture_dataset(dataset):
+def is_mixture_dataset(dataset: GTensorDataset) -> bool:
     return num_sources(dataset) > 1
 
 
-def list_sources(dataset):
+def list_sources(dataset: GTensorDataset) -> List[str]:
     if "source" in dataset.coords:
         return dataset.coords["source"].values.tolist()
     return []
 
 
-def fetch_source(dataset, source):
+def fetch_source(dataset: GTensorDataset, source: str) -> GTensorDataset:
     """
     Extract and restructure data for a specific source from a multi-source dataset.
 
@@ -426,7 +458,7 @@ def fetch_source(dataset, source):
 
     Parameters
     ----------
-    dataset : xarray.Dataset
+    dataset : GTensorDataset
         The input dataset containing data from multiple sources, organized with 
         hierarchical variable names (e.g., "Features/source/variable", "State/source/variable").
     source : str
@@ -434,7 +466,7 @@ def fetch_source(dataset, source):
 
     Returns
     -------
-    xarray.Dataset
+    GTensorDataset
         A new dataset containing:
         - Source-specific features and state variables (with paths flattened)
         - Shared features and state variables (common to all sources)
@@ -493,7 +525,7 @@ def fetch_source(dataset, source):
     return source_corpus
 
 
-def get_explanation(dataset, component):
+def get_explanation(dataset: GTensorDataset, component: str) -> "shap.Explanation":
     """
     Generate SHAP explanations for a specific model component.
 
@@ -502,7 +534,7 @@ def get_explanation(dataset, component):
 
     Parameters
     ----------
-    dataset : xr.Dataset
+    dataset : GTensorDataset
         Dataset containing SHAP values and feature information
     component : str
         Name of the model component to explain
@@ -610,8 +642,14 @@ def get_explanation(dataset, component):
     return expl
 
 
-def get_shap_summary(data) -> pd.DataFrame:
+def get_shap_summary(data: GTensorDataset, source: Optional[str] = None) -> pd.DataFrame:
     """Generate a summary of SHAP values for the specified components."""
+    
+    if is_mixture_dataset(data) and source is None:
+        raise ValueError("Must specify source when dataset is a mixture.")
+    
+    source = "State/" + source if source is not None else "State"
+
     shap_values = data["SHAP_values"]
     locus_dim = "locus" if "locus" in shap_values.dims else "shap_locus"
 
@@ -628,11 +666,11 @@ def get_shap_summary(data) -> pd.DataFrame:
         )
     )
     shap_values = shap_values.merge(
-        data["State/locus_features"]
+        data[f"{source}/locus_features"]
         .sel(locus=shap_values.locus.unique())
         .to_dataframe()
         .reset_index()
-        .rename(columns={"State/locus_features": "feature_value"}),
+        .rename(columns={f"{source}/locus_features": "feature_value"}),
         on=["locus", "feature"],
         how="inner",
     )
@@ -661,7 +699,9 @@ def get_shap_summary(data) -> pd.DataFrame:
     return component_summary
 
 
-def equal_size_quantiles(dataset, var_name, n_bins=10, key=None):
+def equal_size_quantiles(
+    dataset: GTensorDataset, var_name: str, n_bins: int = 10, key: Optional[str] = None
+) -> GTensorDataset:
     """
     Create equal-size quantile bins for a variable in the dataset.
 
@@ -670,7 +710,7 @@ def equal_size_quantiles(dataset, var_name, n_bins=10, key=None):
 
     Parameters
     ----------
-    dataset : xarray.Dataset
+    dataset : GTensorDataset
         Dataset containing the variable to bin
     var_name : str
         Name of the variable to create quantile bins for
@@ -683,7 +723,7 @@ def equal_size_quantiles(dataset, var_name, n_bins=10, key=None):
 
     Returns
     -------
-    xarray.Dataset
+    GTensorDataset
         The input dataset with quantile bins added as a new variable
     """
 
@@ -715,12 +755,14 @@ def equal_size_quantiles(dataset, var_name, n_bins=10, key=None):
     return dataset
 
 
-def slice_samples(dataset, samples: List[str]):
+def slice_samples(dataset: GTensorDataset, samples: List[str]) -> GTensorDataset:
     d = mutate(lambda d: d.sel(sample=list(samples)) if len(samples) > 0 else d)(dataset)
-    return DifferentSamples(d, samples)
+    return SampleSlice(d, samples)
 
 
-def slice_regions(dataset, *regions, lazy=False):
+def slice_regions(
+    dataset: GTensorDataset, *regions: str, lazy: bool = False
+) -> GTensorDataset:
     """
     Extract genomic regions that overlap with specified intervals.
 
@@ -731,7 +773,7 @@ def slice_regions(dataset, *regions, lazy=False):
 
     Parameters
     ----------
-    dataset : xr.Dataset
+    dataset : GTensorDataset
         Input dataset containing genomic regions
     regions : str
         Region specification(s) in formats:
@@ -743,7 +785,7 @@ def slice_regions(dataset, *regions, lazy=False):
 
     Returns
     -------
-    xr.Dataset or LazySlicer
+    GTensorDataset
         Filtered dataset containing only overlapping regions
 
     Raises
@@ -777,12 +819,14 @@ def slice_regions(dataset, *regions, lazy=False):
     )
 
     if lazy:
-        return LazySlicer(dataset, locus=regions_mask)
+        return LocusSlice(dataset, locus=regions_mask)
 
     return dataset.isel(locus=regions_mask)
 
 
-def annot_empirical_marginal(dataset, key="empirical_marginal"):
+def annot_empirical_marginal(
+    dataset: GTensorDataset, key: str = "empirical_marginal"
+) -> GTensorDataset:
     """
     Calculate and add empirical marginal mutation rates to a dataset.
 
@@ -791,7 +835,7 @@ def annot_empirical_marginal(dataset, key="empirical_marginal"):
 
     Parameters
     ----------
-    dataset : xarray.Dataset
+    dataset : GTensorDataset
         Dataset containing mutation data to analyze
     key : str, default="empirical_marginal"
         Base name for the mutation rate variables to be added to the dataset.
@@ -799,7 +843,7 @@ def annot_empirical_marginal(dataset, key="empirical_marginal"):
 
     Returns
     -------
-    xarray.Dataset
+    GTensorDataset
         The input dataset with empirical marginal rates added as new variables:
         - {key}: Marginal mutation rates normalized by context frequencies
         - {key}_locus: Per-locus marginal rates normalized by region length
@@ -840,7 +884,7 @@ def annot_empirical_marginal(dataset, key="empirical_marginal"):
     return dataset
 
 
-def make_mixture_dataset(**datasets):
+def make_mixture_dataset(**datasets: GTensorDataset) -> GTensorDataset:
     """
     Create a mixed dataset by combining multiple source datasets.
 
@@ -850,12 +894,12 @@ def make_mixture_dataset(**datasets):
 
     Parameters
     ----------
-    **datasets : dict
+    **datasets : GTensorDataset
         Named datasets to combine. Keys become source identifiers.
 
     Returns
     -------
-    CorpusInterface
+    GTensorDataset
         Combined dataset with source-specific feature namespaces
     """
 
@@ -891,24 +935,24 @@ def make_mixture_dataset(**datasets):
     return CorpusInterface(merged)
 
 
-def dims_except_for(dims, *keepdims):
+def dims_except_for(dims: Iterable, *keepdims: str) -> tuple:
     return tuple({*dims}.difference({*keepdims}))
 
 
-def match_dims(X, **dim_sizes):
+def match_dims(X: xr.DataArray, **dim_sizes: int) -> xr.DataArray:
     return X.expand_dims(
         {d: dim_sizes[d] for d in dims_except_for(dim_sizes.keys(), *X.dims)}
     )
 
 
-def get_regions_filename(dataset):
+def get_regions_filename(dataset: GTensorDataset) -> str:
 
     return os.path.join(
         os.path.dirname(dataset.attrs["filename"]), dataset.attrs["regions_file"]
     )
 
 
-def unstack_regions(dataset):
+def unstack_regions(dataset: GTensorDataset) -> GTensorDataset:
     """
     Unstack regions from a compressed format to full coordinate arrays.
 
@@ -918,12 +962,12 @@ def unstack_regions(dataset):
 
     Parameters
     ----------
-    dataset : xr.Dataset
+    dataset : GTensorDataset
         Dataset with stacked region representation
 
     Returns
     -------
-    xr.Dataset
+    GTensorDataset
         Dataset with unstacked region coordinates
     """
     n_regions = dataset.coords["locus"].size
@@ -948,43 +992,33 @@ def unstack_regions(dataset):
 
 
 def fetch_features(
-    dataset: xr.Dataset,
+    dataset: GTensorDataset,
     *feature_names: str,
     source: Union[str, None] = None,
-):
+) -> xr.DataArray:
     """
-    Extract numerical features from a dataset.
-
-    This function selects numerical features from the dataset's 'Features' section
-    based on the provided feature names and optional source filter.
+    Extract numerical features from the dataset's "Features" section.
 
     Parameters
     ----------
-    dataset : xr.Dataset
-        The dataset containing the features in its 'Features' section.
-    feature_names : Union[str, List[str], tuple, set]
-        Names of features to extract. If empty, all numerical features are returned.
-        Feature names can be full paths or just the basename.
-    source : Union[str, None], optional
-        If provided, only features from this source directory will be returned.
-        Default is None, which includes features from all sources.
+    dataset : GTensorDataset
+        Dataset containing feature variables under the "Features" group.
+    *feature_names : str
+        Glob patterns or basenames of features to select. When empty, all
+        numeric features are returned.
+    source : str, optional
+        Restrict selection to features within this source directory. When None,
+        features from all sources are considered.
 
     Returns
     -------
-    xr.DataArray
-        A DataArray containing the selected features with the following structure:
-        - Values: Feature values arranged as a matrix
-        - Dimensions: 'feature' and 'locus'
-        - Coordinates:
-            - 'locus': locus values from the dataset
-            - 'feature': full feature paths
-            - 'feature_name': basename of each feature
-            - 'source': directory name of each feature
+    xarray.DataArray
+        A DataArray with dims ("feature", "locus") and coords "locus",
+        "feature" (full paths), "feature_name" (basenames), and "source".
 
     Notes
     -----
-    Features are filtered to include only those with numerical data types,
-    since these can be stuck together in an xarray DataArray.
+    All selected features must share a compatible numeric dtype.
     """
     from fnmatch import fnmatch
 
@@ -1076,20 +1110,20 @@ class ComponentWrapper:
         return self.dataset["Spectra/shared_effects"].isel(component=self._get_k(idx))
 
 
-def rename_components(dataset: xr.Dataset, names: List[str]):
+def rename_components(dataset: GTensorDataset, names: List[str]) -> GTensorDataset:
     """
     Rename the components of the model and update the dataset coordinates accordingly.
 
     Parameters
     ----------
-    dataset : xarray.Dataset
+    dataset : GTensorDataset
         The dataset containing model components to be renamed.
     names : typing.List[str]
         New names for the components. Must have the same length as the number of components in the model.
 
     Returns
     -------
-    xarray.Dataset
+    GTensorDataset
         The dataset with updated component names in coordinates.
 
     Raises
@@ -1125,7 +1159,7 @@ def rename_components(dataset: xr.Dataset, names: List[str]):
 
 
 def _fetch_component_data(
-    dataset, component_name: Union[str, int], fetch_fn
+    dataset: GTensorDataset, component_name: Union[str, int], fetch_fn
 ) -> xr.DataArray:
     components = ComponentWrapper(dataset)
     d = getattr(components, fetch_fn)(component_name)
@@ -1133,24 +1167,24 @@ def _fetch_component_data(
     return d
 
 
-def list_components(dataset) -> List[str]:
+def list_components(dataset: GTensorDataset) -> List[str]:
     components = ComponentWrapper(dataset)
     return components.component_names
 
 
-def fetch_component(dataset, component_name: Union[str, int]) -> xr.DataArray:
+def fetch_component(dataset: GTensorDataset, component_name: Union[str, int]) -> xr.DataArray:
     return _fetch_component_data(dataset, component_name, "get_spectrum")
 
 
-def fetch_interactions(dataset, component_name: Union[str, int]) -> xr.DataArray:
+def fetch_interactions(dataset: GTensorDataset, component_name: Union[str, int]) -> xr.DataArray:
     return _fetch_component_data(dataset, component_name, "get_interactions")
 
 
-def fetch_shared_effects(dataset, component_name: Union[str, int]) -> xr.DataArray:
+def fetch_shared_effects(dataset: GTensorDataset, component_name: Union[str, int]) -> xr.DataArray:
     return _fetch_component_data(dataset, component_name, "get_shared_effects")
 
 
-def excel_report(self, dataset, output, normalization="global"):
+def excel_report(self, dataset: GTensorDataset, output: str, normalization="global"):
     """
     Generate a comprehensive Excel report with model results.
 
@@ -1159,7 +1193,7 @@ def excel_report(self, dataset, output, normalization="global"):
 
     Parameters
     ----------
-    dataset : xarray.Dataset
+    dataset : GTensorDataset
         Dataset containing the model results to export
     output : str
         Output file path for the Excel report

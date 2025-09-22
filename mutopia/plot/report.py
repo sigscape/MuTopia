@@ -1,11 +1,20 @@
+from __future__ import annotations
+
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from matplotlib.figure import Figure
+    from mutopia.gtensor.gtensor import GTensorDataset
+
+
 def plot_signature_report(
-    dataset,
+    dataset: "GTensorDataset",
     component,
-    width=5.25,
-    height=2.0,
-    show=True,
-    bubble_scale=300,
-):
+    width: float = 5.25,
+    height: float = 2.0,
+    show: bool = True,
+    bubble_scale: float = 300,
+) -> Optional["Figure"]:
     """
     Generate a comprehensive report for a specific signature component.
 
@@ -14,21 +23,23 @@ def plot_signature_report(
 
     Parameters
     ----------
+    dataset : GTensorDataset
+        Dataset containing the signature data.
     component : int or str
         The signature component to visualize. Can be an integer index or a string identifier.
-    normalization : str, default="global"
-        The normalization method to use for the signatures.
     width : float, default=5.25
         The base width of the figure in inches. The actual figure width may be adjusted based on the number of states.
     height : float, default=2.0
         The base height per signature group in inches.
     show : bool, default=True
         Whether to display the figure immediately.
+    bubble_scale : float, default=300
+        Scale parameter passed to the SHAP summary bubble sizes.
 
     Returns
     -------
-    matplotlib.figure.Figure
-        The generated figure containing signature plots and interaction matrix.
+    matplotlib.figure.Figure or None
+        The generated figure when ``show=False``; otherwise ``None``.
 
     Notes
     -----

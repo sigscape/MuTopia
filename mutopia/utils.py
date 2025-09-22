@@ -149,50 +149,6 @@ def using_priors_from(model_state):
     return lambda corpus, _: model_state.alpha[corpus.attrs["name"]]
 
 
-def borrow_kwargs(*borrow_sigs):
-
-    import inspect
-
-    def decorator(func):
-
-        # start the signature with the incipient function
-        combined_params = dict(
-            (
-                (name, param)
-                for name, param in inspect.signature(func).parameters.items()
-                if not param.kind == inspect.Parameter.VAR_KEYWORD
-            )
-        )
-
-        # iterate over the borrowed functions
-        for f in borrow_sigs:
-            sig = inspect.signature(f)
-            # add the kwargs from the borrowed function
-            for name, param in sig.parameters.items():
-                if not param.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
-                    continue
-                combined_params[name] = param
-
-        # Sort the parameters so that the order is valid
-        sorted_params = sorted(
-            combined_params.values(),
-            key=lambda p: (p.kind, p.default is not inspect.Parameter.empty),
-        )
-        combined_params = {param.name: param for param in sorted_params}
-        # Create a new signature with combined parameters
-        merged_signature = inspect.Signature(parameters=combined_params.values())
-
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            return func(*args, **kwargs)
-
-        # Update the wrapper's signature
-        wrapper.__signature__ = merged_signature
-        return wrapper
-
-    return decorator
-
-
 def close_process(process):
 
     import subprocess

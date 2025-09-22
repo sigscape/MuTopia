@@ -4,9 +4,9 @@ import mutopia.gtensor.disk_interface as disk
 __all__ = [
     "CorpusInterface",
     "LazySampleLoader",
-    "LazySlicer",
+    "LocusSlice",
     "SampleCorpusFusion",
-    "DifferentSamples",
+    "SampleSlice",
 ]
 
 
@@ -121,7 +121,7 @@ class LazySampleLoader(CorpusInterface):
                 yield data
 
 
-class LazySlicer(CorpusInterface):
+class LocusSlice(CorpusInterface):
     """
     Making slices of the corpus is memory-intensive.
     This problem is exacerbated when we want to slice by locus
@@ -197,7 +197,7 @@ class SampleCorpusFusion(CorpusInterface):
         yield self._sample
 
 
-class DifferentSamples(CorpusInterface):
+class SampleSlice(CorpusInterface):
 
     __slots__ = ("_corpus", "_samples")
 

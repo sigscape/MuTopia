@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import numpy as np
 import xarray as xr
-from functools import partial
+from functools import partial, wraps
 from joblib import dump
 from sklearn.base import BaseEstimator
 from abc import ABC, abstractmethod
@@ -10,7 +12,7 @@ from mutopia.gtensor import dims_except_for, train_test_split
 from mutopia.gtensor.validation import check_corpus
 from mutopia.gtensor.dtypes import get_mode_config
 
-from .model.optim import fit_model
+from .model.optim import fit_model as _fit_model_impl
 from .model.model_components import *
 from .model.latent_var_models import *
 from .model.factor_model import FactorModel
@@ -19,13 +21,22 @@ from .model.factor_model import FactorModel
 from .mixture_model.mixture_interface import MixtureInterface as MIX
 from .mixture_model import DenseMixtureModel, SparseMixtureModel, SharedExposuresMixtureModel
 
+# typing helpers
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    # Prefer forward references at runtime; only import for type checkers
+    from mutopia.gtensor.gtensor import GTensorDataset
+    from numpy.random import RandomState
+
 """
 The Model class is a wrapper around a trained model state object, 
 and provides the high-level interface for interacting with the model.
 This is the entry point for the user to interact with and annotate data.
 """
 
-__all__=["TopographyModel"]
+__all__=["TopographyModel", "fit_model"]
 
 
 class DenseSharedMixtureModel(DenseMixtureModel, SharedExposuresMixtureModel):
@@ -37,155 +48,153 @@ class SparseSharedMixtureModel(SparseMixtureModel, SharedExposuresMixtureModel):
 
 
 class TopographyModel(ABC, BaseEstimator):
+    """
+    The TopographyModel is the heart of the mutopia modeling framework. It decomposes 
+    genome topography data into discrete components, simultaneously capturing their
+    genomic distributions and spectra. MuTopia models are memory and compute efficient,
+    and can be accelerated using multiple-threading. 
+
+    The models mostly work like Scikit-learn estimators. After fitting a model, 
+    you can use it to annotate your data using the `annot_data` method.
+
+    Parameters
+    ----------
+    num_components : int, default=15
+        Number of components in the signature model.
+    init_components : list, default=[]
+        List of initial components to use.
+    fix_components : list, default=[]
+        List of components to keep fixed during optimization.
+    seed : int, default=0
+        Random seed for reproducibility.
+    context_reg : float, default=0.0001
+        Regularization parameter for context model.
+    context_conditioning : float, default=1e-9
+        Conditioning parameter for context model.
+    conditioning_alpha : float, default=1e-9
+        Alpha parameter for conditioning.
+    pi_prior : float, default=1.0
+        Prior parameter for pi in the locals model.
+    tau_prior : float, default=1.0
+        Prior parameter for tau in the locals model.
+    locus_model_type : str, default="gbt"
+        Type of model for locus. Gradient Boosted Trees by default.
+    tree_learning_rate : float, default=0.15
+        Learning rate for tree-based models.
+    max_depth : int, default=5
+        Maximum depth of trees in the locus model.
+    max_trees_per_iter : int, default=25
+        Maximum number of trees per iteration.
+    max_leaf_nodes : int, default=31
+        Maximum number of leaf nodes in each tree.
+    min_samples_leaf : int, default=30
+        Minimum number of samples required at a leaf node.
+    max_features : float, default=1.0
+        Fraction of features to consider when looking for best split.
+    n_iter_no_change : int, default=1
+        Number of iterations with no improvement to wait before early stopping.
+    use_groups : bool, default=True
+        Whether to use groups in the model.
+    add_corpus_intercepts : bool, default=False
+        Whether to add corpus-specific intercepts.
+    convolution_width : int, default=0
+        Width of convolution window.
+    l2_regularization : float, default=1
+        L2 regularization strength.
+    max_iter : int, default=25
+        Maximum number of iterations for the optimization.
+    init_variance_theta : float, default=0.03
+        Initial variance for theta parameters.
+    init_variance_context : float, default=0.1
+        Initial variance for context parameters.
+    empirical_bayes : bool, default=True
+        Whether to use empirical Bayes for parameter estimation.
+    begin_prior_updates : int, default=50
+        Iteration to begin prior updates.
+    stop_condition : int, default=50
+        Stopping condition for optimization.
+    num_epochs : int, default=2000
+        Number of epochs for training.
+    locus_subsample : float or None, default=None
+        Fraction of loci to subsample in each iteration.
+    batch_subsample : float or None, default=None
+        Fraction of batches to subsample in each iteration.
+    threads : int, default=1
+        Number of threads for parallel execution.
+    kappa : float, default=0.5
+        Kappa parameter for optimization.
+    tau : float, default=1.0
+        Tau parameter for optimization.
+    callback : callable or None, default=None
+        Callback function to be called during optimization.
+    eval_every : int, default=10
+        Evaluate model every N iterations.
+    verbose : int, default=0
+        Verbosity level (0: quiet, >0: increasingly verbose).
+    time_limit : float or None, default=None
+        Time limit for optimization in seconds.
+    test_chroms : tuple, default=("chr1",)
+        Chromosomes to use for testing.
+
+    Examples
+    --------
+    >>> import mutopia as mu
+    >>> data = mu.gt.load_dataset("example_data.nc")
+    >>> # Create and fit a model with subsampling and 15 components
+    >>> model = data.modality().TopographyModel(locus_subsample=0.125, num_components=15)
+    >>> model.fit(train_data)
+    """
 
     def __init__(
         self,
-        num_components=15,
-        init_components=[],
-        fix_components=[],
-        seed=0,
+        num_components: int = 15,
+        init_components: list[str] = [],
+        fix_components: list[str] = [],
+        seed: int = 0,
         # context model
-        context_reg=0.0001,
-        context_conditioning=1e-9,
-        conditioning_alpha=1e-9,
+        context_reg: float = 0.0001,
+        context_conditioning: float = 1e-9,
+        conditioning_alpha: float = 1e-9,
         # locals model
-        pi_prior=1.0,
-        tau_prior=1.0,
-        estep_iterations=1000,
-        difference_tol=5e-5,
-        shared_exposures=False,
+        pi_prior: float = 1.0,
+        tau_prior: float = 1.0,
+        estep_iterations: int = 1000,
+        difference_tol: float = 5e-5,
+        shared_exposures: bool = False,
         # locus model
-        locus_model_type="gbt",
-        tree_learning_rate=0.15,
-        max_depth=5,
-        max_trees_per_iter=25,
-        max_leaf_nodes=31,
-        min_samples_leaf=30,
-        max_features=1.0,
-        n_iter_no_change=1,
-        use_groups=True,
-        add_corpus_intercepts=False,
-        convolution_width=0,
-        l2_regularization=1,
-        max_iter=25,
-        init_variance_theta=0.03,
-        init_variance_context=0.1,
+        locus_model_type: str = "gbt",
+        tree_learning_rate: float = 0.15,
+        max_depth: int = 5,
+        max_trees_per_iter: int = 25,
+        max_leaf_nodes: int = 31,
+        min_samples_leaf: int = 30,
+        max_features: float = 1.0,
+        n_iter_no_change: int = 1,
+        use_groups: bool = True,
+        add_corpus_intercepts: bool = False,
+        convolution_width: int = 0,
+        l2_regularization: float = 1,
+        max_iter: int = 25,
+        init_variance_theta: float = 0.03,
+        init_variance_context: float = 0.1,
         # optimization settings
-        empirical_bayes=True,
-        begin_prior_updates=50,
-        stop_condition=50,
+        empirical_bayes: bool = True,
+        begin_prior_updates: int = 50,
+        stop_condition: int = 50,
         # optimization settings
-        num_epochs=2000,
-        locus_subsample=None,
-        batch_subsample=None,
-        threads=1,
-        kappa=0.5,
-        tau=1.0,
-        callback=None,
-        eval_every=10,
-        verbose=0,
-        time_limit=None,
-        full_normalizers=False,
-        test_chroms=("chr1",),
-    ):
-        """Initialize the signature model.
-
-        This constructor sets up a signature model with specified parameters for components, regularization,
-        conditioning, and optimization settings.
-
-        Parameters
-        ----------
-        num_components : int, default=15
-            Number of components in the signature model.
-        init_components : list, default=[]
-            List of initial components to use.
-        fix_components : list, default=[]
-            List of components to keep fixed during optimization.
-        seed : int, default=0
-            Random seed for reproducibility.
-        context_reg : float, default=0.0001
-            Regularization parameter for context model.
-        context_conditioning : float, default=1e-9
-            Conditioning parameter for context model.
-        conditioning_alpha : float, default=1e-9
-            Alpha parameter for conditioning.
-        pi_prior : float, default=1.0
-            Prior parameter for pi in the locals model.
-        tau_prior : float, default=1.0
-            Prior parameter for tau in the locals model.
-        locus_model_type : str, default="gbt"
-            Type of model for locus. Gradient Boosted Trees by default.
-        tree_learning_rate : float, default=0.15
-            Learning rate for tree-based models.
-        max_depth : int, default=5
-            Maximum depth of trees in the locus model.
-        max_trees_per_iter : int, default=25
-            Maximum number of trees per iteration.
-        max_leaf_nodes : int, default=31
-            Maximum number of leaf nodes in each tree.
-        min_samples_leaf : int, default=30
-            Minimum number of samples required at a leaf node.
-        max_features : float, default=1.0
-            Fraction of features to consider when looking for best split.
-        n_iter_no_change : int, default=1
-            Number of iterations with no improvement to wait before early stopping.
-        use_groups : bool, default=True
-            Whether to use groups in the model.
-        add_corpus_intercepts : bool, default=False
-            Whether to add corpus-specific intercepts.
-        convolution_width : int, default=0
-            Width of convolution window.
-        l2_regularization : float, default=1
-            L2 regularization strength.
-        max_iter : int, default=25
-            Maximum number of iterations for the optimization.
-        init_variance_theta : float, default=0.03
-            Initial variance for theta parameters.
-        init_variance_context : float, default=0.1
-            Initial variance for context parameters.
-        empirical_bayes : bool, default=True
-            Whether to use empirical Bayes for parameter estimation.
-        begin_prior_updates : int, default=50
-            Iteration to begin prior updates.
-        stop_condition : int, default=50
-            Stopping condition for optimization.
-        num_epochs : int, default=2000
-            Number of epochs for training.
-        locus_subsample : float or None, default=None
-            Fraction of loci to subsample in each iteration.
-        batch_subsample : float or None, default=None
-            Fraction of batches to subsample in each iteration.
-        threads : int, default=1
-            Number of threads for parallel execution.
-        kappa : float, default=0.5
-            Kappa parameter for optimization.
-        tau : float, default=1.0
-            Tau parameter for optimization.
-        callback : callable or None, default=None
-            Callback function to be called during optimization.
-        eval_every : int, default=10
-            Evaluate model every N iterations.
-        verbose : int, default=0
-            Verbosity level (0: quiet, >0: increasingly verbose).
-        time_limit : float or None, default=None
-            Time limit for optimization in seconds.
-        test_chroms : tuple, default=("chr1",)
-            Chromosomes to use for testing.
-
-        Examples
-        --------
-        >>> import mutopia as mu
-        >>> data = mu.gt.load_dataset("example_data.nc")
-        >>> # Create and fit a model with subsampling and 15 components
-        >>> model = TopographyModel(locus_subsample=0.125, num_components=15)
-        >>> model.fit(train_data)
-        >>>
-        >>> # Annotate contributions of each component to the data
-        >>> annotated_data = model.annot_contributions(train_data)
-        >>>
-        >>> # Visualize the first component
-        >>> model.plot_component(0)
-        """
+        num_epochs: int = 2000,
+        locus_subsample: Optional[float] = None,
+        batch_subsample: Optional[float] = None,
+        threads: int = 1,
+        kappa: float = 0.5,
+        tau: float = 1.0,
+        callback: Optional[Callable[..., Any]] = None,
+        eval_every: int = 10,
+        verbose: int = 0,
+        time_limit: Optional[float] = None,
+        full_normalizers: bool = False,
+        test_chroms: Sequence[str] = ("chr1",),
+    ) -> None:
 
         self.num_components = num_components
         self.init_components = init_components
@@ -235,14 +244,14 @@ class TopographyModel(ABC, BaseEstimator):
         self.full_normalizers = full_normalizers
 
     @property
-    def modality(self):
+    def modality(self) -> Any:
         if not hasattr(self, "_modality"):
             raise AttributeError(
                 "Modality not set. Please set the modality before using it."
             )
         return get_mode_config(self._modality)
 
-    def sample_params(self, trial, extensive=0):
+    def sample_params(self, trial: Any, extensive: int = 0) -> Dict[str, Any]:
 
         params = {}
 
@@ -321,18 +330,18 @@ class TopographyModel(ABC, BaseEstimator):
     @abstractmethod
     def _init_factor_model(
         self,
-        train_corpuses,
-        random_state,
-        GT,
-        **kw,
+        train_corpuses: Sequence[GTensorDataset],
+        random_state: "RandomState",
+        GT: Any,
+        **kw: Any,
     ) -> FactorModel:
         raise NotImplementedError()
 
     def _init_locals_model(
         self,
-        train_datasets,
-        random_state,
-    ):
+        train_datasets: Sequence[GTensorDataset],
+        random_state: "RandomState",
+    ) -> Any:
 
         is_sparse = train_datasets[0].X.is_sparse()
         if not all(corpus.X.is_sparse() == is_sparse for corpus in train_datasets):
@@ -371,7 +380,9 @@ class TopographyModel(ABC, BaseEstimator):
 
         return locals_model
 
-    def _train_test_split(self, datasets):
+    def _train_test_split(
+        self, datasets: Sequence[GTensorDataset]
+    ) -> Tuple[Tuple[GTensorDataset, ...], Tuple[GTensorDataset, ...]]:
         return list(
             zip(
                 *map(
@@ -381,7 +392,7 @@ class TopographyModel(ABC, BaseEstimator):
             )
         )
 
-    def init_model(self, train_datasets):
+    def init_model(self, train_datasets: Sequence[GTensorDataset]) -> TopographyModel:
 
         random_state = np.random.RandomState(self.seed)
 
@@ -401,11 +412,12 @@ class TopographyModel(ABC, BaseEstimator):
 
         return self
 
+
     def fit(
         self,
-        train_datasets,
-        test_datasets=None,
-    ):
+    train_datasets: Union[GTensorDataset, Sequence[GTensorDataset]],
+    test_datasets: Optional[Union[GTensorDataset, Sequence[GTensorDataset]]] = None,
+    ) -> TopographyModel:
         """
         Fit the model to the provided training datasets.
 
@@ -415,29 +427,24 @@ class TopographyModel(ABC, BaseEstimator):
 
         Parameters
         ----------
-        *train_datasets : list of Dataset
+        train_datasets : GTensorDataset or sequence of GTensorDataset
             One or more datasets to use for training the model.
-        test_datasets : list of Dataset, optional
+        test_datasets : GTensorDataset or sequence of GTensorDataset, optional
             Datasets to use for testing the model. If None, a portion of the
             training datasets will be used for testing.
 
         Returns
         -------
-        self : object
+        TopographyModel
             The fitted estimator.
-
-        Raises
-        ------
-        ValueError
-            If no training datasets are provided.
 
         Notes
         -----
         This method sets the following attributes:
-        - modality_ : The modality of the training datasets
-        - factor_model_ : The fitted factor model
-        - locals_model_ : The fitted locals model
-        - test_scores_ : Performance metrics on test datasets
+        - ``modality_`` : The modality of the training datasets
+        - ``factor_model_`` : The fitted factor model
+        - ``locals_model_`` : The fitted locals model
+        - ``test_scores_`` : Performance metrics on test datasets
         """
         if not isinstance(train_datasets, (tuple, list)):
             train_datasets = (train_datasets,)
@@ -457,9 +464,16 @@ class TopographyModel(ABC, BaseEstimator):
             # initialize the models if not already done
             self.init_model(train_datasets)
 
+        n_preset_components = len(self.init_components) + len(self.fix_components)
+        self._component_names = (
+            self.fix_components
+            + self.init_components
+            + ["M{}".format(i) for i in range(n_preset_components, self.num_components)]
+        )
+
         random_state = np.random.RandomState(self.seed)
 
-        (self.factor_model_, self.locals_model_, self.test_scores_) = fit_model(
+        (self.factor_model_, self.locals_model_, self.test_scores_) = _fit_model_impl(
             self.GT,
             train_datasets,
             test_datasets,
@@ -472,21 +486,21 @@ class TopographyModel(ABC, BaseEstimator):
         return self
 
     @property
-    def alpha_(self):
+    def alpha_(self) -> Any:
         return self.locals_model_.alpha
 
     @property
-    def n_components(self):
+    def n_components(self) -> int:
         return self.num_components
 
     @property
-    def component_names(self):
+    def component_names(self) -> List[str]:
         try:
             return self._component_names
         except AttributeError:
             return ["M{}".format(i) for i in range(0, self.n_components)]
 
-    def _check_corpus(self, dataset, enforce_sample=True):
+    def _check_corpus(self, dataset: GTensorDataset, enforce_sample: bool = True) -> None:
         check_corpus(dataset)
         # if enforce_sample:
         #    check_dims(dataset, self.factor_model_)
@@ -497,7 +511,7 @@ class TopographyModel(ABC, BaseEstimator):
             "Regions/context_frequencies"
         ].astype(np.float32, copy=False)
 
-    def setup_corpus(self, dataset):
+    def setup_corpus(self, dataset: GTensorDataset) -> GTensorDataset:
         """
         Set up the corpus dataset with initial state and update normalization factors.
 
@@ -506,12 +520,12 @@ class TopographyModel(ABC, BaseEstimator):
 
         Parameters
         ----------
-        dataset : Dataset
+        dataset : GTensorDataset
             The dataset to be set up for modeling
 
         Returns
         -------
-        Dataset
+        GTensorDataset
             The initialized and normalized dataset
         """
 
@@ -530,7 +544,7 @@ class TopographyModel(ABC, BaseEstimator):
         logger.info("Done ...")
         return dataset
 
-    def save(self, path):
+    def save(self, path: str) -> None:
         """
         Save the model to a file.
 
@@ -549,7 +563,7 @@ class TopographyModel(ABC, BaseEstimator):
 
         dump(self, path)
 
-    def annot_components(self, dataset: xr.Dataset, normalization="global"):
+    def annot_components(self, dataset: GTensorDataset, normalization: str = "global") -> GTensorDataset:
 
         spectra = xr.concat(
             [
@@ -602,10 +616,10 @@ class TopographyModel(ABC, BaseEstimator):
 
     def annot_contributions(
         self,
-        dataset,
-        threads=1,
-        key="contributions",
-    ):
+        dataset: GTensorDataset,
+        threads: int = 1,
+        key: str = "contributions",
+    ) -> GTensorDataset:
         """
         Calculate and add component contributions to a dataset.
 
@@ -614,7 +628,7 @@ class TopographyModel(ABC, BaseEstimator):
 
         Parameters
         ----------
-        dataset : xarray.Dataset
+        dataset : GTensorDataset
             Dataset to analyze and annotate with contributions
         threads : int, default=1
             Number of parallel threads to use for computation
@@ -623,7 +637,7 @@ class TopographyModel(ABC, BaseEstimator):
 
         Returns
         -------
-        xarray.Dataset
+        GTensorDataset
             The input dataset with the calculated contributions added as a new variable
             with the specified key name and dimensions ('sample', 'component')
 
@@ -664,10 +678,10 @@ class TopographyModel(ABC, BaseEstimator):
 
     def annot_component_distributions(
         self,
-        dataset,
-        threads=1,
-        key="component_distributions",
-    ):
+        dataset: GTensorDataset,
+        threads: int = 1,
+        key: str = "component_distributions",
+    ) -> GTensorDataset:
         """
         Calculate and add component distributions to a dataset.
 
@@ -676,7 +690,7 @@ class TopographyModel(ABC, BaseEstimator):
 
         Parameters
         ----------
-        dataset : xarray.Dataset
+        dataset : GTensorDataset
             Dataset to analyze and annotate with component distributions
         threads : int, default=1
             Number of parallel threads to use for computation
@@ -686,7 +700,7 @@ class TopographyModel(ABC, BaseEstimator):
 
         Returns
         -------
-        xarray.Dataset
+        GTensorDataset
             The input dataset with the calculated component distributions added as new variables:
             - key: Full distributions with dimensions ('source', 'component', ...)
             - {key}_locus: Per-locus distributions normalized by region length
@@ -738,10 +752,10 @@ class TopographyModel(ABC, BaseEstimator):
 
     def annot_marginal_prediction(
         self,
-        dataset,
-        threads=1,
-        key="predicted_marginal",
-    ):
+        dataset: GTensorDataset,
+        threads: int = 1,
+        key: str = "predicted_marginal",
+    ) -> GTensorDataset:
         """
         Calculate and add marginal predictions to a dataset.
 
@@ -750,7 +764,7 @@ class TopographyModel(ABC, BaseEstimator):
 
         Parameters
         ----------
-        dataset : xarray.Dataset
+        dataset : GTensorDataset
             Dataset to analyze and annotate with marginal predictions
         threads : int, default=1
             Number of parallel threads to use for computation
@@ -760,7 +774,7 @@ class TopographyModel(ABC, BaseEstimator):
 
         Returns
         -------
-        xarray.Dataset
+        GTensorDataset
             The input dataset with marginal predictions added as new variables:
             - key: Marginal mutation rate predictions
             - {key}_locus: Per-locus marginal predictions normalized by region length
@@ -808,15 +822,15 @@ class TopographyModel(ABC, BaseEstimator):
 
     def annot_SHAP_values(
         self,
-        dataset,
-        *components,
-        threads=1,
-        scan=False,
-        n_samples=2000,
-        seed=42,
-        key="SHAP_values",
-        source=None,
-    ):
+        dataset: GTensorDataset,
+        *components: Union[int, str],
+        threads: int = 1,
+        scan: bool = False,
+        n_samples: int = 2000,
+        seed: int = 42,
+        key: str = "SHAP_values",
+        source: Optional[str] = None,
+    ) -> GTensorDataset:
         """
         Calculate and add SHAP values to explain component predictions.
 
@@ -826,7 +840,7 @@ class TopographyModel(ABC, BaseEstimator):
 
         Parameters
         ----------
-        dataset : xarray.Dataset
+        dataset : GTensorDataset
             Dataset to analyze and annotate with SHAP values
         *components : int or str
             Component indices or names to calculate SHAP values for. If none provided,
@@ -844,7 +858,7 @@ class TopographyModel(ABC, BaseEstimator):
 
         Returns
         -------
-        xarray.Dataset
+        GTensorDataset
             The input dataset with SHAP values added as a new variable with the specified
             key name and dimensions ('shap_component', 'locus' or 'shap_locus', 'shap_features')
 
@@ -941,7 +955,7 @@ class TopographyModel(ABC, BaseEstimator):
         logger.info(f'Added key: "{key}"')
         return dataset
 
-    def annot_data(self, dataset, threads=1):
+    def annot_data(self, dataset: GTensorDataset, threads: int = 1) -> GTensorDataset:
         """
         Annotate a dataset with comprehensive model analysis information.
 

@@ -1,6 +1,14 @@
+from __future__ import annotations
+
 from math import sqrt
 from itertools import chain
-from typing import Union
+from typing import Any, Optional, Sequence, Union, TYPE_CHECKING
+
+if TYPE_CHECKING:  # Only imported for typing; avoids runtime dependency cycles
+    import xarray as xr
+    from matplotlib.axes import Axes
+    from matplotlib.figure import Figure
+    from mutopia.gtensor.gtensor import GTensorDataset
 
 def _plot_linear_signature(
     xlabels,
@@ -85,78 +93,58 @@ def _plot_linear_signature(
     return ax
 
 
-def plot_spectrum(signature, *select, **kw):
+def plot_spectrum(
+    signature: "xr.DataArray",
+    *select: str,
+    **kw: Any,
+) -> "Axes":
     """
     Plot a component of a signature using its modality's plotting method.
 
-    This function serves as a convenience wrapper that calls the appropriate plotting
-    method based on the signature's modality. If no selection is provided, it defaults
-    to plotting the "Baseline" component.
+    This wraps the modality-specific plot method. If no selection is provided,
+    downstream modality implementations typically default to "Baseline".
 
     Parameters
     ----------
     signature : xr.DataArray
-        The signature data array to plot. Must have a modality method that returns
-        an object with a plot method.
+        Signature data array to plot. Must implement ``signature.modality().plot(...)``.
     *select : str, optional
-        Variable number of string arguments specifying which components to select
-        for plotting. If no arguments are provided, defaults to ["Baseline"].
+        One or more state/section labels to plot (e.g., "Baseline").
     **kw : dict, optional
-        Additional keyword arguments passed to the underlying plot method.
+        Extra keyword arguments forwarded to the modality plot method.
 
     Returns
     -------
-    object
-        The return value from the modality's plot method, typically a matplotlib
-        figure or axes object.
-
-    Examples
-    --------
-    >>> plot_component(signature_data)  # Plots baseline component
-    >>> plot_component(signature_data, "Component1", "Component2")  # Plots specific components
-    >>> plot_component(signature_data, "Baseline", figsize=(10, 6))  # With additional kwargs
+    matplotlib.axes.Axes
+        The axes containing the rendered plot.
     """
     return signature.modality().plot(signature, *select, **kw)
 
 
 def plot_component(
-    dataset,
+    dataset: "GTensorDataset",
     component: Union[str, int],
-    *select,
-    **kw,
-):
+    *select: str,
+    **kw: Any,
+) -> "Axes":
     """
-    Plot a specific component from the dataset using its modality's plotting method.
-
-    This function retrieves the specified component from the dataset and calls its
-    modality's plot method. If no selection is provided, it defaults to plotting
-    the "Baseline" component.
+    Plot a specific component from a dataset using its modality's plotting method.
 
     Parameters
     ----------
-    dataset : xr.DataSet
-        The dataset containing the signature components.
+    dataset : GTensorDataset
+        Dataset containing signature components.
     component : int or str
-        The index or identifier of the component to plot.
+        Component index or identifier to plot.
     *select : str, optional
-        Variable number of string arguments specifying which components to select
-        for plotting. If no arguments are provided, defaults to ["Baseline"].
-    key : str, optional
-        The key in the dataset where the signatures are stored. Defaults to "mutopia".
+        One or more state/section labels to plot (e.g., "Baseline").
     **kw : dict, optional
-        Additional keyword arguments passed to the underlying plot method.
+        Extra keyword arguments forwarded to the modality plot method.
 
     Returns
     -------
-    object
-        The return value from the modality's plot method, typically a matplotlib
-        figure or axes object.
-
-    Examples
-    --------
-    >>> plot_component(dataset, 0)  # Plots baseline of component at index 0
-    >>> plot_component(dataset, "Component1", "Component2")  # Plots specific components by name
-    >>> plot_component(dataset, 1, figsize=(10, 6))  # With additional kwargs
+    matplotlib.axes.Axes
+        The axes containing the rendered plot.
     """
     from mutopia.gtensor import fetch_component
 
@@ -168,41 +156,35 @@ def plot_component(
 
 
 def plot_signature_panel(
-    dataset,
-    ncols=4,
-    width=3.5,
-    height=1.25,
-    show=True,
-    **kwargs,
-):
+    dataset: "GTensorDataset",
+    ncols: int = 4,
+    width: float = 3.5,
+    height: float = 1.25,
+    show: bool = True,
+    **kwargs: Any,
+) -> Optional["Figure"]:
     """
-    Create a panel of signature plots for all components in the model.
+    Create a panel of signature plots for all components in a dataset.
 
     Parameters
     ----------
-    ncols : int, default=3
+    dataset : GTensorDataset
+        Dataset containing signature components.
+    ncols : int, default=4
         Number of columns in the panel.
-    normalization : str, default="global"
-        Normalization method for the signatures.
     width : float, default=3.5
         Width of each subplot in inches.
     height : float, default=1.25
         Height of each subplot in inches.
     show : bool, default=True
-        If True, displays the figure. If False, returns the figure object.
+        If True, display the figure; if False, return it.
     **kwargs
-        Additional keyword arguments passed to plot_component method.
+        Extra keyword arguments forwarded to ``plot_spectrum``.
 
     Returns
     -------
-    fig : matplotlib.figure.Figure, optional
-        The figure object containing the panel of signatures. Only returned if show=False.
-
-    Notes
-    -----
-    This method creates a grid of subplots, each displaying one signature component.
-    The number of rows is calculated based on ncols and the number of components.
-    Component names are displayed as y-axis labels.
+    matplotlib.figure.Figure or None
+        The figure when ``show=False``; otherwise ``None``.
     """
     import numpy as np
     import matplotlib.pyplot as plt
