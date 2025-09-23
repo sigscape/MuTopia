@@ -17,7 +17,7 @@ def overrided_by(default_fn):
     def inner(fn):
         def wrapped_fn(self, *args, **kwargs):
             if getattr(self, default_fn) is None:
-                return fn(self, *args, **kwargs)
+                return fn(*args, **kwargs)
             else:
                 return getattr(self, default_fn)(self, *args, **kwargs)
 
@@ -121,7 +121,6 @@ class FactorModel:
 
     @overrided_by("predict_fn")
     def predict(self, k, dataset, with_context=True):
-        raise NotImplementedError()
         """
         The difference between this method and the _get_propto_log_mutation_rate
         is that this method returns the log mutation rate for all
@@ -136,7 +135,7 @@ class FactorModel:
                     model.predict(k, dataset) for model in self.models.values()
                 ),  # sum over models
                 np.log(self.GT.get_exposures(dataset))
-                + factor_model.get_normalizers(dataset)[k],
+                + self.get_normalizers(dataset)[k],
             )
             if with_context:
                 y_hat += np.log(self.GT.get_freqs(dataset))
@@ -246,8 +245,6 @@ class FactorModel:
 
     @overrided_by("offsets_fn")
     def _get_exp_offsets_k_c(self, k, dataset):
-        raise NotImplementedError()
-
         model_predictions = {
             model_name: model.predict(k, dataset)
             for model_name, model in self.models.items()

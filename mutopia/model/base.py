@@ -36,7 +36,7 @@ and provides the high-level interface for interacting with the model.
 This is the entry point for the user to interact with and annotate data.
 """
 
-__all__=["TopographyModel", "fit_model"]
+__all__=["TopographyModel"]
 
 
 class DenseSharedMixtureModel(DenseMixtureModel, SharedExposuresMixtureModel):
@@ -473,6 +473,9 @@ class TopographyModel(ABC, BaseEstimator):
 
         random_state = np.random.RandomState(self.seed)
 
+        params = self.get_params()
+        params["empirical_bayes"] = self.empirical_bayes and (self.num_components > 1)
+
         (self.factor_model_, self.locals_model_, self.test_scores_) = _fit_model_impl(
             self.GT,
             train_datasets,
@@ -480,7 +483,7 @@ class TopographyModel(ABC, BaseEstimator):
             random_state,
             self.factor_model_,
             self.locals_model_,
-            **self.get_params(),
+            **params,
         )
 
         return self

@@ -5,6 +5,9 @@ from ..model_components.base import _svi_update_fn
 from math import prod
 from .base import *
 import warnings
+# ignore PerformanceWarnings from numba
+from numba.core.errors import NumbaPerformanceWarning
+warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
 
 
 class WrapsFactorModel:
@@ -27,7 +30,7 @@ class WrapsFactorModel:
 
 
 @njit(
-    "Tuple((float32, float32))(float32[::1], float32[::1,:], float32[::1], float32, float32[::1], int64)",
+    "Tuple((float32, float32))(float32[::1], float32[:,:], float32[::1], float32, float32[::1], int64)",
     nogil=True,
 )
 def _sample_deviance(
