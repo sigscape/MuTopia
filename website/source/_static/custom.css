@@ -1,0 +1,10 @@
+:root{ --content-width: 85rem; --toc-width: 22rem; }
+
+/* Furo exposes CSS vars; enforce wider content area */
+.content .bd-article-container {
+  max-width: var(--content-width);
+}
+
+.sidebar-drawer, .toc-drawer {
+  width: var(--toc-width);
+}
