@@ -415,8 +415,8 @@ class TopographyModel(ABC, BaseEstimator):
 
     def fit(
         self,
-    train_datasets: Union[GTensorDataset, Sequence[GTensorDataset]],
-    test_datasets: Optional[Union[GTensorDataset, Sequence[GTensorDataset]]] = None,
+        train_datasets: Union[GTensorDataset, Sequence[GTensorDataset]],
+        test_datasets: Optional[Union[GTensorDataset, Sequence[GTensorDataset]]] = None,
     ) -> TopographyModel:
         """
         Fit the model to the provided training datasets.
