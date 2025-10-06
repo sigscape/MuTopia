@@ -72,8 +72,11 @@ def _train_test_split(*args, **kwargs):
     from .gensor_core import train_test_split
     train_test_split(*args, **kwargs)
 
+@gtensor_cli.group("slice", short_help="Slice a G-Tensor by samples or regions")
+def slice():
+    pass
 
-@gtensor_cli.command("slice-samples")
+@slice.command("samples")
 @click.argument("dataset", type=click.Path(exists=True), metavar="DATASET")
 @click.argument("output", type=click.Path(writable=True), metavar="OUTPUT")
 @click.argument("sample_id_file", type=click.Path(exists=True, dir_okay=False), metavar="SAMPLE_ID_FILE")
@@ -92,7 +95,7 @@ def _slice_samples(*args, **kwargs):
     slice_samples(*args, **kwargs)
 
 
-@gtensor_cli.command("slice-regions", short_help="Extract genomic regions from a G-Tensor")
+@slice.command("regions")
 @click.argument("dataset", type=click.Path(exists=True), metavar="DATASET")
 @click.argument("output", type=click.Path(writable=True), metavar="OUTPUT")
 @click.argument("query_regions", type=str, nargs=-1, metavar="REGIONS...")
@@ -1043,7 +1046,8 @@ def _make_quant_file(
     """
     Create a BED file with gene expression values from quantification files.
     
-    QUANT_FILE is the expression quantification files (e.g., from salmon, kallisto).
+    QUANT_FILE is a TSV where the first column are Gene IDs
+    and the second column are expression values (e.g., TPM, FPKM).
     
     This utility combines gene annotation from GTF files with expression
     quantification to create BED files suitable for adding as continuous
@@ -1058,7 +1062,6 @@ def _make_quant_file(
                                              -o expression.bed --join-on gene_id
     """
     from .gensor_core import make_expression_bedfile
-
     make_expression_bedfile(quantitation_file, output, gtf_file, join_on)
 
 
@@ -1081,3 +1084,20 @@ def _make_annotation_bedfile(gtf_file=None, output=None):
     from .gensor_core import make_annotation_bedfile
 
     make_annotation_bedfile(gtf_file, output)
+
+
+@utils.command("fill-template", short_help="Fill a configuration template using Jinja2")
+@click.argument("template_file", type=click.Path(exists=True), metavar="TEMPLATE_FILE")
+@click.argument("variables_file", type=click.Path(exists=True), metavar="VARIABLES_FILE")
+def fill_template(template_file: str, variables_file: str) -> None:
+    import yaml
+    from mutopia.utils import fill_jinja_template
+
+    with open(variables_file, "r") as vf:
+        variables = yaml.safe_load(vf)
+    
+    with open(template_file, "r") as tf:
+        template_str = tf.read()
+
+    filled_template = fill_jinja_template(template_str, **variables)
+    click.echo(filled_template)

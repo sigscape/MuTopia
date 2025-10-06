@@ -8,6 +8,10 @@ logger = logging.getLogger(" Mutopia")
 logging.basicConfig(level=logging.INFO)
 logger.setLevel(logging.INFO)
 
+def fill_jinja_template(template_str, **kwargs):
+    from jinja2 import Environment
+    template = Environment().from_string(template_str)
+    return template.render(**kwargs)
 
 def plot_presets():
     import matplotlib.pyplot as plt
