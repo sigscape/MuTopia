@@ -4,39 +4,37 @@ Core business logic for model training and analysis operations.
 This module contains the core business logic separated from CLI interfaces,
 making the functionality reusable across different interfaces (CLI, API, notebooks).
 """
-
 from typing import List, Optional
-import mutopia as mu
 import mutopia.gtensor as gt
 import mutopia.gtensor.disk_interface as disk
 from mutopia.utils import logger
 
-
 def train_model(
-    train_corpuses: List[str],
+    train: List[str],
+    test: List[str],
     output: str,
     time_profile: bool = False,
     lazy: bool = False,
-    test_chroms: List[str] = ["chr1"],
     **model_kw,
 ):
-    if not len(train_corpuses) > 0:
-        raise ValueError("At least one training corpus is required")
+    if not len(train) > 0:
+        raise ValueError("At least one training dataset is required")
+    
+    if len(train) != len(test):
+        raise ValueError("Number of training and testing datasets must match")
 
     # Filter out None values from model parameters
     model_kw = {k: v for k, v in model_kw.items() if v is not None}
 
+    logger.info(f"Training with {len(train)} dataset pairs")
+
     # Load train/test data splits
-    train, test = list(
-        zip(
-            *[
-                (gt.lazy_train_test_load if lazy else gt.eager_train_test_load)(
-                    corpus, *test_chroms
-                )
-                for corpus in train_corpuses
-            ]
-        )
-    )
+    if lazy:
+        train_data = [gt.lazy_load(path) for path in train]
+        test_data = [gt.lazy_load(path) for path in test]
+    else:
+        train_data = [gt.eager_load(path) for path in train]
+        test_data = [gt.eager_load(path) for path in test]
 
     # Configure profiling mode
     if time_profile:
@@ -45,8 +43,8 @@ def train_model(
         logger.setLevel("DEBUG")
 
     # Train the model
-    model = gt.get_mode(train[0]).TopographyModel(**model_kw)
-    model = model.fit(*train, test_datasets=test)
+    model = gt.get_mode(train_data[0]).TopographyModel(**model_kw)
+    model = model.fit(*train_data, test_datasets=test_data)
 
     best_score = max(model.test_scores_)
 
@@ -71,24 +69,10 @@ def run_optimization_trial(**kw):
     _run_trial_cli(**kw)
 
 
-def launch_optimization_dashboard(study_name: str):
-    """
-    Launch interactive optimization dashboard.
-
-    Parameters
-    ----------
-    study_name : str
-        Name of the study to visualize
-    """
-    from mutopia.model import tuning
-
-    tuning.dashboard(study_name)
-
-
 def get_study_summary(study_name: str):
-    from mutopia.model import tuning
+    from mutopia.tuning import summary
 
-    trials = tuning.summary(study_name)
+    trials = summary(study_name)
     trials = trials.sort_values("value", ascending=False, na_position="last")
     sel_cols = ["number", "value", "state"]
 
@@ -102,35 +86,8 @@ def get_study_summary(study_name: str):
     return trials
 
 
-def retrain_trial(
-    study_name: str,
-    trial_number: int,
-    output: str,
-    threads: int = 1,
-    time_limit: Optional[int] = None,
-    seed: Optional[int] = None,
-    lazy: bool = False,
-):
-    from mutopia.model import tuning
-
-    tuning.retrain(
-        lazy=lazy,
-        study_name=study_name,
-        trial_number=trial_number,
-        seed=seed,
-        threads=threads,
-        time_limit=time_limit,
-        save_name=output,
-    )
-
-
-def list_optimization_studies():
-    from mutopia.model import tuning
-
-    return tuning.list_studies()
-
-
 def annot(model: str, dataset: str, output: str):
+    import mutopia.analysis as mu
     model = mu.load_model(model)
     ds = gt.load_dataset(dataset, with_samples=False, with_state=False)
     annotated = model.annot_data(ds)
@@ -145,6 +102,7 @@ def simulate_from_model(
     scale_num_mutations: float = 1.0,
 ):
     from mutopia.simulate import simulate_from_model
+    import mutopia.analysis as mu
 
     dataset = disk.load_dataset(dataset_path, with_samples=False)
     model = mu.load_model(model_path)
