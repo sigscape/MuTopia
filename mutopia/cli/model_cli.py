@@ -15,15 +15,20 @@ def model():
 
 
 @model.command("train", short_help="Train a genome topography model")
-@click.argument(
-    "train_corpuses", type=click.Path(exists=True), nargs=-1, metavar="CORPUS..."
+@click.option(
+    "-ds",
+    "--dataset",
+    type=click.Tuple([click.Path(exists=True), click.Path(exists=True)]),
+    multiple=True,
+    metavar="TRAIN_DATA TEST_DATA",
+    help="Paired training and testing dataset files (.nc format) - can specify multiple pairs",
 )
 @click.option(
     "-o",
     "--output",
     type=click.Path(writable=True),
     required=True,
-    help="Path to save the trained model file",
+    help="Output file for the trained model (.pkl format)",
 )
 @click.option(
     "-k",
@@ -226,71 +231,66 @@ def model():
 def train(
     *,
     output,
-    train_corpuses: List[str],
+    dataset: List[Tuple[str, str]] = [],
     time_profile: bool = False,
     lazy: bool = False,
-    test_chroms: List[str] = ["chr1"],
+    init_components: List[str] = [],
+    fix_components: List[str] = [],
     **model_kw,
 ):
     """
     Train a genome topography model from G-Tensor datasets.
     
-    CORPUS... are G-Tensor dataset files (.nc format) containing genomic samples
-    with data and features for training the model.
+    Uses paired training and testing datasets to train a model with specified
+    parameters and evaluate performance.
     
     Examples:
         # Basic training with 5 components
-        model train dataset1.nc dataset2.nc -k 5 -o model.pkl
+        model train --dataset train.nc test.nc -k 5 -o model.pkl
         
-        # Advanced training with regularization and custom parameters
-        model train data.nc -k 10 -o model.pkl --context-reg 0.1 \\
-                    --l2-regularization 0.01 \\
-                    --test-chroms chr1 chr2 --threads 8
+        # Advanced training with multiple datasets and regularization
+        model train --dataset data1_train.nc data1_test.nc \\
+                    --dataset data2_train.nc data2_test.nc \\
+                    -k 10 -o model.pkl --context-reg 0.1 \\
+                    --l2-regularization 0.01
         
         # Training with feature convolution and empirical Bayes
-        model train corpus.nc -k 8 -o model.pkl --convolution-width 2 \\
-                    --empirical-bayes --pi-prior 1.0 --epochs 1000
+        model train --dataset train.nc test.nc -k 8 -o model.pkl \\
+                    --convolution-width 2 --empirical-bayes --pi-prior 1.0
     """
-    if not len(train_corpuses) > 0:
+    from .model_core import train_model
+
+    if not len(dataset) > 0:
         raise click.exceptions.BadOptionUsage(
-            "train-corpuses",
-            "At least one training corpus is required",
+            "dataset",
+            "At least one training/testing dataset pair is required",
         )
 
     model_kw = {k: v for k, v in model_kw.items() if v is not None}
-    click.echo(
-        f"Training model with parameters: ", file=click.get_text_stream("stderr")
-    )
+
+    click.echo(f"Training model with parameters: ")
     click.echo(
         tabulate(
             model_kw.items(),
             headers=["Parameter", "Value"],
             tablefmt="simple",
-        ),
-        file=click.get_text_stream("stderr"),
-    )
-
-    click.echo(
-        "Testing on chromosomes: {}".format(",".join(test_chroms)),
-        file=click.get_text_stream("stderr"),
-    )
-
-    from .model_core import train_model
-
-    try:
-        best_score = train_model(
-            train_corpuses=train_corpuses,
-            output=output,
-            time_profile=time_profile,
-            lazy=lazy,
-            test_chroms=test_chroms,
-            **model_kw,
         )
+    )
 
-        click.echo("Best test score:\t{:.5f}".format(best_score))
+    train, test = list(zip(*dataset))
 
-    except ValueError as e:
-        raise click.exceptions.BadOptionUsage("train-corpuses", str(e))
+    best_score = train_model(
+        train=list(train),
+        test=list(test),
+        output=output,
+        time_profile=time_profile,
+        lazy=lazy,
+        init_components=list(init_components),
+        fix_components=list(fix_components),
+        **model_kw,
+    )
+
+    click.echo(f"Training completed successfully. Best test score: {best_score:.5f}")
 
 
 @model.group("study")
@@ -333,14 +333,7 @@ def study():
     type=bool,
     default=False,
     is_flag=True,
-    help="Save trained models for each trial under '<output_dir>/<study_name>_<trial_number>.pkl'",
-)
-@click.option(
-    "-outdir",
-    "--output-dir",
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, writable=True),
-    default=".",
-    help="Directory to save model files and study results",
+    help="Save trained models for each trial under '<study_name>/trial=<trial_number>.pkl'",
 )
 @click.option(
     "--seed", type=int, default=42, help="Random seed for reproducible optimization"
@@ -507,9 +500,7 @@ def _create_study(
     max_components: int,
     seed: int = 0,
     save_model: bool = False,
-    output_dir: str = ".",
     extensive: int = 0,
-    test_chroms: List[str] = ["chr1"],
     **model_kw,
 ):
     """
@@ -535,7 +526,7 @@ def _create_study(
                             --min-components 8 --max-components 12 \\
                             --locus-model-type linear --empirical-bayes
     """
-    from mutopia.model.tuning import create_study
+    from mutopia.tuning import create_study
 
     if not len(dataset) > 0:
         raise click.exceptions.BadOptionUsage(
@@ -558,15 +549,14 @@ def _create_study(
 
     try:
         create_study(
-            train=train,
-            test=test,
+            train=list(train),
+            test=list(test),
             eval_every=5,
             min_components=min_components,
             max_components=max_components,
             study_name=study_name,
             seed=seed,
             save_model=save_model,
-            output_dir=output_dir,
             extensive=extensive,
             **model_kw,
         )
@@ -674,10 +664,10 @@ def summary(
         # Export results to CSV file
         model study summary my_study --output results.csv
     """
-    from .model_core import get_study_summary
+    from mutopia.tuning import summary
 
     try:
-        trials = get_study_summary(study_name)
+        trials = summary(study_name)
         trials = trials.sort_values("value", ascending=False, na_position="last")
         sel_cols = ["number", "value", "state"]
 
@@ -694,7 +684,7 @@ def summary(
         else:
             print(
                 tabulate(
-                    trials,
+                    trials, # type: ignore
                     headers="keys",
                     tablefmt="simple",
                 )
@@ -761,17 +751,16 @@ def retrain(
         # Retrain with different random seed for ensemble
         model study retrain my_study 42 model_v2.pkl --seed 999 --lazy
     """
-    from .model_core import retrain_trial
-
+    from mutopia import tuning
     try:
-        retrain_trial(
+        tuning.retrain(
+            lazy=lazy,
             study_name=study_name,
             trial_number=trial_number,
-            output=output,
-            lazy=lazy,
             seed=seed,
             threads=threads,
             time_limit=time_limit,
+            save_name=output,
         )
         click.echo(
             f"Successfully retrained trial {trial_number} from study {study_name}"

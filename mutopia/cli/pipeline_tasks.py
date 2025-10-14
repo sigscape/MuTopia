@@ -106,7 +106,7 @@ class DownloadTask(luigi.Task):
         os.makedirs("downloads", exist_ok=True)
 
         # Download to a temporary file first
-        with tempfile.NamedTemporaryFile(delete=True) as temp_file:
+        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
             temp_path = temp_file.name
             try:
                 with requests.get(self.url, stream=True) as r:
@@ -122,6 +122,8 @@ class DownloadTask(luigi.Task):
                 # Clean up temp file if download failed
                 if os.path.exists(temp_path):
                     os.unlink(temp_path)
+                if os.path.exists(self.download_path):
+                    os.unlink(self.download_path)
                 logger.error(f"Download failed: {e}")
                 raise
 

@@ -6,24 +6,21 @@ hyperparameter optimization, including database storage, study management,
 and model training with automated pruning.
 """
 
-from typing import Iterable
+from typing import Iterable, Union, List, Optional, Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pandas as pd
 import os
-from glob import glob
 from functools import partial
 import optuna
 from optuna.storages import JournalStorage
 from optuna.storages.journal import JournalFileBackend
 from mutopia.utils import logger
 
-def _get_study_path(study_name):
-    #return os.path.join(
-    #    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    #    "{study_name}",
-    #)
-    return os.path.join("studies/", study_name)
+def _get_study_path(study_name: str) -> str:
+    return os.path.join(study_name, "study.journal")
 
-
-def _get_nfs_storage(study_name):
+def _get_nfs_storage(study_name: str) -> JournalStorage:
     """
     Create a journal file storage backend for Optuna studies.
 
@@ -41,38 +38,7 @@ def _get_nfs_storage(study_name):
     storage = JournalStorage(JournalFileBackend(journal))
     return storage
 
-
-def dashboard(study_name, storage=None):
-    """
-    Launch an Optuna dashboard for visualizing study progress.
-
-    Parameters
-    ----------
-    study_name : str
-        Name of the study to visualize
-    storage : optuna.storages.BaseStorage, optional
-        Custom storage backend. If None, uses default NFS storage.
-
-    Raises
-    ------
-    ImportError
-        If optuna_dashboard package is not installed
-    """
-
-    try:
-        from optuna_dashboard import run_server
-    except ImportError:
-        raise ImportError(
-            "To use the dashboard, you must install the optuna_dashboard package: `pip install optuna_dashboard`"
-        )
-
-    if storage is None:
-        storage = _get_nfs_storage(study_name)
-
-    run_server(storage)
-
-
-def summary(study_name, storage=None):
+def summary(study_name: str, storage: Optional[optuna.storages.BaseStorage] = None) -> "pd.DataFrame":
     """
     Get a summary dataframe of all trials in a study.
 
@@ -100,21 +66,19 @@ def summary(study_name, storage=None):
 
     return study.trials_dataframe()
 
-
 def create_study(
-    seed=0,
-    storage=None,
-    save_model=True,
-    output_dir=".",
-    extensive=0,
+    seed: int = 0,
+    storage: Optional[optuna.storages.BaseStorage] = None,
+    save_model: bool = True,
+    extensive: int = 0,
     *,
-    train,
-    test,
-    min_components,
-    max_components,
-    study_name,
-    **model_kw,
-):
+    train: Union[str, List[str]],
+    test: Union[str, List[str]],
+    min_components: int,
+    max_components: int,
+    study_name: str,
+    **model_kw: Any,
+) -> None:
     """
     Create a new Optuna study for hyperparameter optimization.
 
@@ -126,8 +90,6 @@ def create_study(
         Custom storage backend. If None, uses default NFS storage.
     save_model : bool, default True
         Whether to save trained models during optimization
-    output_dir : str, default "."
-        Directory to save models and results
     extensive : int, default 0
         Level of extensive parameter sampling
     train : str or list of str
@@ -143,9 +105,9 @@ def create_study(
     **model_kw
         Additional model parameters to store as study attributes
     """
-
-    if not os.path.exists("studies"):
-        os.makedirs("studies")
+        # if there are slashes in the study name, make those directories
+    if not os.path.isdir(study_name):
+        os.makedirs(study_name, exist_ok=True)
 
     if storage is None:
         storage = _get_nfs_storage(study_name)
@@ -173,7 +135,6 @@ def create_study(
     study.set_user_attr("test", list(map(os.path.abspath, test)))
     study.set_user_attr("save_model", save_model)
     study.set_user_attr("extensive", extensive)
-    study.set_user_attr("output_dir", os.path.abspath(output_dir))
 
     for key, value in model_kw.items():
         study.set_user_attr(key, value)
@@ -229,7 +190,6 @@ def load_study(study_name, storage=None, prune=True):
         "train": model_attrs.pop("train"),
         "test": model_attrs.pop("test"),
         "save_model": model_attrs.pop("save_model"),
-        "output_dir": model_attrs.pop("output_dir"),
         "extensive": model_attrs.pop("extensive", 0),
         "test_chroms": model_attrs.pop("test_chroms", ["chr1"]),
     }
@@ -239,7 +199,6 @@ def load_study(study_name, storage=None, prune=True):
         study_attrs,
         model_attrs,
     )
-
 
 def load_study_data(study, lazy=False):
     """
@@ -273,7 +232,6 @@ def load_study_data(study, lazy=False):
 
     return train, test
 
-
 def _model_report_callback(trial, factor_model, epoch, test_scores):
     """
     Callback function for reporting trial progress to Optuna.
@@ -304,7 +262,6 @@ def _model_report_callback(trial, factor_model, epoch, test_scores):
         if trial.should_prune():
             raise optuna.TrialPruned()
 
-
 def get_reporting_callback(trial):
     """
     Create a partial callback function for trial reporting.
@@ -320,7 +277,6 @@ def get_reporting_callback(trial):
         Partial callback function with trial pre-bound
     """
     return partial(_model_report_callback, trial)
-
 
 def _get_save_model_fn(study):
     """
@@ -341,25 +297,15 @@ def _get_save_model_fn(study):
     PermissionError
         If the output directory is not writable
     """
-
     study_name = study.study_name
-    output_dir = study.user_attrs["output_dir"]
-
-    if not os.access(output_dir, os.W_OK):
-        raise PermissionError(f"Cannot write to directory: {output_dir}")
-
     def _save_model(trial, model):
-
         model_path = os.path.join(
-            output_dir,
-            f'{study_name.replace("/",".")}_{trial.number}.pkl',
+            study_name,
+            f"trial={trial.number}.pkl",
         )
-
         trial.set_user_attr("model_path", model_path)
         model.save(model_path)
-
     return _save_model
-
 
 def _objective(
     trial,
@@ -405,7 +351,7 @@ def _objective(
     """
 
     if save_model:
-        save_fn = _get_save_model_fn(study)
+        _get_save_model_fn(study)
 
     if param_sampling_fn is None:
         param_sampling_fn = partial(
@@ -442,7 +388,7 @@ def _objective(
     )
 
     if save_model:
-        save_fn(trial, model)
+        _get_save_model_fn(study)(trial, model)
 
     if not summary_callback is None:
         summary_callback(trial, model=model, study=study, train=train, test=test)
@@ -533,7 +479,6 @@ def _run_trial_cli(
     model_kw["eval_every"] = 5
 
     train, test = load_study_data(study, lazy)
-
     model = train[0].modality().TopographyModel(**model_kw)
 
     run_trial(
@@ -584,37 +529,18 @@ def retrain(
     This function automatically sets max_features based on convolution_width
     and removes eval_every from parameters to ensure full training.
     """
-
-    from mutopia.gtensor import lazy_train_test_load, eager_train_test_load
-
-    study, study_attrs, model_kw = load_study(study_name, storage)
+    study, _, model_kw = load_study(study_name, storage)
     model_kw.update(kwargs)
-    model_kw.update(study.trials[trial_number].params)
-    model_kw["max_features"] = 1 / (model_kw.get("convolution_width", 0) + 1)
+    model_kw["eval_every"] = 5
+    
+    train, test = load_study_data(study, lazy)
+    model_cls = train[0].modality().TopographyModel
 
-    if "eval_every" in model_kw:
-        model_kw.pop("eval_every")
-
-    logger.info(
-        f"Retraining trial {trial_number} with params:\n\t"
-        + "\n\t".join([f"{key}: {value}" for key, value in model_kw.items()])
-    )
-
-    train, test = list(
-        zip(
-            *[
-                (lazy_train_test_load if lazy else eager_train_test_load)(
-                    corpus, *study_attrs["test_chroms"]
-                )
-                for corpus in study_attrs["train_corpuses"]
-            ]
-        )
-    )
-    example_corpus = train[0]
+    trial = study.trials[trial_number]
+    model_kw.update(trial.params)
 
     model = (
-        example_corpus.modality()
-        .TopographyModel(
+        model_cls(
             **model_kw,
             seed=seed,
         )

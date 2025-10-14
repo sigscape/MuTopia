@@ -71,6 +71,9 @@ def stream_bedfile(bedfile):
     except Exception as e:
         raise ValueError(f"Error reading bedfile {bedfile}: {str(e)}") from e
 
+def sorted_bedfile(bedfile):
+    return sorted(list(stream_bedfile(bedfile)), key=lambda x: (x[0], x[1]))
+
 
 @dataclass
 class Region:
@@ -115,6 +118,7 @@ def _get_endpoints(
     *bedfiles,
     blacklist=None,
     base_regions=None,
+    sort=False,
 ):
     key = lambda x: (x.chrom, x.start)
 
@@ -134,7 +138,7 @@ def _get_endpoints(
 
     def _iter_endpoints_bedfile(bedfile, track_id):
         # okay the problem is that this is not current sorted ...
-        for chrom, start, end, feature in stream_bedfile(bedfile):
+        for chrom, start, end, feature in (stream_bedfile if not sort else sorted_bedfile)(bedfile):
             yield Endpoint(chrom, start, end, track_id, feature, True)
             yield Endpoint(chrom, end, end, track_id, feature, False)
 
@@ -342,6 +346,7 @@ def make_regions(
     output=sys.stdout,
     window_size=10000,
     min_windowsize=25,
+    sort=True,
 ):
     allowed_chroms = []
     with open(genome_file, "r") as f:
@@ -383,7 +388,8 @@ def make_regions(
         logger.info(f"Building regions ...")
         # 1. get the endpoints from the bedfiles
         data = _get_endpoints(
-            *bedfiles, blacklist=blacklist_file, base_regions=base_regions
+            *bedfiles, blacklist=blacklist_file, base_regions=base_regions,
+            sort=sort,
         )
 
         # 2. filter out the endpoints that are not on the allowed chromosomes

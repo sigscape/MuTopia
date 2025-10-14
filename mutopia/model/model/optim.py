@@ -265,6 +265,9 @@ def fit_model(
     # If the data is sparse, we should make sure it's in the right format.
     # GCSX with locus and sample dimensions compressed.
     ##
+    train_datasets = list(train_datasets)
+    test_datasets = list(test_datasets)
+    
     logger.info("Validating datasets...")
     for dataset in train_datasets + test_datasets:
         check_dims(dataset, factor_model)
