@@ -234,6 +234,6 @@ class TransformerInterface(CorpusInterface):
     def fetch_sample(self, sample_name):
         return self._func(self._corpus.fetch_sample(sample_name))
 
-    def iter_samples(self):
-        for sample_name, data in self._corpus.iter_samples():
-            yield sample_name, self._func(data)
+    def iter_samples(self, subset=None):
+        for sample in self._corpus.iter_samples(subset=subset):
+            yield self._func(sample)

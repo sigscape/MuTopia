@@ -5,14 +5,15 @@ Start by making a new conda environment:
 
 .. code-block:: bash
 
-    $ conda create --name my-mutopia -c conda-forge -y python=3.11
+    $ conda create --name my-mutopia -c conda-forge -y python=3.11 ipykernel
     $ conda activate my-mutopia
+    $ python -m ipykernel install --user --name my-mutopia
 
 Next, install the package from github:
 
 .. code-block:: bash
 
-    $ pip install git+https://github.com/AllenWLynch/Mutopia.git
+    $ pip install git+https://github.com/AllenWLynch/Mutopia.git@no-datatree
 
 
 Mutopia model training

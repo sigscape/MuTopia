@@ -179,13 +179,13 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
 
     def post_fit(self, corpus):
 
-        locus_effects = (
-            CS.fetch_val(corpus, "log_locus_distribution").transpose("locus", ...).data
-        )
-
         freqs = CS.get_regions(corpus).context_frequencies
 
-        if "context" in freqs.dims:
+        if False:
+            locus_effects = (
+                CS.fetch_val(corpus, "log_locus_distribution").transpose("locus", ...).data
+            )
+            #if "context" in freqs.dims:
             contexts = (
                 freqs.sum(dim=dims_except_for(freqs.dims, "context", "locus"))
                 .transpose("context", "locus")

@@ -126,6 +126,7 @@ class LDAUpdateSparse(LocalsModel):
         dataset,
         factor_model,
         logsafe=True,
+        renormalize=False,
         *,
         sample_dict,
     ):
@@ -150,7 +151,7 @@ class LDAUpdateSparse(LocalsModel):
             )
 
         if logsafe:
-            logp_X - logp_X.max()
+            logp_X = logp_X - logp_X.max()
 
         return np.ascontiguousarray(
             np.nan_to_num(np.exp(logp_X), nan=0.0), dtype=self.dtype
@@ -285,6 +286,7 @@ class LDAUpdateSparse(LocalsModel):
             dataset,
             factor_model,
             logsafe=False,  # we want the actual likelihood, don't remove the max for numerical stability
+            renormalize=True,  # we want a proper likelihood distribution
             sample_dict=sample_dict,
         )
 

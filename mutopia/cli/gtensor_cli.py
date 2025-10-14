@@ -48,6 +48,7 @@ def _run_pipeline(*args, **kwargs):
 @gtensor_cli.command("split", short_help="Split a G-Tensor into training and test sets")
 @click.argument("filename", type=click.Path(exists=True), metavar="DATASET")
 @click.argument("test_contigs", nargs=-1, type=str, required=True, metavar="CONTIG...")
+@click.option("-o", "--output-prefix", type=str, default=None, help="Prefix for output files, defaults to input filename")
 @click.option(
     "-min",
     "--min-region-size",

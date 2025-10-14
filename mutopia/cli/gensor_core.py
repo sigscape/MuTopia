@@ -262,12 +262,16 @@ def train_test_split(
     filename: str,
     test_contigs: list[str],
     min_region_size=5,
+    output_prefix: Optional[str] = None,
 ):
 
     if not len(test_contigs) > 0:
         raise click.BadParameter("Must provide at least one contig to use for testing.")
-
-    outprefix = ".".join(filename.split(".")[:-1])
+    
+    if output_prefix is None:
+        outprefix = ".".join(filename.split(".")[:-1]) + "."
+    else:
+        outprefix = output_prefix
 
     dataset = disk.load_dataset(filename, with_samples=False)
     dataset.attrs["regions_file"] = "none"
@@ -287,8 +291,8 @@ def train_test_split(
     train = LocusSlice(LazySampleLoader(dataset), locus=train_mask)
     test = LocusSlice(LazySampleLoader(dataset), locus=test_mask)
 
-    disk.write_dataset(train, outprefix + ".train.nc", bar=True)
-    disk.write_dataset(test, outprefix + ".test.nc", bar=True)
+    disk.write_dataset(train, outprefix + "train.nc", bar=True)
+    disk.write_dataset(test, outprefix + "test.nc", bar=True)
 
 
 def add_sample(
