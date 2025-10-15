@@ -247,6 +247,14 @@ def make_discrete_features(
     vals = [m.split("|") for m in mappings]
     classes = set([_v for v in vals for _v in v]).difference({null})
 
+    if len(classes) > 255:
+        raise RuntimeError(
+            f"Too many classes to encode as uint8, max allowed classes is 255. Did you specify the correct column of your bed file?"
+            f"\tFile: {bed_file}"
+            f"\tColumn: {column}"
+            f"\tFound classes: {classes}"
+        )
+    
     if class_priority is None:
         class_priority = sorted(list(classes))
     else:
@@ -255,7 +263,6 @@ def make_discrete_features(
         ), f"Class priority must contain all classes in {classes}, non including the null class: {null}"
 
     vals = array([_resolve_class_priority(v, class_priority) for v in vals])
-
     return (vals, list(reversed(list(class_priority) + [null])))
 
 

@@ -346,7 +346,7 @@ def make_regions(
     output=sys.stdout,
     window_size=10000,
     min_windowsize=25,
-    sort=True,
+    sort=False,
 ):
     allowed_chroms = []
     with open(genome_file, "r") as f:
