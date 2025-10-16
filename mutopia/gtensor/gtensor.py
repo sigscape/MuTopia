@@ -73,6 +73,7 @@ __all__ = [
     "fetch_shared_effects",
     "rename_components",
     "excel_report",
+    "infer_source_celltypes",
 ]
 
 BED_COLS = [
@@ -154,6 +155,31 @@ def GTensor(
             "dtype": dtype or modality.MODE_ID,
         },
     )
+
+def infer_source_celltypes(dataset: GTensorDataset) -> GTensorDataset:
+    """
+    Infer source cell types from feature names and assign to dataset coordinates.
+
+    This function examines the feature names in the dataset to identify unique
+    source cell types based on directory structure. It then assigns these
+    inferred cell types to the 'source' coordinate of the dataset.
+
+    Parameters
+    ----------
+    dataset : GTensorDataset
+        Input dataset containing features with potential source information
+
+    Returns
+    -------
+    GTensorDataset
+        Dataset with 'source' coordinate added, reflecting inferred cell types
+
+    Raises
+    ------
+    ValueError
+        If no features are found in the dataset to infer sources from
+    """
+    return disk.infer_source_celltypes(dataset)
 
 
 def apply_to_samples(data: GTensorDataset, func: Callable, bar: bool = True) -> GTensorDataset:

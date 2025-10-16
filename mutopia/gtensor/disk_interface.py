@@ -533,6 +533,20 @@ def _pack_samples(samples):
     return samples
 
 
+def infer_source_celltypes(dataset):
+    source_names = list({
+            os.path.dirname(feature) 
+            for feature in dataset.sections["Features"].data_vars
+            if "/" in feature
+        })
+        
+    if len(source_names) > 0:
+        dataset = dataset.mutate(
+            lambda ds : ds.assign_coords({"source": source_names})
+        )
+    return dataset
+
+
 def load_dataset(filename, with_samples=True, with_state=True, verbose=False):
 
     def open_ds(**kw):
@@ -594,6 +608,9 @@ def load_dataset(filename, with_samples=True, with_state=True, verbose=False):
         pass
 
     dataset.attrs["filename"] = filename
-    # dataset = dataset.assign_coords(dataset.modality().coords)
+
+    if not "source" in dataset.coords:
+        logger.info("MuTopia inferred source celltypes from feature names.")
+        dataset = infer_source_celltypes(dataset)
 
     return dataset

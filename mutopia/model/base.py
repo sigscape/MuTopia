@@ -958,7 +958,7 @@ class TopographyModel(ABC, BaseEstimator):
         logger.info(f'Added key: "{key}"')
         return dataset
 
-    def annot_data(self, dataset: GTensorDataset, threads: int = 1) -> GTensorDataset:
+    def annot_data(self, dataset: GTensorDataset, threads: int = 1, source: Optional[str] = None) -> GTensorDataset:
         """
         Annotate a dataset with comprehensive model analysis information.
 
@@ -987,7 +987,7 @@ class TopographyModel(ABC, BaseEstimator):
         
         _annot_fns = [
             self.annot_components,
-            partial(self.annot_SHAP_values, threads=threads),
+            partial(self.annot_SHAP_values, threads=threads, source=source),
             partial(self.annot_contributions, threads=threads),
             partial(self.annot_component_distributions, threads=threads),
             partial(self.annot_marginal_prediction, threads=threads),
