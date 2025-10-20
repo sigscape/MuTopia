@@ -24,6 +24,8 @@ extensions = [
     'sphinx.ext.autosummary',
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
+    'nbsphinx',
+    'sphinx_copybutton',
 ]
 
 autosummary_generate = True
@@ -49,6 +51,23 @@ suppress_warnings = [
 templates_path = ['_templates']
 exclude_patterns: list[str] = []
 
+# -- nbsphinx configuration --------------------------------------------------
+# Don't execute notebooks during build
+nbsphinx_execute = 'never'
+# Allow errors in notebooks
+nbsphinx_allow_errors = True
+# Timeout for notebook execution (if needed)
+nbsphinx_timeout = 180
+# Remove execution prompt numbers from rendered notebooks
+nbsphinx_prompt_width = '0'
+
+# -- sphinx-copybutton configuration -----------------------------------------
+# Strip prompts from copied code
+copybutton_prompt_text = r">>> |\.\.\. |\$ |In \[\d*\]: | {2,5}\.\.\.: | {5,8}: "
+copybutton_prompt_is_regexp = True
+# Remove output prompts
+copybutton_only_copy_prompt_lines = False
+
 # -- Options for HTML output -------------------------------------------------
 html_theme = 'furo'
 html_static_path = ['_static']
@@ -57,6 +76,8 @@ html_theme_options = {
     # Branding
     'light_logo': 'mutopia_logo.png',
     'dark_logo': 'mutopia_logo.png',
+    # Set default theme to light mode (auto, light, or dark)
+    'theme_color': 'light',
     # Also configurable via CSS variables; set here for both themes
     'light_css_variables': {
         'content-width': '85rem',

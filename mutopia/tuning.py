@@ -16,6 +16,7 @@ import optuna
 from optuna.storages import JournalStorage
 from optuna.storages.journal import JournalFileBackend
 from mutopia.utils import logger
+STUDY_NAME="mutopia_tuning_study"
 
 def _get_study_path(study_name: str) -> str:
     return os.path.join(study_name, "study.journal")
@@ -60,7 +61,7 @@ def summary(study_name: str, storage: Optional[optuna.storages.BaseStorage] = No
         storage = _get_nfs_storage(study_name)
 
     study = optuna.load_study(
-        study_name=study_name,
+        study_name=STUDY_NAME,
         storage=storage,
     )
 
@@ -113,7 +114,7 @@ def create_study(
         storage = _get_nfs_storage(study_name)
 
     study = optuna.create_study(
-        study_name=study_name,
+        study_name=STUDY_NAME,
         storage=storage,
         direction="maximize",
         load_if_exists=True,
@@ -135,6 +136,7 @@ def create_study(
     study.set_user_attr("test", list(map(os.path.abspath, test)))
     study.set_user_attr("save_model", save_model)
     study.set_user_attr("extensive", extensive)
+    study.set_user_attr("output_dir", study_name)
 
     for key, value in model_kw.items():
         study.set_user_attr(key, value)
@@ -169,7 +171,7 @@ def load_study(study_name, storage=None, prune=True):
         storage = _get_nfs_storage(study_name)
 
     study = optuna.load_study(
-        study_name=study_name,
+        study_name=STUDY_NAME,
         storage=storage,
         pruner=(
             optuna.pruners.HyperbandPruner(
@@ -192,6 +194,7 @@ def load_study(study_name, storage=None, prune=True):
         "save_model": model_attrs.pop("save_model"),
         "extensive": model_attrs.pop("extensive", 0),
         "test_chroms": model_attrs.pop("test_chroms", ["chr1"]),
+        "output_dir": model_attrs.pop("output_dir"),
     }
 
     return (
@@ -297,7 +300,13 @@ def _get_save_model_fn(study):
     PermissionError
         If the output directory is not writable
     """
-    study_name = study.study_name
+    study_name = study.user_attrs.get("output_dir")
+    if study_name is None:
+        raise PermissionError("Study does not have an output directory set.")
+
+    if not os.path.isdir(study_name):
+        raise PermissionError(f"Output directory {study_name} does not exist - cannot save models.")
+
     def _save_model(trial, model):
         model_path = os.path.join(
             study_name,

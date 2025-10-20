@@ -175,8 +175,8 @@ def select(var_name: str, **sel: Any) -> Callable[["Dataset"], "DataArray"]:
     """
 
     def _accessor(dataset: "Dataset") -> "DataArray":
-        return dataset[var_name].sel(**sel).transpose(..., "locus")
-
+        return dataset[var_name].sel(**sel).squeeze().transpose(..., "locus")
+    
     return _accessor
 
 

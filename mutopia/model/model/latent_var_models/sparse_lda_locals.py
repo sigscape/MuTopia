@@ -322,6 +322,7 @@ class LDAUpdateSparse(LocalsModel):
         )
 
         context_sum = np.sum(self.GT.get_freqs(dataset).data)
+        alpha = np.ascontiguousarray(self.get_alpha(dataset))
 
         # 1. figure out the missing dimensions
         missing_dims = dims_except_for(
@@ -338,7 +339,7 @@ class LDAUpdateSparse(LocalsModel):
                 sample=sample,
                 Nk=(exposures_fn or self.GT.fetch_topic_compositions)(
                     dataset, sample_name
-                ).ravel(),
+                ).ravel() + alpha,
                 context_sum=context_sum,
                 n_types=n_types,
             )

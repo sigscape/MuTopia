@@ -323,7 +323,7 @@ def rm_sample(
 ##
 #
 ##
-def write_dataset(dataset, filename, bar=True):
+def write_dataset(dataset, filename, bar=True, write_samples: bool = True):
     """Write a dataset to a NetCDF file.
 
     Writes a dataset to a NetCDF file, handling special variables, sections, and samples.
@@ -382,7 +382,7 @@ def write_dataset(dataset, filename, bar=True):
             **WRITE_KW,
         )
 
-    if len(dataset.list_samples()) > 0:
+    if len(dataset.list_samples()) > 0 and write_samples:
 
         for sample_name in (
             dataset.list_samples()
@@ -535,12 +535,13 @@ def _pack_samples(samples):
 
 def infer_source_celltypes(dataset):
     source_names = list({
-            os.path.dirname(feature) 
-            for feature in dataset.sections["Features"].data_vars
-            if "/" in feature
-        })
+        os.path.dirname(feature) 
+        for feature in dataset.sections["Features"].data_vars
+        if "/" in feature
+    })
         
     if len(source_names) > 0:
+        logger.info("MuTopia inferred source celltypes from feature names.")
         dataset = dataset.mutate(
             lambda ds : ds.assign_coords({"source": source_names})
         )
@@ -610,7 +611,6 @@ def load_dataset(filename, with_samples=True, with_state=True, verbose=False):
     dataset.attrs["filename"] = filename
 
     if not "source" in dataset.coords:
-        logger.info("MuTopia inferred source celltypes from feature names.")
         dataset = infer_source_celltypes(dataset)
 
     return dataset

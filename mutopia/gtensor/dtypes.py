@@ -45,6 +45,10 @@ def get_mode(dataset):
     return get_mode_config(dataset.attrs["dtype"])
 
 
+def make_model_cls(dataset):
+    return get_mode(dataset).TopographyModel
+
+
 @register_dataset_accessor("modality")
 @register_dataarray_accessor("modality")
 class ModalityAccessor:

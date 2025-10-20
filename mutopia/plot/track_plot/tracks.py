@@ -18,8 +18,17 @@ if TYPE_CHECKING:
     from mutopia.gtensor.gtensor import GTensorDataset
     from .track_plot import GenomeView
 
+__all__ = [
+    "plot_gene_annotation",
+    "plot_marginal_observed_vs_expected",
+    "plot_component_rates",
+    "plot_topography",
+    "plot_empirical_topography",
+    "plot_gene_expression_track",
+    "order_components",
+]
 
-def gene_annotation_track(
+def plot_gene_annotation(
     gtf: str,
     label: str = "Genes",
     all_labels_inside: bool = False,
@@ -74,7 +83,7 @@ def gene_annotation_track(
     )
 
 
-def marginal_observed_vs_expected(
+def plot_marginal_observed_vs_expected(
     view: "GenomeView",
     smooth: int = 20,
     pred_smooth: int = 10,
@@ -148,7 +157,7 @@ def marginal_observed_vs_expected(
     )
 
 
-def component_rates(
+def plot_component_rates(
     view: "GenomeView",
     *components: Any,
     smooth: int = 30,
@@ -211,7 +220,7 @@ def _topography_ax_fn(ax: "Axes", transformer: TopographyTransformer):
     )
 
 
-def topography(
+def plot_topography(
     transformer: TopographyTransformer,
     palette: str = "Greys",
     yticks: bool = False,
@@ -259,7 +268,7 @@ def topography(
     )
 
 
-def empirical_topography(
+def plot_empirical_topography(
     transformer: TopographyTransformer,
     palette: str = "Greys",
     label: str = "Empirical\ntopography",
@@ -335,7 +344,7 @@ def empirical_topography(
     
     return tr.stack_plots(
         _topography_scatter,
-        topography(
+        plot_topography(
             transformer,
             palette=palette,
             zorder=0,
@@ -346,7 +355,7 @@ def empirical_topography(
     )
 
 
-def gene_expression_track(
+def plot_gene_expression_track(
     expression_key: str = "GeneExpression",
     strand_key: str = "GeneStrand",
     linewidth: float = 0.5,
@@ -418,6 +427,7 @@ def order_components(dataset: "GTensorDataset") -> np.ndarray:
     """
     component_order = tr.pipeline(
         tr.select("component_distributions_locus"),
+        lambda x : x.squeeze(),
         tr.apply_rows(tr.renorm),
         lambda x: x.to_pandas(),
         tr.reorder_df,
@@ -425,75 +435,76 @@ def order_components(dataset: "GTensorDataset") -> np.ndarray:
     return component_order
 
 
-def component_rate_summary(
-    view: "GenomeView",
-    *,
-    ideogram: str,
-    scalebar_size: int = int(1e7),
-    scalebar_scale: str = "mb",
-    pred_smooth: int = 20,
-    empirical_smooth: int = 10,
-    legend: bool = True,
-    pred_kw: Mapping[str, Any] = {
-        "color": categorical_palette[1],
-        "dashes": (1, 1),
-        "alpha": 1,
-        "linewidth": 0.75,
-    },
-    component_smooth: int = 30,
-    component_order: Optional[Sequence[Any]] = None,
-) -> tuple[Any, ...]:
-    """
-    Summary: scale bar, ideogram, observed vs predicted, and per-component rates.
-
-    Parameters
-    ----------
-    view : GenomeView
-        Genome view for smoothing, spacing, and region info.
-    ideogram : str
-        Path to cytoband file for ideogram.
-    scalebar_size : int, default 1e7
-        Scale bar size (bp).
-    scalebar_scale : str, default "mb"
-        Scale label units.
-    pred_smooth : int, default 20
-        Smoothing for predicted rate line.
-    empirical_smooth : int, default 10
-        Smoothing for empirical rate points.
-    legend : bool, default True
-        Whether to show legend in the rate plot.
-    pred_kw : dict
-        Predicted line kwargs.
-    component_smooth : int, default 30
-        Smoothing window for component rate tracks.
-    component_order : sequence, optional
-        Explicit component order; computed from dataset if None.
-
-    Returns
-    -------
-    tuple
-        A tuple of track callables consumable by tr.plot_view.
-    """
-    component_order = (
-        order_components(view.dataset) if component_order is None else component_order
-    )
-
-    return (
-        tr.scale_bar(scalebar_size, scale=scalebar_scale),
-        tr.ideogram(ideogram, height=0.1),
-        tr.tracks.marginal_observed_vs_expected(
-            view,
-            smooth=empirical_smooth,
-            pred_smooth=pred_smooth,
-            predicted_kw=pred_kw,
-            legend=legend,
-        ),
-        tr.spacer(0.1),
-        *tr.tracks.component_rates(view, *component_order, smooth=component_smooth),
-    )
-
-
 if False:
+    def component_rate_summary(
+        view: "GenomeView",
+        *,
+        ideogram: str,
+        scalebar_size: int = int(1e7),
+        scalebar_scale: str = "mb",
+        pred_smooth: int = 20,
+        empirical_smooth: int = 10,
+        legend: bool = True,
+        pred_kw: Mapping[str, Any] = {
+            "color": categorical_palette[1],
+            "dashes": (1, 1),
+            "alpha": 1,
+            "linewidth": 0.75,
+        },
+        component_smooth: int = 30,
+        component_order: Optional[Sequence[Any]] = None,
+    ) -> tuple[Any, ...]:
+        """
+        Summary: scale bar, ideogram, observed vs predicted, and per-component rates.
+
+        Parameters
+        ----------
+        view : GenomeView
+            Genome view for smoothing, spacing, and region info.
+        ideogram : str
+            Path to cytoband file for ideogram.
+        scalebar_size : int, default 1e7
+            Scale bar size (bp).
+        scalebar_scale : str, default "mb"
+            Scale label units.
+        pred_smooth : int, default 20
+            Smoothing for predicted rate line.
+        empirical_smooth : int, default 10
+            Smoothing for empirical rate points.
+        legend : bool, default True
+            Whether to show legend in the rate plot.
+        pred_kw : dict
+            Predicted line kwargs.
+        component_smooth : int, default 30
+            Smoothing window for component rate tracks.
+        component_order : sequence, optional
+            Explicit component order; computed from dataset if None.
+
+        Returns
+        -------
+        tuple
+            A tuple of track callables consumable by tr.plot_view.
+        """
+        component_order = (
+            order_components(view.dataset) if component_order is None else component_order
+        )
+
+        return (
+            tr.scale_bar(scalebar_size, scale=scalebar_scale),
+            tr.ideogram(ideogram, height=0.1),
+            tr.tracks.plot_marginal_observed_vs_expected(
+                view,
+                smooth=empirical_smooth,
+                pred_smooth=pred_smooth,
+                predicted_kw=pred_kw,
+                legend=legend,
+            ),
+            tr.spacer(0.1),
+            *plot_component_rates(view, *component_order, smooth=component_smooth),
+        )
+
+
+
     def mega_summary(
         view,
         *,

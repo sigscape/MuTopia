@@ -151,12 +151,13 @@ def plot_component(
     signature = fetch_component(dataset, component)
 
     if len(select) == 0:
-        select = ["Baseline"]
+        select = ("Baseline",)
     return signature.modality().plot(signature, *select, **kw)
 
 
 def plot_signature_panel(
     dataset: "GTensorDataset",
+    *select: str,
     ncols: int = 4,
     width: float = 3.5,
     height: float = 1.25,
@@ -200,10 +201,12 @@ def plot_signature_panel(
         figsize=(width * ncols, height * nrows),
         gridspec_kw={"hspace": 0.5, "wspace": 0.25},
     )
+    if len(select) == 0:
+        select = ("Baseline",)
 
     for k in range(K):
         _ax = np.ravel(ax)[k]
-        plot_spectrum(fetch_component(dataset, k), ax=_ax, **kwargs)
+        plot_spectrum(fetch_component(dataset, k), *select, ax=_ax, **kwargs)
         _ax.set_ylabel(component_names[k], fontsize=8)
 
     for _ax in np.ravel(ax)[K:]:

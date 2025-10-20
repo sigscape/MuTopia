@@ -461,14 +461,67 @@ def eager_train_test_load(
 
 
 def num_sources(dataset: GTensorDataset) -> int:
+    """
+    Get the number of distinct sources in a dataset.
+
+    This function counts the number of unique sources present in the dataset's
+    'source' coordinate, which is useful for determining if the dataset contains
+    data from multiple cell types or conditions.
+
+    Parameters
+    ----------
+    dataset : GTensorDataset
+        Input dataset to query for sources
+
+    Returns
+    -------
+    int
+        Number of distinct sources in the dataset. Returns 0 if no sources
+        are defined.
+    """
     return len(list_sources(dataset))
 
 
 def is_mixture_dataset(dataset: GTensorDataset) -> bool:
+    """
+    Check if a dataset contains data from multiple sources.
+
+    This function determines whether the dataset is a mixture dataset by checking
+    if it contains more than one source. Mixture datasets have source-specific
+    features and require special handling for analysis.
+
+    Parameters
+    ----------
+    dataset : GTensorDataset
+        Input dataset to check
+
+    Returns
+    -------
+    bool
+        True if the dataset contains multiple sources, False otherwise
+    """
     return num_sources(dataset) > 1
 
 
 def list_sources(dataset: GTensorDataset) -> List[str]:
+    """
+    List all source identifiers in the dataset.
+
+    This function extracts and returns the names of all sources present in the
+    dataset. Sources typically represent different cell types, tissues, or
+    experimental conditions.
+
+    Parameters
+    ----------
+    dataset : GTensorDataset
+        Input dataset containing source information
+
+    Returns
+    -------
+    List[str]
+        List of source names. Returns an empty list if the dataset has no
+        'source' coordinate defined.
+    """
     if "source" in dataset.coords:
         return dataset.coords["source"].values.tolist()
     return []
@@ -669,7 +722,36 @@ def get_explanation(dataset: GTensorDataset, component: str) -> "shap.Explanatio
 
 
 def get_shap_summary(data: GTensorDataset, source: Optional[str] = None) -> pd.DataFrame:
-    """Generate a summary of SHAP values for the specified components."""
+    """
+    Generate a summary of SHAP values for model components.
+
+    This function computes summary statistics for SHAP values across all components,
+    including effect sizes (97th percentile of absolute SHAP values) and correlations
+    between SHAP values and feature values. This provides a high-level view of which
+    features have the strongest associations with each component.
+
+    Parameters
+    ----------
+    data : GTensorDataset
+        Dataset containing SHAP values and feature information
+    source : str, optional
+        Source identifier to analyze. Required if the dataset is a mixture dataset
+        with multiple sources.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with columns:
+        - component: Component name
+        - feature: Feature name
+        - effect_size: 97th percentile of absolute SHAP values
+        - correlation: Pearson correlation between SHAP values and feature values
+
+    Raises
+    ------
+    ValueError
+        If the dataset is a mixture dataset and no source is specified
+    """
     
     if is_mixture_dataset(data) and source is None:
         raise ValueError("Must specify source when dataset is a mixture.")
@@ -691,6 +773,9 @@ def get_shap_summary(data: GTensorDataset, source: Optional[str] = None) -> pd.D
             }
         )
     )
+    #shap_values["feature"] = shap_values["feature"].str.split(":", expand=True)[0]
+    #hap_values = shap_values.groupby(["component", "locus", "feature"])["shap_value"].sum().reset_index()
+
     shap_values = shap_values.merge(
         data[f"{source}/locus_features"]
         .sel(locus=shap_values.locus.unique())
@@ -782,6 +867,37 @@ def equal_size_quantiles(
 
 
 def slice_samples(dataset: GTensorDataset, samples: List[str]) -> GTensorDataset:
+    """
+    Extract a subset of samples from the dataset.
+
+    This function filters the dataset to include only the specified samples,
+    enabling focused analysis on particular samples of interest while maintaining
+    all other dataset dimensions and attributes.
+
+    Parameters
+    ----------
+    dataset : GTensorDataset
+        Input dataset containing multiple samples
+    samples : List[str]
+        List of sample names to extract from the dataset. Sample names must
+        exist in the dataset's sample coordinate.
+
+    Returns
+    -------
+    GTensorDataset
+        Filtered dataset containing only the specified samples wrapped in a
+        SampleSlice interface
+
+    Raises
+    ------
+    KeyError
+        If any of the specified samples are not found in the dataset
+
+    Notes
+    -----
+    If an empty list is provided, the original dataset is returned unchanged.
+    The function uses the mutate pattern to maintain interface chain compatibility.
+    """
     d = mutate(lambda d: d.sel(sample=list(samples)) if len(samples) > 0 else d)(dataset)
     return SampleSlice(d, samples)
 
@@ -1194,19 +1310,116 @@ def _fetch_component_data(
 
 
 def list_components(dataset: GTensorDataset) -> List[str]:
+    """
+    List all component names in the dataset.
+
+    This function extracts and returns the names of all model components
+    (mutational signatures or processes) present in the dataset.
+
+    Parameters
+    ----------
+    dataset : GTensorDataset
+        Input dataset containing model components
+
+    Returns
+    -------
+    List[str]
+        List of component names
+
+    Raises
+    ------
+    ValueError
+        If the dataset does not contain a 'component' coordinate
+    """
     components = ComponentWrapper(dataset)
     return components.component_names
 
 
 def fetch_component(dataset: GTensorDataset, component_name: Union[str, int]) -> xr.DataArray:
+    """
+    Retrieve the mutational spectrum for a specific component.
+
+    This function extracts the signature spectrum (mutational profile) for a
+    specified component from the dataset. The spectrum describes the relative
+    frequency of different mutation types for this component.
+
+    Parameters
+    ----------
+    dataset : GTensorDataset
+        Dataset containing component spectra
+    component_name : Union[str, int]
+        Name or index of the component to retrieve
+
+    Returns
+    -------
+    xr.DataArray
+        DataArray containing the component's mutational spectrum with
+        appropriate dimensions and coordinates
+
+    Raises
+    ------
+    ValueError
+        If the specified component is not found in the dataset
+    """
     return _fetch_component_data(dataset, component_name, "get_spectrum")
 
 
 def fetch_interactions(dataset: GTensorDataset, component_name: Union[str, int]) -> xr.DataArray:
+    """
+    Retrieve interaction effects for a specific component.
+
+    This function extracts the interaction matrix for a specified component,
+    showing how the mutational spectrum varies across different genomic contexts
+    (e.g., strand orientation, replication timing, gene regions).
+
+    Parameters
+    ----------
+    dataset : GTensorDataset
+        Dataset containing component interaction data
+    component_name : Union[str, int]
+        Name or index of the component to retrieve
+
+    Returns
+    -------
+    xr.DataArray
+        DataArray containing the component's interaction effects with
+        appropriate dimensions and coordinates
+
+    Raises
+    ------
+    ValueError
+        If the specified component is not found in the dataset
+    """
     return _fetch_component_data(dataset, component_name, "get_interactions")
 
 
 def fetch_shared_effects(dataset: GTensorDataset, component_name: Union[str, int]) -> xr.DataArray:
+    """
+    Retrieve shared effects for a specific component.
+
+    This function extracts the shared effects matrix for a specified component,
+    representing effects that are common across different contexts or conditions.
+    Shared effects capture baseline mutational patterns that don't vary with
+    genomic features.
+
+    Parameters
+    ----------
+    dataset : GTensorDataset
+        Dataset containing component shared effects data
+    component_name : Union[str, int]
+        Name or index of the component to retrieve
+
+    Returns
+    -------
+    xr.DataArray
+        DataArray containing the component's shared effects with
+        appropriate dimensions and coordinates
+
+    Raises
+    ------
+    ValueError
+        If the specified component is not found in the dataset
+    """
     return _fetch_component_data(dataset, component_name, "get_shared_effects")
 
 

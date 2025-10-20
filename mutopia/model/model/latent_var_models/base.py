@@ -6,10 +6,30 @@ import numpy as np
 from numba.extending import get_cython_function_address
 import ctypes
 from functools import wraps, partial
+from contextlib import contextmanager
 from mutopia.utils import logger, parallel_map, parallel_gen
 from ._dirichlet_update import update_alpha
 from ..model_components.base import _svi_update_fn
 from ..gtensor_interface import GtensorInterface
+
+
+@contextmanager
+def predict_mode(model, estep_iterations=100_000, difference_tol=1e-5):
+    """
+    A context manager to temporarily set the model to prediction mode
+    by adjusting the E-step parameters.
+    """
+    logger.info("Setting model to prediction mode.")
+    old_iters = model.estep_iterations
+    old_tol = model.difference_tol
+
+    model.estep_iterations = estep_iterations
+    model.difference_tol = difference_tol
+    try:
+        yield model
+    finally:
+        model.estep_iterations = old_iters
+        model.difference_tol = old_tol
 
 
 def delayed(fn, *args, **kwargs):
@@ -452,6 +472,9 @@ class LocalsModel:
             for name, _ in self.GT.expand_datasets(*datasets)
         }
 
+    def get_alpha(self, dataset) -> np.ndarray:
+        return self.alpha[self.GT.get_name(dataset)]
+    
     def update_prior(self, datasets):
 
         sstats = {
@@ -526,33 +549,30 @@ class LocalsModel:
                     )
 
         return sstats
+    
+    def _predict(self, dataset, factor_model, threads=1, estep_iterations=100_000, difference_tol=1e-5):
 
-    def _predict(self, dataset, factor_model, threads=1):
+        with predict_mode(self, estep_iterations=estep_iterations, difference_tol=difference_tol):
 
-        old_iters = self.estep_iterations
-        self.estep_iterations = 10000
+            Nk = self.init_locals(dataset)
 
-        Nk = self.init_locals(dataset)
+            update_fns = self._get_update_fns(
+                dataset,
+                factor_model,
+                exposures_fn=_just_next_Nk(Nk),
+            )
 
-        update_fns = self._get_update_fns(
-            dataset,
-            factor_model,
-            exposures_fn=_just_next_Nk(Nk),
-        )
+            update_fns = tqdm(
+                update_fns,
+                total=len(dataset.list_samples()),
+                ncols=100,
+                desc="Estimating contributions",
+            )
 
-        update_fns = tqdm(
-            update_fns,
-            total=len(dataset.list_samples()),
-            ncols=100,
-            desc="Estimating contributions",
-        )
-
-        Nks = np.array(
-            [stats["Nk"] for stats in parallel_map(update_fns, threads=threads)]
-        )
-
-        self.estep_iterations = old_iters
-        return Nks
+            Nks = np.array(
+                [stats["Nk"] for stats in parallel_map(update_fns, threads=threads)]
+            )
+            return Nks
 
     def predict(
         self,

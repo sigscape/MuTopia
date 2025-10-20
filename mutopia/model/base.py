@@ -19,6 +19,7 @@ from .model.factor_model import FactorModel
 
 # interfaces
 from .mixture_model.mixture_interface import MixtureInterface as MIX
+from .model.gtensor_interface import GtensorInterface as GTI
 from .mixture_model import DenseMixtureModel, SparseMixtureModel, SharedExposuresMixtureModel
 
 # typing helpers
@@ -145,6 +146,8 @@ class TopographyModel(ABC, BaseEstimator):
     >>> model.fit(train_data)
     """
 
+    GT: GTI | MIX
+
     def __init__(
         self,
         num_components: int = 15,
@@ -192,7 +195,7 @@ class TopographyModel(ABC, BaseEstimator):
         eval_every: int = 10,
         verbose: int = 0,
         time_limit: Optional[float] = None,
-        full_normalizers: bool = False,
+        full_normalizers: bool = True,
         test_chroms: Sequence[str] = ("chr1",),
     ) -> None:
 
@@ -607,7 +610,11 @@ class TopographyModel(ABC, BaseEstimator):
 
         dataset = dataset.mutate(
             lambda ds: (
-                ds.assign_coords(component=("component", self.component_names)).assign(
+                (
+                    ds.assign_coords(component=("component", self.component_names))
+                    if ds.coords.get("component") is None
+                    else ds
+                ).assign(
                     **component_xrs
                 )
             )
@@ -802,14 +809,23 @@ class TopographyModel(ABC, BaseEstimator):
         except KeyError:
             dataset = self.annot_contributions(dataset, threads)
 
-        marginal_exposures = self.GT.fetch_locals(dataset).sum(dim="sample")
+        prior = xr.DataArray(
+            self.locals_model_.get_alpha(dataset),
+            dims=("component",),
+        )
+        
+        marginal_exposures = (
+            dataset["contributions"] + prior
+        ).sum(dim="sample")
 
         marginal = self.factor_model_._log_marginalize_mutrate(
-            np.log(dataset["component_distributions"]), marginal_exposures
+            np.log(dataset["component_distributions"]),
+            marginal_exposures
         )
 
         dataset[key] = (
-            np.exp(marginal - marginal.max(skipna=True)).fillna(0.0).astype(np.float32)
+            np.exp(marginal - marginal.max(skipna=True))
+            .fillna(0.0).astype(np.float32)
         )
         dataset[f"{key}_locus"] = (
             (np.exp(marginal) * dataset["Regions/context_frequencies"]).sum(
@@ -958,7 +974,14 @@ class TopographyModel(ABC, BaseEstimator):
         logger.info(f'Added key: "{key}"')
         return dataset
 
-    def annot_data(self, dataset: GTensorDataset, threads: int = 1, source: Optional[str] = None) -> GTensorDataset:
+    def annot_data(
+        self, 
+        dataset: GTensorDataset, 
+        subset_region: Optional[str] = None,
+        threads: int = 1, 
+        source: Optional[str] = None, 
+        calc_shap=True
+    ) -> GTensorDataset:
         """
         Annotate a dataset with comprehensive model analysis information.
 
@@ -983,12 +1006,14 @@ class TopographyModel(ABC, BaseEstimator):
             4. Component distribution annotations
             5. Marginal prediction annotations
         """
-        from mutopia.gtensor import annot_empirical_marginal
+        from mutopia.gtensor import annot_empirical_marginal, slice_regions
         
         _annot_fns = [
-            self.annot_components,
-            partial(self.annot_SHAP_values, threads=threads, source=source),
+            self.setup_corpus,
             partial(self.annot_contributions, threads=threads),
+            lambda ds: slice_regions(ds, subset_region) if subset_region else ds,
+            self.annot_components,
+            partial(self.annot_SHAP_values, threads=threads, source=source) if calc_shap else lambda ds: ds,
             partial(self.annot_component_distributions, threads=threads),
             partial(self.annot_marginal_prediction, threads=threads),
             annot_empirical_marginal,
