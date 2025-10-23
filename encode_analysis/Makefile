@@ -5,13 +5,13 @@
 # Phony targets for convenience - allows "make lung" instead of "make data/gtensors/lung.done"
 .PHONY: lung ovary lung.features lung.samples ovary.features ovary.samples
 
-data/repliseq.yaml:
+configs/repliseq.yaml:
 	python download_encode.py --genome hg19 --assays "Repli-seq" --no-groupby > $@
 
-data/functional_data.yaml:
+configs/functional_data.yaml:
 	python download_encode.py > $@
 
-data/experiments.yaml: data/repliseq.yaml data/functional_data.yaml
+configs/experiments.yaml: data/repliseq.yaml data/functional_data.yaml
 	cat $^ > $@
 
 configs/features/lung.yaml: data/experiments.yaml

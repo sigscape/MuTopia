@@ -176,7 +176,6 @@ def _update_step(
     weights,
     Nk,
 ):
-
     exp_Elog_prior = np.exp(psivec32(alpha + Nk))
 
     X_div_X_tild = np.where(
@@ -186,7 +185,6 @@ def _update_step(
     )
 
     Nk = exp_Elog_prior * (conditional_likelihood @ X_div_X_tild)
-
     return Nk
 
 

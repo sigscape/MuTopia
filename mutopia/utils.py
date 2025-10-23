@@ -4,9 +4,26 @@ from functools import wraps
 import logging
 from joblib import Parallel, delayed
 
-logger = logging.getLogger(" Mutopia")
-logging.basicConfig(level=logging.INFO)
+# Set up colorized logging
+import colorlog
+
+logger = colorlog.getLogger(" Mutopia")
+handler = colorlog.StreamHandler()
+handler.setFormatter(
+    colorlog.ColoredFormatter(
+        "%(log_color)s%(levelname)-8s%(reset)s %(blue)s%(name)s%(reset)s %(message)s",
+        log_colors={
+            'DEBUG': 'cyan',
+            'INFO': 'green',
+            'WARNING': 'yellow',
+            'ERROR': 'red',
+            'CRITICAL': 'red,bg_white',
+        }
+    )
+)
+logger.addHandler(handler)
 logger.setLevel(logging.INFO)
+logger.propagate = False
 
 def fill_jinja_template(template_str, **kwargs):
     from jinja2 import Environment
