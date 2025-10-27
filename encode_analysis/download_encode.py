@@ -469,7 +469,7 @@ assay_to_file_selector = {
     "total RNA-seq": _select_rna_files,
     "polyA plus RNA-seq": _select_rna_files,
     "Repli-seq": partial(_select_output_type, "bigWig", {"percentage normalized signal"}),
-    "Histone ChIP-seq": partial(_select_peak_files, 0.01, "bigWig", {"signal p-value"}),
+    "Histone ChIP-seq": partial(_select_peak_files, 0.0, "bigWig", {"signal p-value"}),
     "ATAC-seq": _union_selector(
         partial(_select_peak_files, 0.1, "bed", {"pseudoreplicated peaks"}),
         partial(_select_peak_files, 0.1, "bigWig", {"signal p-value"}),
@@ -478,6 +478,7 @@ assay_to_file_selector = {
         partial(_select_output_type, "bed", {"peaks"}),
         partial(_select_output_type, "bigWig", {"read-depth normalized signal"}),
     ),
+    "WGBS" : partial(_select_output_type, "bed", {"methylation state at CpG"})
 }
 
 def choose_files(experiment: Experiment) -> List[File]:
@@ -545,13 +546,8 @@ def to_config(experiment: Experiment) -> EncodeExperimentConfig:
 
 @cache
 def get_encode_config(
-    allowed_assays: Tuple[str, ...] = (
-        "Histone+ChIP-seq",
-        "total+RNA-seq",
-        "polyA+plus+RNA-seq",
-        "DNase-seq",
-        "ATAC-seq",
-    ),
+    *,
+    allowed_assays: Tuple[str, ...],
     genome: str = "GRCh38",
     group_by_biosample: bool = True
 ) -> Dict[str, EncodeExperimentConfig]:
@@ -602,6 +598,7 @@ def main():
             "polyA+plus+RNA-seq",
             "DNase-seq",
             "ATAC-seq",
+            "WGBS",
         ],
         help="List of assay titles to include (default: common assays)."
     )

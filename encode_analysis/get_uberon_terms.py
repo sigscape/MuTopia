@@ -1,18 +1,18 @@
 
 from download_encode import EncodeExperimentConfig
 from typing import Any, Dict
+from collections import Counter
 
 def get_term_matches(
     encode_confgs: list[EncodeExperimentConfig],
     search_term: str,
-) -> Dict[str, str]:
-    
-    term_matches = {}
+) -> Dict[tuple[str, str], int]:
+
+    term_matches = Counter()
     for config in encode_confgs:
         biosample_desc = config.biosample_term_name.lower()
         if search_term.lower() in biosample_desc:
-            term_matches[biosample_desc] = config.biosample_term_id
-
+            term_matches[(biosample_desc, config.biosample_term_id)] += 1 
     return term_matches
 
 def main():
@@ -47,8 +47,10 @@ def main():
         args.SEARCH_TERM
     )
 
-    for desc, term_id in sorted(term_matches.items(), key=lambda x: len(x[0])):
-        print(f"{desc}: {term_id}")
+    term_matches = sorted(term_matches.items(), key=lambda x: len(x[0][0]))
+
+    for (desc, term_id), count in term_matches:
+        print(f"{desc}: {term_id} ({count})")
 
 if __name__ == "__main__":
     main()

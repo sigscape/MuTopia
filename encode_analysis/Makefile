@@ -2,46 +2,80 @@
 # Enable secondary expansion for multi-wildcard rules
 .SECONDEXPANSION:
 
-# Phony targets for convenience - allows "make lung" instead of "make data/gtensors/lung.done"
-.PHONY: lung ovary lung.features lung.samples ovary.features ovary.samples
+# Prevent Make from deleting config files when downstream targets fail
+.PRECIOUS: configs/features/%.yaml staged/%.train.nc staged/%.test.nc gtensors/%.nc studies/%/study.journal
 
-configs/repliseq.yaml:
+# Mark temp files as intermediate - they'll be deleted on failure and after successful completion
+.INTERMEDIATE: gtensor__tempfiles/processed/%/
+
+# Phony targets for convenience - allows "make lung" instead of "make data/gtensors/lung.done"
+.PHONY: run/% uberon_terms/%
+
+configs/repliseq.yaml: download_encode.py
 	python download_encode.py --genome hg19 --assays "Repli-seq" --no-groupby > $@
 
-configs/functional_data.yaml:
+configs/functional_data.yaml: download_encode.py
 	python download_encode.py > $@
 
-configs/experiments.yaml: data/repliseq.yaml data/functional_data.yaml
+configs/experiments.yaml: configs/repliseq.yaml configs/functional_data.yaml
 	cat $^ > $@
 
-configs/features/lung.yaml: data/experiments.yaml
+uberon_terms/%: configs/experiments.yaml
+	python get_uberon_terms.py $< $*
+
+
+# Define tissue-specific UBERON IDs and repliseq terms
+UBERON_IDS_Lung-Adeno := "UBERON:0002048" "UBERON:0002168" "UBERON:0002167" "UBERON:0008953" "UBERON:0008952" "UBERON:0002170" "UBERON:0002171"
+REPLISEQ_Lung-Adeno := "EFO:0001196"
+
+UBERON_IDS_AML := "CL:0000837" "CL:2000001" 
+REPLISEQ_AML := "EFO:0002783"
+
+UBERON_IDS_Ovary-Adeno := "UBERON:0000992"
+REPLISEQ_Ovary-Adeno := "EFO:0001203"
+
+UBERON_IDS_Breast := "UBERON:0008367" "UBERON:0000310"
+REPLISEQ_Breast := "EFO:0001203"
+
+UBERON_IDS_Skin-Melanoma := "CL:1000458" "UBERON:0002097" "UBERON:0001003" "UBERON:0004264" "UBERON:0036149"
+REPLISEQ_Skin-Melanoma := "EFO:0001196"
+
+# Pattern rule that uses tissue-specific variables
+configs/features/%.yaml: configs/experiments.yaml base_config.yaml write_config.py
+	@mkdir -p $(dir $@)
 	python write_config.py \
+		base_config.yaml \
 		$< \
-		-ids "UBERON:0002048" "UBERON:0002168" "UBERON:0002167" "UBERON:0008953" "UBERON:0008952" "UBERON:0002170" "UBERON:0002171" \
-		-repliseq "EFO:0001196" \
-		> $@
+		--name $* \
+		-ids $(UBERON_IDS_$*) \
+		-repliseq $(REPLISEQ_$*) \
+		-o $@
 
-configs/features/ovary.yaml: data/experiments.yaml
-	python write_config.py \
-		$< \
-		-ids "UBERON:0001261" "UBERON:0001736" "UBERON:0004493" "UBERON:0004494" "UBERON:0004495" "UBERON:0004496" \
-		-repliseq "EFO:0001196" \
-		> $@
+gtensors/%.features gtensors/%.nc gtensor__tempfiles/processed/%/: configs/features/%.yaml
+	@mkdir -p $(dir $@)
+	gtensor compose base_config.yaml configs/features/$*.yaml -o gtensors/$* -w 5 && touch gtensors/$*.features
 
-gtensors/%.features:
-	gtensor compose configs/features/$*.yaml --name $* -w 1 && touch $@
+gtensors/%.samples gtensors/%.nc: gtensors/%.features
+	gtensor compose base_config.yaml configs/features/$*.yaml configs/samples/$*.yaml -o gtensors/$* -w 5 && touch gtensors/$*.samples
 
-gtensors/%.samples: gtensors/%.features
-	gtensor compose configs/samples/$*.yaml --name $* -w 1 && touch $@
-
-staged/%.train.nc staged/%.test.nc: gtensors/%.samples
-	gtensor split $< -o staged/$*
+staged/%.done staged/%.train.nc staged/%.test.nc: gtensors/%.samples gtensors/%.nc
+	mkdir -p staged
+	gtensor split gtensors/$*.nc -o staged/$*. "chr2" && touch $@
 
 # Optional arguments that can be passed via command line
-# Usage: make studies/lung/01/journal.journal STUDY_ARGS="--epochs 100 --lr 0.001"
-STUDY_ARGS ?=
+STUDY_ARGS_Lung-Adeno := -min 10 -max 20
+STUDY_ARGS_Ovary-Adeno := -min 5 -max 15 -e -lsub 0.25
 
-# Generic fallback for other tissues
-studies/%/journal.journal: staged/$$(firstword $$(subst /, ,$$*)).train.nc staged/$$(firstword $$(subst /, ,$$*)).test.nc
+studies/%/study.journal: staged/$$(firstword $$(subst /, ,$$*)).train.nc staged/$$(firstword $$(subst /, ,$$*)).test.nc
 	@mkdir -p $(dir $@)
-	topo-model study create $@ -ds $^ $(STUDY_ARGS)
+	topo-model study create $@ -ds $^ $(STUDY_ARGS_$(firstword $(subst /, ,$*)))
+
+run/%/: studies/%/study.journal
+	topo-model study run $< -@ 5 --lazy
+
+summaries/%.summary.txt: studies/%/study.journal
+	@mkdir -p $(dir $@)
+	topo-model study summary $< -o $@
+
+analyses/%.analysis.ipynb: studies/%/study.journal
+	@mkdir -p $(dir $@)

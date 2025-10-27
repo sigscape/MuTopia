@@ -4,8 +4,19 @@ from download_encode import EncodeExperimentConfig
 from mutopia.utils import logger
 from mutopia.cli.pipeline_config import FeatureConfig, ProcessingConfig, GenomeConfig
 
-class GTensorConfigPresets(pydantic.BaseModel):
+class PipelineParams(pydantic.BaseModel):
+    liftover_chain: str
+    hg38_full_chromsizes: str
+    replication_strand: str
+    gc_content: str
+    repeat_masker_fraction: str
+
+class InputConfig(pydantic.BaseModel):
     genome: GenomeConfig
+    pipeline_params: PipelineParams
+
+class GTensorConfigPresets(pydantic.BaseModel):
+    name: str
     processing: Dict[str, ProcessingConfig]
     features: Dict[str, FeatureConfig]
 
@@ -55,6 +66,8 @@ def _get_assay(
                 e.assay_title == assay_title[0]
                 and e.biosample_term_id == biosample_term_ids[0]
                 and e.audit_flag >= 3
+                and e.description is not None
+                and "adult" in e.description, # prioritize adult samples
             ),
             filtered_experiments,
         ),
@@ -82,42 +95,56 @@ def _get_assay(
 
 
 HISTONE_MARKS = {"H3K4me1", "H3K27ac", "H3K4me3", "H3K36me3", "H3K27me3", "H3K9me3"}
-GC_FILE = "/Users/allen/data/genomes/hg38/hg38.gc.bed"
-REPLICATION_STRAND_FILE = "/Users/allen/data/replication_strand/hg38_replication_strand.bed"
 
 def get_config_dict(
     *,
+    name: str,
+    input_config: InputConfig,
     encode_configs: List[EncodeExperimentConfig],
     biosample_term_ids: List[str],
     repliseq_term_id: str,
 ) -> GTensorConfigPresets:
 
-    genome = GenomeConfig(
-        blacklist="https://raw.githubusercontent.com/Boyle-Lab/Blacklist/master/lists/hg38-blacklist.v2.bed.gz",
-        chromsizes="https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.chrom.sizes",
-        fasta="https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa",
-    )
-    
+    genome = input_config.genome
+    pipeline_params = input_config.pipeline_params
+
     processing_functions = {
         "liftover_repliseq" : ProcessingConfig(
-            output_extension="bed",
-            function="{input} {output}",
+            output_extension="bigwig",
+            function=f"bash bin/process-repliseq.sh {pipeline_params.liftover_chain} {pipeline_params.hg38_full_chromsizes} {{input}} {{output}}",
         ),
         "extract_encode_gex" : ProcessingConfig(
-            output_extension="tsv",
-            function="{input} {output}",
-        ),
-        "extract_atac_peaks" : ProcessingConfig(
             output_extension="bed",
-            function="{input} {output}",
+            function="bash bin/extract-encode-gex.sh {input} > {output}",
+        ),
+        "merge_strand" : ProcessingConfig(
+            output_extension="bed",
+            function="bash bin/merge-strand.sh {input} {output}",
         ),
         "get_gene_position" : ProcessingConfig(
             output_extension="bed",
-            function="{input} {output}",
+            function=(
+                "(set -euo pipefail; "
+                "bash bin/extract-encode-gex.sh {input} "
+                "| python bin/tile_genes.py - --width 2500 --max_id 3 --overhang 3)"
+                "> {output}"
+            ),
         ),
-        "get_gc_content" : ProcessingConfig(
+        "sort_gzipped_bedfile" : ProcessingConfig(
             output_extension="bed",
-            function="{input} {output}",
+            function="gzip -dc {input} | LC_COLLATE=C sort -k1,1 -k2,2n > {output}"
+        ),
+        "aggregate_bed_50kb" : ProcessingConfig(
+            output_extension="bedgraph.gz",
+            function=f"bash bin/aggregate-bed.sh 50000 {genome.chromsizes} {{input}} > {{output}}",
+        ),
+        "repliseq_mask_rate" : ProcessingConfig(
+            output_extension="bedgraph.gz",
+            function=f"bash bin/repliseq-mask-rate.sh 50000 {genome.chromsizes} {{input}} > {{output}}",
+        ),
+        "gc_ratio" : ProcessingConfig(
+            output_extension="bedgraph.gz",
+            function=f"bash bin/gc-ratio.sh 50000 {genome.chromsizes} {{input}} > {{output}}",
         ),
     }
     
@@ -138,51 +165,62 @@ def get_config_dict(
         biosample_term_ids,
         file_format="bigWig",
     )
+    wgbs: EncodeExperimentConfig = _get_assay(
+        encode_configs,
+        ["WGBS"],
+        biosample_term_ids,
+        file_format="bed",
+    )
 
     base_features = {
+        "RepeatMaskerFraction" : FeatureConfig(
+            normalization="standardize",
+            column=4,
+            sources=[pipeline_params.repeat_masker_fraction],
+        ),
+        "MethylationFraction" : FeatureConfig(
+            normalization="standardize",
+            column=4,
+            sources=[_first_file(wgbs)],
+            description=_experiment_summary(wgbs),
+            processing="aggregate_bed_50kb",
+        ),
         "GCContent" : FeatureConfig(
             normalization="standardize",
             column=4,
-            sources=[GC_FILE],
-            processing="get_gc_content",
+            sources=[pipeline_params.gc_content],
         ),
         "GeneExpression" : FeatureConfig(
             normalization="gex",
-            column=5,
             sources=[_first_file(gex)],
-            processing="extract_encode_gex",
             description=_experiment_summary(gex),
+            processing="extract_encode_gex",
+            column=5,
         ),
         "GeneStrand" : FeatureConfig(
             normalization="strand",
-            column=6,
-            sources=[_first_file(gex)],
-            processing="extract_encode_gex",
-            description=_experiment_summary(gex),
-        ),
-        "GenePosition" : FeatureConfig(
-            normalization="quantile",
             column=4,
             sources=[_first_file(gex)],
-            processing="get_gene_position",
+            processing="merge_strand",
             description=_experiment_summary(gex),
-        ),
-        "ReplicationStrand" : FeatureConfig(
-            normalization="strand",
-            column=4,
-            sources=[REPLICATION_STRAND_FILE],
         ),
         "AccessiblePeak" : FeatureConfig(
-            normalization="categorical",
+            normalization="quantile",
             sources=[_first_file(atac, file_format="bed")],
-            processing="extract_atac_peaks",
             description=_experiment_summary(atac),
+            column=5,
+            processing="sort_gzipped_bedfile"
         ),
         "ChromatinAccessibility" : FeatureConfig(
             normalization="log1p_cpm",
             sources=[_first_file(dnase, file_format="bigWig")],
             description=_experiment_summary(dnase),
         ),
+        "ReplicationStrand": FeatureConfig(
+            normalization="strand",
+            column=4,
+            sources=[pipeline_params.replication_strand],
+        )
     }
 
     def _get_phase(experiment: EncodeExperimentConfig) -> str:
@@ -235,7 +273,7 @@ def get_config_dict(
     }
 
     return GTensorConfigPresets(
-        genome=genome,
+        name=name,
         processing=processing_functions,
         features={**base_features, **histone_features, **repliseq_features},
     )
@@ -247,9 +285,20 @@ def main():
 
     parser = argparse.ArgumentParser(description="Generate GTensor config from ENCODE experiments")
     parser.add_argument(
+        "INPUT_CONFIG",
+        type=str,
+        help="Path to YAML file with input configuration (genome files)",
+    )
+    parser.add_argument(
         "ENCODE_CONFIGS",
         type=str,
         help="Path to YAML file with list of ENCODE experiment configurations",
+    )
+    parser.add_argument(
+        "--name",
+        type=str,
+        required=True,
+        help="Name for the GTensor configuration",
     )
     parser.add_argument(
         "--biosample-term-ids",
@@ -267,7 +316,7 @@ def main():
         help="Biosample term ID to use for Repliseq features",
     )
     parser.add_argument(
-        "--output",
+        "--output", "-o",
         type=argparse.FileType("w"),
         default=sys.stdout,
         help="Path to output GTensor config YAML file",
@@ -283,11 +332,21 @@ def main():
         for data in encode_configs_data.values()
     ]
 
-    config_presets = get_config_dict(
-        encode_configs=encode_configs,
-        biosample_term_ids=args.biosample_term_ids,
-        repliseq_term_id=args.repliseq_term_id,
-    )
+    with open(args.INPUT_CONFIG, "r") as f:
+        input_config_data: Dict[str, Any] = yaml.safe_load(f)
+    input_config = InputConfig(**input_config_data)
+
+    try:
+        config_presets = get_config_dict(
+            input_config=input_config,
+            encode_configs=encode_configs,
+            biosample_term_ids=args.biosample_term_ids,
+            repliseq_term_id=args.repliseq_term_id,
+            name=args.name,
+        )
+    except NoExperimentFoundError as e:
+        logger.error(e)
+        sys.exit(1)
 
     args.output.write("# GTensor configuration generated from ENCODE experiments\n")
     args.output.write("# biosample term IDs: " + " ".join(map(lambda s : f"'{s}'", args.biosample_term_ids)) + "\n")
