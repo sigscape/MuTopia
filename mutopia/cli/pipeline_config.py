@@ -1,4 +1,5 @@
 from typing import Any, Optional, Dict, List, Union
+import os
 from pydantic import BaseModel, Field
 import pydantic
 from mutopia.utils import logger
@@ -36,8 +37,25 @@ class ProcessingConfig(BaseModel):
         command = self.function.format(input=input_file, output=output_file)
         logger.info(f"Running processing command: {command}")
         import subprocess
-        subprocess.run(command, shell=True, check=True)
-
+        # Use bash with pipefail so that failures anywhere in a pipeline
+        # cause a non-zero exit status (and thus raise when check=True).
+        # This preserves shell semantics while ensuring pipeline errors
+        # are not silently ignored.
+        bash_cmd = ["bash", "-o", "pipefail", "-c", command]
+        try:
+            # capture_output and text=True so stderr is available on exception
+            subprocess.run(bash_cmd, check=True, capture_output=True, text=True)
+        except subprocess.CalledProcessError as e:
+            if os.path.exists(output_file):
+                os.remove(output_file)
+            stderr = getattr(e, "stderr", None)
+            if stderr:
+                logger.error(
+                    f"Processing command '{command}' failed with exit code {e.returncode}. stderr:\n{stderr}"
+                )
+            else:
+                logger.error(f"Processing command '{command}' failed with exit code {e.returncode}. No stderr captured.")
+            raise
 
 class FeatureConfig(BaseModel):
     normalization: str = Field(..., description="Type of normalization to apply")
@@ -88,13 +106,17 @@ class SampleParams(BaseModel):
 
 
 class SampleConfig(SampleParams):
-    file: str = Field(..., description="Path to the sample file (e.g., VCF)")
+    url: str = Field(..., description="Path to the sample file (e.g., VCF)")
     sample_weight: float = Field(default=1.0, description="Weight of the sample")
     copy_number: Optional[str] = Field(default=None, description="Path to copy number file")
     sample_name: Optional[str] = Field(
         default=None, description="Name of the sample, for VCFs with multiple samples."
     )
 
+    @property
+    def file(self) -> str:
+        """Get the sample file path"""
+        return self.url
 
 class GenomeConfig(BaseModel):
     chromsizes: str = Field(..., description="Path to chromosome sizes file")

@@ -320,82 +320,11 @@ def groupkey(experiment: Experiment) -> Tuple:
         experiment.get("target", {}).get("label", "None")
     )
 
-def filter_experiments(experiment):
-    files = experiment.get("files", [])
-    read_lengths = {f.get("read_length", 0) for f in files}
-    return (
-        read_lengths
-        and max(read_lengths) >= min_read_lengths[experiment["assay_title"]]
-        and (
-            experiment["audit_flag"] > AuditFlag.FAIL
-            or "ChIP-seq" in experiment["assay_title"]
-        )
-    )
+class FilterExperimentError(Exception):
+    pass
 
-def experiment_priority(experiment: Experiment) -> Tuple:
-    """
-    Prioritize experiments according to the following criteria (in order of importance):
-    1. Used non-genetically modified samples (this preference primarily impacts TF ChIP-seq selection). - already filtered out
-    2. Had less severe audit flags (PASS > WARNING > NOT_COMPLIANT).
-    3. Used paired-end sequencing.
-    4. Derived from primary cells (vs. in vitro differentiated cells) or tissues (vs. organoids).
-    5. Originated from more commonly profiled life stages (e.g., adult > embryonic > child).
-    6. Were not from subcellular fractions.
-    7. more recently created
-    8. Prefer longer read lengths.
-    """
-    biosample_classification = experiment.get("biosample_ontology", {}).get("classification", "").lower()
-    life_stage_age = experiment.get("life_stage_age", "").lower()
-    files = experiment.get("files", [])
-    read_lengths = {f.get("read_length", 0) for f in files}
-    read_type = {f.get("run_type", 'single-ended') for f in files}
-
-    return (
-        (
-            4 if "adult" in life_stage_age else
-            3 if "child" in life_stage_age else
-            2 if "embryonic" in life_stage_age else
-            1 if life_stage_age 
-            else 0
-        ),                                                          # 5. Life stage preference
-        not any(term in experiment.get("simple_biosample_summary", "") for term in not_accepted_terms),
-        experiment.get("audit_flag", AuditFlag.FAIL),                  # 2. Audit flag
-        'paired-ended' in read_type,                                   # 3. Paired-end sequencing
-        biosample_classification == "primary cell" or biosample_classification == "tissue",  # 4. Primary cells/tissues
-        biosample_classification in {"whole organism", "cell line", "primary cell", "tissue"},  # 6. Subcellular fractions
-        max(frip(f) for f in files),                         # 7. Higher FRiP scores
-        date_created(experiment),                                 # 8. More recently created
-        max(read_lengths) if read_lengths else 0                      # Prefer longer read lengths
-    )
-
-@cache
-def select_experiments(*allowed_assays: str, genome: str="GRCh38", group_by_biosample: bool = True) -> List[Experiment]:
-
-    def _add_audit_info(experiment: Experiment) -> Experiment:
-        audit_flag, description = get_audit_flag(experiment.get("audit", {}))
-        return {
-            **experiment,
-            "audit_flag": audit_flag,
-            "audit_description": description
-        }
-    
-    experiments = cache_request(query_encode_experiments(*allowed_assays, genome=genome)).json()["@graph"]
-
-    if not group_by_biosample:
-        return experiments
-
-    experiments = map(_add_audit_info, experiments)
-
-    filtered_experiments = list(filter(filter_experiments, experiments))
-
-    selected_experiments = []
-    grouped_experiments = groupby(sorted(filtered_experiments, key=groupkey), key=groupkey)
-    for _, group in grouped_experiments:
-        group = list(group)
-        selected_experiments.append(max(group, key=experiment_priority))
-        
-    return selected_experiments
-
+def _biosample_classification(experiment: Experiment) -> str:
+    return experiment.get("biosample_ontology", {}).get("classification", "").lower()
 
 def _most_recent_files(files: List[File]) -> List[File]:
     def _key(f: File):
@@ -483,6 +412,115 @@ assay_to_file_selector = {
 
 def choose_files(experiment: Experiment) -> List[File]:
     return assay_to_file_selector[experiment["assay_title"]](experiment.get("files", []))
+
+def filter_experiments(experiment):
+    if not (
+            experiment["audit_flag"] > AuditFlag.FAIL
+            or experiment["assay_title"] in {"Histone ChIP-seq", "WGBS"} # ignore audit flags for Histone ChIP-seq and WGBS
+        ):
+        raise FilterExperimentError("Audit flag failure")
+    try:
+        choose_files(experiment)
+    except NoFilesError as e:
+        raise FilterExperimentError(str(e))
+    if not  _biosample_classification(experiment) in {"whole organism", "cell line", "primary cell", "tissue"}:
+        raise FilterExperimentError("Biosample from subcellular fraction")
+    return True
+
+def meets_criterion(experiment):
+    biosample_classification = _biosample_classification(experiment)
+    files = experiment.get("files", [])
+    read_type = {f.get("run_type", 'single-ended') for f in files}
+    read_lengths = {f.get("read_length", 0) for f in files}
+
+    return all((
+        not any(term in experiment.get("simple_biosample_summary", "") for term in not_accepted_terms),
+        experiment.get("audit_flag", AuditFlag.FAIL) >= 3,                  # 2. Audit flag
+        'paired-ended' in read_type,                                   # 3. Paired-end sequencing
+        biosample_classification == "primary cell" or biosample_classification == "tissue",  # 4. Primary cells/tissues
+        date_created(experiment) > datetime.datetime(2020, 1, 1),                                   # 7. More recently created
+        max(read_lengths) >= min_read_lengths[experiment["assay_title"]],                      # Prefer longer read lengths
+    ))
+
+def experiment_priority(experiment: Experiment) -> Tuple:
+    """
+    Prioritize experiments according to the following criteria (in order of importance):
+    1. Used non-genetically modified samples (this preference primarily impacts TF ChIP-seq selection). - already filtered out
+    2. Had less severe audit flags (PASS > WARNING > NOT_COMPLIANT).
+    3. Used paired-end sequencing.
+    4. Derived from primary cells (vs. in vitro differentiated cells) or tissues (vs. organoids).
+    5. Originated from more commonly profiled life stages (e.g., adult > embryonic > child).
+    6. Were not from subcellular fractions.
+    7. more recently created
+    8. Prefer longer read lengths.
+    """
+    biosample_classification = experiment.get("biosample_ontology", {}).get("classification", "").lower()
+    life_stage_age = experiment.get("life_stage_age", "").lower()
+    files = experiment.get("files", [])
+    read_lengths = {f.get("read_length", 0) for f in files}
+    read_type = {f.get("run_type", 'single-ended') for f in files}
+
+    return (
+        (
+            4 if "adult" in life_stage_age else
+            3 if "child" in life_stage_age else
+            2 if "embryonic" in life_stage_age else
+            1 if life_stage_age 
+            else 0
+        ),                                                          # 5. Life stage preference
+        not any(term in experiment.get("simple_biosample_summary", "") for term in not_accepted_terms),
+        experiment.get("audit_flag", AuditFlag.FAIL),                  # 2. Audit flag
+        'paired-ended' in read_type,                                   # 3. Paired-end sequencing
+        biosample_classification == "primary cell" or biosample_classification == "tissue",  # 4. Primary cells/tissues
+        biosample_classification in {"whole organism", "cell line", "primary cell", "tissue"},  # 6. Subcellular fractions
+        max(frip(f) for f in files),                         # 7. Higher FRiP scores
+        date_created(experiment),                                 # 8. More recently created
+        max(read_lengths) if read_lengths else 0                      # Prefer longer read lengths
+    )
+
+@cache
+def select_experiments(*allowed_assays: str, genome: str="GRCh38", group_by_biosample: bool = True) -> List[Experiment]:
+
+    def _add_audit_info(experiment: Experiment) -> Experiment:
+        audit_flag, description = get_audit_flag(experiment.get("audit", {}))
+        return {
+            **experiment,
+            "audit_flag": audit_flag,
+            "audit_description": description
+        }
+    
+    experiments = cache_request(query_encode_experiments(*allowed_assays, genome=genome)).json()["@graph"]
+
+    if not group_by_biosample:
+        return experiments
+
+    experiments = map(_add_audit_info, experiments)
+
+    filtered_experiments = []
+    filter_messages = defaultdict(Counter)
+    for experiment in experiments:
+        try:
+            if filter_experiments(experiment):
+                filtered_experiments.append(experiment)
+        except Exception as e:
+            filter_messages[experiment["assay_title"]][str(e)] += 1
+
+    for assay, messages in filter_messages.items():
+        logger.warning(f"Filter messages for {assay}:")
+        for message, count in messages.items():
+            logger.warning(f"  {message}: {count} experiments")
+
+    selected_experiments = []
+    grouped_experiments = groupby(sorted(filtered_experiments, key=groupkey), key=groupkey)
+    for _, group in grouped_experiments:
+        group = list(group)
+        met_criteria = [e for e in group if meets_criterion(e)]
+        if met_criteria:
+            selected_experiments.extend(met_criteria)
+        else:
+            selected_experiments.append(max(group, key=experiment_priority))
+
+    return selected_experiments
 
 class EncodeFileConfig(pydantic.BaseModel):
     accession: str = pydantic.Field(..., description="Experiment accession")

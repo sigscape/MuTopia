@@ -58,16 +58,15 @@ def _get_assay(
     ))
     if not filtered_experiments:
         raise NoExperimentFoundError(f"No experiments found for assay_title={assay_title}, target={target} in biosamples {biosample_term_ids}")
-    
-    # first try exact match
+    # first try exact match <- what's wrong HERE
     exact = next(
         filter(
             lambda e : (
-                e.assay_title == assay_title[0]
-                and e.biosample_term_id == biosample_term_ids[0]
-                and e.audit_flag >= 3
-                and e.description is not None
-                and "adult" in e.description, # prioritize adult samples
+                (e.assay_title == assay_title[0])
+                and (e.biosample_term_id == biosample_term_ids[0])
+                and (e.audit_flag >= 3)
+                and (e.description is not None)
+                and ("adult" in e.description) # prioritize adult samples
             ),
             filtered_experiments,
         ),
@@ -317,8 +316,8 @@ def main():
     )
     parser.add_argument(
         "--output", "-o",
-        type=argparse.FileType("w"),
-        default=sys.stdout,
+        type=str,
+        required=True,
         help="Path to output GTensor config YAML file",
     )
 
@@ -348,16 +347,17 @@ def main():
         logger.error(e)
         sys.exit(1)
 
-    args.output.write("# GTensor configuration generated from ENCODE experiments\n")
-    args.output.write("# biosample term IDs: " + " ".join(map(lambda s : f"'{s}'", args.biosample_term_ids)) + "\n")
-    args.output.write(f"# repliseq biosample term ID: '{args.repliseq_term_id}'\n")
-    args.output.write("\n")
+    with open(args.output, "w") as output_file:
+        output_file.write("# GTensor configuration generated from ENCODE experiments\n")
+        output_file.write("# biosample term IDs: " + " ".join(map(lambda s : f"'{s}'", args.biosample_term_ids)) + "\n")
+        output_file.write(f"# repliseq biosample term ID: '{args.repliseq_term_id}'\n")
+        output_file.write("\n")
 
-    yaml.dump(
-        config_presets.model_dump(exclude_defaults=True),
-        args.output,
-        sort_keys=False,
-    )
+        yaml.dump(
+            config_presets.model_dump(exclude_defaults=True),
+            output_file,
+            sort_keys=False,
+        )
 
 if __name__ == "__main__":
     main()

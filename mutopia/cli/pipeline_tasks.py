@@ -118,6 +118,21 @@ class DownloadTask(luigi.Task):
                         if chunk:
                             temp_file.write(chunk)
 
+                    # Ensure all buffered data is written to disk before moving.
+                    # On some systems, moving/copying an open file can copy only
+                    # the already-flushed portion, resulting in truncated files.
+                    temp_file.flush()
+                    os.fsync(temp_file.fileno())
+
+                # Close the temp file explicitly before moving to ensure all
+                # data is visible to the mover (and to avoid platform-specific
+                # issues when copying open files across filesystems).
+                try:
+                    temp_file.close()
+                except Exception:
+                    # ignore - context manager will close on exit if needed
+                    pass
+
                 # If download successful, move temp file to final location
                 shutil.move(temp_path, self.download_path)
 
@@ -372,7 +387,8 @@ class IngestSampleTask(luigi.Task):
 
         params = config.sample_params.model_dump()
         params.update(sample_config.model_dump(exclude_defaults=True))
-
+        params["file"] = params.pop("url")
+        
         params.update(
             {
                 "dataset": gtensor_path,
@@ -441,7 +457,6 @@ def run_pipeline(
         temp_config.flush()
         temp_config.seek(0)
 
-        # Run pipeline
         result = luigi.build(
             [GTensorPipeline(config_path=temp_config.name)],
             workers=workers * (not dry_run),

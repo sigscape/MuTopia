@@ -3,10 +3,10 @@ min_region_size: 100
 region_size: 10000
 
 genome:
-  fasta: /Users/allen/genomes/hg38/hg38.fa
+  fasta: /n/data1/hms/dbmi/park/SOFTWARE/REFERENCE/hg38/cgap_matches/Homo_sapiens_assembly38.fa
   chromsizes: annotations/hg38.mainchroms.sizes
   mutation_rate_file: annotations/mutation-rate.hg38.bedgraph.gz
-  blacklist: annotations/blacklist_method12_v1_comb_sort_merged.bed
+  blacklist: annotations/blacklist_method12_v1_comb_sort_merged.bed.gz
 
 pipeline_params:
   liftover_chain: annotations/hg19ToHg38.over.chain.gz
@@ -17,4 +17,3 @@ pipeline_params:
 
 sample_params:
   cluster: false
-  skip_sort: true
