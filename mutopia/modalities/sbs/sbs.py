@@ -76,7 +76,7 @@ class SBSMode(ModeConfig):
             A mapping from coordinate key to a pair of (dimension name, labels).
         """
         return {
-            "clustered": ("clustered", ["no", "yes"]),
+            #"clustered": ("clustered", ["no", "yes"]),
             "configuration": ("configuration", CONFIGURATIONS),
             "context": ("context", MUTOPIA_ORDER),
             "mutation": ("context", [s[2:5] for s in MUTOPIA_ORDER]),
@@ -250,7 +250,7 @@ class SBSMode(ModeConfig):
         Returns
         -------
         xarray.DataArray
-            Sparse COO-backed array with dims (``clustered``, ``configuration``,
+            Sparse COO-backed array with dims (``configuration``,
             ``context``, ``locus``).
         """
         _, coords, weights = featurize_mutations(
@@ -271,9 +271,9 @@ class SBSMode(ModeConfig):
             COO(
                 coords,
                 weights,
-                shape=(2, 2, len(MUTOPIA_ORDER), locus_dim),
+                shape=(2, len(MUTOPIA_ORDER), locus_dim),
             ),
-            dims=("clustered", "configuration", "context", "locus"),
+            dims=("configuration", "context", "locus"),
         )
 
         return sample_arr.isel(locus=locus_coords)
@@ -310,7 +310,7 @@ class SBSMode(ModeConfig):
         -------
         tuple[list[str], xarray.DataArray]
             Variant identifiers and the sparse COO-backed observation tensor
-            with dims (``clustered``, ``configuration``, ``context``, ``locus``).
+            with dims (``configuration``, ``context``, ``locus``).
         """
 
         mut_ids, coords, weights = featurize_mutations(
@@ -325,13 +325,13 @@ class SBSMode(ModeConfig):
             COO(
                 coords,
                 weights,
-                shape=(2, 2, len(MUTOPIA_ORDER), locus_dim),
+                shape=(2, len(MUTOPIA_ORDER), locus_dim),
                 has_duplicates=False,
                 sorted=True,
                 prune=False,
                 cache=False,
             ),
-            dims=("clustered", "configuration", "context", "locus"),
+            dims=("configuration", "context", "locus"),
         )
 
         sample_arr = sample_arr.isel(locus=locus_coords)

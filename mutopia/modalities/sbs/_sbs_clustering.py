@@ -70,41 +70,104 @@ def stream_passed_SNVs(
     if not filter_string is None:
         filter_basecmd += ["-i", filter_string]
 
+    # Suppress bcftools view output by redirecting stderr to DEVNULL
     filter_process = subprocess.Popen(
         filter_basecmd + [vcf_file],
         stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
         universal_newlines=True,
         bufsize=10000,
-        stderr=sys.stderr,
     )
 
     query_process = subprocess.Popen(
         ["bcftools", "query", "-f", chr_prefix + query_string],
         stdin=filter_process.stdout,
         stdout=subprocess.PIPE if sorted else output,
+        stderr=subprocess.PIPE,  # Capture stderr to detect errors
         universal_newlines=True,
         bufsize=10000,
     )
+    
+    # Close filter_process stdout so query_process can detect EOF
+    if filter_process.stdout:
+        filter_process.stdout.close()
 
+    sort_process = None
     if sorted:
         # ahh so annoying - it would be nice to delegate sorting to the user
         # but it can be difficult to make sure the VCFs are in lexigraphical order.
         # Instead, I'll bite the bullet and sort here.
         sort_process = subprocess.Popen(
-            ["sort", "-k1,1", "-k2,2n"],
+            "LC_COLLATE=C sort -k1,1 -k2,2n",
             stdin=query_process.stdout,
             stdout=output,
-            stderr=sys.stderr,
+            stderr=subprocess.PIPE,  # Capture stderr to detect errors
             universal_newlines=True,
             bufsize=10000,
+            shell=True,
         )
+        
+        # Close query_process stdout so sort_process can detect EOF
+        if query_process.stdout:
+            query_process.stdout.close()
 
     out_process = sort_process if sorted else query_process
 
     try:
         yield out_process
     finally:
-        close_process(out_process)
+        # Check each process for errors with descriptive messages
+        try:
+            close_process(out_process)
+        except subprocess.CalledProcessError as e:
+            if sorted:
+                # Check which process failed
+                query_returncode = query_process.wait()
+                filter_returncode = filter_process.wait()
+                
+                if filter_returncode != 0:
+                    raise RuntimeError(
+                        f"bcftools view failed (exit code {filter_returncode}). "
+                        f"Command: {' '.join(filter_basecmd + [vcf_file])}"
+                    ) from e
+                elif query_returncode != 0:
+                    stderr_output = query_process.stderr.read() if query_process.stderr else ""
+                    raise RuntimeError(
+                        f"bcftools query failed (exit code {query_returncode}). "
+                        f"Command: bcftools query -f {chr_prefix + query_string}. "
+                        f"Error: {stderr_output}"
+                    ) from e
+                else:
+                    raise RuntimeError(
+                        f"sort failed (exit code {e.returncode}). "
+                        f"Command: LC_COLLATE=C sort -k1,1 -k2,2n"
+                    ) from e
+            else:
+                # query_process is the out_process
+                filter_returncode = filter_process.wait()
+                
+                if filter_returncode != 0:
+                    raise RuntimeError(
+                        f"bcftools view failed (exit code {filter_returncode}). "
+                        f"Command: {' '.join(filter_basecmd + [vcf_file])}"
+                    ) from e
+                else:
+                    stderr_output = query_process.stderr.read() if query_process.stderr else ""
+                    raise RuntimeError(
+                        f"bcftools query failed (exit code {e.returncode}). "
+                        f"Command: bcftools query -f {chr_prefix + query_string}. "
+                        f"Error: {stderr_output}"
+                    ) from e
+        
+        # Ensure all processes are terminated
+        processes_to_check = [filter_process, query_process]
+        if sort_process is not None:
+            processes_to_check.append(sort_process)
+            
+        for proc in processes_to_check:
+            if proc.poll() is None:  # Process still running
+                proc.terminate()
+                proc.wait()
 
 
 def transfer_annotations_to_vcf(

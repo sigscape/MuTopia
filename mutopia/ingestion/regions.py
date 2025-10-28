@@ -430,6 +430,12 @@ def make_regions(
         # 9. format the segments as bed12 records
         data = map(expand_args(format_bed12_record), data)
 
+        data = streaming_local_sort(
+            data,
+            key=lambda x : (x[0], x[1], str(x[3])), # weird issues with lexical sorting
+            has_lapsed=lambda curr, buffval: curr[0] != buffval[0] or (curr[1] > buffval[1])
+        )
+
         # 10. write the bed12 records to the output
         data = map(expand_args(partial(print, sep="\t", file=output)), data)
 

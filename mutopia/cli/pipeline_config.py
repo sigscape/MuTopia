@@ -1,6 +1,7 @@
 from typing import Any, Optional, Dict, List, Union
 from pydantic import BaseModel, Field
 import pydantic
+from mutopia.utils import logger
 from ..utils import FeatureType
 from ..ingestion import FileType
 
@@ -33,6 +34,7 @@ class ProcessingConfig(BaseModel):
                 f"Output file must end with {self.output_extension}, got {output_file}"
             )
         command = self.function.format(input=input_file, output=output_file)
+        logger.info(f"Running processing command: {command}")
         import subprocess
         subprocess.run(command, shell=True, check=True)
 
@@ -57,14 +59,8 @@ class FeatureConfig(BaseModel):
         default=None, description="Description of the feature"
     )
 
-    @property
-    def file_type(self) -> FileType:
-        """Determine file type from the first file's extension"""
-        return FileType.from_extension(self.sources[0].file)
-
-    def validate_extension(self) -> None:
+    def validate_extension(self, file_type: FileType) -> None:
         """Validate that the file type supports the chosen normalization"""
-        file_type = self.file_type
         norm_type = FeatureType(self.normalization)
         if not (norm_type in file_type.allowed_normalizations):
             raise ValueError(
@@ -76,15 +72,11 @@ class FeatureConfig(BaseModel):
         """Validate after model initialization"""
         # convert all sources to URL configs
         self.sources = [URLConfig(file=src) if isinstance(src, str) else src for src in self.sources]
-        self.validate_extension()
         super().model_post_init(*args, **kwargs)
 
 
 class SampleParams(BaseModel):
-    mutation_rate_file: Optional[str] = Field(
-        default=None, description="Path to mutation rate file"
-    )
-    cluster: Optional[bool] = Field(default=True, description="Whether to cluster the samples")
+    cluster: Optional[bool] = Field(default=False, description="Whether to cluster the samples")
     chr_prefix: Optional[str] = Field(default="", description="Prefix for chromosome names")
     pass_only: Optional[bool] = Field(
         default=True, description="Whether to only pass the sample through"
@@ -97,20 +89,24 @@ class SampleParams(BaseModel):
 
 class SampleConfig(SampleParams):
     file: str = Field(..., description="Path to the sample file (e.g., VCF)")
+    sample_weight: float = Field(default=1.0, description="Weight of the sample")
+    copy_number: Optional[str] = Field(default=None, description="Path to copy number file")
     sample_name: Optional[str] = Field(
-        None, description="Name of the sample, for VCFs with multiple samples."
+        default=None, description="Name of the sample, for VCFs with multiple samples."
     )
-    sample_weight: Optional[float] = Field(1.0, description="Weight of the sample")
-    copy_number: Optional[str] = Field(None, description="Path to copy number file")
 
 
 class GenomeConfig(BaseModel):
     chromsizes: str = Field(..., description="Path to chromosome sizes file")
     blacklist: str = Field(..., description="Path to blacklist file")
     fasta: str = Field(..., description="Path to FASTA file")
+    mutation_rate_file: Optional[str] = Field(
+        default=None, description="Path to mutation rate file"
+    )
 
 
 class GTensorConfig(BaseModel):
+    output_prefix: str = Field(..., description="Prefix for output GTensor files")
     name: str = Field(..., description="Name of the GTensor object")
     dtype: str = Field(..., description="Data type for the GTensor")
     region_size: int = Field(..., description="Size of regions")
@@ -130,14 +126,33 @@ class GTensorConfig(BaseModel):
     samples: Dict[str, SampleConfig] = Field(
         {}, description="List of samples to process"
     )
+
+    @property
+    def gtensor_file(self) -> str:
+        """Get the GTensor output file name"""
+        return f"{self.output_prefix}.nc"
     
+    def get_filetype(self, feature_name: str) -> FileType:
+        """Get the FileType for a given feature"""
+        feature: FeatureConfig = self.features[feature_name]
+        source_file: List[str] = (
+            [src.file for src in feature.sources]
+            if feature.processing is None
+            else [f".{self.processing[feature.processing].output_extension}"]
+        )
+        exts = [FileType.from_extension(f) for f in source_file]
+        if not all(ext == exts[0] for ext in exts):
+            raise ValueError(
+                f"Feature '{feature_name}' has mixed file types: {exts}"
+            )
+        return exts[0]
 
     @property
     def bed_cuts(self) -> list[tuple[str, str]]:
         """Get list of BED files to be cut during GTensor creation"""
         cuts = []
         for name, feature in self.features.items():
-            if feature.file_type == FileType.BED:
+            if self.get_filetype(name) == FileType.BED:
                 cuts.extend((name, conf.file) for conf in feature.sources)
         return cuts
 
@@ -155,3 +170,5 @@ class GTensorConfig(BaseModel):
                     f"'{feature.processing}'. Available functions: "
                     f"{list(self.processing.keys())}"
                 )
+            file_type = self.get_filetype(feature_name)
+            feature.validate_extension(file_type)

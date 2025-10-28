@@ -18,28 +18,11 @@ def gtensor_cli():
 @gtensor_cli.command("compose", short_help="Run the G-Tensor construction pipeline")
 @click.argument("config_file", type=click.Path(exists=True), metavar="CONFIG_FILES...", nargs=-1)
 @click.option(
-    "-n", "--name",
-    type=str,
+    "-o",
+    "--output-prefix",
+    type=click.Path(writable=True),
     required=True,
-    help="Name of the G-Tensor dataset."
-)
-@click.option(
-    "-d", "--dtype",
-    type=str,
-    default="sbs",
-    help="Data type of the G-Tensor dataset."
-)
-@click.option(
-    "--region-size", 
-    type=int,
-    default=10000,
-    help="Max size of the genomic regions to create."
-)
-@click.option(
-    "--min-region-size",
-    type=int,
-    default=75,
-    help="Min size of the genomic regions to create."
+    help="Prefix for output GTensor files."
 )
 @click.option(
     "-w",
@@ -56,6 +39,7 @@ def gtensor_cli():
 )
 def _run_pipeline(
     config_file: List[str],
+    output_prefix: str,
     **kwargs,
 ):
     """
@@ -72,7 +56,11 @@ def _run_pipeline(
         click.echo("Error: At least one CONFIG_FILE must be provided.", err=True)
         sys.exit(1)
         
-    run_pipeline(tuple(config_file), **kwargs)
+    try:
+        run_pipeline(output_prefix, tuple(config_file), **kwargs)
+    except Exception as e:
+        click.echo(f"Pipeline execution failed: {e}", err=True)
+        sys.exit(1)
 
 
 @gtensor_cli.command("split", short_help="Split a G-Tensor into training and test sets")

@@ -155,6 +155,7 @@ def add_continuous_feature(
         group=group,
         name=feature_name if source is None else os.path.join(source, feature_name),
         normalization=FeatureType(normalization),
+        source_file=ingest_file,
     )
 
     logger.info(f"Added feature: {feature_name}")
@@ -185,6 +186,7 @@ def add_discrete_feature(
         column=column,
         null=null,
         class_priority=classes if len(classes) > 0 else None,
+        source_file=ingest_file,
     )
 
     logger.info("Found classes: " + ", ".join(['"{}"'.format(str(c)) for c in classes]))
@@ -227,6 +229,7 @@ def add_vector_feature(
         group=group,
         name=feature_name if source is None else os.path.join(source, feature_name),
         normalization=FeatureType(normalization),
+        source_file=ingest_file,
     )
 
 
@@ -255,6 +258,7 @@ def add_strand_feature(
         group=group,
         name=feature_name if source is None else os.path.join(source, feature_name),
         normalization=FeatureType.STRAND,
+        source_file=ingest_file,
     )
 
 
@@ -298,7 +302,7 @@ def train_test_split(
 def add_sample(
     dataset: str,
     sample_file: str,
-    sample_name: str,
+    sample_name: Optional[str] = None,
     chr_prefix: str = "",
     pass_only: bool = True,
     weight_col: Union[None, str] = None,

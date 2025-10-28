@@ -52,9 +52,6 @@ def make_continuous_features_bed(
     **kw,
 ):
     check_regions_file(regions_file)
-
-    split = True
-
     cmd = [
         "bedtools",
         "map",
@@ -71,16 +68,12 @@ def make_continuous_features_bed(
         "-split",
     ]
 
-    # if split:
-    #    cmd.append("-split")
-
     map_out = subprocess.check_output(cmd)
 
-    vals = []
-    for line in map_out.decode().strip().split("\n"):
-        vals.append(float(line.strip().split("\t")[-1]))
-    vals = array(vals)
-
+    data = map(lambda s: s.strip().split("\t"), map_out.decode().strip().split("\n"))
+    data = map(lambda s: (int(s[3]), float(s[-1])), data)
+    data = sorted(data, key=lambda x: x[0])
+    vals = array(list(map(lambda x: x[1], data)))
     if not len(vals) > 1:
         raise RuntimeError(f"No values found in {bed_file} for {regions_file}")
 
@@ -239,12 +232,15 @@ def make_discrete_features(
     )
 
     awk_out = subprocess.check_output(
-        ["awk", " {print $NF}"],
+        "awk '{print $4, $NF}'",
         stdin=map_out.stdout,
+        shell=True,
     )
 
-    mappings = [x.strip() for x in awk_out.decode().strip().split("\n")]
-    vals = [m.split("|") for m in mappings]
+    mappings = [x.strip().split(" ", 1) for x in awk_out.decode().strip().split("\n")]
+    vals = sorted(mappings, key=lambda x: int(x[0]))
+    vals = [v[1] for v in vals]
+    vals = [m.split("|") for m in vals]
     classes = set([_v for v in vals for _v in v]).difference({null})
 
     if len(classes) > 255:

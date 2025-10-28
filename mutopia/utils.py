@@ -7,7 +7,7 @@ from joblib import Parallel, delayed
 # Set up colorized logging
 import colorlog
 
-logger = colorlog.getLogger(" Mutopia")
+logger = colorlog.getLogger("Mutopia")
 handler = colorlog.StreamHandler()
 handler.setFormatter(
     colorlog.ColoredFormatter(

@@ -173,8 +173,9 @@ class ProcessFeatureTask(luigi.Task):
 
     def output(self):
         ext = self.processing_config.output_extension
+        config = load_config(self.config_path)
         input_filename = os.path.basename(self.input().path)
-        processed_path = os.path.join("gtensor__tempfiles/processed", f"{input_filename}-{self.function_name}.{ext}")
+        processed_path = os.path.join("gtensor__tempfiles", "processed", config.name, f"{input_filename}-{self.function_name}.{ext}")
         return luigi.LocalTarget(processed_path)
 
     def run(self):
@@ -223,7 +224,7 @@ class CreateGTensorTask(luigi.Task):
 
     def output(self):
         config = load_config(self.config_path)
-        return luigi.LocalTarget(f"{config.name}.nc")
+        return luigi.LocalTarget(config.gtensor_file)
 
     def requires(self):
         config = load_config(self.config_path)
@@ -256,7 +257,7 @@ class CreateGTensorTask(luigi.Task):
         create_gtensor(
             name=c.name,
             dtype=c.dtype,
-            output=f"{c.name}.nc",
+            output=self.output().path,
             region_size=c.region_size,
             min_region_size=c.min_region_size,
             genome_file=genome["chromsizes"].path,
@@ -296,14 +297,14 @@ class IngestFeatureTask(luigi.Task):
     def output(self):
         config = load_config(self.config_path)
         return GTensorFeatureTarget(
-            gtensor_path=f"{config.name}.nc",
+            gtensor_path=config.gtensor_file,
             feature_name=self.feature_name,
             source=(config.features[self.feature_name].sources[int(self.idx)].celltype),
         )
 
     def run(self):
         config = load_config(self.config_path)
-        gtensor_path = f"{config.name}.nc"
+        gtensor_path = config.gtensor_file
         feature_config: FeatureConfig = config.features[str(self.feature_name)]
         file_config = feature_config.sources[int(self.idx)]
 
@@ -357,7 +358,7 @@ class IngestSampleTask(luigi.Task):
     def output(self):
         config = load_config(self.config_path)
         return GTensorSampleTarget(
-            gtensor_path=f"{config.name}.nc",
+            gtensor_path=config.gtensor_file,
             sample_id=self.sample_id,
         )
 
@@ -367,9 +368,10 @@ class IngestSampleTask(luigi.Task):
         file_path = self.input()["file"].path
         gtensor_path = self.input()["gtensor"].path
         fasta_path = self.input()["fasta"].path
+        mutation_rate_file = config.genome.mutation_rate_file
 
         params = config.sample_params.model_dump()
-        params.update(sample_config.model_dump())
+        params.update(sample_config.model_dump(exclude_defaults=True))
 
         params.update(
             {
@@ -377,10 +379,14 @@ class IngestSampleTask(luigi.Task):
                 "sample_file": file_path,
                 "fasta": fasta_path,
                 "sample_id": self.sample_id,
+                "mutation_rate_file": mutation_rate_file,
             }
         )
         params.pop("file", None)  # Remove file as it's not needed here
-
+        logger.info(
+            f"Ingesting sample '{self.sample_id}' from file '{file_path}' "
+            f"into GTensor '{gtensor_path}'"
+        )
         add_sample(**params)
 
 
@@ -410,24 +416,16 @@ class GTensorPipeline(luigi.WrapperTask):
 
 
 def run_pipeline(
+    output_prefix: str, 
     config_files: Tuple[str, ...],
     *,
-    name: str,
-    min_region_size: int = 75,
-    region_size: int = 10000,
-    dtype: str = "sbs",
     workers=1,
     remote_scheduler=False,
     dry_run=False,
 ):
     """Run the GTensor pipeline with the given configuration file."""
-
-    # Validate configuration first to fail fast if invalid
     config_dict = {
-        "name": name,
-        "dtype": dtype,
-        "region_size": region_size,
-        "min_region_size": min_region_size,
+        "output_prefix": output_prefix,
     }
     try:
         for config_file in config_files:
@@ -455,7 +453,7 @@ def run_pipeline(
         # Luigi returns LuigiStatusCode: SUCCESS, SUCCESS_WITH_RETRY, FAILED, FAILED_AND_SCHEDULING_FAILED, etc.
         # Check if any tasks failed
         from luigi.execution_summary import LuigiStatusCode
-        if result not in (LuigiStatusCode.SUCCESS, LuigiStatusCode.SUCCESS_WITH_RETRY):
+        if result.status not in (LuigiStatusCode.SUCCESS, LuigiStatusCode.SUCCESS_WITH_RETRY):
             logger.error("Pipeline failed. Check the logs for details.")
             raise click.Abort()
             

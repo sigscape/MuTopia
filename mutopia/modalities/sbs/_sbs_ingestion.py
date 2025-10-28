@@ -121,7 +121,7 @@ def _process_query_line(line, fasta_object):
 
     return (
         (query.CHROM, query.POS0),
-        (int(query.CLUSTER_SIZE > 3), configuration_idx, context_idx, locus_idx),
+        (configuration_idx, context_idx, locus_idx),
         adjusted_weight,
     )
 
@@ -173,8 +173,6 @@ def featurize_mutations(
                     "You must provide a mutation rate bedgraph file in order to cluster mutations."
                 )
 
-            logger.info("Clustering mutations ...")
-
             cluster_vcf(
                 mutation_rate_bedgraph=mutation_rate_file,
                 query_fn=partial(query_fn, vcf_file, sorted=True),
@@ -186,8 +184,6 @@ def featurize_mutations(
             input_vcf = processed_vcf.name
         else:
             input_vcf = vcf_file
-
-        logger.info("Parsing mutations ...")
 
         query_fn = partial(
             query_fn,
@@ -233,12 +229,9 @@ def featurize_mutations(
                     n_ingested += 1
 
                 except (WeirdMutationError, BadWeightError) as err:
-                    logger.warning(err)
+                    logger.debug(err)
                     n_weird += 1
                     continue
-
-                if n_ingested % 5000 == 0:
-                    logger.info(f"Ingested {n_ingested} mutations ...")
 
     if len(weights) == 0:
         raise ValueError(
