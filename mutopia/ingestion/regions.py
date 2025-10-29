@@ -56,10 +56,14 @@ def _make_fixed_size_windows(
 def stream_bedfile(bedfile):
 
     try:
-        with (open if not bedfile.endswith(".gz") else gzopen)(bedfile, "rt") as f:
+        opener = open if not bedfile.endswith(".gz") else gzopen
+        with opener(bedfile, "rt") as f:
+            has_data_line = False
             for line in f:
                 if line.startswith("#"):
                     continue
+                # We saw a non-comment line
+                has_data_line = True
                 cols = line.strip().split("\t")
                 if len(cols) < 3:
                     raise ValueError(f"Bedfile {bedfile} must have at least 3 columns")
@@ -68,6 +72,11 @@ def stream_bedfile(bedfile):
                 start = int(start)
                 end = int(end)
                 yield chrom, start, end, feature
+
+            # If there were no non-comment lines, raise a clear error so callers
+            # don't silently proceed with empty inputs.
+            if not has_data_line:
+                raise ValueError(f"Bedfile {bedfile} is empty (no data lines)")
     except Exception as e:
         raise ValueError(f"Error reading bedfile {bedfile}: {str(e)}") from e
 
