@@ -260,7 +260,7 @@ def get_config_dict(
                 target=mark,
             )
         except NoExperimentFoundError as e:
-            logger.error(e)
+            logger.warning(e)
 
     histone_features = {
         mark: FeatureConfig(

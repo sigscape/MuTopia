@@ -210,7 +210,7 @@ def featurize_mutations(
                 stdin=query.stdout,
                 stdout=subprocess.PIPE,
                 universal_newlines=True,
-                bufsize=10000,
+                #bufsize=10000,
             )
 
             coords = []
@@ -218,9 +218,8 @@ def featurize_mutations(
             mut_ids = []
             n_ingested = 0
             n_weird = 0
-
+            
             for line in stream_subprocess_output(intersect_process):
-
                 try:
                     mut_id, coo, weight = _process_query_line(line, fa)
                     coords.append(coo)

@@ -14,52 +14,66 @@ from ..utils import logger, str_wrapped_list
 def _make_fixed_size_windows(
     *, genome_file, window_size, blacklist_file=None, output=sys.stdout
 ):
-
-    process_kw = dict(
-        universal_newlines=True,
-        bufsize=10000,
-    )
-
-    makewindows_process = subprocess.Popen(
-        ["bedtools", "makewindows", "-g", genome_file, "-w", str(window_size)],
-        stdout=subprocess.PIPE,
-        **process_kw,
-    )
-
-    sort_process = subprocess.Popen(
-        ["sort", "-k1,1", "-k2,2n"],
-        stdin=makewindows_process.stdout,
-        stdout=subprocess.PIPE,
-        **process_kw,
-    )
-
-    if blacklist_file is not None:
-        subract_process = subprocess.Popen(
-            ["bedtools", "intersect", "-a", "-", "-b", blacklist_file, "-v"],
-            stdin=sort_process.stdout,
-            stdout=subprocess.PIPE,
-            universal_newlines=True,
-            bufsize=10000,
-        )
-        sort_process = subract_process
-
-    add_id_process = subprocess.Popen(
-        ["awk", "-v", "OFS=\t", '{print $0,NR-1,"0","+",$2,$3,"0,0,0","1",$3-$2,"0"}'],
-        stdin=sort_process.stdout,
-        stdout=output,
-        **process_kw,
-    )
-
-    add_id_process.wait()
+    """
+    Generate fixed-size genomic windows in BED12 format.
+    
+    Pure Python implementation - reads genome file, generates windows,
+    and writes them sorted by chromosome name.
+    """
+    # Read chromosome sizes from genome file
+    chroms = []
+    with open(genome_file, 'r') as f:
+        for line in f:
+            if line.startswith('#'):
+                continue
+            parts = line.strip().split('\t')
+            if len(parts) >= 2:
+                chrom_name = parts[0]
+                chrom_size = int(parts[1])
+                chroms.append((chrom_name, chrom_size))
+    
+    # Sort chromosomes lexicographically by name
+    chroms.sort(key=lambda x: x[0])
+    
+    # Generate windows for each chromosome
+    region_id = 0
+    for chrom_name, chrom_size in chroms:
+        # Create windows of fixed size
+        for start in range(0, chrom_size, window_size):
+            end = min(start + window_size, chrom_size)
+            
+            # Write in BED12 format with the awk-style fields
+            # Format: chrom, start, end, name, score, strand, thickStart, thickEnd, itemRgb, blockCount, blockSizes, blockStarts
+            print(
+                chrom_name,
+                start,
+                end,
+                region_id,
+                "0",
+                "+",
+                start,
+                end,
+                "0,0,0",
+                "1",
+                end - start,
+                "0",
+                sep='\t',
+                file=output
+            )
+            region_id += 1
 
 
 def stream_bedfile(bedfile):
 
     try:
-        with (open if not bedfile.endswith(".gz") else gzopen)(bedfile, "rt") as f:
+        opener = open if not bedfile.endswith(".gz") else gzopen
+        with opener(bedfile, "rt") as f:
+            has_data_line = False
             for line in f:
                 if line.startswith("#"):
                     continue
+                # We saw a non-comment line
+                has_data_line = True
                 cols = line.strip().split("\t")
                 if len(cols) < 3:
                     raise ValueError(f"Bedfile {bedfile} must have at least 3 columns")
@@ -68,6 +82,11 @@ def stream_bedfile(bedfile):
                 start = int(start)
                 end = int(end)
                 yield chrom, start, end, feature
+
+            # If there were no non-comment lines, raise a clear error so callers
+            # don't silently proceed with empty inputs.
+            if not has_data_line:
+                raise ValueError(f"Bedfile {bedfile} is empty (no data lines)")
     except Exception as e:
         raise ValueError(f"Error reading bedfile {bedfile}: {str(e)}") from e
 

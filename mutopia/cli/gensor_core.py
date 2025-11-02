@@ -266,6 +266,7 @@ def train_test_split(
     filename: str,
     test_contigs: list[str],
     min_region_size=5,
+    min_mutations: int=800,
     output_prefix: Optional[str] = None,
 ):
 
@@ -277,8 +278,15 @@ def train_test_split(
     else:
         outprefix = output_prefix
 
-    dataset = disk.load_dataset(filename, with_samples=False)
+    dataset = lazy_load(filename)
     dataset.attrs["regions_file"] = "none"
+
+    sample_counts = [sample.X.sum().item() for sample in dataset.iter_samples()]
+    use_samples = [sample_name for sample_name, count in zip(disk.list_samples(filename), sample_counts) if count >= min_mutations]
+    
+    removed_n_samples = len(disk.list_samples(filename)) - len(use_samples)
+    if removed_n_samples > 0:
+        logger.info(f"Removing {removed_n_samples} samples with fewer than {min_mutations} mutations.")
 
     test_mask = np.isin(dataset["Regions/chrom"].values, test_contigs)
     include_region = dataset["Regions/length"].values >= min_region_size
@@ -294,6 +302,9 @@ def train_test_split(
 
     train = LocusSlice(LazySampleLoader(dataset), locus=train_mask)
     test = LocusSlice(LazySampleLoader(dataset), locus=test_mask)
+
+    train = SampleSlice(train, use_samples)
+    test = SampleSlice(test, use_samples)
 
     disk.write_dataset(train, outprefix + "train.nc", bar=True)
     disk.write_dataset(test, outprefix + "test.nc", bar=True)
