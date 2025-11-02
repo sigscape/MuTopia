@@ -171,13 +171,19 @@ class SBSMode(ModeConfig):
 
         with Fasta(fasta_file) as fasta_object:
             trinuc_matrix = [
-                _count_trinucs(w, fasta_object)
+                (
+                    int(w.name),
+                    _count_trinucs(w, fasta_object)
+                )
                 for w in tqdm(
                     stream_bed12(regions_file),
                     nrows=100,
                     desc="Aggregating trinucleotide content",
                 )
             ]
+
+        trinuc_matrix.sort(key=lambda x: x[0])
+        trinuc_matrix = [x[1] for x in trinuc_matrix]
 
         # LxDxC => DxCxL
         trinuc_matrix = (

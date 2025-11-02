@@ -131,7 +131,7 @@ class LDAUpdateDense(LocalsModel):
             Nk,
         )
 
-        new_Nk = _svi_update_fn(Nk, map_estimate, learning_rate)
+        new_Nk = _svi_update_fn(Nk, map_estimate, learning_rate, parameter_name="Nk")
 
         suffstats = self._calc_sstats(
             *args,

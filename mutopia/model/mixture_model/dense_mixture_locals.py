@@ -101,7 +101,7 @@ class DenseMixtureModel(LDAUpdateDense):
 
         # logger.debug(f"t: {t}, tol: {tol}")
 
-        Nk = _svi_update_fn(Nk, map_estimate, learning_rate)
+        Nk = _svi_update_fn(Nk, map_estimate, learning_rate, parameter_name="Nk")
 
         weighted_posterior = calc_local_variables(*args, Nk)  # (D*K, I)
         trailing_shape = weighted_posterior.shape[1:]

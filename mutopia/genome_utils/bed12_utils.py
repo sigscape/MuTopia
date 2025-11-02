@@ -1,4 +1,5 @@
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from itertools import starmap, chain
 from numpy import array
@@ -77,7 +78,7 @@ class BED12Record:
         )
 
 
-def parse_bed12_line(line):
+def parse_bed12_line(line) -> BED12Record:
     (
         chromosome,
         start,
@@ -111,7 +112,7 @@ def parse_bed12_line(line):
     )
 
 
-def stream_bed12(bed12_file, sep="\t"):
+def stream_bed12(bed12_file, sep="\t") -> Iterable[BED12Record]:
 
     with safe_read(bed12_file) as f:
 

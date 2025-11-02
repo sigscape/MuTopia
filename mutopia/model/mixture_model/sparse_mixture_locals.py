@@ -112,7 +112,7 @@ class SparseMixtureModel(LDAUpdateSparse):
             Nk,
         )
 
-        Nk = _svi_update_fn(Nk, map_estimate, learning_rate)
+        Nk = _svi_update_fn(Nk, map_estimate, learning_rate, parameter_name=f"Nk_sample_{sample.coords['sample']}")
 
         weighted_posterior = calc_local_variables(*args, Nk)  # (D*K, I)
 

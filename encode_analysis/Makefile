@@ -11,7 +11,10 @@ SHELL := /bin/bash
 .INTERMEDIATE: gtensor__tempfiles/processed/%/
 
 # Phony targets for convenience - allows "make lung" instead of "make data/gtensors/lung.done"
-.PHONY: run/% uberon_terms/%
+.PHONY: run/% uberon_terms/% clean
+
+clean:
+	rm -r staged gtensors studies summaries configs/features configs/experiments.yaml configs/repliseq.yaml configs/functional_data.yaml gtensor__tempfiles
 
 configs/repliseq.yaml: download_encode.py
 	python download_encode.py --genome hg19 --assays "Repli-seq" --no-groupby > $@
