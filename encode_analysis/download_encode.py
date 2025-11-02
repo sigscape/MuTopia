@@ -1,3 +1,4 @@
+import sys
 import datetime
 from enum import IntEnum
 from itertools import groupby, chain
@@ -6,13 +7,7 @@ from functools import cache, partial
 import requests
 from collections import defaultdict, Counter
 import pydantic
-from mutopia.utils import logger
-
-"""
-TODO:
-- Add Mint-CHIP-seq?
-- Add more permissive min-frip filtering for ChIP-seq
-"""
+from mutopia.utils import logger # type: ignore
 
 __all__ = ["EncodeExperimentConfig", "EncodeFileConfig", "get_encode_config"]
 
@@ -35,7 +30,9 @@ def query_encode_experiments(*allowed_assays: str, genome="GRCh38") -> str:
         "?type=Experiment"
         "&status=released"
         f"&assembly={genome}"
+        f"&files.assembly={genome}"
         "&perturbed=false"
+        "&field=assembly"
         "&field=replicates.library.biosample.donor.organism.scientific_name"
         "&field=accession"
         "&field=assay_title"
@@ -47,6 +44,7 @@ def query_encode_experiments(*allowed_assays: str, genome="GRCh38") -> str:
         "&field=date_created"
         "&field=life_stage_age"
         "&field=audit"
+        "&field=files.assembly"
         "&field=files.read_length"
         "&field=files.run_type"
         "&field=files.file_format"
@@ -410,17 +408,21 @@ assay_to_file_selector = {
     "WGBS" : partial(_select_output_type, "bed", {"methylation state at CpG"})
 }
 
-def choose_files(experiment: Experiment) -> List[File]:
-    return assay_to_file_selector[experiment["assay_title"]](experiment.get("files", []))
+def choose_files(experiment: Experiment, assembly: str) -> List[File]:
+    files = experiment.get("files", [])
+    files = [f for f in files if f.get("assembly") == assembly]
+    if len(files) == 0:
+        raise NoFilesError(f"No files found for assembly {assembly}")
+    return assay_to_file_selector[experiment["assay_title"]](files)
 
-def filter_experiments(experiment):
+def filter_experiments(experiment, assembly: str) -> bool:
     if not (
             experiment["audit_flag"] > AuditFlag.FAIL
             or experiment["assay_title"] in {"Histone ChIP-seq", "WGBS"} # ignore audit flags for Histone ChIP-seq and WGBS
         ):
         raise FilterExperimentError("Audit flag failure")
     try:
-        choose_files(experiment)
+        choose_files(experiment, assembly=assembly)
     except NoFilesError as e:
         raise FilterExperimentError(str(e))
     if not  _biosample_classification(experiment) in {"whole organism", "cell line", "primary cell", "tissue"}:
@@ -500,7 +502,7 @@ def select_experiments(*allowed_assays: str, genome: str="GRCh38", group_by_bios
     filter_messages = defaultdict(Counter)
     for experiment in experiments:
         try:
-            if filter_experiments(experiment):
+            if filter_experiments(experiment, assembly=genome):
                 filtered_experiments.append(experiment)
         except Exception as e:
             filter_messages[experiment["assay_title"]][str(e)] += 1
@@ -529,6 +531,7 @@ class EncodeFileConfig(pydantic.BaseModel):
     url: str = pydantic.Field(..., description="URL to download the file")
     biological_replicates: List[int] = pydantic.Field(..., description="List of biological replicate IDs")
     technical_replicates: List[int] = pydantic.Field(..., description="List of technical replicate IDs")
+    assembly: str = pydantic.Field(..., description="Genome assembly")
 
 
 class EncodeExperimentConfig(pydantic.BaseModel):
@@ -550,9 +553,9 @@ class EncodeExperimentConfig(pydantic.BaseModel):
         self.species = self.species.replace(" ", "_")
         return self
 
-def to_config(experiment: Experiment) -> EncodeExperimentConfig:
-    
-    files = choose_files(experiment)
+def to_config(experiment: Experiment, assembly: str) -> EncodeExperimentConfig:
+
+    files = choose_files(experiment, assembly=assembly)
     if not files:
         raise NoFilesError("No suitable files found")
 
@@ -561,6 +564,7 @@ def to_config(experiment: Experiment) -> EncodeExperimentConfig:
             accession=file["accession"],
             file_format=file["file_format"],
             output_type=file["output_type"],
+            assembly=file["assembly"],
             url="https://www.encodeproject.org" + file["href"],
             biological_replicates=file.get("biological_replicates", []),
             technical_replicates=file.get("technical_replicates", []),
@@ -600,7 +604,7 @@ def get_encode_config(
     experiment_configs = {}
     for experiment in experiments:
         try:
-            config = to_config(experiment)
+            config = to_config(experiment, assembly=genome)
             experiment_configs[experiment["accession"]] = config
         except NoFilesError as e:
             logger.warning(f"No valid files found for experiment {experiment['accession']}|{experiment['assay_title']}: {e}")

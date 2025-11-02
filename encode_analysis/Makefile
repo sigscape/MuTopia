@@ -8,19 +8,7 @@ SHELL := /bin/bash
 .PRECIOUS: configs/features/%.yaml staged/%.train.nc staged/%.test.nc gtensors/%.nc gtensors/%.features
 
 # Phony targets for convenience - allows "make lung" instead of "make data/gtensors/lung.done"
-.PHONY: run/% uberon_terms/% summarize/%/
-
-configs/repliseq.yaml: download_encode.py
-	python download_encode.py --genome hg19 --assays "Repli-seq" --no-groupby > $@
-
-configs/functional_data.yaml: download_encode.py
-	python download_encode.py > $@
-
-configs/experiments.yaml: configs/repliseq.yaml configs/functional_data.yaml
-	cat $^ > $@
-
-uberon_terms/%: configs/experiments.yaml
-	python get_uberon_terms.py $< $*
+.PHONY: run/% uberon_terms/% summarize/%/ stage.all
 
 # Define tissue-specific UBERON IDs and repliseq terms
 UBERON_IDS_Lung-All := "UBERON:0002048" "UBERON:0002168" "UBERON:0002167" "UBERON:0008953" "UBERON:0008952" "UBERON:0002170" "UBERON:0002171"
@@ -83,6 +71,19 @@ REPLISEQ_Bone-Osteosarc := "EFO:0002784"
 UBERON_IDS_Bladder-AdenoCA := "UBERON:0001255" "UBERON:0001259" "UBERON:0005033" "CL:2000040"
 REPLISEQ_Bladder-AdenoCA := "EFO:0001187"
 
+
+configs/repliseq.yaml: download_encode.py
+	python download_encode.py --genome hg19 --assays "Repli-seq" --no-groupby > $@
+
+configs/functional_data.yaml: download_encode.py
+	python download_encode.py > $@
+
+configs/experiments.yaml: configs/repliseq.yaml configs/functional_data.yaml
+	cat $^ > $@
+
+uberon_terms/%: configs/experiments.yaml
+	python get_uberon_terms.py $< $*
+
 # Pattern rule that uses tissue-specific variables
 configs/features/%.yaml: configs/experiments.yaml base_config.yaml write_config.py
 	@mkdir -p $(dir $@)
@@ -97,50 +98,57 @@ configs/features/%.yaml: configs/experiments.yaml base_config.yaml write_config.
 # Use grouped targets (&:) to tell Make these files are created together atomically
 gtensors/%.features: configs/features/%.yaml
 	@mkdir -p $(dir $@)
-	gtensor compose base_config.yaml configs/features/$*.yaml -o gtensors/$* -w 5
-	gtensor feature ls gtensors/$*.nc > gtensors/$*.features
+	gtensor compose base_config.yaml configs/features/$*.yaml -o gtensors/$* -w 3 && \
+	gtensor feature ls gtensors/$*.nc > gtensors/$*.features 
 
 gtensors/%.samples: gtensors/%.features
 	@mkdir -p $(dir $@)
-	gtensor compose base_config.yaml configs/features/$*.yaml configs/samples/$*.yaml -o gtensors/$* -w 15
+	gtensor compose base_config.yaml configs/features/$*.yaml configs/samples/$*.yaml -o gtensors/$* -w 10 && \
 	gtensor info gtensors/$*.nc > $@
 
 staged/%.train.nc staged/%.test.nc: gtensors/%.samples
 	@mkdir -p staged
-	gtensor split gtensors/$*.nc -o staged/$*. "chr2" && \
-	cp gtensors/$*.nc.regions.bed staged/
+	gtensor split -o staged/$*. --min-mutations 800 --min-region-size 100 gtensors/$*.nc "chr2"
 
 # Optional arguments that can be passed via command line
-STUDY_ARGS_Lung-All := -min 10 -max 20
-STUDY_ARGS_Ovary-AdenoCA := -min 5 -max 15 -e -lsub 0.25 -init SBS1 -init SBS2 -init SBS3 -init SBS5 -init SBS8 -init SBS13 -init SBS18
-STUDY_ARGS_Jake-Breast := -min 8 -max 23 -e -lsub 0.125 -bsub 0.5
+STUDY_ARGS_Lung-All := -min 10 -max 20 -lsub 0.125 -init SBS17a -init SBS17b # 02
+STUDY_ARGS_Ovary-AdenoCA := -min 5 -max 15 -lsub 0.125 -init SBS1 -init SBS2 -init SBS5 -init SBS8 -init SBS13 -init SBS18 # 02
+STUDY_ARGS_Jake-Breast := -min 8 -max 23 -lsub 0.125 -bsub 0.5 -init SBS1 -init SBS2 -init SBS5 -init SBS8 -init SBS13 -init SBS17a -init SBS17b -init SBS18 # 01
 
 studies/%/: staged/$$(firstword $$(subst /, ,$$*)).train.nc staged/$$(firstword $$(subst /, ,$$*)).test.nc
 	@mkdir -p studies
 	$(if $(STUDY_ARGS_$(firstword $(subst /, ,$*))),, \
 		$(error Error: STUDY_ARGS_$(firstword $(subst /, ,$*)) is not defined. Please define it in the Makefile))
-	topo-model study create $@ -ds $^ $(STUDY_ARGS_$(firstword $(subst /, ,$*))) --save-model
+	topo-model study create $@ -ds $^ $(STUDY_ARGS_$(firstword $(subst /, ,$*))) --save-model -ee -stop 100
+
+stage.all: staged/Lung-All.train.nc staged/Ovary-AdenoCA.train.nc staged/Jake-Breast.train.nc \
+	staged/Prost-AdenoCA.train.nc staged/Myeloid-All.train.nc staged/Panc-AdenoCA.train.nc \
+	staged/Kidney-All.train.nc staged/Panc-Endocrine.train.nc staged/Stomach-AdenoCA.train.nc \
+	staged/Skin-Melanoma.train.nc staged/Liver-HCC.train.nc staged/ColoRect-AdenoCA.train.nc \
+	staged/Lymph-All.train.nc staged/Head-SCC.train.nc staged/Eso-AdenoCA.train.nc \
+	staged/CNS-GbmOligoPiloAstro.train.nc staged/Uterus-AdenoCA.train.nc \
+	staged/Cervix-All.train.nc staged/Bone-Osteosarc.train.nc staged/Bladder-AdenoCA.train.nc
 
 run/%/: studies/%/
 	topo-model study run $< -@ 5 --lazy
 
 array/%/: studies/%/
 	sbatch \
-		--mem-per-cpu=1000 \
+		--mem-per-cpu=1100 \
 		--cpus-per-task=5 \
 		--ntasks=1 \
-		--time=12:00:00 \
+		--time=6:00:00 \
 		--job-name=$< \
-		--array=1-5 \
+		--array=1-5%25 \
 		--output=logs/%x/%A_%a.out \
 		--partition=short,park \
 		--account=park \
 		--wrap="topo-model study run $< -@ 4 --lazy --time-limit 710"
 
-summarize/%/: studies/%/
-	@TMPFILE=$$(mktemp /tmp/summary_XXXXXX.png); \
-	python bin/plot_summary.py $< $$TMPFILE && \
-	code -r $$TMPFILE
+analyses/%/summary.png: studies/%/
+	@mkdir -p $(dir $@)
+	python bin/plot_summary.py $< $@ && \
+	code -r $@
 
 analyses/%/analysis.ipynb: bin/analysis_template.ipynb
 	@mkdir -p $(dir $@)
@@ -151,9 +159,19 @@ analyses/%/analysis.ipynb: bin/analysis_template.ipynb
 	STUDY_ID=$$(echo $$FULL_PATH | cut -d'/' -f2); \
 	MODEL_ID=$$(echo $$FULL_PATH | cut -d'/' -f3); \
 	STUDY_DIR="studies/$$STUDY_NAME/$$STUDY_ID"; \
-	papermill bin/analysis_template.ipynb $@ \
-		-p study_name $$STUDY_NAME \
-		-p study_id $$STUDY_ID \
-		-p model_id $$MODEL_ID \
-		-p study_dir $$STUDY_DIR \
-	&& code -r $@
+	job_id="analyses/$${STUDY_NAME}/$${STUDY_ID}/$${MODEL_ID}"; \
+	sbatch \
+		--mem=10G \
+		--cpus-per-task=5 \
+		--ntasks=1 \
+		--time=1:00:00 \
+		--job-name=$$job_id \
+		--output=%x/log.out \
+		--partition=short,park \
+		--account=park \
+		--wait \
+		--wrap="papermill bin/analysis_template.ipynb $@ \
+			-p study_name $$STUDY_NAME \
+			-p study_id $$STUDY_ID \
+			-p model_id $$MODEL_ID \
+			-p study_dir $$STUDY_DIR"

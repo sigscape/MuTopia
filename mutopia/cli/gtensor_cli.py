@@ -74,6 +74,13 @@ def _run_pipeline(
     default=5,
     help="Minimum region size in base pairs to include in splits.",
 )
+@click.option(
+    "-min-muts",
+    "--min-mutations",
+    type=click.IntRange(1, 100000000),
+    default=800,
+    help="Minimum number of mutations per sample to include in splits.",
+)
 def _train_test_split(*args, **kwargs):
     """
     Split a G-Tensor dataset into training and test sets based on chromosomes/contigs.
