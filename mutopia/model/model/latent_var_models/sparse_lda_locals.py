@@ -233,16 +233,14 @@ class LDAUpdateSparse(LocalsModel):
 
         return suffstats
     
-    def _predict(self, dataset, factor_model, threads=1, estep_iterations=100000, difference_tol=0.00001):
-        
+    '''def _predict(self, dataset, factor_model, threads=1, estep_iterations=100000, difference_tol=0.00001):
         _, norms = factor_model.get_exp_offsets_dict((dataset,))
 
         factor_model = WrapsFactorModel(
             factor_model,
             norms,
         )
-
-        return super()._predict(dataset, factor_model, threads, estep_iterations, difference_tol)
+        return super()._predict(dataset, factor_model, threads, estep_iterations, difference_tol)'''
 
     def _get_update_fns(
         self,
