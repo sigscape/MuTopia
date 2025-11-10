@@ -10,7 +10,7 @@ from pyfaidx import Fasta
 import xarray as xr
 from sparse import COO
 import matplotlib.colors as mcolors
-
+from mutopia.utils import logger
 from mutopia.genome_utils.bed12_utils import stream_bed12
 from ..mode_config import ModeConfig
 from ._sbs_nucdata import *
@@ -285,7 +285,11 @@ class SBSMode(ModeConfig):
             dims=("configuration", "context", "locus"),
         )
 
-        return sample_arr.isel(locus=locus_coords)
+        if not locus_dim==len(locus_coords):
+            logger.info("Subsetting to specified loci ...")
+            sample_arr = sample_arr.isel(locus=locus_coords)
+
+        return sample_arr
 
     def ingest_uncollaposed(
         self,

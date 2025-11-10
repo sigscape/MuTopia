@@ -5,7 +5,7 @@ SHELL := /bin/bash
 
 .SECONDEXPANSION:
 # Prevent Make from deleting config files when downstream targets fail
-.PRECIOUS: configs/features/%.yaml staged/%.train.nc staged/%.test.nc gtensors/%.nc gtensors/%.features
+.PRECIOUS: configs/features/%.yaml staged/%.train.nc staged/%.test.nc gtensors/%.nc gtensors/%.features studies/%/
 
 # Phony targets for convenience - allows "make lung" instead of "make data/gtensors/lung.done"
 .PHONY: run/% uberon_terms/% summarize/%/ clean
@@ -114,23 +114,20 @@ staged/%.train.nc staged/%.test.nc: gtensors/%.samples
 	gtensor split -o staged/$*. --min-mutations 800 --min-region-size 100 gtensors/$*.nc "chr2"
 
 # Optional arguments that can be passed via command line
-STUDY_ARGS_Lung-All := -min 10 -max 20 -lsub 0.125 -init SBS17a -init SBS17b # 02
-STUDY_ARGS_Ovary-AdenoCA := -min 5 -max 15 -lsub 0.125 -init SBS1 -init SBS2 -init SBS5 -init SBS8 -init SBS13 -init SBS18 # 02
-STUDY_ARGS_Jake-Breast := -min 8 -max 23 -lsub 0.125 -bsub 0.5 -init SBS1 -init SBS2 -init SBS5 -init SBS8 -init SBS13 -init SBS17a -init SBS17b -init SBS18 # 01
+#STUDY_ARGS_Ovary-AdenoCA := -min 7 -max 14 -lsub 0.25 -init SBS1 -init SBS2 -init SBS3 -init SBS5 -init SBS8 -init SBS13 -init SBS18 # 02
+#STUDY_ARGS_Jake-Breast := -min 8 -max 18 -lsub 0.125 -init SBS1 -init SBS2 -init SBS3 -init SBS5 -init SBS8 -init SBS13 -init SBS17a -init SBS17b -init SBS18 # 03
+#STUDY_ARGS_Jake-Breast := -min 8 -max 18 -lsub 0.125 # 04
+#STUDY_ARGS_Lung-All := -min 10 -max 19 -lsub 0.125 -init SBS17a -init SBS17b # 01, init because SBS17 is rare and the model needs a little help.
+#STUDY_Bone-Osteosarc := -min 5 -max 10 -lsub 0.25 -init SBS1 -init SBS5 -init SBS8 -init SBS18 # 20
 
 studies/%/: staged/$$(firstword $$(subst /, ,$$*)).train.nc staged/$$(firstword $$(subst /, ,$$*)).test.nc
 	@mkdir -p studies
-	$(if $(STUDY_ARGS_$(firstword $(subst /, ,$*))),, \
-		$(error Error: STUDY_ARGS_$(firstword $(subst /, ,$*)) is not defined. Please define it in the Makefile))
-	topo-model study create $@ -ds $^ $(STUDY_ARGS_$(firstword $(subst /, ,$*))) --save-model -ee -stop 100
+	@FULL_PATH="$*"; \
+	STUDY_NAME=$$(echo $$FULL_PATH | cut -d'/' -f1); \
+	PARAMS=$$(python bin/set_parameters.py $$STUDY_NAME 25); \
+	echo "Creating study $$STUDY_NAME with parameters: $$PARAMS"; \
+	topo-model study create $@ -ds $^ -lsub 0.2 --save-model -ee -stop 100 $$PARAMS
 
-stage.all: staged/Lung-All.train.nc staged/Ovary-AdenoCA.train.nc staged/Jake-Breast.train.nc \
-	staged/Prost-AdenoCA.train.nc staged/Myeloid-All.train.nc staged/Panc-AdenoCA.train.nc \
-	staged/Kidney-All.train.nc staged/Panc-Endocrine.train.nc staged/Stomach-AdenoCA.train.nc \
-	staged/Skin-Melanoma.train.nc staged/Liver-HCC.train.nc staged/ColoRect-AdenoCA.train.nc \
-	staged/Lymph-All.train.nc staged/Head-SCC.train.nc staged/Eso-AdenoCA.train.nc \
-	staged/CNS-GbmOligoPiloAstro.train.nc staged/Uterus-AdenoCA.train.nc \
-	staged/Cervix-All.train.nc staged/Bone-Osteosarc.train.nc staged/Bladder-AdenoCA.train.nc
 
 run/%/: studies/%/
 	topo-model study run $< -@ 5 --lazy
@@ -142,7 +139,7 @@ array/%/: studies/%/
 		--ntasks=1 \
 		--time=6:00:00 \
 		--job-name=$< \
-		--array=1-5%25 \
+		--array=1-100%10 \
 		--output=logs/%x/%A_%a.out \
 		--partition=short,park \
 		--account=park \
@@ -155,8 +152,6 @@ analyses/%/summary.png: studies/%/
 
 analyses/%/analysis.ipynb: bin/analysis_template.ipynb
 	@mkdir -p $(dir $@)
-	@# Parse the target path: analyses/Ovary-AdenoCA/02/1/analysis.ipynb
-	@# Extract: study_name=Ovary-AdenoCA, study_id=02, model_id=1
 	@FULL_PATH="$*"; \
 	STUDY_NAME=$$(echo $$FULL_PATH | cut -d'/' -f1); \
 	STUDY_ID=$$(echo $$FULL_PATH | cut -d'/' -f2); \
