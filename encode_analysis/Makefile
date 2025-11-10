@@ -5,10 +5,10 @@ SHELL := /bin/bash
 
 .SECONDEXPANSION:
 # Prevent Make from deleting config files when downstream targets fail
-.PRECIOUS: configs/features/%.yaml staged/%.train.nc staged/%.test.nc gtensors/%.nc gtensors/%.features studies/%/
+.PRECIOUS: configs/features/%.yaml staged/%.train.nc staged/%.test.nc studies/%/ gtensors/%.nc gtensors/%.features gtensors/%.samples
 
 # Phony targets for convenience - allows "make lung" instead of "make data/gtensors/lung.done"
-.PHONY: run/% uberon_terms/% summarize/%/ stage.all
+.PHONY: run/% uberon_terms/% summarize/%/ stage.all retrain/% pickup_retrain/%
 
 # Define tissue-specific UBERON IDs and repliseq terms
 UBERON_IDS_Lung-All := "UBERON:0002048" "UBERON:0002168" "UBERON:0002167" "UBERON:0008953" "UBERON:0008952" "UBERON:0002170" "UBERON:0002171"
@@ -19,6 +19,9 @@ REPLISEQ_Ovary-AdenoCA := "EFO:0001203"
 
 UBERON_IDS_Jake-Breast := "UBERON:0008367" "UBERON:0000310" "CL:0002327"
 REPLISEQ_Jake-Breast := "EFO:0001203"
+
+UBERON_IDS_Breast-All := "UBERON:0008367" "UBERON:0000310" "CL:0002327"
+REPLISEQ_Breast-All := "EFO:0001203"
 
 UBERON_IDS_Prost-AdenoCA := "UBERON:0002367" "CL:0002231"
 REPLISEQ_Prost-AdenoCA := "EFO:0001203"
@@ -38,7 +41,7 @@ REPLISEQ_Panc-Endocrine := "EFO:0001187"
 UBERON_IDS_Stomach-AdenoCA := "UBERON:0000945"
 REPLISEQ_Stomach-AdenoCA := "EFO:0001187"
 
-UBERON_IDS_Skin-Melanoma := "CL:1000458" "UBERON:0002097" "UBERON:0001003" "UBERON:0004264" "UBERON:0036149"
+UBERON_IDS_Skin-Melanoma := "CL:1000458" "UBERON:0002097" "UBERON:0001003" "UBERON:0004264" "UBERON:0036149" "CL:1001606"
 REPLISEQ_Skin-Melanoma := "EFO:0001196"
 
 UBERON_IDS_Liver-HCC := "UBERON:0002107" "UBERON:0001115" "UBERON:0001114"
@@ -56,8 +59,8 @@ REPLISEQ_Head-SCC := "EFO:0001196"
 UBERON_IDS_Eso-AdenoCA := "UBERON:0001043" "UBERON:0002469" "UBERON:0004648"
 REPLISEQ_Eso-AdenoCA := "EFO:0001187"
 
-UBERON_IDS_CNS-GbmOligoPiloAstro := "CL:0000127" "CL:0002603" "CL:0002604" "CL:0002606" "EFO:0003072"
-REPLISEQ_CNS-GbmOligoPiloAstro := "EFO:0003072"
+UBERON_IDS_CNS-All := "CL:0000127" "CL:0002603" "CL:0002604" "CL:0002606" "EFO:0003072"
+REPLISEQ_CNS-All := "EFO:0003072"
 
 UBERON_IDS_Uterus-AdenoCA := "UBERON:0000995" "EFO:0002791"
 REPLISEQ_Uterus-AdenoCA := "EFO:0002791"
@@ -85,7 +88,7 @@ uberon_terms/%: configs/experiments.yaml
 	python get_uberon_terms.py $< $*
 
 # Pattern rule that uses tissue-specific variables
-configs/features/%.yaml: configs/experiments.yaml base_config.yaml write_config.py
+configs/features/%.yaml: configs/experiments.yaml base_config.yaml
 	@mkdir -p $(dir $@)
 	python write_config.py \
 		base_config.yaml \
@@ -98,7 +101,7 @@ configs/features/%.yaml: configs/experiments.yaml base_config.yaml write_config.
 # Use grouped targets (&:) to tell Make these files are created together atomically
 gtensors/%.features: configs/features/%.yaml
 	@mkdir -p $(dir $@)
-	gtensor compose base_config.yaml configs/features/$*.yaml -o gtensors/$* -w 3 && \
+	gtensor compose base_config.yaml configs/features/$*.yaml -o gtensors/$* -w 4 && \
 	gtensor feature ls gtensors/$*.nc > gtensors/$*.features 
 
 gtensors/%.samples: gtensors/%.features
@@ -108,44 +111,131 @@ gtensors/%.samples: gtensors/%.features
 
 staged/%.train.nc staged/%.test.nc: gtensors/%.samples
 	@mkdir -p staged
-	gtensor split -o staged/$*. --min-mutations 800 --min-region-size 100 gtensors/$*.nc "chr2"
+	gtensor split -o staged/$*. --min-mutations 500 --min-region-size 100 gtensors/$*.nc "chr2"
 
-# Optional arguments that can be passed via command line
-#STUDY_ARGS_Ovary-AdenoCA := -min 7 -max 14 -lsub 0.25 -init SBS1 -init SBS2 -init SBS3 -init SBS5 -init SBS8 -init SBS13 -init SBS18 # 02
-#STUDY_ARGS_Jake-Breast := -min 8 -max 18 -lsub 0.125 -init SBS1 -init SBS2 -init SBS3 -init SBS5 -init SBS8 -init SBS13 -init SBS17a -init SBS17b -init SBS18 # 03
-#STUDY_ARGS_Jake-Breast := -min 8 -max 18 -lsub 0.125 # 04
-#STUDY_ARGS_Lung-All := -min 10 -max 19 -lsub 0.125 -init SBS17a -init SBS17b # 01, init because SBS17 is rare and the model needs a little help.
-#STUDY_Bone-Osteosarc := -min 5 -max 10 -lsub 0.25 -init SBS1 -init SBS5 -init SBS8 -init SBS18 # 20
 
 studies/%/: staged/$$(firstword $$(subst /, ,$$*)).train.nc staged/$$(firstword $$(subst /, ,$$*)).test.nc
 	@mkdir -p studies
-	@FULL_PATH="$*"; \
+	FULL_PATH="$*"; \
 	STUDY_NAME=$$(echo $$FULL_PATH | cut -d'/' -f1); \
+	if [ "$$STUDY_NAME" = "Lymph-All" ] || [ "$$STUDY_NAME" = "CNS-All" ] || [ "$$STUDY_NAME" = "Myeloid-All" ]; then \
+		LSUB=0.5; \
+	else \
+		LSUB=0.2; \
+	fi; \
 	PARAMS=$$(python bin/set_parameters.py $$STUDY_NAME 25); \
 	echo "Creating study $$STUDY_NAME with parameters: $$PARAMS"; \
-	topo-model study create $@ -ds $^ -lsub 0.2 --save-model -ee -stop 100 $$PARAMS
+	topo-model study create $@ -ds $^ -lsub $$LSUB --save-model -ee -stop 100 $$PARAMS
 
 
 run/%/: studies/%/
 	topo-model study run $< -@ 5 --lazy
 
+
 array/%/: studies/%/
+	@FULL_PATH="$*"; \
+	STUDY_NAME=$$(echo $$FULL_PATH | cut -d'/' -f1); \
+	if [ "$$STUDY_NAME" = "Lung-All" ] || [ "$$STUDY_NAME" = "Skin-Melanoma" ]; then \
+		MEM_PER_CPU=2000; \
+	else \
+		MEM_PER_CPU=1250; \
+	fi; \
 	sbatch \
-		--mem-per-cpu=1100 \
+		--mem-per-cpu=$$MEM_PER_CPU \
 		--cpus-per-task=5 \
 		--ntasks=1 \
 		--time=6:00:00 \
 		--job-name=$< \
-		--array=1-100%10 \
+		--array=1-10%10 \
 		--output=logs/%x/%A_%a.out \
 		--partition=short,park \
 		--account=park \
-		--wrap="topo-model study run $< -@ 4 --lazy --time-limit 710"
+		--wrap="topo-model study run $< -@ 4 --lazy --time-limit 350"
 
-analyses/%/summary.png: studies/%/
+retrain/%:
+	@FULL_PATH="$*"; \
+	STUDY_NAME=$$(echo $$FULL_PATH | cut -d'/' -f1); \
+	STUDY_ID=$$(echo $$FULL_PATH | cut -d'/' -f2); \
+	MODEL_ID=$$(echo $$FULL_PATH | cut -d'/' -f3); \
+	if [ "$$STUDY_NAME" = "Lung-All" ] || [ "$$STUDY_NAME" = "Skin-Melanoma" ]; then \
+		MEM_PER_CPU=2000; \
+	else \
+		MEM_PER_CPU=1100; \
+	fi; \
+	sbatch \
+		--mem-per-cpu=$$MEM_PER_CPU \
+		--cpus-per-task=5 \
+		--ntasks=1 \
+		--time=6:00:00 \
+		--job-name=$@ \
+		--output=logs/%x/%A_%a.out \
+		--partition=short,park \
+		--account=park \
+		--wrap="topo-model study retrain "studies/$$STUDY_NAME/$$STUDY_ID" $$MODEL_ID "studies/$$STUDY_NAME/$$STUDY_ID/trial=$$MODEL_ID.pkl" -@ 5 --lazy --time-limit 350"
+
+pickup_retrain/%:
+	FULL_PATH="$*"; \
+	STUDY_NAME=$$(echo $$FULL_PATH | cut -d'/' -f1); \
+	STUDY_ID=$$(echo $$FULL_PATH | cut -d'/' -f2); \
+	if [ "$$STUDY_NAME" = "Lung-All" ] || [ "$$STUDY_NAME" = "Skin-Melanoma" ]; then \
+		MEM_PER_CPU=2000; \
+	else \
+		MEM_PER_CPU=1100; \
+	fi; \
+	PICKUP_MODELS=$$(python bin/get_models_to_pickup.py studies/$$STUDY_NAME/$$STUDY_ID); \
+	if [ -z "$$PICKUP_MODELS" ]; then \
+		echo "No models to pickup for $$STUDY_NAME/$$STUDY_ID"; \
+		exit 0; \
+	fi; \
+	ARRAY_SPEC=$$(echo $$PICKUP_MODELS | tr ' ' ','); \
+	sbatch \
+		--mem-per-cpu=$$MEM_PER_CPU \
+		--cpus-per-task=5 \
+		--ntasks=1 \
+		--time=6:00:00 \
+		--job-name=pickup_retrain_$$STUDY_NAME/$$STUDY_ID \
+		--array=$$ARRAY_SPEC%10 \
+		--output=logs/pickup_retrain/$$STUDY_NAME/$$STUDY_ID/%A_%a.out \
+		--partition=short,park \
+		--account=park \
+		--wrap="topo-model study retrain studies/$$STUDY_NAME/$$STUDY_ID \$$SLURM_ARRAY_TASK_ID studies/$$STUDY_NAME/$$STUDY_ID/trial=\$$SLURM_ARRAY_TASK_ID.pkl -@ 5 --lazy --time-limit 350"
+
+analyses/%/summary.png:
 	@mkdir -p $(dir $@)
-	python bin/plot_summary.py $< $@ && \
+	python bin/plot_summary.py studies/$* $@ && \
 	code -r $@
+
+analyses/%/spectra.pdf:
+	@mkdir -p $(dir $@)
+	python bin/plot_spectra.py studies/$* $@ && \
+	code -r $@
+
+training_summary.tar.gz: studies.txt
+	@echo "Creating training summary tarball..."
+	@STUDIES=$$(cat studies.txt | sed 's:/*$$::'); \
+	SUMMARY_FILES=""; \
+	SPECTRA_FILES=""; \
+	for study in $$STUDIES; do \
+		SUMMARY_FILE="analyses/$$study/summary.png"; \
+		SPECTRA_FILE="analyses/$$study/spectra.pdf"; \
+		if [ -f "$$SUMMARY_FILE" ]; then \
+			SUMMARY_FILES="$$SUMMARY_FILES $$SUMMARY_FILE"; \
+		else \
+			echo "Warning: $$SUMMARY_FILE not found, generating..."; \
+			$(MAKE) "$$SUMMARY_FILE"; \
+			SUMMARY_FILES="$$SUMMARY_FILES $$SUMMARY_FILE"; \
+		fi; \
+		if [ -f "$$SPECTRA_FILE" ]; then \
+			SPECTRA_FILES="$$SPECTRA_FILES $$SPECTRA_FILE"; \
+		else \
+			echo "Warning: $$SPECTRA_FILE not found, generating..."; \
+			$(MAKE) "$$SPECTRA_FILE"; \
+			SPECTRA_FILES="$$SPECTRA_FILES $$SPECTRA_FILE"; \
+		fi; \
+	done; \
+	tar -czf $@ $$SUMMARY_FILES $$SPECTRA_FILES
+	@echo "Created $@ with summary and spectra files from studies.txt"
+
 
 analyses/%/analysis.ipynb: bin/analysis_template.ipynb
 	@mkdir -p $(dir $@)
@@ -164,7 +254,6 @@ analyses/%/analysis.ipynb: bin/analysis_template.ipynb
 		--output=%x/log.out \
 		--partition=short,park \
 		--account=park \
-		--wait \
 		--wrap="papermill bin/analysis_template.ipynb $@ \
 			-p study_name $$STUDY_NAME \
 			-p study_id $$STUDY_ID \

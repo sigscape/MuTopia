@@ -261,24 +261,26 @@ class TopographyModel(ABC, BaseEstimator):
         if extensive > 0:
             params = {
                 "l2_regularization": trial.suggest_float(
-                    "l2_regularization", 1e-5, 1000.0, log=True
+                    "l2_regularization", 1e-5, 10.0, log=True
                 ),
                 "tree_learning_rate": trial.suggest_float(
-                    "tree_learning_rate", 0.025, 0.2
+                    "tree_learning_rate", 0.05, 0.2
                 ),
                 "init_variance_theta": trial.suggest_float(
-                    "init_variance_theta", 0.025, 0.1
+                    "init_variance_theta", 0.03, 0.1
                 ),
                 "empirical_bayes": trial.suggest_categorical(
                     "empirical_bayes", [True, False]
                 ),
+                "max_features": trial.suggest_categorical(
+                    "max_features", [0.5, 0.75, 1.0]
+                )
             }
 
         if extensive > 1:
             params["convolution_width"] = trial.suggest_categorical(
-                "convolution_width", [0, 1, 2]
+                "convolution_width", [0, 1]
             )
-            params["max_features"] = 1 / (params["convolution_width"] + 1)
 
         if extensive > 2:
             params.update(

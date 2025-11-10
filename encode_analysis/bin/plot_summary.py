@@ -2,6 +2,8 @@
 
 # for now just plot a random matplotlib figure
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from mutopia.tuning import load_study
@@ -10,27 +12,47 @@ import mutopia.analysis as mu
 def plot_summary(study_dir: str, output_file: str) -> None:
 
     study, *_ = load_study(study_dir)
-    results = study.trials_dataframe()
+
+    best_values = pd.Series(
+        {
+            trial.number : max(trial.intermediate_values.values(), default=float("nan"))
+            for trial in study.trials
+        }
+    )
+    results = study.trials_dataframe().join(best_values.rename("best_value"), how="left")
+    results["best_value"] = np.where(~np.isfinite(results["best_value"]), results["value"], results["best_value"])
+    results = results.dropna(subset=["best_value"])
+
+    print("Summary of results:")
+    print(results[["number", "best_value"]].head(4))
 
     _, ax = plt.subplots(figsize=(6,4))
     sns.scatterplot(
         data=results,
         x="params_num_components",
-        y="value",
+        y="best_value",
         style="state",
         hue="state",
         palette=mu.pl.categorical_palette,
+        style_order=["COMPLETE", "PRUNED", "RUNNING", "FAIL"],
+        ax=ax,
     )
     
+    top = results["best_value"].max()*1.001
+    bottom = results[results["state"].isin(["COMPLETE","RUNNING"])]["best_value"].min()*0.999
+    ax.set_ylim(
+        bottom=bottom,
+        top=top,
+    )
     # Label the maximum value point for each params_num_components
-    for num_components in results.dropna(subset=["value"])["params_num_components"].unique():
-        group = results[results["params_num_components"] == num_components]
+    for num_components in results.dropna(subset=["best_value"])["params_num_components"].unique():
+        group = results[(results["params_num_components"] == num_components) & (results["best_value"] >= bottom)]
         if len(group) > 0:
-            max_idx = group["value"].idxmax()
+            max_idx = group["best_value"].idxmax()
             max_row = group.loc[max_idx]
             ax.text(
                 max_row["params_num_components"],
-                max_row["value"],
+                max_row["best_value"],
                 f' {max_row["number"]}',
                 verticalalignment='bottom',
                 horizontalalignment='left',

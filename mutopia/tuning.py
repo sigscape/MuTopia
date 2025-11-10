@@ -378,6 +378,9 @@ def _objective(
 
     params.update(param_sampling_fn(trial))
 
+    #if "init_components" in params and params["num_components"] < len(params["init_components"]):
+    #    params["init_components"] = params["init_components"][:params["num_components"]]
+
     logger.info(
         f"Running trial {trial.number} with params:\n\t"
         + "\n\t".join([f"{key}: {value}" for key, value in params.items()])
@@ -546,17 +549,21 @@ def retrain(
     model_cls = train[0].modality().TopographyModel
 
     trial = study.trials[trial_number]
+
+    logger.info(f"Retraining trial {trial.number} with params:\n\t" +
+        "\n\t".join([f"{key}: {value}" for key, value in trial.params.items()])
+    )
     model_kw.update(trial.params)
 
-    model = (
-        model_cls(
-            **model_kw,
-            seed=seed,
-        )
-        .fit(
-            *train,
-            test_datasets=test,
-        )
+    model = model_cls(
+        **model_kw,
+        seed=seed,
     )
 
+    score = model.fit(
+        *train,
+        test_datasets=test,
+    )
     model.save(save_name)
+    study.tell(trial.number, score)
+    return score

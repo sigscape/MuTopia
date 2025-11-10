@@ -131,11 +131,15 @@ def get_config_dict(
         ),
         "sort_gzipped_bedfile" : ProcessingConfig(
             output_extension="bed",
-            function="gzip -dc {input} | LC_COLLATE=C sort -k1,1 -k2,2n > {output}"
+            function="(set -euo pipefail; gzip -dc {input} | LC_COLLATE=C sort -k1,1 -k2,2n > {output})"
+        ),
+        "rename_to_peak" : ProcessingConfig(
+            output_extension="bed",
+            function="(set -euo pipefail; gzip -dc {input} | LC_COLLATE=C sort -k1,1 -k2,2n | awk -v OFS=\"\t\" '{{print $1,$2,$3,\"Peak\"}}' > {output})"
         ),
         "aggregate_bed_50kb" : ProcessingConfig(
             output_extension="bedgraph.gz",
-            function=f"bash bin/aggregate-bed.sh 50000 {genome.chromsizes} {{input}} > {{output}}",
+            function=f"bash bin/aggregate-bed.sh 10000 {genome.chromsizes} {{input}} > {{output}}",
         ),
         "repliseq_mask_rate" : ProcessingConfig(
             output_extension="bedgraph.gz",
@@ -203,12 +207,12 @@ def get_config_dict(
             processing="merge_strand",
             description=_experiment_summary(gex),
         ),
-        "AccessiblePeak" : FeatureConfig(
-            normalization="quantile",
+        "IsAccessiblePeak" : FeatureConfig(
+            normalization="categorical",
             sources=[_first_file(atac, file_format="bed")],
             description=_experiment_summary(atac),
-            column=5,
-            processing="sort_gzipped_bedfile"
+            column=4,
+            processing="rename_to_peak",
         ),
         "ChromatinAccessibility" : FeatureConfig(
             normalization="log1p_cpm",

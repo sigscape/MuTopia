@@ -1,7 +1,7 @@
 from functools import partial, reduce
 import numpy as np
 from xarray import DataArray
-
+from mutopia.utils import logger
 from mutopia.gtensor import dims_except_for
 from ._glm_compiled import (
     make_optimizer,
@@ -271,15 +271,14 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
 
     def init_from_signatures(self, signatures):
 
-        k = signatures.shape[0]
+        num_loaded = signatures.shape[0]
 
-        if k > self.n_components:
-            raise ValueError(
-                "You are trying to initialize with too many signatures! Increase `num_components/k`, then try again."
+        if num_loaded > self.n_components:
+            logger.warning(
+                "You are trying to initialize with too many signatures! Only the first `{}` will be used.".format(self.n_components)
             )
 
         c = self.context_transformer.n_coefs
-
         context_effects = (
             signatures.sum(dim=dims_except_for(signatures.dims, "context", "component"))
             .transpose("component", "context")
@@ -289,7 +288,8 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         context_effects /= context_effects.sum(axis=1, keepdims=True)
         renormalized = 100 * (context_effects + 1e-5)  # /self._context_distribution
 
-        self._coefs[:k, :c] = np.log(renormalized)
+        k = min(num_loaded, self.n_components)
+        self._coefs[:k, :c] = np.log(renormalized)[:k]
 
         return self
 
