@@ -612,7 +612,7 @@ class TopographyModel(ABC, BaseEstimator):
             lambda ds: (
                 (
                     ds.assign_coords(component=("component", self.component_names))
-                    if ds.coords.get("component") is None
+                    if not "component" in ds.coords
                     else ds
                 ).assign(
                     **component_xrs
