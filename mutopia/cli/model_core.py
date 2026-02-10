@@ -86,12 +86,26 @@ def get_study_summary(study_name: str):
     return trials
 
 
-def annot(model: str, dataset: str, output: str):
+def annot(
+    model: str, 
+    dataset: str, 
+    output: str, 
+    region: Optional[str] = None, 
+    threads: int =1, 
+    calc_shap: bool = False,
+    celltype: Optional[str] = None,
+):
     import mutopia.analysis as mu
     model = mu.load_model(model)
     ds = gt.load_dataset(dataset, with_samples=False, with_state=False)
-    annotated = model.annot_data(ds)
-    disk.write_dataset(annotated, output)
+    annotated = model.annot_data(
+        ds,
+        subset_region=region,
+        threads=threads,
+        calc_shap=calc_shap,
+        source=celltype,
+    )
+    disk.write_dataset(annotated, output, write_samples=False)
 
 
 def simulate_from_model(

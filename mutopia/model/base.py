@@ -261,7 +261,7 @@ class TopographyModel(ABC, BaseEstimator):
         if extensive > 0:
             params = {
                 "l2_regularization": trial.suggest_float(
-                    "l2_regularization", 1e-5, 10.0, log=True
+                    "l2_regularization", 1e-5, 100.0, log=True
                 ),
                 "tree_learning_rate": trial.suggest_float(
                     "tree_learning_rate", 0.05, 0.2
@@ -281,15 +281,18 @@ class TopographyModel(ABC, BaseEstimator):
             params["convolution_width"] = trial.suggest_categorical(
                 "convolution_width", [0, 1]
             )
+            params["context_conditioning"] = trial.suggest_float(
+                "context_conditioning", 1e-9, 1e-5, log=True
+            )
+            params["conditioning_alpha"] = trial.suggest_float(
+                "conditioning_alpha", 1e-9, 1e-5, log=True
+            )
 
         if extensive > 2:
             params.update(
                 {
                     "context_reg": trial.suggest_float(
                         "context_reg", 1e-5, 5e-2, log=True
-                    ),
-                    "context_conditioning": trial.suggest_float(
-                        "context_conditioning", 1e-9, 1e-2, log=True
                     ),
                     "init_variance_context": trial.suggest_float(
                         "init_variance_context", 0.025, 0.15
@@ -504,7 +507,7 @@ class TopographyModel(ABC, BaseEstimator):
     @property
     def component_names(self) -> List[str]:
         try:
-            return self._component_names
+            return self._component_names[:self.n_components]
         except AttributeError:
             return ["M{}".format(i) for i in range(0, self.n_components)]
 
@@ -519,7 +522,7 @@ class TopographyModel(ABC, BaseEstimator):
             "Regions/context_frequencies"
         ].astype(np.float32, copy=False)
 
-    def setup_corpus(self, dataset: GTensorDataset) -> GTensorDataset:
+    def setup_corpus(self, dataset: GTensorDataset, threads: int = 1) -> GTensorDataset:
         """
         Set up the corpus dataset with initial state and update normalization factors.
 
@@ -530,6 +533,8 @@ class TopographyModel(ABC, BaseEstimator):
         ----------
         dataset : GTensorDataset
             The dataset to be set up for modeling
+        threads : int, optional
+            The number of threads to use for parallel processing, by default 1
 
         Returns
         -------
@@ -541,7 +546,7 @@ class TopographyModel(ABC, BaseEstimator):
 
         dataset = self.GT.init_state(dataset, self.factor_model_, self.locals_model_)
 
-        with ParContext(1) as par:
+        with ParContext(threads) as par:
             self.GT.update_state(
                 dataset,
                 self.factor_model_,
@@ -614,7 +619,7 @@ class TopographyModel(ABC, BaseEstimator):
             lambda ds: (
                 (
                     ds.assign_coords(component=("component", self.component_names))
-                    if ds.coords.get("component") is None
+                    if not "component" in ds.coords
                     else ds
                 ).assign(
                     **component_xrs

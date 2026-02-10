@@ -465,6 +465,7 @@ def _run_trial_cli(
     lazy=False,
     *,
     study_name,
+    summary_callback=None,
     **kwargs,
 ):
     """
@@ -487,8 +488,8 @@ def _run_trial_cli(
     """
 
     study, study_attrs, model_kw = load_study(study_name, storage)
-    model_kw.update(kwargs)
     model_kw["eval_every"] = 5
+    model_kw.update(kwargs)
 
     train, test = load_study_data(study, lazy)
     model = train[0].modality().TopographyModel(**model_kw)
@@ -499,6 +500,7 @@ def _run_trial_cli(
         model=model,
         train=train,
         test=test,
+        summary_callback=summary_callback,
     )
 
 

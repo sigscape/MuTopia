@@ -94,7 +94,7 @@ class DenseMixtureModel(LDAUpdateDense):
 
         map_estimate = iterative_update(
             self.estep_iterations,
-            self.difference_tol,
+            np.float32(self.difference_tol),
             *args,
             Nk,
         )

@@ -160,7 +160,12 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
         # X, y = self._validate_data(X, y, dtype=[X_DTYPE], force_all_finite=False)
         X = self._preprocess_X(X, reset=False)
         y = _check_y(y, estimator=self)
-        y = self._encode_y(y)
+        try:
+            y = self._encode_y(y)
+        except ValueError as e:
+            #print(y.shape, np.max(y), np.min(y), np.nanmax(y), np.nanmin(y))
+            raise ValueError("Error encoding y: " + str(e)) from e
+        
         check_consistent_length(X, y)
         # Do not create unit sample weights by default to later skip some
         # computation

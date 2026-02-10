@@ -132,6 +132,10 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
             **optim_kw,
         )  # f(X) -> f(z, w, beta) -> beta
 
+        self._comp_context_distribution = np.expand_dims(
+            self.context_distribution_, axis=0
+        )
+
     def _make_optimizer(
         self,
         X,
@@ -285,11 +289,12 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
             .data
         )
 
-        context_effects /= context_effects.sum(axis=1, keepdims=True)
-        renormalized = 100 * (context_effects + 1e-5)  # /self._context_distribution
+        context_effects = context_effects / context_effects.sum(axis=1, keepdims=True)
+        log_eff = np.log(context_effects + 5e-3)
+        log_eff -= np.mean(log_eff, axis=1, keepdims=True)
 
         k = min(num_loaded, self.n_components)
-        self._coefs[:k, :c] = np.log(renormalized)[:k]
+        self._coefs[:k, :c] = log_eff[:k]
 
         return self
 

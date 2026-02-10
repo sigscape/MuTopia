@@ -65,6 +65,25 @@ def center_at_zero(ax: "Axes") -> "Axes":
     ax.axhline(0, color="k", linewidth=0.75)
     return ax
 
+def ax_no_spines(ax: "Axes") -> "Axes":
+    """
+    Clean up the axes by removing top and right spines and ticks.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        The axes to modify.
+    
+    Returns
+    -------
+    matplotlib.axes.Axes
+    """
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.spines["left"].set_visible(False)
+    ax.spines["bottom"].set_visible(False)
+    return ax
+
 
 @dataclass
 class GenomeView:

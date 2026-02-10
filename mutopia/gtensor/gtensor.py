@@ -786,6 +786,15 @@ def get_shap_summary(data: GTensorDataset, source: Optional[str] = None) -> pd.D
         how="inner",
     )
 
+    try:
+        shap_values[["feature", "window"]] = shap_values["feature"].str.split(":", expand=True, n=1)
+        shap_values = shap_values.groupby(["component", "locus", "feature"]).agg({
+            "feature_value": "mean",
+            "shap_value": "sum",
+        }).reset_index()
+    except ValueError:
+        pass
+
     effect_size = (
         shap_values.groupby(["component", "feature"])["shap_value"]
         .apply(lambda x: np.quantile(np.abs(x), 0.97))

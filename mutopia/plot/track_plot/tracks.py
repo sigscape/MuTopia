@@ -26,7 +26,26 @@ __all__ = [
     "plot_empirical_topography",
     "plot_gene_expression_track",
     "order_components",
+    "plot_gene_expression_strip",
 ]
+
+def plot_gene_expression_strip(feature_name: str = "GeneExpression", label=None) -> Callable[..., "Axes"]:
+    return tr.heatmap_plot(
+        tr.pipeline(
+            tr.feature_matrix(feature_name),
+            lambda x : x.expand_dims("feature"),
+            lambda x : np.log1p(x),
+        ),
+        palette="Greys",
+        ax_fn=lambda ax: (
+            ax.spines["top"].set_visible(False),
+            ax.spines["right"].set_visible(False),
+            ax.spines["left"].set_visible(False),
+            ax.spines["bottom"].set_visible(False),
+            ax.set_yticklabels([]),
+        ),
+        label=label or feature_name,
+    )
 
 def plot_gene_annotation(
     gtf: str,
