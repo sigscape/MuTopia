@@ -123,7 +123,7 @@ def _plot_interaction_matrix(
     cbar.set_label("Interaction effect", rotation=90, labelpad=5, fontsize=8)
     cbar.ax.tick_params(labelsize=8)
 
-    return gs
+    return fig, gs
 
 
 def plot_interaction_matrix(
@@ -133,7 +133,7 @@ def plot_interaction_matrix(
     gridspec: Optional["GridSpec"] = None,
     title: Optional[str] = None,
     **kw: Any,
-) -> "GridSpec":
+) -> "Figure":
     """
     Generate a visualization of component interactions.
 
@@ -185,7 +185,7 @@ def plot_interaction_matrix(
 
     signature = fetch_component(dataset, component)
 
-    return _plot_interaction_matrix(
+    fig, gs = _plot_interaction_matrix(
         partial(dtype.plot, signature, "Baseline", label_xaxis=False),
         interactions,
         shared_effects,  # .iloc[:,0],
@@ -194,3 +194,5 @@ def plot_interaction_matrix(
         title=title,
         **kw,
     )
+    
+    return fig

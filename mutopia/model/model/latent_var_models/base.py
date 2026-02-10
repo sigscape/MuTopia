@@ -527,6 +527,8 @@ class LocalsModel:
                 self.GT.list_samples(dataset),
                 update_fns,
             ):
+                if sample_suffstats is None:
+                    continue
                 # Update the topic compositions for the sample
                 self.GT.update_topic_compositions(
                     dataset, sample_name, sample_suffstats["Nk"]

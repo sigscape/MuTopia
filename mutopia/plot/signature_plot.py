@@ -162,6 +162,7 @@ def plot_signature_panel(
     width: float = 3.5,
     height: float = 1.25,
     show: bool = True,
+    order: Optional[Sequence[Union[str, int]]] = None,
     **kwargs: Any,
 ) -> Optional["Figure"]:
     """
@@ -204,10 +205,13 @@ def plot_signature_panel(
     if len(select) == 0:
         select = ("Baseline",)
 
-    for k in range(K):
-        _ax = np.ravel(ax)[k]
-        plot_spectrum(fetch_component(dataset, k), *select, ax=_ax, **kwargs)
-        _ax.set_ylabel(component_names[k], fontsize=8)
+    if order is None:
+        order = list(component_names)
+
+    for i, c in enumerate(order):
+        _ax = np.ravel(ax)[i]
+        plot_spectrum(fetch_component(dataset, c), *select, ax=_ax, **kwargs)
+        _ax.set_ylabel(c, fontsize=8)
 
     for _ax in np.ravel(ax)[K:]:
         _ax.axis("off")
