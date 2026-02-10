@@ -1,7 +1,27 @@
 #!/usr/bin/env python
 
-def set_parameters(tumor_type, max_components: int = 20):
+ADJUSTMENTS = {
+    "ColoRect-AdenoCA" : (
+        ("SBS94",), ("SBS4",),
+    ),
+    "Eso-AdenoCA" : (
+        ("SBS37",), ("SBS28",),
+    ),
+    "Head-SCC" : (
+        (), ("SBS33",),
+    ),
+    "Liver-HCC" : (
+        (), ("SBS17b",),
+    ),
+    "Kidney-All" : (
+        (), ("SBS40a", "SBS40b", "SBS40c", "SBS17b",),
+    ),
+    "Prost-AdenoCA" : (
+        (), ("SBS33", "SBS3"),
+    ),
+}
 
+def list_components(tumor_type: str, max_components: int = 20):
     import pandas as pd
 
     # Load and normalize exposures
@@ -31,11 +51,15 @@ def set_parameters(tumor_type, max_components: int = 20):
     
     # Get components with occurrence > 0.025 for initialization
     active_components = components_sorted[components_sorted > 0.025]
-    components = [comp for comp in active_components.index.tolist() if not comp.startswith("SBS40") or comp in ["SBS3",]]
-    
-    # Calculate max_components
-    max_components = max(min(max_components, len(components) * 2), len(components) + 1, 10)
+    components = [comp for comp in active_components.index.tolist() if not (comp.startswith("SBS40") or comp == "SBS34")]
 
+    max_components = max(min(max_components, len(components) * 2), len(components) + 5, 10)
+
+    return components, min_components, max_components
+
+
+def set_parameters(tumor_type, max_components: int = 20):
+    components, min_components, max_components = list_components(tumor_type, max_components)
     print(
         f"-min {min_components} -max {max_components} ",
         *[f"-init {comp}" for comp in components],

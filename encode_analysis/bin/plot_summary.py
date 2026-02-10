@@ -2,6 +2,7 @@
 
 # for now just plot a random matplotlib figure
 import matplotlib.pyplot as plt
+import os
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -22,6 +23,15 @@ def plot_summary(study_dir: str, output_file: str) -> None:
     results = study.trials_dataframe().join(best_values.rename("best_value"), how="left")
     results["best_value"] = np.where(~np.isfinite(results["best_value"]), results["value"], results["best_value"])
     results = results.dropna(subset=["best_value"])
+    
+    results["state"] = results[["number", "state"]].apply(
+        lambda s : (
+            "COMPLETE" if os.path.exists(os.path.join(study_dir, f"trial={s['number']}.pkl"))
+            else "FAIL" if s["state"] == "RUNNING"
+            else s["state"]
+        ),
+        axis=1
+    )
 
     print("Summary of results:")
     print(results[["number", "best_value"]].head(4))
