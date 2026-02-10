@@ -699,7 +699,8 @@ class LocalsModel:
             alpha0 = self.alpha[name]
 
             self.alpha[name] = _svi_update_fn(
-                alpha0, update_alpha(alpha0, Nks).astype(self.dtype), learning_rate
+                alpha0, update_alpha(alpha0, Nks).astype(self.dtype), learning_rate,
+                parameter_name="alpha"
             )
 
         return self

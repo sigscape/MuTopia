@@ -296,6 +296,7 @@ class FactorModel:
                 curr,
                 np.log(genome_size / self.get_genome_size(ds)) + normalizers[name],
                 learning_rate,
+                parameter_name=f"normalizers_{name}",
             )
 
     def init_normalizers(self, datasets, par_context=None):

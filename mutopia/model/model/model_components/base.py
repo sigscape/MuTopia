@@ -3,6 +3,7 @@ from sparse import COO, GCXS
 from abc import ABC, abstractmethod
 from numba import njit
 import sys
+from mutopia.utils import logger
 from ..gtensor_interface import GtensorInterface as CS
 
 
@@ -147,13 +148,12 @@ def get_corpus_design(corpuses, encoder: dict, n_repeats=lambda x: 1):
     )
 
 
-def _svi_update_fn(old_value, new_value, learning_rate):
+def _svi_update_fn(old_value, new_value, learning_rate, parameter_name=""):
 
     if np.isnan(new_value).any():
-        print(
-            "\n\rNaN value encountered in update! - if this happens repeatedly later in training, "
+        logger.warning(
+            f"\n\rNaN value encountered in update of parameter {{{parameter_name}}}! - if this happens repeatedly later in training, "
             "consider increasing `conditioning_alpha`, `locus_subsample`, or `batch_subsample`",
-            file=sys.stderr,
         )
         return old_value
 

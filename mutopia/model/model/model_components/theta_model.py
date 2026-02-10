@@ -313,7 +313,8 @@ class LinearThetaModel(ThetaModel):
 
             # merge the new model state with the old using SVI update
             self.rate_models[k].coef_ = _svi_update_fn(
-                old_coef, self.rate_models[k].coef_, learning_rate
+                old_coef, self.rate_models[k].coef_, learning_rate,
+                parameter_name=f"component_{k}_coefficients"
             )
 
         yield update_model

@@ -230,11 +230,8 @@ class LDAUpdateSparse(LocalsModel):
             Nk,
         )
 
-        #map_estimate = np.nan_to_num(map_estimate, nan=0.0)
-        new_Nk = (
-            _svi_update_fn(Nk, map_estimate, learning_rate)
-            if learning_rate < 1.0
-            else map_estimate
+        new_Nk = _svi_update_fn(Nk, map_estimate, learning_rate, 
+            parameter_name=f"Nk_sample_{sample.coords['sample']}"
         )
 
         suffstats = self._calc_sstats(

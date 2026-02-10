@@ -383,7 +383,8 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         model,
     ):
         update_vec[:] = _svi_update_fn(
-            update_vec, model(y, sample_weight)(update_vec), learning_rate=learning_rate
+            update_vec, model(y, sample_weight)(update_vec), learning_rate=learning_rate,
+            parameter_name="context_model_coefficients"
         )
 
     def partial_fit(
