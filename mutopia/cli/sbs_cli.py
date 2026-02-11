@@ -570,7 +570,6 @@ def mutation_ll(sample_file: str,
         logit = log_cll + log_pi                   # (K, I)
 
     z_logpost = logit - logsumexp(logit, axis=0, keepdims=True)  # (K, I)
-    print(z_logpost)
        
     annotations_df = pd.DataFrame(
         {f"logp_{name.replace(' ', '_')}": z_logpost[k, :]
