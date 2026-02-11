@@ -539,8 +539,8 @@ def mutation_ll(sample_file: str,
     cond = locals_model._conditional_observation_likelihood(
         dataset,
         factor_model,
-        logsafe=False,       # important: real likelihood scale
-        renormalize=False,   # usually what you want for scoring
+        logsafe=True,
+        renormalize=False,
         sample_dict=sample_dict,
     )
     log_cll = np.log(cond)  # (K, I)
