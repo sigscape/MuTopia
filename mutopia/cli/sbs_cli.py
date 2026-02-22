@@ -2,6 +2,8 @@ from mutopia.analysis import load_model
 from mutopia.model import GtensorInterface as CS
 from mutopia.modalities import SBS
 from mutopia.modalities.sbs._sbs_clustering import *
+from mutopia.modalities.sbs._sbs_ingestion import featurize_mutations
+from mutopia.modalities.sbs._sbs_nucdata import *
 from mutopia.gtensor import disk_interface as disk
 from mutopia.gtensor import lazy_load
 from mutopia.model.model.latent_var_models.base import iterative_update, exp_log_dirichlet_expectation
@@ -11,6 +13,8 @@ from functools import partial
 from typing import Union, TextIO
 import numpy as np
 from scipy.special import logsumexp
+import xarray as xr
+from sparse import COO 
 import pandas as pd
 import sys
 import os
@@ -509,18 +513,51 @@ def mutation_ll(sample_file: str,
     num_regions = sum(1 for _ in stream_bed12(regions_file))
     locus_coords = disk.read_coords(dataset_file)["locus"]
     fasta = attrs["fasta_file"]
-    
-    mut_ids, sample = SBS.ingest_uncollaposed(
+
+    # Run the ingestion pipeline once to get both the raw COO coordinates
+    # (needed to re-align mut_ids) and the mutation weights.
+    mut_ids, coords, weights = featurize_mutations(
         sample_file,
-        fasta_file=fasta,
-        regions_file=regions_file,
-        locus_dim=num_regions,
-        locus_coords=locus_coords,
-        mutation_rate_file=mutation_rate_file
+        regions_file,
+        fasta,
+        mutation_rate_file=mutation_rate_file,
     )
+ 
+    # Build the sparse sample DataArray (same logic as ingest_uncollaposed).
+    _sample_arr = xr.DataArray(
+        COO(
+            coords,
+            weights,
+            shape=(2, len(MUTOPIA_ORDER), num_regions),
+            has_duplicates=False,
+            sorted=True,
+            prune=False,
+            cache=False,
+        ),
+        dims=("configuration", "context", "locus"),
+    ).isel(locus=locus_coords)
+ 
+    # After isel the sparse library re-sorts nnz entries into canonical
+    # (config, context, locus) order, which differs from the original
+    # locus-sorted (genomic) order when mutations have mixed configuration
+    # indices.  Rebuild mut_ids aligned with the post-isel COO nnz order so
+    # that z_logpost columns are correctly paired with their identifiers.
+    locus_coords_arr = np.asarray(locus_coords)
+    mut_id_mask = np.isin(coords[-1, :], locus_coords_arr)
+    coord_to_mut_id = {
+        (int(coords[0, i]), int(coords[1, i]), int(coords[2, i])): mut_ids[i]
+        for i in np.where(mut_id_mask)[0]
+    }
+    coo = _sample_arr.ascoo().data
+    original_loci = locus_coords_arr[coo.coords[2]]
+    mut_ids = [
+        coord_to_mut_id[(int(c), int(ctx), int(l))]
+        for c, ctx, l in zip(coo.coords[0], coo.coords[1], original_loci)
+    ]
+
     from types import SimpleNamespace
     
-    sample = SimpleNamespace(X=sample)
+    sample = SimpleNamespace(X=_sample_arr)
 
     
     locals_model = model.locals_model_
