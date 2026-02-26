@@ -60,18 +60,31 @@ def _plot_interaction_matrix(
 
     heat_x = np.arange(interactions.shape[0]) - 0.5
     heat_y = np.arange(interactions.shape[1]) - 0.5
-    interaction_ax.pcolormesh(
-        heat_y,
-        heat_x,
-        interactions.values,
-        cmap=palette,
-        shading="auto",
-        rasterized=True,
-        vmin=-extrema,
-        vmax=extrema,
-        edgecolor="white",
-        linewidth=0.1,
-    )
+    if interactions.shape[0] == 1:
+        interaction_ax.pcolormesh(
+            interactions.values,
+            cmap=palette,
+            shading="auto",
+            rasterized=True,
+            vmin=-extrema,
+            vmax=extrema,
+            edgecolor="white",
+            linewidth=0.1,
+        )
+
+    else:
+        interaction_ax.pcolormesh(
+            heat_y,
+            heat_x,
+            interactions.values,
+            cmap=palette,
+            shading="auto",
+            rasterized=True,
+            vmin=-extrema,
+            vmax=extrema,
+            edgecolor="white",
+            linewidth=0.1,
+        )
 
     interaction_ax.set(yticks=[], xticks=[])
     interaction_ax.set_xlabel("Context", fontsize=8)
