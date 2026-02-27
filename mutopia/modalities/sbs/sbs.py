@@ -146,7 +146,7 @@ class SBSMode(ModeConfig):
                 yield seq[i : i + w]
 
         def _reduce_count(counts, seq):
-            if not "N" in counts:
+            if not "N" in seq:
                 counts[seq] += 1
             else:
                 counts["N"] += 1

@@ -18,9 +18,6 @@ def make_continous_features_bigwig(
 
     with tempfile.NamedTemporaryFile() as bed, tempfile.NamedTemporaryFile() as regions:
 
-        # with open(regions.name, "w") as r:
-        #    subprocess.check_call(["cut", "-f", "1-4", regions_file], stdout=r)
-
         try:
             subprocess.check_output(
                 ["bigWigAverageOverBed", bigwig_file, regions_file, bed.name],

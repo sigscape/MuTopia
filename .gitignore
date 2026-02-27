@@ -8,3 +8,10 @@ build/
 *.prof
 test.py
 testing.ipynb
+encode_analysis/analyses/
+encode_analysis/data/
+encode_analysis/studies/
+encode_analysis/first_pass/
+encode_analysis/second_pass/
+encode_analysis/gtensor__tempfiles/
+encode_analysis/staged/

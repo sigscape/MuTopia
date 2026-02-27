@@ -317,6 +317,10 @@ def rm_sample(
             )
 
         raw = dset.groups["raw"]
+        if not sample_name in raw.groups["X"].groups:
+            logger.warning(f"Sample {sample_name} not found in dataset.")
+            return
+        
         raw["X"][sample_name].active = 0
 
 

@@ -378,6 +378,9 @@ def _objective(
 
     params.update(param_sampling_fn(trial))
 
+    #if "init_components" in params and params["num_components"] < len(params["init_components"]):
+    #    params["init_components"] = params["init_components"][:params["num_components"]]
+
     logger.info(
         f"Running trial {trial.number} with params:\n\t"
         + "\n\t".join([f"{key}: {value}" for key, value in params.items()])
@@ -462,6 +465,7 @@ def _run_trial_cli(
     lazy=False,
     *,
     study_name,
+    summary_callback=None,
     **kwargs,
 ):
     """
@@ -484,8 +488,8 @@ def _run_trial_cli(
     """
 
     study, study_attrs, model_kw = load_study(study_name, storage)
-    model_kw.update(kwargs)
     model_kw["eval_every"] = 5
+    model_kw.update(kwargs)
 
     train, test = load_study_data(study, lazy)
     model = train[0].modality().TopographyModel(**model_kw)
@@ -496,6 +500,7 @@ def _run_trial_cli(
         model=model,
         train=train,
         test=test,
+        summary_callback=summary_callback,
     )
 
 
@@ -546,17 +551,21 @@ def retrain(
     model_cls = train[0].modality().TopographyModel
 
     trial = study.trials[trial_number]
+
+    logger.info(f"Retraining trial {trial.number} with params:\n\t" +
+        "\n\t".join([f"{key}: {value}" for key, value in trial.params.items()])
+    )
     model_kw.update(trial.params)
 
-    model = (
-        model_cls(
-            **model_kw,
-            seed=seed,
-        )
-        .fit(
-            *train,
-            test_datasets=test,
-        )
+    model = model_cls(
+        **model_kw,
+        seed=seed,
     )
 
+    score = model.fit(
+        *train,
+        test_datasets=test,
+    )
     model.save(save_name)
+    study.tell(trial.number, score)
+    return score

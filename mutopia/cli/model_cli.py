@@ -1,6 +1,6 @@
 import click
 from tabulate import tabulate
-from typing import List, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 
 @click.group("Model training")
@@ -39,6 +39,12 @@ def model():
 )
 @click.option(
     "--seed", type=int, default=0, help="Random seed for reproducible training"
+)
+@click.option(
+    "-cc",
+    "--context-conditioning",
+    type=click.FloatRange(0.0, 100.0),
+    default=None,
 )
 @click.option(
     "-init",
@@ -220,14 +226,6 @@ def model():
     default=None,
     help="Maximum training time in seconds (training stops when limit reached)",
 )
-@click.option(
-    "--test-chroms",
-    "-test",
-    multiple=True,
-    type=str,
-    default=["chr1"],
-    help="Chromosomes to reserve for testing (remaining chroms used for training)",
-)
 def train(
     *,
     output,
@@ -267,6 +265,11 @@ def train(
         )
 
     model_kw = {k: v for k, v in model_kw.items() if v is not None}
+    
+    if init_components:
+        model_kw["init_components"] = list(init_components)
+    if fix_components:
+        model_kw["fix_components"] = list(fix_components)
 
     click.echo(f"Training model with parameters: ")
     click.echo(
@@ -285,8 +288,6 @@ def train(
         output=output,
         time_profile=time_profile,
         lazy=lazy,
-        init_components=list(init_components),
-        fix_components=list(fix_components),
         **model_kw,
     )
 
@@ -483,14 +484,6 @@ def study():
     type=int,
     default=0,
     help="How extensively to tune hyperparameters: -e (basic), -ee (moderate), -eee (extensive)",
-)
-@click.option(
-    "--test-chroms",
-    "-test",
-    multiple=True,
-    type=str,
-    default=["chr1"],
-    help="Chromosomes to reserve for testing (remaining chromosomes used for training)",
 )
 def _create_study(
     study_name: str,
@@ -774,13 +767,38 @@ def retrain(
 @click.argument("model", type=click.Path(exists=True), metavar="MODEL_FILE")
 @click.argument("dataset", type=click.Path(exists=True), metavar="DATASET_FILE")
 @click.argument("output", type=click.Path(writable=True), metavar="OUTPUT_FILE")
+@click.option("--region", type=str, default=None)
+@click.option(
+    "-@",
+    "--threads",
+    type=click.IntRange(1, 1000),
+    default=1,
+    help="Number of parallel threads for annotation",
+)
+@click.option(
+    "--calc-shap/--no-calc-shap",
+    type=bool,
+    default=False,
+    is_flag=True,
+    help="Calculate SHAP values for feature importance",
+)
+@click.option(
+    "--celltype",
+    type=str,
+    default=None,
+    help="Cell type to use as source for locus model predictions",
+)
 def annot(
     model: str,
     dataset: str,
     output: str,
+    region: Optional[str] = None,
+    threads: int = 1,
+    calc_shap: bool = False,
+    celltype: Optional[str] = None,
 ):
     from .model_core import annot
-    annot(model, dataset, output)
+    annot(model, dataset, output, region=region, threads=threads, calc_shap=calc_shap, celltype=celltype)
 
 
 @model.command("add-model-state", short_help="Add model state to dataset")

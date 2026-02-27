@@ -9,6 +9,8 @@ import warnings
 from numba.core.errors import NumbaPerformanceWarning
 warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
 
+class ReductionError(ValueError):
+    pass
 
 class WrapsFactorModel:
     """
@@ -151,7 +153,10 @@ class LDAUpdateSparse(LocalsModel):
             )
 
         if logsafe:
-            logp_X = logp_X - logp_X.max()
+            try:
+                logp_X = logp_X - logp_X.max()
+            except ValueError as e:
+                raise ReductionError("Error in log-safety adjustment of conditional likelihood") from e
 
         return np.ascontiguousarray(
             np.nan_to_num(np.exp(logp_X), nan=0.0), dtype=self.dtype
@@ -200,11 +205,14 @@ class LDAUpdateSparse(LocalsModel):
         weights = self._get_weights(sample) / locus_subsample
         sample_dict = self._convert_sample(sample)
 
-        conditional_likelihood = self._conditional_observation_likelihood(
-            dataset,
-            factor_model,
-            sample_dict=sample_dict,
-        )
+        try:
+            conditional_likelihood = self._conditional_observation_likelihood(
+                dataset,
+                factor_model,
+                sample_dict=sample_dict,
+            )
+        except ReductionError as e:
+            return None
 
         alpha = np.ascontiguousarray(self.alpha[self.GT.get_name(dataset)])
         Nk = np.ascontiguousarray(Nk.ravel(), dtype=self.dtype)
@@ -293,13 +301,16 @@ class LDAUpdateSparse(LocalsModel):
         sample_dict = self._convert_sample(sample)
 
         # K x I::
-        conditional_likelihood = self._conditional_observation_likelihood(
-            dataset,
-            factor_model,
-            logsafe=False,  # we want the actual likelihood, don't remove the max for numerical stability
-            renormalize=True,  # we want a proper likelihood distribution
-            sample_dict=sample_dict,
-        )
+        try:
+            conditional_likelihood = self._conditional_observation_likelihood(
+                dataset,
+                factor_model,
+                logsafe=False,  # we want the actual likelihood, don't remove the max for numerical stability
+                renormalize=True,  # we want a proper likelihood distribution
+                sample_dict=sample_dict,
+            )
+        except ReductionError as e:
+            return 0., 0.
 
         # the context frequencies are missing dimensions that the observations have ...
         log_context_effect = self.to_contig(
