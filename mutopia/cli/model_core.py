@@ -110,7 +110,7 @@ def annot(
 
 def add_model_state(model_path: str, dataset_path: str, output_path: str):
     import mutopia.analysis as mu
-    dataset = disk.load_dataset(dataset_path, with_samples=False)
+    dataset = mu.gt.lazy_load(dataset_path)
     model = mu.load_model(model_path)
     dataset = model.setup_corpus(dataset)
     disk.write_dataset(dataset, output_path)
