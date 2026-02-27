@@ -25,10 +25,10 @@ def retry_until_write(func, n_tries=1000, sleep=1):
                 return func(*args, **kwargs)
             except FileNotFoundError as err:
                 raise err from None
-            except OSError:
+            except OSError as err:
                 if t > 10:
                     logger.warning(
-                        "Could not open netCDF file for writing - likely because of concurrent write traffic.\n"
+                        f"Could not open netCDF file for writing (OS error: {repr(err)}) - likely because of concurrent write traffic.\n"
                         "If the G-tensor is in-use, this will block writing."
                     )
                 time.sleep(sleep)

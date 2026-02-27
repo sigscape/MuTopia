@@ -780,8 +780,20 @@ def annot(
     output: str,
 ):
     from .model_core import annot
-
     annot(model, dataset, output)
+
+
+@model.command("add-model-state", short_help="Add model state to dataset")
+@click.argument("model", type=click.Path(exists=True), metavar="MODEL_FILE")
+@click.argument("dataset", type=click.Path(exists=True), metavar="DATASET_FILE")
+@click.argument("output", type=click.Path(writable=True), metavar="OUTPUT_FILE")
+def add_model_state(
+    model: str,
+    dataset: str,
+    output: str,
+):
+    from .model_core import add_model_state
+    add_model_state(model, dataset, output)
 
 
 @model.group("tools")

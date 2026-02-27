@@ -773,8 +773,6 @@ def get_shap_summary(data: GTensorDataset, source: Optional[str] = None) -> pd.D
             }
         )
     )
-    #shap_values["feature"] = shap_values["feature"].str.split(":", expand=True)[0]
-    #hap_values = shap_values.groupby(["component", "locus", "feature"])["shap_value"].sum().reset_index()
 
     shap_values = shap_values.merge(
         data[f"{source}/locus_features"]
@@ -785,6 +783,15 @@ def get_shap_summary(data: GTensorDataset, source: Optional[str] = None) -> pd.D
         on=["locus", "feature"],
         how="inner",
     )
+
+    try:
+        shap_values[["feature", "window"]] = shap_values["feature"].str.split(":", expand=True, n=1)
+        shap_values = shap_values.groupby(["component", "locus", "feature"]).agg({
+            "feature_value": "mean",
+            "shap_value": "sum",
+        }).reset_index()
+    except ValueError:
+        pass
 
     effect_size = (
         shap_values.groupby(["component", "feature"])["shap_value"]

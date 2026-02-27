@@ -88,10 +88,18 @@ def get_study_summary(study_name: str):
 
 def annot(model: str, dataset: str, output: str):
     import mutopia.analysis as mu
-    model = mu.load_model(model)
+    model_ = mu.load_model(model)
     ds = gt.load_dataset(dataset, with_samples=False, with_state=False)
-    annotated = model.annot_data(ds)
+    annotated = model_.annot_data(ds)
     disk.write_dataset(annotated, output)
+
+
+def add_model_state(model_path: str, dataset_path: str, output_path: str):
+    import mutopia.analysis as mu
+    dataset = disk.load_dataset(dataset_path, with_samples=False)
+    model = mu.load_model(model_path)
+    dataset = model.setup_corpus(dataset)
+    disk.write_dataset(dataset, output_path)
 
 
 def simulate_from_model(

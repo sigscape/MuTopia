@@ -149,7 +149,6 @@ def get_corpus_design(corpuses, encoder: dict, n_repeats=lambda x: 1):
 
 
 def _svi_update_fn(old_value, new_value, learning_rate, parameter_name=""):
-
     if np.isnan(new_value).any():
         logger.warning(
             f"\n\rNaN value encountered in update of parameter {{{parameter_name}}}! - if this happens repeatedly later in training, "
