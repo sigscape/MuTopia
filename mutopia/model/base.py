@@ -636,6 +636,8 @@ class TopographyModel(ABC, BaseEstimator):
         dataset: GTensorDataset,
         threads: int = 1,
         key: str = "contributions",
+        locus_subsample: float = None,
+        **svi_kw,
     ) -> GTensorDataset:
         """
         Calculate and add component contributions to a dataset.
@@ -673,6 +675,8 @@ class TopographyModel(ABC, BaseEstimator):
             dataset,
             self.factor_model_,
             threads=threads,
+            locus_subsample=locus_subsample,
+            **svi_kw,
         )
 
         dataset = dataset.mutate(
