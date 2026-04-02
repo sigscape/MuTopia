@@ -518,6 +518,8 @@ def add_locus_offsets_to_gtensor(
         column=column,
     ).astype(np.float32)
 
+    np.nan_to_num(exp_offsets, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
+    exp_offsets = exp_offsets + 1e-6  # add small constant to avoid zero offsets
     exp_offsets /= exp_offsets.mean()
 
     disk.write_locus_offsets(

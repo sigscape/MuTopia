@@ -4,6 +4,7 @@ import os
 import click
 from functools import cache
 import tempfile
+from collections import defaultdict
 from typing import Tuple
 
 from mutopia.utils import FeatureType, logger
@@ -243,10 +244,11 @@ class CreateGTensorTask(luigi.Task):
 
     def requires(self):
         config = load_config(self.config_path)
-        cutout_features = {
-            k: feature_sourcedata_task(str(self.config_path), k, v)
-            for k, v in config.bed_cuts
-        }
+        
+        cutout_features = {}
+        for k, v in config.bed_cuts:
+            cutout_features[(k,v)] = feature_sourcedata_task(str(self.config_path), k, v)
+
         genome_requirements = {
             "fasta": url_or_file_task(config.genome.fasta),
             "chromsizes": url_or_file_task(config.genome.chromsizes),
@@ -278,7 +280,10 @@ class CreateGTensorTask(luigi.Task):
             genome_file=genome["chromsizes"].path,
             blacklist_file=genome["blacklist"].path,
             fasta_file=genome["fasta"].path,
-            cutout_regions=[(k, v.path) for k, v in self.input()["cutouts"].items()],
+            cutout_regions=[
+                (featurename, task.path) 
+                for (featurename, _), task in self.input()["cutouts"].items()
+            ],
         )
 
 class IngestFeatureTask(luigi.Task):

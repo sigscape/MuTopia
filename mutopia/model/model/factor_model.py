@@ -254,11 +254,14 @@ class FactorModel:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
 
+            exposures = self.GT.get_exposures(dataset)
+            freqs = self.GT.get_freqs(dataset)
+
             log_mutation_rate = reduce(
                 lambda x, y: x + y,
                 model_predictions.values(),  # sum over models
-                np.log(self.GT.get_exposures(dataset))
-                + np.log(self.GT.get_freqs(dataset)),  # start with the background rates
+                np.log(exposures)
+                + np.log(freqs),  # start with the background rates
             )
 
             """

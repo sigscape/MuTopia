@@ -5,7 +5,7 @@ structure of the datasets.
 """
 
 import os
-from mutopia.utils import parallel_gen
+from mutopia.utils import parallel_gen, logger
 from mutopia.gtensor import CorpusInterface, mutate_method
 from ..model.gtensor_interface import GtensorInterface
 import numpy as np
@@ -113,6 +113,7 @@ class MixtureInterface(GtensorInterface):
         state_elements.update(locals_model.prepare_corpusstate(dataset))
 
         for source, data in self.sources(dataset):
+            logger.info(f"Initializing source: {source}")
             source_elements = {}
 
             for model in factor_model.models.values():

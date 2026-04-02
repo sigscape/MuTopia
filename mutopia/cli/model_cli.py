@@ -485,6 +485,13 @@ def study():
     default=0,
     help="How extensively to tune hyperparameters: -e (basic), -ee (moderate), -eee (extensive)",
 )
+@click.option(
+    "-eval",
+    "--eval-every",
+    type=click.IntRange(1, 1000),
+    default=5,
+    help="Evaluate model performance every N training epochs during optimization",
+)
 def _create_study(
     study_name: str,
     *,
@@ -494,6 +501,7 @@ def _create_study(
     seed: int = 0,
     save_model: bool = False,
     extensive: int = 0,
+    eval_every=5,
     **model_kw,
 ):
     """
@@ -544,7 +552,7 @@ def _create_study(
         create_study(
             train=list(train),
             test=list(test),
-            eval_every=5,
+            eval_every=eval_every,
             min_components=min_components,
             max_components=max_components,
             study_name=study_name,

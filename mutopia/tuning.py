@@ -235,7 +235,7 @@ def load_study_data(study, lazy=False):
 
     return train, test
 
-def _model_report_callback(trial, factor_model, epoch, test_scores):
+def _model_report_callback(trial, factor_model, epoch, test_scores,*, data):
     """
     Callback function for reporting trial progress to Optuna.
 
@@ -258,28 +258,20 @@ def _model_report_callback(trial, factor_model, epoch, test_scores):
     optuna.TrialPruned
         If the trial should be pruned based on intermediate results
     """
-    from numpy import isfinite
+    from numpy import isfinite, var
 
     if isfinite(test_scores[-1]):
         trial.report(test_scores[-1], epoch)
         if trial.should_prune():
             raise optuna.TrialPruned()
 
-def get_reporting_callback(trial):
-    """
-    Create a partial callback function for trial reporting.
+    #locals = factor_model.GT.fetch_locals(data)
+    #print("EPOCH ", epoch, ": VARIANCE=", var(locals.values))
+    #path = os.path.join("generated/studies/healthy.length.full.03", f"trial-{trial.number}_locals", f"epoch-{epoch}.csv")
+    #os.makedirs(os.path.dirname(path), exist_ok=True)
+    #print(f"Saving locals to {path}")
+    #locals.to_dataframe().to_csv(path)
 
-    Parameters
-    ----------
-    trial : optuna.Trial
-        Trial object to bind to the callback
-
-    Returns
-    -------
-    functools.partial
-        Partial callback function with trial pre-bound
-    """
-    return partial(_model_report_callback, trial)
 
 def _get_save_model_fn(study):
     """
@@ -386,7 +378,7 @@ def _objective(
         + "\n\t".join([f"{key}: {value}" for key, value in params.items()])
     )
 
-    callback = partial(_model_report_callback, trial)
+    callback = partial(_model_report_callback, trial, data=train[0])
 
     model.set_params(
         **params,
@@ -488,7 +480,6 @@ def _run_trial_cli(
     """
 
     study, study_attrs, model_kw = load_study(study_name, storage)
-    model_kw["eval_every"] = 5
     model_kw.update(kwargs)
 
     train, test = load_study_data(study, lazy)
@@ -537,16 +528,10 @@ def retrain(
         Path where to save the retrained model
     **kwargs
         Additional keyword arguments to override model parameters
-
-    Notes
-    -----
-    This function automatically sets max_features based on convolution_width
-    and removes eval_every from parameters to ensure full training.
     """
     study, _, model_kw = load_study(study_name, storage)
     model_kw.update(kwargs)
-    model_kw["eval_every"] = 5
-    
+
     train, test = load_study_data(study, lazy)
     model_cls = train[0].modality().TopographyModel
 
