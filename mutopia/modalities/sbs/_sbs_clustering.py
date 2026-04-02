@@ -171,7 +171,8 @@ def stream_passed_SNVs(
 
 
 def transfer_annotations_to_vcf(
-    annotations_df, *, vcf_file, description, output=subprocess.PIPE, chr_prefix=""
+    annotations_df, *, vcf_file, description, output=subprocess.PIPE, chr_prefix="",
+    extra_headers=None,
 ):
 
     annotations_df = annotations_df.copy()
@@ -217,6 +218,10 @@ def transfer_annotations_to_vcf(
                     file=f,
                     sep="\n",
                 )
+
+            if extra_headers:
+                for hdr in extra_headers:
+                    print(hdr, file=f)
 
             annotations_df.to_csv(dataframe.name, index=None, sep="\t", header=None)
 

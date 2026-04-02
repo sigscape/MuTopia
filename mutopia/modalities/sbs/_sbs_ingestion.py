@@ -173,6 +173,7 @@ def featurize_mutations(
                     "You must provide a mutation rate bedgraph file in order to cluster mutations."
                 )
 
+            logger.info("Clustering mutations ...")
             cluster_vcf(
                 mutation_rate_bedgraph=mutation_rate_file,
                 query_fn=partial(query_fn, vcf_file, sorted=True),
@@ -182,6 +183,7 @@ def featurize_mutations(
             )
             processed_vcf.flush()
             input_vcf = processed_vcf.name
+            logger.info("Clustering done.")
         else:
             input_vcf = vcf_file
 
@@ -192,6 +194,7 @@ def featurize_mutations(
             sorted=not skip_sort,
         )
 
+        logger.info("Intersecting mutations with regions ...")
         with query_fn() as query, Fasta(fasta_file) as fa:
 
             intersect_process = subprocess.Popen(
@@ -202,7 +205,6 @@ def featurize_mutations(
                     regions_file,
                     "-b",
                     "-",
-                    "-sorted",
                     "-wa",
                     "-wb",
                     "-split",
@@ -210,7 +212,6 @@ def featurize_mutations(
                 stdin=query.stdout,
                 stdout=subprocess.PIPE,
                 universal_newlines=True,
-                #bufsize=10000,
             )
 
             coords = []
@@ -218,7 +219,7 @@ def featurize_mutations(
             mut_ids = []
             n_ingested = 0
             n_weird = 0
-            
+
             for line in stream_subprocess_output(intersect_process):
                 try:
                     mut_id, coo, weight = _process_query_line(line, fa)
@@ -226,6 +227,9 @@ def featurize_mutations(
                     weights.append(weight)
                     mut_ids.append(mut_id)
                     n_ingested += 1
+
+                    if n_ingested % 5000 == 0:
+                        logger.info(f"  ... {n_ingested} mutations ingested so far")
 
                 except (WeirdMutationError, BadWeightError) as err:
                     logger.debug(err)
