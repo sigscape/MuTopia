@@ -108,6 +108,45 @@ def annot(
     disk.write_dataset(annotated, output, write_samples=False)
 
 
+def predict(
+    model_path: str,
+    dataset_path: str,
+    output_path: str,
+    region: Optional[str] = None,
+    threads: int = 1,
+    lazy: bool = False,
+    locus_subsample: float = 1 / 128,
+    min_steps: int = 30,
+    max_steps: int = 500,
+    relative_tol: float = 0.01,
+    seed: int = 42,
+):
+    import mutopia.analysis as mu
+
+    model = mu.load_model(model_path)
+
+    if lazy:
+        ds = gt.lazy_load(dataset_path)
+    else:
+        ds = gt.load_dataset(dataset_path, with_samples=False, with_state=False)
+
+    if region is not None:
+        ds = mu.gt.slice_regions(ds, region)
+
+    ds = model.annot_contributions(
+        ds,
+        threads=threads,
+        locus_subsample=locus_subsample,
+        min_steps=min_steps,
+        max_steps=max_steps,
+        relative_tol=relative_tol,
+        seed=seed,
+    )
+
+    disk.write_dataset(ds, output_path, write_samples=False)
+    logger.info(f"Saved annotated dataset to {output_path}")
+
+
 def add_model_state(model_path: str, dataset_path: str, output_path: str):
     import mutopia.analysis as mu
     dataset = mu.gt.lazy_load(dataset_path)

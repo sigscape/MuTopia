@@ -809,6 +809,97 @@ def annot(
     annot(model, dataset, output, region=region, threads=threads, calc_shap=calc_shap, celltype=celltype)
 
 
+@model.command("predict", short_help="Estimate sample contributions via SVI")
+@click.argument("model", type=click.Path(exists=True), metavar="MODEL_FILE")
+@click.argument("dataset", type=click.Path(exists=True), metavar="DATASET_FILE")
+@click.argument("output", type=click.Path(writable=True), metavar="OUTPUT_FILE")
+@click.option("--region", type=str, default=None, help="Genomic region to subset (e.g. 'chr1:1-100000000')")
+@click.option(
+    "-@", "--threads",
+    type=click.IntRange(1, 1000),
+    default=1,
+    help="Number of parallel threads",
+)
+@click.option(
+    "-lsub", "--locus-subsample",
+    type=click.FloatRange(0.0, 1.0),
+    default=1 / 128,
+    show_default=True,
+    help="Fraction of loci per SVI step",
+)
+@click.option(
+    "--min-steps",
+    type=click.IntRange(1, 100000),
+    default=30,
+    show_default=True,
+    help="Minimum averaging steps before checking convergence",
+)
+@click.option(
+    "--max-steps",
+    type=click.IntRange(1, 100000),
+    default=500,
+    show_default=True,
+    help="Maximum averaging steps per sample",
+)
+@click.option(
+    "--tol",
+    type=click.FloatRange(0.0, 1.0),
+    default=0.01,
+    show_default=True,
+    help="Relative SE convergence threshold",
+)
+@click.option("--seed", type=int, default=42, help="Random seed")
+@click.option(
+    "--lazy/--eager",
+    type=bool,
+    default=False,
+    is_flag=True,
+    help="Use lazy loading to reduce memory usage",
+)
+def predict(
+    model: str,
+    dataset: str,
+    output: str,
+    region: Optional[str] = None,
+    threads: int = 1,
+    locus_subsample: float = 1 / 128,
+    min_steps: int = 30,
+    max_steps: int = 500,
+    tol: float = 0.01,
+    seed: int = 42,
+    lazy: bool = False,
+):
+    """
+    Estimate per-sample contributions using stochastic variational inference.
+
+    Uses Polyak averaging over random locus subsets for memory-efficient
+    inference on large datasets. Converges when the sampling variance of
+    the proportion estimates drops below the tolerance.
+
+    Examples:
+        topo-model predict model.pkl data.nc annotated.nc
+
+        topo-model predict model.pkl data.nc out.nc -@ 10 --locus-subsample 0.01
+
+        topo-model predict model.pkl data.nc out.nc --region chr1 --lazy
+    """
+    from .model_core import predict as _predict
+
+    _predict(
+        model_path=model,
+        dataset_path=dataset,
+        output_path=output,
+        region=region,
+        threads=threads,
+        lazy=lazy,
+        locus_subsample=locus_subsample,
+        min_steps=min_steps,
+        max_steps=max_steps,
+        relative_tol=tol,
+        seed=seed,
+    )
+
+
 @model.command("add-model-state", short_help="Add model state to dataset")
 @click.argument("model", type=click.Path(exists=True), metavar="MODEL_FILE")
 @click.argument("dataset", type=click.Path(exists=True), metavar="DATASET_FILE")
