@@ -1,0 +1,126 @@
+Annotating VCFs with MuTopia
+============================
+
+This tutorial walks through annotating a VCF file with mutational signature
+assignments using a pre-trained MuTopia model. Each mutation in the VCF is
+assigned posterior probabilities over model components (signatures), and
+per-component mutation count estimates (Nk) are reported for the sample.
+
+We also demonstrate the **whitelist** feature, which adapts the model for
+samples sequenced with a targeted panel or exome capture kit rather than
+whole-genome sequencing.
+
+Prerequisites
+-------------
+
+Make sure the following tools are available on your ``PATH``:
+
+- ``bcftools``
+- ``bedtools``
+- ``mutopia`` (install the MuTopia package)
+
+Download data
+-------------
+
+Download the pre-trained model, reference G-Tensor dataset, and an example
+VCF:
+
+.. code-block:: bash
+
+   # Pre-trained model
+   wget -O model.pkl <MODEL_URL>
+
+   # Reference G-Tensor dataset
+   wget -O dataset.nc <DATASET_URL>
+
+   # Example VCF
+   wget -O sample.vcf.gz <VCF_URL>
+
+
+Step 1: Set up the dataset
+--------------------------
+
+Before annotating mutations, we initialize the dataset with the model's
+internal state (locus-level predictions and normalizers). This is a one-time
+step per model/dataset pair -- the result can be reused across many samples.
+
+.. code-block:: bash
+
+   topo-model setup model.pkl dataset.nc dataset_setup.nc -@ 4
+
+This writes ``dataset_setup.nc``, which contains the original dataset plus
+the pre-computed model state needed for fast per-sample annotation.
+
+
+Step 2: Annotate a VCF
+----------------------
+
+Now annotate the sample VCF against the set-up dataset:
+
+.. code-block:: bash
+
+   mutopia sbs annotate-vcf \
+       model.pkl \
+       dataset_setup.nc \
+       sample.vcf.gz \
+       -o sample_annotated.vcf
+
+Each mutation in the output VCF receives an ``INFO`` field with log posterior
+probabilities over model components. The estimated per-component mutation
+fractions (Nk) are printed to stderr and recorded in the VCF header:
+
+.. code-block:: text
+
+   Estimated component fractions:
+     SBS1    0.3421
+     SBS5    0.2876
+     SBS40   0.1503
+     ...
+
+
+Using a whitelist for panel/exome data
+--------------------------------------
+
+When mutations come from targeted sequencing (exome capture, gene panel),
+the model needs to know which regions of the genome were actually assayed.
+Without this information, the model assumes the entire genome was observed,
+which biases signature assignments.
+
+Provide a BED file of assayed regions with the ``--white-list`` flag:
+
+.. code-block:: bash
+
+   mutopia sbs annotate-vcf \
+       model.pkl \
+       dataset_setup.nc \
+       sample.vcf.gz \
+       --white-list capture_targets.bed \
+       -o sample_annotated.vcf
+
+The whitelist adjusts two things:
+
+1. **Exposure correction** -- Per-region exposure terms are scaled by the
+   fraction of each genomic window covered by the whitelist, so the model
+   accounts for unobserved territory.
+
+2. **Mutation filtering** -- Only mutations falling within whitelisted
+   regions are included in the analysis, discarding off-target variants.
+
+
+Additional options
+------------------
+
+The ``annotate-vcf`` command supports several additional options for
+controlling mutation ingestion:
+
+.. code-block:: text
+
+   -m, --mutation-rate-file   Mutation rate bedgraph (required for clustering)
+   --no-cluster               Skip mutation clustering
+   -name, --sample-name       Sample name for multi-sample VCFs
+   -chr, --chr-prefix         Chromosome name prefix (e.g. "chr")
+   -fa, --fasta               Override the reference genome fasta path
+   -@, --threads              Number of threads
+   --no-pass-only             Include non-PASS variants
+
+Run ``mutopia sbs annotate-vcf --help`` for the full list.

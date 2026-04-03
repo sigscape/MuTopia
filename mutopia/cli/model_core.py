@@ -86,6 +86,19 @@ def get_study_summary(study_name: str):
     return trials
 
 
+def setup(
+    model: str,
+    dataset: str,
+    output: str,
+    threads: int = 1,
+):
+    import mutopia.analysis as mu
+    model_ = mu.load_model(model)
+    ds = gt.load_dataset(dataset, with_samples=False, with_state=False)
+    ds = model_.setup_corpus(ds, threads=threads)
+    disk.write_dataset(ds, output, write_samples=False)
+
+
 def annot(
     model: str, 
     dataset: str, 

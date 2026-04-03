@@ -12,3 +12,4 @@ Welcome to the MuTopia tutorials. These interactive notebooks guide you through 
    2.analyzing_gtensors
    3.training_models
    4.analyzing_models
+   5.annotating_vcfs

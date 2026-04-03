@@ -771,6 +771,38 @@ def retrain(
         raise click.ClickException(f"Retraining failed: {str(e)}")
 
 
+@model.command("setup", short_help="Initialize dataset state from trained model")
+@click.argument("model", type=click.Path(exists=True), metavar="MODEL_FILE")
+@click.argument("dataset", type=click.Path(exists=True), metavar="DATASET_FILE")
+@click.argument("output", type=click.Path(writable=True), metavar="OUTPUT_FILE")
+@click.option(
+    "-@",
+    "--threads",
+    type=click.IntRange(1, 1000),
+    default=1,
+    help="Number of parallel threads for setup",
+)
+def setup(
+    model: str,
+    dataset: str,
+    output: str,
+    threads: int = 1,
+):
+    """
+    Initialize dataset state using a trained model.
+
+    Applies model state (locus predictions, normalizers) to a dataset
+    without computing contributions, SHAP values, or other annotations.
+
+    Examples:
+        topo-model setup model.pkl data.nc data_with_state.nc
+
+        topo-model setup model.pkl data.nc out.nc -@ 8
+    """
+    from .model_core import setup
+    setup(model, dataset, output, threads=threads)
+
+
 @model.command("annot", short_help="Annotate dataset using trained model")
 @click.argument("model", type=click.Path(exists=True), metavar="MODEL_FILE")
 @click.argument("dataset", type=click.Path(exists=True), metavar="DATASET_FILE")
