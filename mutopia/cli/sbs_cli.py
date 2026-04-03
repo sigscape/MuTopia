@@ -246,6 +246,7 @@ def mutation_ll(
         sample_name=ingest_kwargs.get('sample_name'),
         cluster=ingest_kwargs.get('cluster', True),
         skip_sort=ingest_kwargs.get('skip_sort', False),
+        white_list=white_list,
     )
     click.echo(f"Ingested {len(mut_ids)} mutations.", err=True)
 
@@ -286,7 +287,7 @@ def mutation_ll(
             exposures[locus_coords].astype(np.float32), dims=("locus",)
         )
         click.echo(
-            f"Whitelist applied: {(exposures[locus_coords] > 0).sum()}/{len(locus_coords)} "
+            f"Whitelist applied: {(exposures[locus_coords] > 1e-6).sum()}/{len(locus_coords)} "
             f"regions have nonzero exposure.",
             err=True,
         )
@@ -294,9 +295,9 @@ def mutation_ll(
     click.echo("Setting up dataset (this may take a while) ...", err=True)
     dataset = model.setup_corpus(dataset, threads=threads)
 
-    if white_list is not None:
-        click.echo("Recomputing normalizers for updated exposures ...", err=True)
-        factor_model.init_normalizers([dataset])
+    #if white_list is not None:
+    #    click.echo("Recomputing normalizers for updated exposures ...", err=True)
+    #    factor_model.init_normalizers([dataset])
 
     # --- Compute per-mutation z-posteriors ------------------------------------
     click.echo("Computing per-mutation posteriors ...", err=True)

@@ -138,6 +138,7 @@ def featurize_mutations(
     pass_only=True,
     cluster=True,
     skip_sort=False,
+    white_list=None,
 ):
     from pyfaidx import Fasta
     import numpy as np
@@ -197,6 +198,22 @@ def featurize_mutations(
         logger.info("Intersecting mutations with regions ...")
         with query_fn() as query, Fasta(fasta_file) as fa:
 
+            # If a whitelist is provided, filter mutations to only those
+            # overlapping whitelisted regions before intersecting with
+            # the model's region windows.
+            if white_list is not None:
+                logger.info("Filtering mutations to whitelist regions ...")
+                whitelist_filter = subprocess.Popen(
+                    ["bedtools", "intersect", "-a", "-", "-b", white_list],
+                    stdin=query.stdout,
+                    stdout=subprocess.PIPE,
+                    universal_newlines=True,
+                )
+                mutation_stream = whitelist_filter.stdout
+            else:
+                whitelist_filter = None
+                mutation_stream = query.stdout
+
             intersect_process = subprocess.Popen(
                 [
                     "bedtools",
@@ -209,7 +226,7 @@ def featurize_mutations(
                     "-wb",
                     "-split",
                 ],
-                stdin=query.stdout,
+                stdin=mutation_stream,
                 stdout=subprocess.PIPE,
                 universal_newlines=True,
             )
