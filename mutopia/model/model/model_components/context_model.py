@@ -333,10 +333,15 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         )
 
     def _get_log_context_distribution(self, corpus_state):
-        return np.array(
-            [self._format_component(k) for k in range(self.n_components)],
-            dtype=self.dtype,
-            order="C",
+        # STABILITY: clip so exp() of this distribution cannot overflow float32.
+        return np.clip(
+            np.array(
+                [self._format_component(k) for k in range(self.n_components)],
+                dtype=self.dtype,
+                order="C",
+            ),
+            -30.0,
+            30.0,
         )
 
     def update_corpusstate(self, corpus, **kwargs):
