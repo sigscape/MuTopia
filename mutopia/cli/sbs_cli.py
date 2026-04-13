@@ -1,12 +1,9 @@
 from mutopia.analysis import load_model
-from mutopia.model import GtensorInterface as CS
-from mutopia.modalities import SBS
 from mutopia.modalities.sbs._sbs_clustering import *
 from mutopia.modalities.sbs._sbs_ingestion import featurize_mutations
 from mutopia.modalities.sbs._sbs_nucdata import *
 from mutopia.gtensor import disk_interface as disk
-from mutopia.gtensor import lazy_load
-from mutopia.model.model.latent_var_models.base import iterative_update, calc_local_variables
+from mutopia.gtensor import load_dataset
 from ..genome_utils.bed12_utils import stream_bed12
 import click
 from functools import partial
@@ -221,6 +218,9 @@ def mutation_ll(
     exposure terms to reflect only the covered fraction of each window, improving
     signature assignment accuracy.
     """
+
+    from mutopia.model.model.latent_var_models.base import iterative_update, calc_local_variables
+
     click.echo("Loading model ...", err=True)
     model = load_model(model_file)
     locals_model = model.locals_model_
@@ -279,7 +279,7 @@ def mutation_ll(
 
     # --- Load dataset and apply whitelist ------------------------------------
     click.echo("Loading dataset ...", err=True)
-    dataset = lazy_load(dataset_file)
+    dataset = load_dataset(dataset_file, with_samples=False, with_state=True)
 
     if white_list is not None:
         exposures = _compute_whitelist_exposures(regions_file, white_list)
@@ -292,8 +292,9 @@ def mutation_ll(
             err=True,
         )
 
-    click.echo("Setting up dataset (this may take a while) ...", err=True)
-    dataset = model.setup_corpus(dataset, threads=threads)
+    if model.needs_setup(dataset):
+        click.echo("Setting up dataset (this may take a while) ...", err=True)
+        dataset = model.setup_corpus(dataset, threads=threads)
 
     #if white_list is not None:
     #    click.echo("Recomputing normalizers for updated exposures ...", err=True)
@@ -313,8 +314,10 @@ def mutation_ll(
     obs_weights = np.ascontiguousarray(locals_model._get_weights(sample))
     cond_c = np.ascontiguousarray(cond)
     Nk = iterative_update(
-        alpha, cond_c, obs_weights,
-        locals_model.estep_iterations, locals_model.difference_tol,
+        alpha, cond_c, 
+        obs_weights,
+        100_000, 
+        1e-5,
         alpha.copy(),
     )
     phi = calc_local_variables(alpha, cond_c, obs_weights, Nk)  # (K, I)

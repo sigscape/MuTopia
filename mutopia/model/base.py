@@ -696,6 +696,25 @@ class TopographyModel(ABC, BaseEstimator):
 
         logger.info(f'Added key to dataset: "{key}"')
         return dataset
+    
+    def needs_setup(self, dataset: GTensorDataset) -> bool:
+        """
+        Check if the dataset needs to be set up with corpus state.
+
+        This method checks if the dataset has the necessary corpus state initialized
+        for modeling. If not, it indicates that the dataset needs to be set up.
+
+        Parameters
+        ----------
+        dataset : GTensorDataset
+            The dataset to check for corpus state initialization.
+
+        Returns
+        -------
+        bool
+            True if the dataset needs to be set up (i.e., corpus state is not initialized), False otherwise.
+        """
+        return not self.GT.has_corpusstate(dataset)
 
     def annot_component_distributions(
         self,
