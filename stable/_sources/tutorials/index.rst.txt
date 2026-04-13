@@ -11,14 +11,14 @@ mutational topographic models.
 Tutorial data
 -------------
 
-All five tutorials share a single data bundle hosted on Zenodo. Download and
+All six tutorials share a single data bundle hosted on Zenodo. Download and
 unpack it once before starting any tutorial:
 
 .. code-block:: bash
 
    # Tutorial data bundle (≈ 2 GB): reference genome, pre-built G-Tensor,
    # pre-trained model, and supporting files.
-   wget -O tutorial_data.tar.gz https://zenodo.org/records/TODO/files/tutorial_data.tar.gz
+   wget -O tutorial_data.tar.gz https://zenodo.org/records/18803136/files/tutorial_data.tar.gz
    tar -xzf tutorial_data.tar.gz
 
 This produces a ``tutorial_data/`` directory that every tutorial references.
@@ -37,3 +37,4 @@ record root and can be downloaded individually — see Tutorial 5 for details.
    3.training_models
    4.analyzing_models
    5.annotating_vcfs
+   6.genome_browser_plotting

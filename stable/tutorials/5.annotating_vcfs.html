@@ -3,7 +3,7 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="API Reference" href="../api/index.html"><link rel="prev" title="Tutorial 4: Analyzing Topographic Models" href="4.analyzing_models.html">
+<link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="Tutorial 6: Genome-browser plotting with a trained model" href="6.genome_browser_plotting.html"><link rel="prev" title="Tutorial 4: Analyzing Topographic Models" href="4.analyzing_models.html">
         <link rel="prefetch" href="../_static/mutopia_logo.png" as="image">
         <link rel="prefetch" href="../_static/mutopia_logo.png" as="image">
 
@@ -214,6 +214,7 @@
 <li class="toctree-l2"><a class="reference internal" href="3.training_models.html">Tutorial 3: Tuning and training models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="4.analyzing_models.html">Tutorial 4: Analyzing Topographic Models</a></li>
 <li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Tutorial 5: Annotating VCFs with a Pre-Trained Model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="6.genome_browser_plotting.html">Tutorial 6: Genome-browser plotting with a trained model</a></li>
 </ul>
 </li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../api/index.html">API Reference</a><input aria-label="Toggle navigation of API Reference" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
@@ -277,7 +278,7 @@ this walkthrough is designed to be run against them directly.</p>
 <ul class="simple">
 <li><p>Downloaded a pre-trained model for a tumor type of interest</p></li>
 <li><p>Run <code class="docutils literal notranslate"><span class="pre">topo-model</span> <span class="pre">setup</span></code> to pre-compute locus-level predictions</p></li>
-<li><p>Run <code class="docutils literal notranslate"><span class="pre">mutopia</span> <span class="pre">sbs</span> <span class="pre">annotate-vcf</span></code> against an example liver-cancer VCF</p></li>
+<li><p>Run <code class="docutils literal notranslate"><span class="pre">mutopia-sbs</span> <span class="pre">annotate-vcf</span></code> against an example liver-cancer VCF</p></li>
 <li><p>An output VCF with per-mutation component posteriors and per-sample
 component fractions in the header</p></li>
 </ul>
@@ -311,29 +312,37 @@ record — see the next section.</p>
 <section id="step-1-download-a-pre-trained-model">
 <h2>Step 1: Download a pre-trained model<a class="headerlink" href="#step-1-download-a-pre-trained-model" title="Link to this heading">¶</a></h2>
 <p>MuTopia ships pre-trained models for several tumor types on the
-<a class="reference external" href="https://zenodo.org/records/TODO">Zenodo record</a>. For each tumor type
+<a class="reference external" href="https://zenodo.org/records/18803136">Zenodo record</a>. For each tumor type
 <code class="docutils literal notranslate"><span class="pre">&lt;tumor_type&gt;</span></code> there are two files at the record root:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">&lt;tumor_type&gt;.nc</span></code> — the reference G-Tensor the model was trained on
 (provides locus coordinates, genomic features, and the trinucleotide
 context for every 10 kb window in hg38).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;tumor_type&gt;.nc.regions.bed</span></code> — the sidecar BED file that lists the
+genomic coordinates of each locus in the G-Tensor. MuTopia expects it to
+live next to the <code class="docutils literal notranslate"><span class="pre">.nc</span></code> file.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">&lt;tumor_type&gt;.model.pkl</span></code> — the trained topographic model itself.</p></li>
 </ul>
 <p>Available tumor types include (non-exhaustive):</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Liver       Breast      Lung        Skin
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Liver-HCC   Breast      Lung        Skin
 Colorectal  Pancreas    Prostate    Stomach
 </pre></div>
 </div>
 <p>Pick one that matches your samples. For this walkthrough we use the liver
 model, which pairs naturally with the example VCF in Step 3.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">TUMOR</span><span class="o">=</span>Liver
-<span class="nv">ZENODO</span><span class="o">=</span>https://zenodo.org/records/TODO/files
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">TUMOR</span><span class="o">=</span>Liver-HCC
+<span class="nv">ZENODO</span><span class="o">=</span>https://zenodo.org/records/18803136/files
 
-mkdir<span class="w"> </span>-p<span class="w"> </span>tutorial_data<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>tutorial_data
-wget<span class="w"> </span>-O<span class="w"> </span><span class="si">${</span><span class="nv">TUMOR</span><span class="si">}</span>.nc<span class="w">        </span><span class="si">${</span><span class="nv">ZENODO</span><span class="si">}</span>/<span class="si">${</span><span class="nv">TUMOR</span><span class="si">}</span>.nc
-wget<span class="w"> </span>-O<span class="w"> </span><span class="si">${</span><span class="nv">TUMOR</span><span class="si">}</span>.model.pkl<span class="w"> </span><span class="si">${</span><span class="nv">ZENODO</span><span class="si">}</span>/<span class="si">${</span><span class="nv">TUMOR</span><span class="si">}</span>.model.pkl
-<span class="nb">cd</span><span class="w"> </span>..
+wget<span class="w"> </span>-O<span class="w"> </span><span class="si">${</span><span class="nv">TUMOR</span><span class="si">}</span>.nc<span class="w">             </span><span class="si">${</span><span class="nv">ZENODO</span><span class="si">}</span>/<span class="si">${</span><span class="nv">TUMOR</span><span class="si">}</span>.nc
+wget<span class="w"> </span>-O<span class="w"> </span><span class="si">${</span><span class="nv">TUMOR</span><span class="si">}</span>.nc.regions.bed<span class="w"> </span><span class="si">${</span><span class="nv">ZENODO</span><span class="si">}</span>/<span class="si">${</span><span class="nv">TUMOR</span><span class="si">}</span>.nc.regions.bed
+wget<span class="w"> </span>-O<span class="w"> </span><span class="si">${</span><span class="nv">TUMOR</span><span class="si">}</span>.model.pkl<span class="w">      </span><span class="si">${</span><span class="nv">ZENODO</span><span class="si">}</span>/<span class="si">${</span><span class="nv">TUMOR</span><span class="si">}</span>.model.pkl
 </pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Every G-Tensor has a sidecar <code class="docutils literal notranslate"><span class="pre">&lt;name&gt;.nc.regions.bed</span></code> file that records
+the genomic coordinates of each locus. MuTopia resolves it by path
+relative to the <code class="docutils literal notranslate"><span class="pre">.nc</span></code> file, so keep both files next to each other.</p>
 </div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -350,9 +359,9 @@ them into a copy of the G-Tensor. The resulting <code class="docutils literal no
 reused across many VCF samples, and annotation is much faster against it than
 against the raw dataset.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>topo-model<span class="w"> </span>setup<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>tutorial_data/Liver.model.pkl<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>tutorial_data/Liver.nc<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>tutorial_data/Liver_setup.nc<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>Liver-HCC.model.pkl<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>Liver-HCC.nc<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>Liver-HCC_setup.nc<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-@<span class="w"> </span><span class="m">4</span>
 </pre></div>
 </div>
@@ -360,34 +369,57 @@ against the raw dataset.</p>
 <section id="step-3-annotate-a-vcf">
 <h2>Step 3: Annotate a VCF<a class="headerlink" href="#step-3-annotate-a-vcf" title="Link to this heading">¶</a></h2>
 <p>To make this tutorial fully reproducible without requiring you to bring your
-own sample, we also host a single example VCF at the Zenodo record root:</p>
+own sample, we also host a single example VCF:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">CHC197.sample.hg38.vcf.gz</span></code> — whole-genome somatic SNVs from a LICA-FR
 liver cancer sample (PCAWG donor CHC197), lifted to hg38. Roughly 12k PASS
 SNVs, ~260 KB.</p></li>
 </ul>
-<p>Download it and run the annotator:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wget<span class="w"> </span>-O<span class="w"> </span>tutorial_data/CHC197.sample.hg38.vcf.gz<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>https://zenodo.org/records/TODO/files/CHC197.sample.hg38.vcf.gz
+<p>You will also need an hg38 reference FASTA. MuTopia does not ship one — point
+<code class="docutils literal notranslate"><span class="pre">-fa</span></code> at whichever copy you already have (e.g. the one you use with
+<code class="docutils literal notranslate"><span class="pre">bcftools</span></code>/<code class="docutils literal notranslate"><span class="pre">samtools</span></code>). The FASTA must be indexed (<code class="docutils literal notranslate"><span class="pre">hg38.fa.fai</span></code> next to
+it); run <code class="docutils literal notranslate"><span class="pre">samtools</span> <span class="pre">faidx</span> <span class="pre">hg38.fa</span></code> once if it isn’t.</p>
+<p>Download the example VCF and run the annotator:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wget<span class="w"> </span>-O<span class="w"> </span>CHC197.sample.hg38.vcf.gz<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>https://github.com/sigscape/MuTopia/releases/download/v1.0.5/CHC197.sample.hg38.vcf.gz
 
-mutopia<span class="w"> </span>sbs<span class="w"> </span>annotate-vcf<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>tutorial_data/Liver.model.pkl<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>tutorial_data/Liver_setup.nc<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>tutorial_data/CHC197.sample.hg38.vcf.gz<span class="w"> </span><span class="se">\</span>
+mutopia-sbs<span class="w"> </span>annotate-vcf<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>Liver-HCC.model.pkl<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>Liver-HCC_setup.nc<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>CHC197.sample.hg38.vcf.gz<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-fa<span class="w"> </span>/path/to/hg38.fa<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-w<span class="w"> </span>VAF<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--no-pass-only<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--no-cluster<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-o<span class="w"> </span>CHC197_annotated.vcf
 </pre></div>
 </div>
-<p>If you have your own background mutation-rate bedgraph (used to cluster
-kataegis-like adjacent mutations before ingestion), supply it with <code class="docutils literal notranslate"><span class="pre">-m</span></code>:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mutopia<span class="w"> </span>sbs<span class="w"> </span>annotate-vcf<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>tutorial_data/Liver.model.pkl<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>tutorial_data/Liver_setup.nc<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>tutorial_data/CHC197.sample.hg38.vcf.gz<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-m<span class="w"> </span>tutorial_data/mutation-rate.hg38.bedgraph.gz<span class="w"> </span><span class="se">\</span>
+<p>A few notes on the flags:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">-fa</span></code> supplies the hg38 reference FASTA so MuTopia can resolve the
+trinucleotide context of each mutation.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-w</span> <span class="pre">VAF</span></code> tells MuTopia to read the variant allele fraction from the
+<code class="docutils literal notranslate"><span class="pre">VAF</span></code> <code class="docutils literal notranslate"><span class="pre">INFO</span></code> field and use it as a per-mutation weight. (The example
+VCF already carries <code class="docutils literal notranslate"><span class="pre">VAF=...</span></code> on every record; for your own data, pick
+whichever INFO tag your caller emits.)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--no-pass-only</span></code> keeps every record in the VCF, not just those with
+<code class="docutils literal notranslate"><span class="pre">FILTER=PASS</span></code>. The example VCF has an empty <code class="docutils literal notranslate"><span class="pre">FILTER</span></code> column on every
+row, so without this flag nothing would make it through.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--no-cluster</span></code> skips MuTopia’s kataegis clustering pre-pass. You can
+drop it if you also supply a background mutation-rate bedgraph via
+<code class="docutils literal notranslate"><span class="pre">-m</span></code>:</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mutopia-sbs<span class="w"> </span>annotate-vcf<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>Liver-HCC.model.pkl<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>Liver-HCC_setup.nc<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>CHC197.sample.hg38.vcf.gz<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-fa<span class="w"> </span>/path/to/hg38.fa<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-w<span class="w"> </span>VAF<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--no-pass-only<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-m<span class="w"> </span>mutation-rate.hg38.bedgraph.gz<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-o<span class="w"> </span>CHC197_annotated.vcf
 </pre></div>
 </div>
-<p>If you omit <code class="docutils literal notranslate"><span class="pre">-m</span></code>, also pass <code class="docutils literal notranslate"><span class="pre">--no-cluster</span></code> to skip the clustering step.</p>
 <p>While running, progress messages are printed to stderr:</p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Loading model ...
 Dataset has 279694 regions, 279694 after coord subsetting.
@@ -445,10 +477,14 @@ information, the model assumes the entire genome was observed, which biases
 signature assignments because the model expects many more background mutations
 than were detected.</p>
 <p>Provide a BED file of assayed regions with <code class="docutils literal notranslate"><span class="pre">--white-list</span></code>:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mutopia<span class="w"> </span>sbs<span class="w"> </span>annotate-vcf<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>tutorial_data/Liver.model.pkl<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>tutorial_data/Liver_setup.nc<span class="w"> </span><span class="se">\</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mutopia-sbs<span class="w"> </span>annotate-vcf<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>Liver-HCC.model.pkl<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>Liver-HCC_setup.nc<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>sample.vcf.gz<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-fa<span class="w"> </span>/path/to/hg38.fa<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-w<span class="w"> </span>VAF<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--no-pass-only<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--no-cluster<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--white-list<span class="w"> </span>capture_targets.bed<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-o<span class="w"> </span>sample_annotated.vcf
 </pre></div>
@@ -471,10 +507,14 @@ add or remove a prefix if needed.</p>
 <section id="multi-sample-vcfs">
 <h2>Multi-sample VCFs<a class="headerlink" href="#multi-sample-vcfs" title="Link to this heading">¶</a></h2>
 <p>If your VCF contains calls for multiple samples, specify which one to annotate:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mutopia<span class="w"> </span>sbs<span class="w"> </span>annotate-vcf<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>tutorial_data/Liver.model.pkl<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>tutorial_data/Liver_setup.nc<span class="w"> </span><span class="se">\</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mutopia-sbs<span class="w"> </span>annotate-vcf<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>Liver-HCC.model.pkl<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>Liver-HCC_setup.nc<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>cohort.vcf.gz<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-fa<span class="w"> </span>/path/to/hg38.fa<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-w<span class="w"> </span>VAF<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--no-pass-only<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--no-cluster<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-name<span class="w"> </span>SAMPLE_ID<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-o<span class="w"> </span>SAMPLE_ID_annotated.vcf
 </pre></div>
@@ -482,18 +522,19 @@ add or remove a prefix if needed.</p>
 </section>
 <section id="additional-options">
 <h2>Additional options<a class="headerlink" href="#additional-options" title="Link to this heading">¶</a></h2>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>-m, --mutation-rate-file FILE   Background mutation rate bedgraph (for clustering)
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>-fa, --fasta FILE               Reference genome FASTA (required)
+-w, --weight-tag TAG            INFO tag to use as per-mutation weight (e.g. &quot;VAF&quot;)
+-m, --mutation-rate-file FILE   Background mutation rate bedgraph (for clustering)
 --no-cluster                    Skip kataegis mutation clustering
+--no-pass-only                  Include non-PASS variants
 -name, --sample-name NAME       Sample name in multi-sample VCF
 -chr, --chr-prefix PREFIX       Chromosome prefix to add (e.g. &quot;chr&quot;)
--fa, --fasta FILE               Override reference genome FASTA
 -@, --threads N                 Parallel threads (default: 1)
---no-pass-only                  Include non-PASS variants
 --skip-sort                     Skip VCF sorting (VCF must be lexicographically sorted)
 -o, --output FILE               Output VCF path (default: stdout)
 </pre></div>
 </div>
-<p>Run <code class="docutils literal notranslate"><span class="pre">mutopia</span> <span class="pre">sbs</span> <span class="pre">annotate-vcf</span> <span class="pre">--help</span></code> for the full option reference.</p>
+<p>Run <code class="docutils literal notranslate"><span class="pre">mutopia-sbs</span> <span class="pre">annotate-vcf</span> <span class="pre">--help</span></code> for the full option reference.</p>
 </section>
 </section>
 
@@ -502,12 +543,12 @@ add or remove a prefix if needed.</p>
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="../api/index.html">
+          <a class="next-page" href="6.genome_browser_plotting.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">API Reference</div>
+                <div class="title">Tutorial 6: Genome-browser plotting with a trained model</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>

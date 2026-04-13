@@ -7,24 +7,24 @@
    "source": [
     "# Tutorial 6: Genome-browser plotting with a trained model\n",
     "\n",
-    "Tutorial 2 introduced the composable `track_plot` API for drawing genome-browser-style figures from a G-Tensor. Tutorial 4 touched on two model-aware composites (`plot_marginal_observed_vs_expected` and `plot_component_rates`). This tutorial is a comprehensive tour of everything that becomes available **once you have a trained topographic model annotating your G-Tensor** — per-component rates, the topography heatmap, strand-aware gene-expression tracks, gene annotations, and a full hypothesis-generation dashboard you can point at any region of the genome.\n",
+    "Tutorial 2 introduced the composable `track_plot` API for drawing genome-browser-style figures from a G-Tensor. Tutorial 4 touched on two model-aware composites (`plot_marginal_observed_vs_expected` and `plot_component_rates`). This tutorial is a comprehensive tour of everything that becomes available **once you have a trained topographic model annotating your G-Tensor** \u2014 per-component rates, the topography heatmap, strand-aware gene-expression tracks, gene annotations, and a full hypothesis-generation dashboard you can point at any region of the genome.\n",
     "\n",
-    "We won't re-teach the primitives from Tutorial 2 (`scatterplot`, `line_plot`, `fill_plot`, `stack_plots`, `pipeline`, `select`, `make_view`, `plot_view`) — glance back at that tutorial if anything feels unfamiliar.\n",
+    "We won't re-teach the primitives from Tutorial 2 (`scatterplot`, `line_plot`, `fill_plot`, `stack_plots`, `pipeline`, `select`, `make_view`, `plot_view`) \u2014 glance back at that tutorial if anything feels unfamiliar.\n",
     "\n",
     "## Prerequisites\n",
     "\n",
     "- MuTopia package installed\n",
-    "- The shared tutorial data bundle from the [Zenodo record](https://zenodo.org/records/TODO) unpacked to `tutorial_data/` — see [Tutorial data](index.html#tutorial-data)\n",
+    "- The shared tutorial data bundle from the [Zenodo record](https://zenodo.org/records/18803136) unpacked to `tutorial_data/` \u2014 see [Tutorial data](index.html#tutorial-data)\n",
     "- A trained model at `tutorial_data/pretrained_model.pkl` (shipped in the bundle; also produced by Tutorial 3)\n",
     "- A cytoband file at `tutorial_data/cytoBand.txt` and the MANE GTF at `tutorial_data/MANE.GRCh38.v1.3.ensembl_genomic.gtf` (both shipped in the bundle)\n",
     "\n",
     "## What we'll build\n",
     "\n",
-    "1. **Observed vs predicted** — peel a composite track apart into primitives and back\n",
-    "2. **Per-component rates** — ordered, labeled, hierarchically clustered\n",
-    "3. **The topography heatmap** — `TopographyTransformer` + `plot_topography` + empirical overlay\n",
-    "4. **Feature context** — heatmaps of chromatin features, strand-aware expression, gene annotations\n",
-    "5. **A reusable dashboard** — one config, three regions, zero copy-paste"
+    "1. **Observed vs predicted** \u2014 peel a composite track apart into primitives and back\n",
+    "2. **Per-component rates** \u2014 ordered, labeled, hierarchically clustered\n",
+    "3. **The topography heatmap** \u2014 `TopographyTransformer` + `plot_topography` + empirical overlay\n",
+    "4. **Feature context** \u2014 heatmaps of chromatin features, strand-aware expression, gene annotations\n",
+    "5. **A reusable dashboard** \u2014 one config, three regions, zero copy-paste"
    ]
   },
   {
@@ -34,7 +34,7 @@
    "source": [
     "## Setup\n",
     "\n",
-    "Load the model, annotate the dataset, and rename components up front. Renaming is optional but makes every subsequent plot (and every legend) readable — once we've labeled components `SBS1`, `SBS5`, etc., everything downstream inherits those names."
+    "Load the model, annotate the dataset, and rename components up front. Renaming is optional but makes every subsequent plot (and every legend) readable \u2014 once we've labeled components `SBS1`, `SBS5`, etc., everything downstream inherits those names."
    ]
   },
   {
@@ -53,14 +53,14 @@
       "\u001b[32mINFO    \u001b[0m \u001b[34mMutopia\u001b[0m Setting up dataset state ...\u001b[0m\n",
       "\u001b[32mINFO    \u001b[0m \u001b[34mMutopia\u001b[0m Done ...\u001b[0m\n",
       "\u001b[32mINFO    \u001b[0m \u001b[34mMutopia\u001b[0m Setting model to prediction mode.\u001b[0m\n",
-      "Estimating contributions: 100%|██████████████████████████████████| 185/185 [00:01<00:00, 152.36it/s]\n",
+      "Estimating contributions: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 185/185 [00:01<00:00, 152.36it/s]\n",
       "\u001b[32mINFO    \u001b[0m \u001b[34mMutopia\u001b[0m Added key to dataset: \"contributions\"\u001b[0m\n",
       "\u001b[32mINFO    \u001b[0m \u001b[34mMutopia\u001b[0m Added keys to dataset: Spectra/spectra, Spectra/interactions, Spectra/shared_effects\u001b[0m\n",
       "\u001b[32mINFO    \u001b[0m \u001b[34mMutopia\u001b[0m Added key: \"component_distributions\"\u001b[0m\n",
       "\u001b[32mINFO    \u001b[0m \u001b[34mMutopia\u001b[0m Added key: \"component_distributions_locus\"\u001b[0m\n",
       "\u001b[32mINFO    \u001b[0m \u001b[34mMutopia\u001b[0m Added key: \"predicted_marginal\"\u001b[0m\n",
       "\u001b[32mINFO    \u001b[0m \u001b[34mMutopia\u001b[0m Added key: \"predicted_marginal_locus\"\u001b[0m\n",
-      "Reducing samples: 100%|██████████| 184/184 [00:27<00:00,  6.76it/s]\n",
+      "Reducing samples: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 184/184 [00:27<00:00,  6.76it/s]\n",
       "\u001b[32mINFO    \u001b[0m \u001b[34mMutopia\u001b[0m Added key: \"empirical_marginal\"\u001b[0m\n",
       "\u001b[32mINFO    \u001b[0m \u001b[34mMutopia\u001b[0m Added key: \"empirical_marginal_locus\"\u001b[0m\n"
      ]
@@ -87,7 +87,7 @@
    "source": [
     "Inspect the learned spectra (Tutorial 4 covers this in depth) and assign biologically meaningful names in the same order. For a 15-component liver model, the dominant signatures typically line up with SBS1 (clock-like CpG deamination), SBS5 (clock-like), SBS16 (liver-specific), SBS22 (aristolochic acid), SBS40, and a handful of low-activity processes. Use `mu.pl.plot_signature_panel(data)` to decide the mapping for your own model.\n",
     "\n",
-    "> **Tip:** If you're not ready to commit to a mapping yet, skip this cell — every plot below also works with the raw `M0..M14` labels."
+    "> **Tip:** If you're not ready to commit to a mapping yet, skip this cell \u2014 every plot below also works with the raw `M0..M14` labels."
    ]
   },
   {
@@ -139,14 +139,14 @@
    "id": "t6-step1-md",
    "metadata": {},
    "source": [
-    "## 1. Observed vs predicted: primitives → composite\n",
+    "## 1. Observed vs predicted: primitives \u2192 composite\n",
     "\n",
     "`plot_marginal_observed_vs_expected` is the single most useful model-aware track: it overlays the empirical mutation rate (from your samples) on the model's locus-level prediction. Before we use the composite, let's build it by hand out of primitives so the machinery is transparent.\n",
     "\n",
     "The two variables we need are both added to `data` by `model.annot_data`:\n",
     "\n",
-    "- `empirical_marginal_locus` — observed mutations per locus, summed over context and configuration\n",
-    "- `predicted_marginal_locus` — model-predicted rate per locus\n",
+    "- `empirical_marginal_locus` \u2014 observed mutations per locus, summed over context and configuration\n",
+    "- `predicted_marginal_locus` \u2014 model-predicted rate per locus\n",
     "\n",
     "`view.smooth(n)` is a pipeline step that convolves along the genomic axis of any selected variable."
    ]
@@ -204,7 +204,7 @@
    "id": "t6-step1-md2",
    "metadata": {},
    "source": [
-    "That's five lines per track — workable, but it gets repetitive across many regions. The composite does exactly this, with sane defaults:"
+    "That's five lines per track \u2014 workable, but it gets repetitive across many regions. The composite does exactly this, with sane defaults:"
    ]
   },
   {
@@ -291,7 +291,7 @@
    "id": "t6-step2-manual-md",
    "metadata": {},
    "source": [
-    "If you only care about one component — say you want to zoom in on SBS1 — you can grab it directly via `select`'s keyword selection. Any keyword passed to `select` is forwarded to `xarray.DataArray.sel`, so you can pick along *any* named dimension:"
+    "If you only care about one component \u2014 say you want to zoom in on SBS1 \u2014 you can grab it directly via `select`'s keyword selection. Any keyword passed to `select` is forwarded to `xarray.DataArray.sel`, so you can pick along *any* named dimension:"
    ]
   },
   {
@@ -337,11 +337,11 @@
    "source": [
     "## 3. The topography heatmap\n",
     "\n",
-    "The **topography** is MuTopia's marquee view: a heatmap whose rows are (mutation type × trinucleotide context × orientation) and whose columns are genomic loci. Each cell is the log-ratio of the predicted per-context mutation rate at that locus to the locus's overall predicted rate. Rows are hierarchically ordered so patterns associated with the same underlying process land together.\n",
+    "The **topography** is MuTopia's marquee view: a heatmap whose rows are (mutation type \u00d7 trinucleotide context \u00d7 orientation) and whose columns are genomic loci. Each cell is the log-ratio of the predicted per-context mutation rate at that locus to the locus's overall predicted rate. Rows are hierarchically ordered so patterns associated with the same underlying process land together.\n",
     "\n",
     "`TopographyTransformer` is a lightweight, scikit-learn-style transformer: `.fit(data)` computes the row ordering and per-row mean/std once over the whole dataset, and `.transform(view)` standardizes a slice on demand. `plot_topography` is the heatmap wrapper.\n",
     "\n",
-    "**Fit once, reuse everywhere** — never refit inside a config."
+    "**Fit once, reuse everywhere** \u2014 never refit inside a config."
    ]
   },
   {
@@ -434,7 +434,7 @@
    "source": [
     "### 4b. Strand-aware gene expression\n",
     "\n",
-    "`plot_gene_expression_track` is a composite that combines the `GeneExpression` magnitude feature with the `GeneStrand` feature (+1 / −1 / 0), producing a signed bar plot. With `log1p=True` it applies a symmetric log transform so both strongly-expressed strands are visible at once."
+    "`plot_gene_expression_track` is a composite that combines the `GeneExpression` magnitude feature with the `GeneStrand` feature (+1 / \u22121 / 0), producing a signed bar plot. With `log1p=True` it applies a symmetric log transform so both strongly-expressed strands are visible at once."
    ]
   },
   {
@@ -490,7 +490,7 @@
      "output_type": "stream",
      "text": [
       "\u001b[32mINFO    \u001b[0m \u001b[34mMutopia\u001b[0m Loading track data from MANE.GRCh38.v1.3.ensembl_genomic.gtf ...\u001b[0m\n",
-      "100%|██████████| 19352/19352 [00:05<00:00, 3382.24it/s]\n",
+      "100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 19352/19352 [00:05<00:00, 3382.24it/s]\n",
       "DEBUG:pygenometracks.tracks.GenomeTrack:ylim 44.779999999999994,-0.08\n",
       "DEBUG:pygenometracks.tracks.GenomeTrack:ylim (np.float64(44.779999999999994), np.float64(-0.08))\n"
      ]
@@ -605,7 +605,7 @@
    "id": "t6-step5-swap-md",
    "metadata": {},
    "source": [
-    "Now the real demonstration: *swap the view, keep the dashboard*. Each of these calls produces a completely different figure from the same `dashboard` function. This is the workflow pattern to steal — build a dashboard once, then fly around the genome."
+    "Now the real demonstration: *swap the view, keep the dashboard*. Each of these calls produces a completely different figure from the same `dashboard` function. This is the workflow pattern to steal \u2014 build a dashboard once, then fly around the genome."
    ]
   },
   {
@@ -635,7 +635,7 @@
     }
    ],
    "source": [
-    "# A heterochromatic desert on chr1 — expect low predicted rate, sparse genes.\n",
+    "# A heterochromatic desert on chr1 \u2014 expect low predicted rate, sparse genes.\n",
     "view_desert = tr.make_view(data, 'chr1:80_000_000-95_000_000')\n",
     "tr.plot_view(dashboard, view_desert, scalebar_bp=1_000_000, width=12)\n",
     "None"
@@ -650,11 +650,11 @@
     "\n",
     "The composites above cover the common cases, but you'll eventually want to drop in something the library doesn't provide. Three ways out:\n",
     "\n",
-    "- **`tr.custom_plot(fn, height=...)`** — wrap a raw function `fn(ax, *, dataset, start, end, idx, interval, **kw)` and stick it in a config like any other track. This is how every composite is built internally.\n",
-    "- **`tr.columns(a, b, ..., width_ratios=[...])`** — put tracks side-by-side instead of stacked. Useful for a narrow summary column next to a wide genome track. Pass `...` (the `Ellipsis`) as a placeholder to leave a column blank.\n",
-    "- **`tr.static_track(track_type='bigwig', file='path/to/file.bw', height=0.5, **props)`** — wraps an arbitrary `pygenometracks` track. Drops any BigWig/BED/GTF from disk straight into your figure without going through the G-Tensor at all.\n",
+    "- **`tr.custom_plot(fn, height=...)`** \u2014 wrap a raw function `fn(ax, *, dataset, start, end, idx, interval, **kw)` and stick it in a config like any other track. This is how every composite is built internally.\n",
+    "- **`tr.columns(a, b, ..., width_ratios=[...])`** \u2014 put tracks side-by-side instead of stacked. Useful for a narrow summary column next to a wide genome track. Pass `...` (the `Ellipsis`) as a placeholder to leave a column blank.\n",
+    "- **`tr.static_track(track_type='bigwig', file='path/to/file.bw', height=0.5, **props)`** \u2014 wraps an arbitrary `pygenometracks` track. Drops any BigWig/BED/GTF from disk straight into your figure without going through the G-Tensor at all.\n",
     "\n",
-    "Here's a minimal `custom_plot` example that shades the top 5% mutated loci in the current view. Notice that MuTopia passes the full `dataset`, the `start`/`end` coordinates of each locus in the view, and the integer `idx` selector — that's the contract every track obeys."
+    "Here's a minimal `custom_plot` example that shades the top 5% mutated loci in the current view. Notice that MuTopia passes the full `dataset`, the `start`/`end` coordinates of each locus in the view, and the integer `idx` selector \u2014 that's the contract every track obeys."
    ]
   },
   {
@@ -664,9 +664,9 @@
    "source": [
     "## Next steps\n",
     "\n",
-    "- **Tutorial 4** — signature spectra, SHAP feature importance, component interaction matrices. Everything here is a per-region view; Tutorial 4 covers the global view.\n",
-    "- **Tutorial 5** — apply the same trained model to annotate your own VCFs with per-mutation component posteriors.\n",
-    "- Dig into `mutopia/plot/track_plot/tracks.py` — every composite in this tutorial is ~20 lines and a good template for building your own."
+    "- **Tutorial 4** \u2014 signature spectra, SHAP feature importance, component interaction matrices. Everything here is a per-region view; Tutorial 4 covers the global view.\n",
+    "- **Tutorial 5** \u2014 apply the same trained model to annotate your own VCFs with per-mutation component posteriors.\n",
+    "- Dig into `mutopia/plot/track_plot/tracks.py` \u2014 every composite in this tutorial is ~20 lines and a good template for building your own."
    ]
   }
  ],
