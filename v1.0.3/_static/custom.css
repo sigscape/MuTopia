@@ -1,0 +1,76 @@
+:root{ --content-width: 85rem; --toc-width: 22rem; }
+
+/* Furo exposes CSS vars; enforce wider content area */
+.content .bd-article-container {
+  max-width: var(--content-width);
+}
+
+.sidebar-drawer, .toc-drawer {
+  width: var(--toc-width);
+}
+
+/* ===== Notebook Output Styling ===== */
+
+/* Improve visibility of stdout/stderr text in notebook outputs */
+.nboutput .output_area pre {
+  background-color: #f8f9fa !important;
+  color: #212529 !important;
+  padding: 0.5em !important;
+  border-radius: 4px !important;
+  border: 1px solid #dee2e6 !important;
+}
+
+/* Style for text/plain outputs */
+.nboutput .output_text pre {
+  background-color: #f8f9fa !important;
+  color: #212529 !important;
+}
+
+/* Ensure HTML repr outputs have proper background and text colors */
+.nboutput .output_html {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  padding: 0.5em !important;
+  border-radius: 4px !important;
+  border: 1px solid #dee2e6 !important;
+}
+
+/* Force text color for all elements within HTML outputs */
+.nboutput .output_html * {
+  color: #000000 !important;
+}
+
+/* Special handling for dataframes and tables in HTML output */
+.nboutput .output_html table {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
+.nboutput .output_html table th,
+.nboutput .output_html table td {
+  color: #000000 !important;
+  border-color: #dee2e6 !important;
+}
+
+/* Dark mode adjustments */
+body[data-theme="dark"] .nboutput .output_area pre {
+  background-color: #2d2d2d !important;
+  color: #e0e0e0 !important;
+  border-color: #444444 !important;
+}
+
+body[data-theme="dark"] .nboutput .output_text pre {
+  background-color: #2d2d2d !important;
+  color: #e0e0e0 !important;
+}
+
+body[data-theme="dark"] .nboutput .output_html {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border-color: #444444 !important;
+}
+
+/* Ensure dark mode HTML outputs still have light background for readability */
+body[data-theme="dark"] .nboutput .output_html * {
+  color: #000000 !important;
+}
