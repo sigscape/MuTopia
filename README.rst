@@ -1,12 +1,6 @@
 MuTopia — Mutational Topography Modeling
 =========================================
 
-.. image:: website/source/_static/mutopia_logo.png
-   :width: 240px
-   :align: center
-
-|
-
 **MuTopia** learns *topographic models* of somatic mutation: it simultaneously
 decomposes a cancer cohort's mutation counts into distinct processes (signatures)
 **and** explains how local genomic context shapes each signature's activity across
@@ -37,7 +31,7 @@ VCF annotation                              ``mutopia sbs annotate-vcf`` assigns
 Panel/exome support                         Whitelist BED corrects exposure for
                                             non-whole-genome sequencing
 Hyperparameter tuning                       Optuna-based study management via ``topo-model study``
-Interactive track plots                     Composable genome-browser figures in matplotlib
+Genome track plots                          Composable genome-browser figures in matplotlib
 ==========================================  ================================================
 
 Installation
