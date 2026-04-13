@@ -32,8 +32,8 @@ ENV VIRTUAL_ENV=/opt/mutopia
 RUN uv venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-COPY . /tmp/mutopia
-RUN uv pip install --no-cache /tmp/mutopia && rm -rf /tmp/mutopia
+ARG VERSION
+RUN uv pip install --no-cache "mutopia${VERSION:+==$VERSION}"
 
 # ── Metadata ──────────────────────────────────────────────────────────────────
 LABEL org.opencontainers.image.title="MuTopia" \
