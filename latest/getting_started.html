@@ -295,11 +295,10 @@ docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>curl<span class="w"> </span>-LsSf<span class="w"> </span>https://astral.sh/uv/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sh
 </pre></div>
 </div>
-<p>Then create a Python 3.11 virtual environment and install MuTopia directly from
-GitHub:</p>
+<p>Then create a Python 3.11 virtual environment and install MuTopia from PyPI:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>uv<span class="w"> </span>venv<span class="w"> </span>--python<span class="w"> </span><span class="m">3</span>.11<span class="w"> </span>.venv
 <span class="nb">source</span><span class="w"> </span>.venv/bin/activate
-uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;git+https://github.com/AllenWLynch/Mutopia.git@imports&quot;</span>
+uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>mutopia
 </pre></div>
 </div>
 <p><strong>With conda</strong></p>
@@ -307,7 +306,7 @@ uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </s
 the pinned scikit-learn version:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>mutopia<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span>-y<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.11
 conda<span class="w"> </span>activate<span class="w"> </span>mutopia
-pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;git+https://github.com/AllenWLynch/Mutopia.git@imports&quot;</span>
+pip<span class="w"> </span>install<span class="w"> </span>mutopia
 </pre></div>
 </div>
 </section>
