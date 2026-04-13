@@ -11,7 +11,27 @@ We recommend `uv <https://docs.astral.sh/uv/>`_ to manage the environment — it
 resolves and installs dependencies significantly faster than pip alone, and its
 lockfile-based workflow makes it easy to reproduce exact environments across machines.
 
-**With uv (recommended)**
+**With Docker (zero setup)**
+
+The fastest way to try MuTopia is with the pre-built Docker image, which ships
+with MuTopia and all the bioinformatics tools it depends on (``bedtools``,
+``bcftools``, ``tabix``, UCSC ``bigWigAverageOverBed``):
+
+.. code-block:: bash
+
+   docker pull allenlynch/mutopia:latest
+
+   # Mount your data directory and run any CLI command
+   docker run --rm -v "$PWD":/workspace allenlynch/mutopia:latest \
+       gtensor --help
+
+For interactive use, drop into a shell inside the container:
+
+.. code-block:: bash
+
+   docker run --rm -it -v "$PWD":/workspace allenlynch/mutopia:latest bash
+
+**With uv (recommended for native installs)**
 
 If you don't have uv yet, install it with the official one-liner:
 

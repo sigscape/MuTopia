@@ -48,7 +48,17 @@ used for fast gradient-boosted tree training. We recommend
 `uv <https://docs.astral.sh/uv/>`_ — it resolves and installs the full dependency
 set in seconds and keeps environments reproducible across machines.
 
-**With uv (recommended)**
+**With Docker (zero setup)**
+
+The pre-built image ships with MuTopia plus all the bioinformatics tools it
+needs (``bedtools``, ``bcftools``, ``tabix``, UCSC ``bigWigAverageOverBed``):
+
+.. code-block:: bash
+
+   docker pull allenlynch/mutopia:latest
+   docker run --rm -v "$PWD":/workspace allenlynch/mutopia:latest gtensor --help
+
+**With uv (recommended for native installs)**
 
 .. code-block:: bash
 
