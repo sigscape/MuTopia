@@ -10,10 +10,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # ── UCSC bigWigAverageOverBed ─────────────────────────────────────────────────
-# Detects linux/amd64 (x86_64) or linux/arm64 (aarch64) automatically.
-RUN ARCH=$(uname -m) && \
+# UCSC only publishes x86_64 binaries; fall back to that on arm64 (runs via
+# Rosetta on Apple Silicon / QEMU on other ARM hosts with no changes needed).
+RUN ARCH=$(uname -m); \
+    if wget -q --spider \
+        "https://hgdownload.soe.ucsc.edu/admin/exe/linux.${ARCH}/bigWigAverageOverBed" \
+        2>/dev/null; then \
+        UCSC_ARCH="${ARCH}"; \
+    else \
+        UCSC_ARCH="x86_64"; \
+    fi; \
     wget -q -O /usr/local/bin/bigWigAverageOverBed \
-        "https://hgdownload.soe.ucsc.edu/admin/exe/linux.${ARCH}/bigWigAverageOverBed" && \
+        "https://hgdownload.soe.ucsc.edu/admin/exe/linux.${UCSC_ARCH}/bigWigAverageOverBed" && \
     chmod +x /usr/local/bin/bigWigAverageOverBed
 
 # ── uv ────────────────────────────────────────────────────────────────────────
