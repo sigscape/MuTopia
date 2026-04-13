@@ -110,14 +110,8 @@ Quick start
 Documentation
 -------------
 
-Full documentation, including tutorials and API reference, is available at the
-project website. To build the docs locally:
-
-.. code-block:: bash
-
-   conda activate mutopia-docs
-   cd website && make html
-   open build/html/index.html
+Full documentation, tutorials, and API reference are at
+`sigscape.github.io/MuTopia <https://sigscape.github.io/MuTopia>`_.
 
 Citation
 --------
