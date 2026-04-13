@@ -1,17 +1,11 @@
-MuTopia — Mutational Topography Modeling
-=========================================
-
-.. image:: _static/mutopia_logo.png
-   :align: center
-   :width: 240px
-
-|
+MuTopia — Mutational Topography Inference and Analysis
+======================================================
 
 **MuTopia** is a Python toolkit for studying how mutational signatures vary across the
 genome. It learns *topographic models* that jointly explain which mutational processes
-are active in a cancer genome and how local genomic context (chromatin state, replication
-timing, transcription level, DNA sequence composition, …) shapes the rate of each process
-across the genome.
+are active in a genome and how local genomic context (chromatin state, replication
+timing, transcription level, DNA sequence composition, …) shapes process's mutation rate
+profiles.
 
 .. grid:: 3
 
@@ -28,36 +22,16 @@ across the genome.
       :link-type: doc
 
       Decompose mutation counts into topographically-resolved components with
-      gradient-boosted local models and iterative NMF refitting. Tune hyperparameters
+      expressive, nonlinear rate models. Tune hyperparameters
       automatically with Optuna.
 
-   .. grid-item-card:: Annotate VCFs
+   .. grid-item-card:: Annotate Data
       :link: tutorials/5.annotating_vcfs
       :link-type: doc
 
-      Apply a trained model to any VCF — including panel and exome data via the
-      whitelist feature — and assign every mutation a posterior probability over
-      model components.
-
-Why MuTopia?
-------------
-
-Standard mutational signature tools (SigProfiler, SigFit, deconstructSigs, …) assign
-signatures to *samples*. MuTopia goes further: it asks **why** each locus in the genome
-has the mutation rate that it does, and which genomic features drive that variation.
-
-Key capabilities:
-
-- **Topographic resolution** — Learns how local chromatin, sequence, and regulatory
-  features modulate each signature's activity across 10 kb windows genome-wide.
-- **SHAP interpretability** — Attributes locus-level rate variation to individual
-  features with SHAP values from the underlying gradient-boosted tree models.
-- **Per-mutation posteriors** — Assigns every somatic mutation to the most likely
-  generating process, supporting downstream variant prioritization and filtering.
-- **Panel/exome support** — The whitelist feature corrects for unobserved territory,
-  enabling accurate refitting on targeted sequencing data.
-- **Interactive visualization** — Composable genome-browser track plots and
-  publication-quality signature panels included out of the box.
+      Apply a trained model to any VCF — including panel and exome data - to learn
+      which topographic processes are driving mutagenes. Go a step further and annotate
+      each mutation with its most likely generating process. 
 
 Quick example
 -------------
