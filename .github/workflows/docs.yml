@@ -1,0 +1,108 @@
+name: Deploy docs
+
+# Deploys to the gh-pages branch (incremental — old versions are never wiped).
+#
+# Push to main       → website/latest/
+# Push vX.Y.Z tag    → website/vX.Y.Z/  +  website/stable/  +  root redirect
+#
+# One-time repo setup required:
+#   Settings → Pages → Source: "Deploy from a branch" → branch: gh-pages, / (root)
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to push commits to gh-pages
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv pip install --system -e .
+          uv pip install --system -r website/requirements.txt
+
+      - name: Build docs
+        working-directory: website
+        run: make html
+
+      # ── Determine where to deploy ──────────────────────────────────────────
+      - name: Set deploy target
+        id: vars
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "dest=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+            echo "is_release=true"         >> $GITHUB_OUTPUT
+          else
+            echo "dest=latest"             >> $GITHUB_OUTPUT
+            echo "is_release=false"        >> $GITHUB_OUTPUT
+          fi
+
+      # ── Disable Jekyll so Sphinx _static/ dirs are served correctly ────────
+      - name: Create .nojekyll
+        run: mkdir /tmp/nojekyll && touch /tmp/nojekyll/.nojekyll
+
+      - name: Deploy .nojekyll to gh-pages root
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: /tmp/nojekyll
+          clean: false
+
+      # ── Deploy this build to latest/ or vX.Y.Z/ ───────────────────────────
+      - name: Deploy docs
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: website/build/html
+          target-folder: ${{ steps.vars.outputs.dest }}
+          clean: false
+
+      # ── On a tagged release: also update stable/ and the root redirect ─────
+      - name: Deploy to stable/
+        if: steps.vars.outputs.is_release == 'true'
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: website/build/html
+          target-folder: stable
+          clean: false
+
+      - name: Build root redirect
+        if: steps.vars.outputs.is_release == 'true'
+        run: |
+          mkdir /tmp/root
+          cat > /tmp/root/index.html << 'HTML'
+          <!DOCTYPE html>
+          <html>
+          <meta charset="utf-8">
+          <title>MuTopia Documentation</title>
+          <meta http-equiv="refresh" content="0; URL=stable/">
+          <link rel="canonical" href="stable/">
+          </html>
+          HTML
+
+      - name: Deploy root redirect
+        if: steps.vars.outputs.is_release == 'true'
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: /tmp/root
+          clean: false
