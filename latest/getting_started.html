@@ -275,7 +275,22 @@ because it uses some internal GBT APIs for fast gradient-boosted tree training.
 We recommend <a class="reference external" href="https://docs.astral.sh/uv/">uv</a> to manage the environment — it
 resolves and installs dependencies significantly faster than pip alone, and its
 lockfile-based workflow makes it easy to reproduce exact environments across machines.</p>
-<p><strong>With uv (recommended)</strong></p>
+<p><strong>With Docker (zero setup)</strong></p>
+<p>The fastest way to try MuTopia is with the pre-built Docker image, which ships
+with MuTopia and all the bioinformatics tools it depends on (<code class="docutils literal notranslate"><span class="pre">bedtools</span></code>,
+<code class="docutils literal notranslate"><span class="pre">bcftools</span></code>, <code class="docutils literal notranslate"><span class="pre">tabix</span></code>, UCSC <code class="docutils literal notranslate"><span class="pre">bigWigAverageOverBed</span></code>):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>docker<span class="w"> </span>pull<span class="w"> </span>allenlynch/mutopia:latest
+
+<span class="c1"># Mount your data directory and run any CLI command</span>
+docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-v<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">&quot;</span>:/workspace<span class="w"> </span>allenlynch/mutopia:latest<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>gtensor<span class="w"> </span>--help
+</pre></div>
+</div>
+<p>For interactive use, drop into a shell inside the container:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-it<span class="w"> </span>-v<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">&quot;</span>:/workspace<span class="w"> </span>allenlynch/mutopia:latest<span class="w"> </span>bash
+</pre></div>
+</div>
+<p><strong>With uv (recommended for native installs)</strong></p>
 <p>If you don’t have uv yet, install it with the official one-liner:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>curl<span class="w"> </span>-LsSf<span class="w"> </span>https://astral.sh/uv/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sh
 </pre></div>
