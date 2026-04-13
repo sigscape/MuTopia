@@ -17,6 +17,8 @@ build:
     - gtensor = mutopia.cli.gtensor_cli:gtensor_cli
     - topo-model = mutopia.cli.model_cli:model
     - mutopia-sbs = mutopia.cli.sbs_cli:sbs
+  run_exports:
+    - {{ pin_subpackage(name, max_pin="x.x") }}
 
 requirements:
   host:
