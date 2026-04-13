@@ -1,0 +1,933 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="Tutorial 4: Analyzing Topographic Models" href="4.analyzing_models.html"><link rel="prev" title="Tutorial 2: Analyzing G-Tensors" href="2.analyzing_gtensors.html">
+        <link rel="prefetch" href="../_static/mutopia_logo.png" as="image">
+        <link rel="prefetch" href="../_static/mutopia_logo.png" as="image">
+
+    <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
+        <title>Tutorial 3: Tuning and training models - MuTopia documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=a35ea3b2" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=8fd06a5a" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  --content-width: 85rem;
+  --toc-width: 22rem;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  --content-width: 85rem;
+  --toc-width: 22rem;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  --content-width: 85rem;
+  --toc-width: 22rem;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../index.html"><div class="brand">MuTopia  documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
+  <div class="sidebar-logo-container">
+    <img class="sidebar-logo only-light" src="../_static/mutopia_logo.png" alt="Light Logo"/>
+    <img class="sidebar-logo only-dark" src="../_static/mutopia_logo.png" alt="Dark Logo"/>
+  </div>
+  
+  <span class="sidebar-brand-text">MuTopia  documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Getting started with MuTopia</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">MuTopia Tutorials</a><input aria-label="Toggle navigation of MuTopia Tutorials" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="1.building_a_gtensor.html">Tutorial 1: Building G-Tensors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="2.analyzing_gtensors.html">Tutorial 2: Analyzing G-Tensors</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Tutorial 3: Tuning and training models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="4.analyzing_models.html">Tutorial 4: Analyzing Topographic Models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="5.annotating_vcfs.html">Tutorial 5: Annotating VCFs with a Pre-Trained Model</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../api/index.html">API Reference</a><input aria-label="Toggle navigation of API Reference" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../api/gtensor.html">GTensor API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/model.html">TopographyModel API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/plot.html">Plot API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/track_plot/track_plot.html">mutopia.plot.track_plot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/track_plot/track_plot.html#module-mutopia.plot.track_plot.track_plot">track_plot API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/track_plot/tracks.html">tracks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/track_plot/transforms.html">transforms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/modes/sbs.html">SBS Modality</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/modes/modes.html">Base ModeConfig</a></li>
+</ul>
+</li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../_sources/tutorials/3.training_models.ipynb.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="Tutorial-3:-Tuning-and-training-models">
+<h1>Tutorial 3: Tuning and training models<a class="headerlink" href="#Tutorial-3:-Tuning-and-training-models" title="Link to this heading">¶</a></h1>
+<p>Once all of the data is QC, processed, and ingested, the real fun begins. This tutorial details, first, how to train a MuTopia model. Then, we’ll go over more rigorous hyperparameter tuning techniques to ensure a better fit to your data.</p>
+<section id="Prerequisites">
+<h2>Prerequisites<a class="headerlink" href="#Prerequisites" title="Link to this heading">¶</a></h2>
+<p>Before starting this tutorial, ensure you have:</p>
+<ul class="simple">
+<li><p>MuTopia package installed</p></li>
+<li><p>Download the pre-compiled data to the <code class="docutils literal notranslate"><span class="pre">tutorial_data</span></code> directory</p></li>
+</ul>
+</section>
+<section id="1.-Training-a-MuTopia-model">
+<h2>1. Training a MuTopia model<a class="headerlink" href="#1.-Training-a-MuTopia-model" title="Link to this heading">¶</a></h2>
+<section id="1.1-Preparing-and-loading-the-data">
+<h3>1.1 Preparing and loading the data<a class="headerlink" href="#1.1-Preparing-and-loading-the-data" title="Link to this heading">¶</a></h3>
+<p>The first step in preparing the data for model training is to split train and test sets. This is easiest using the CLI as below. I like to use chromosome 1 as the test set and train on everything else.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="o">!</span>gtensor<span class="w"> </span>split<span class="w"> </span>tutorial_data/Liver.nc<span class="w"> </span>chr1
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Writing samples: 100%|████████████████████████████████████████████| 185/185 [01:02&lt;00:00,  2.97it/s]
+Writing samples: 100%|████████████████████████████████████████████| 185/185 [00:28&lt;00:00,  6.48it/s]
+</pre></div></div>
+</div>
+<p>Import <code class="docutils literal notranslate"><span class="pre">MuTopia</span></code>:</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">mutopia.analysis</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mu</span>
+</pre></div>
+</div>
+</div>
+<p>Now, you can use <code class="docutils literal notranslate"><span class="pre">gt.lazy_load</span></code> or <code class="docutils literal notranslate"><span class="pre">gt.load_dataset(...,</span> <span class="pre">with_samples=False)</span></code> to load the dataset, while keeping the samples on-disk:</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">train</span> <span class="o">=</span> <span class="n">mu</span><span class="o">.</span><span class="n">gt</span><span class="o">.</span><span class="n">lazy_load</span><span class="p">(</span><span class="s2">&quot;tutorial_data/Liver.train.nc&quot;</span><span class="p">)</span>
+<span class="n">test</span> <span class="o">=</span> <span class="n">mu</span><span class="o">.</span><span class="n">gt</span><span class="o">.</span><span class="n">lazy_load</span><span class="p">(</span><span class="s2">&quot;tutorial_data/Liver.test.nc&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="1.2-Instantiating-the-model">
+<h3>1.2 Instantiating the model<a class="headerlink" href="#1.2-Instantiating-the-model" title="Link to this heading">¶</a></h3>
+<p>Now, we can instantiate a model. Make sure to use the correct data modality - in this case <code class="docutils literal notranslate"><span class="pre">{dataset}.modality()</span></code>, and make a <code class="docutils literal notranslate"><span class="pre">TopographyModel</span></code> object.</p>
+<p>There are a ton of configurable parameters, but the main ones you’ll often use are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">num_components</span></code> - how many processes to fit.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">init_components</span></code> - a list of signatures to initialize the model with.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">locus_subsample</span></code> - to what degree to subsample the loci in the dataset for each update.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">batch_subsample</span></code> - to what degree to subsample the samples in the dataset. I shoot for a batch size of at least 32.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">threads</span></code> - number of threads to devote to update calculations.</p></li>
+</ul>
+<section id="Rules-of-thumb-for-training-models">
+<h4>Rules of thumb for training models<a class="headerlink" href="#Rules-of-thumb-for-training-models" title="Link to this heading">¶</a></h4>
+<ul class="simple">
+<li><p>Always use some form of subsampling as batch training leads to overfitting. - <code class="docutils literal notranslate"><span class="pre">locus_subsample</span></code> works by far the best.</p></li>
+<li><p>Make sure your iteration time is below 30 seconds by adjusting <code class="docutils literal notranslate"><span class="pre">threads</span></code>, <code class="docutils literal notranslate"><span class="pre">locus_subsampling</span></code>, and <code class="docutils literal notranslate"><span class="pre">batch_subsample</span></code>. Iteration time is proportional to the number of mutations used for the parameter updates. Using more mutations has diminishing returns over the number of steps you perform. I usually shoot for about 20 seconds per iteration to start (iteration time decreases as the model converges as well).</p></li>
+<li><p>Train until convergence (by not setting <code class="docutils literal notranslate"><span class="pre">num_epochs</span></code>) - MuTopia will automatically stop the model when it detects it has converged.</p></li>
+<li><p>For really small datasets, use <code class="docutils literal notranslate"><span class="pre">init_components</span></code> to specify starting points for the spectra. You can list COSMIC components like: <code class="docutils literal notranslate"><span class="pre">[&quot;SBS1&quot;,</span> <span class="pre">&quot;SBS3&quot;,</span> <span class="pre">...]</span></code>.</p></li>
+</ul>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">SBS_model</span> <span class="o">=</span> <span class="n">mu</span><span class="o">.</span><span class="n">make_model_cls</span><span class="p">(</span><span class="n">train</span><span class="p">)</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">SBS_model</span><span class="p">(</span>
+    <span class="n">num_components</span> <span class="o">=</span> <span class="mi">15</span><span class="p">,</span>
+    <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span>
+    <span class="n">locus_subsample</span><span class="o">=</span><span class="mi">1</span><span class="o">/</span><span class="mi">8</span><span class="p">,</span>
+    <span class="n">threads</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+    <span class="n">eval_every</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="c1"># just for illustration purposes; use a larger value in practice or your train time will increase</span>
+    <span class="n">num_epochs</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="c1"># just for illustration purposes; use a larger value in practice (like 1000 just to be safe)</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+INFO: Mutopia:JIT-compiling model operations ...
+</pre></div></div>
+</div>
+</section>
+</section>
+<section id="1.3-Training">
+<h3>1.3 Training<a class="headerlink" href="#1.3-Training" title="Link to this heading">¶</a></h3>
+<p>Now, we are ready to train. Supply the train and the test sets to the <code class="docutils literal notranslate"><span class="pre">fit</span></code> method:</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">train</span><span class="p">,</span> <span class="n">test</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+INFO: Mutopia:Initializing model parameters and transformations...
+INFO: Mutopia:Found strand features:
+        GeneStrand, ReplicationStrand
+INFO: Mutopia:Found mesoscale features:[]
+INFO: Mutopia:Found locus features:
+        ATACAccessible, DNase, GeneExpression, GenePosition,
+        H3K27ac, H3K27me3, H3K36me3, H3K4me1,
+        H3K4me3, H3K9me3, NucleotideRatio, RepliseqG1b,
+        RepliseqG2, RepliseqS1, RepliseqS2, RepliseqS3,
+        RepliseqS4
+INFO: Mutopia:Validating datasets...
+INFO: Mutopia:Found n=185 training samples across 1 datasets.
+INFO: Mutopia:Preprocessing training datasets...
+INFO: Mutopia:Preprocessing testing datasets...
+WARNING: Mutopia:Calculating full factor normalizers for updates - this will increase the memory usage, but will reduce variance.
+INFO: Mutopia:Using SVI.
+INFO: Mutopia:Training model with 5 threads.
+INFO: Mutopia:The first few epochs take longer as things get warmed up -
+        expect the time per epoch to decrease about 4-fold.
+INFO: Mutopia:Model will stop training if no improvement in the last 50 epochs.
+INFO: Mutopia:Training usually coverges much sooner than 10 epochs.
+Epoch: 10/10 |██████████| [01:48&lt;00:00, 10.85s/it] Scores, Best=0.027843, Recent=0.027172, 0.027352, 0.027563, 0.027724, 0.027843
+INFO: Mutopia:Finalizing models ...
+</pre></div></div>
+</div>
+<p>For score, higher is better - Don’t worry about the “low” score values this is mostly reflective of the sparse nature of the data.</p>
+<p>You can save a model to disk using the <code class="docutils literal notranslate"><span class="pre">model.save</span></code> method:</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">model</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;tutorial_data/trained_model.pkl&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<p>Alternatively, you can perform the same training from the CLI using the command below:</p>
+<p><strong>Note:</strong> Make sure to use the <code class="docutils literal notranslate"><span class="pre">--lazy</span></code> flag!</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="o">!</span>topo-model<span class="w"> </span>train<span class="w"> </span><span class="err">\</span>
+    <span class="o">-</span><span class="n">ds</span> <span class="n">tutorial_data</span><span class="o">/</span><span class="n">Liver</span><span class="o">.</span><span class="n">train</span><span class="o">.</span><span class="n">nc</span> <span class="n">tutorial_data</span><span class="o">/</span><span class="n">Liver</span><span class="o">.</span><span class="n">test</span><span class="o">.</span><span class="n">nc</span> \
+    <span class="o">-</span><span class="n">k</span> <span class="mi">15</span> \
+    <span class="o">-</span><span class="n">o</span> <span class="n">tutorial_data</span><span class="o">/</span><span class="n">cli_trained_model</span><span class="o">.</span><span class="n">pkl</span> \
+    <span class="o">-@</span> <span class="mi">5</span> \
+    <span class="o">--</span><span class="n">seed</span> <span class="mi">42</span> \
+    <span class="o">--</span><span class="n">locus</span><span class="o">-</span><span class="n">subsample</span> <span class="mf">0.125</span> \
+    <span class="o">--</span><span class="nb">eval</span><span class="o">-</span><span class="n">every</span> <span class="mi">1</span> \
+    <span class="o">--</span><span class="n">num</span><span class="o">-</span><span class="n">epochs</span> <span class="mi">10</span> \
+    <span class="o">--</span><span class="n">lazy</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Training model with parameters:
+Parameter              Value
+---------------------  ---------
+num_components         15
+threads                5
+seed                   42
+locus_subsample        0.125
+eval_every             1
+num_epochs             10
+locus_model_type       gbt
+use_groups             True
+add_corpus_intercepts  False
+empirical_bayes        True
+stop_condition         50
+test_chroms            (&#39;chr1&#39;,)
+INFO: Mutopia:Training with 1 dataset pairs
+INFO: Mutopia:JIT-compiling model operations ...
+INFO: Mutopia:Initializing model parameters and transformations...
+INFO: Mutopia:Found strand features:
+        GeneStrand, ReplicationStrand
+INFO: Mutopia:Found mesoscale features:[]
+INFO: Mutopia:Found locus features:
+        ATACAccessible, DNase, GeneExpression, GenePosition,
+        H3K27ac, H3K27me3, H3K36me3, H3K4me1,
+        H3K4me3, H3K9me3, NucleotideRatio, RepliseqG1b,
+        RepliseqG2, RepliseqS1, RepliseqS2, RepliseqS3,
+        RepliseqS4
+INFO: Mutopia:Validating datasets...
+INFO: Mutopia:Found n=185 training samples across 1 datasets.
+INFO: Mutopia:Preprocessing training datasets...
+INFO: Mutopia:Preprocessing testing datasets...
+WARNING: Mutopia:Calculating full factor normalizers for updates - this will increase the memory usage, but will reduce variance.
+INFO: Mutopia:Using SVI.
+INFO: Mutopia:Training model with 5 threads.
+INFO: Mutopia:The first few epochs take longer as things get warmed up -
+        expect the time per epoch to decrease about 4-fold.
+INFO: Mutopia:Model will stop training if no improvement in the last 50 epochs.
+INFO: Mutopia:Training usually coverges much sooner than 10 epochs.
+Epoch: 10/10 |█| [01:48&lt;00:00, 10.89s/it] Scores, Best=0.027843, Recent=0.027172
+INFO: Mutopia:Finalizing models ...
+Training completed successfully. Best test score: 0.02784
+</pre></div></div>
+</div>
+</section>
+</section>
+<section id="2.-Model-hyperparameter-tuning">
+<h2>2. Model hyperparameter tuning<a class="headerlink" href="#2.-Model-hyperparameter-tuning" title="Link to this heading">¶</a></h2>
+<p>Hyperparameter optimization provides a convenient way to launch many trial trainings to find the best hyperparameter configurations among them.</p>
+<p>Trials are organized under a “study”. Create a study using the <code class="docutils literal notranslate"><span class="pre">topo-model</span> <span class="pre">study</span> <span class="pre">create</span></code> command. The most important parameters to specify are the study path (“studies/liver/01”), the datasets (you can provide multiple train/test pairs by providing multiple <code class="docutils literal notranslate"><span class="pre">-ds</span></code> flags), the minimum and maximum number of components to try out (<code class="docutils literal notranslate"><span class="pre">-min</span></code> and <code class="docutils literal notranslate"><span class="pre">-max</span></code>, respectively), <code class="docutils literal notranslate"><span class="pre">--save-model</span></code>, which will write models to disk under <code class="docutils literal notranslate"><span class="pre">studies/&lt;study_name&gt;</span></code> when trials complete, and whatever other
+parameter values you would like to fix across trials (in this case, just the locus subsample rate, <code class="docutils literal notranslate"><span class="pre">-lsub</span></code>).</p>
+<p><strong>Optional:</strong> By adding <code class="docutils literal notranslate"><span class="pre">-e</span></code> flags (e.g. <code class="docutils literal notranslate"><span class="pre">-e</span></code>, <code class="docutils literal notranslate"><span class="pre">-ee</span></code>, etc.) you can increase how “extensive” the hyperparameter tuning is. For no <code class="docutils literal notranslate"><span class="pre">e</span></code>, MuTopia only tunes the number of components. For one <code class="docutils literal notranslate"><span class="pre">e</span></code>, MuTopia tunes the next most important hyperparameters, and so on. If you have the time, one <code class="docutils literal notranslate"><span class="pre">-e</span></code> is a good balance.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="o">!</span>topo-model<span class="w"> </span>study<span class="w"> </span>create<span class="w"> </span><span class="err">\</span>
+    <span class="s2">&quot;studies/liver/01&quot;</span> \
+    <span class="o">-</span><span class="n">ds</span> <span class="n">tutorial_data</span><span class="o">/</span><span class="n">Liver</span><span class="o">.</span><span class="n">train</span><span class="o">.</span><span class="n">nc</span> <span class="n">tutorial_data</span><span class="o">/</span><span class="n">Liver</span><span class="o">.</span><span class="n">test</span><span class="o">.</span><span class="n">nc</span> \
+    <span class="o">-</span><span class="nb">min</span> <span class="mi">5</span> <span class="o">-</span><span class="nb">max</span> <span class="mi">20</span> \
+    <span class="o">--</span><span class="n">save</span><span class="o">-</span><span class="n">model</span> \
+    <span class="o">-</span><span class="n">lsub</span> <span class="mf">0.125</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Fixing parameters:
+Parameter              Value
+---------------------  ---------
+locus_subsample        0.125
+init_components        ()
+fix_components         ()
+pi_prior               1.0
+locus_model_type       gbt
+use_groups             False
+add_corpus_intercepts  False
+empirical_bayes        True
+stop_condition         50
+num_epochs             2000
+test_chroms            (&#39;chr1&#39;,)
+<span class="ansi-green-fg">[I 2025-10-20 10:14:26,742]</span> Using an existing study with name &#39;mutopia_tuning_study&#39; instead of creating a new one.
+Successfully created optimization study: studies/liver/01
+</pre></div></div>
+</div>
+<p>Now, you can launch trials from the CLI, which makes this easy to parallelize using slurm jobs on a server. Just refer the <code class="docutils literal notranslate"><span class="pre">study_name</span></code> using the path and your runtime options (laziness and number of threads), and you’re off!</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="o">!</span>topo-model<span class="w"> </span>study<span class="w"> </span>run<span class="w"> </span><span class="s2">&quot;studies/liver/01&quot;</span><span class="w"> </span>--lazy<span class="w"> </span>-@<span class="w"> </span><span class="m">5</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+INFO: Mutopia:JIT-compiling model operations ...
+INFO: Mutopia:Running trial 1 with params:
+        num_components: 16
+INFO: Mutopia:Initializing model parameters and transformations...
+INFO: Mutopia:Found strand features:
+        GeneStrand, ReplicationStrand
+INFO: Mutopia:Found mesoscale features:[]
+INFO: Mutopia:Found locus features:
+        ATACAccessible, DNase, GeneExpression, GenePosition,
+        H3K27ac, H3K27me3, H3K36me3, H3K4me1,
+        H3K4me3, H3K9me3, NucleotideRatio, RepliseqG1b,
+        RepliseqG2, RepliseqS1, RepliseqS2, RepliseqS3,
+        RepliseqS4
+INFO: Mutopia:Validating datasets...
+INFO: Mutopia:Found n=185 training samples across 1 datasets.
+INFO: Mutopia:Preprocessing training datasets...
+INFO: Mutopia:Preprocessing testing datasets...
+WARNING: Mutopia:Calculating full factor normalizers for updates - this will increase the memory usage, but will reduce variance.
+INFO: Mutopia:Using SVI.
+INFO: Mutopia:Training model with 5 threads.
+INFO: Mutopia:The first few epochs take longer as things get warmed up -
+        expect the time per epoch to decrease about 4-fold.
+INFO: Mutopia:Model will stop training if no improvement in the last 50 epochs.
+INFO: Mutopia:Training usually coverges much sooner than 2000 epochs.
+Epoch: 49/2000 | | [07:30&lt;4:44:44,  8.76s/it] Scores, Best=0.029113, Recent=0.02INFO: Mutopia:Beginning to update priors.
+Epoch: 67/2000 | | [10:07&lt;4:43:04,  8.79s/it] Scores, Best=0.029312, Recent=0.02^C
+Epoch: 67/2000 | | [10:14&lt;4:55:25,  9.17s/it] Scores, Best=0.029312, Recent=0.02
+INFO: Mutopia:Finalizing models ...
+</pre></div></div>
+</div>
+<p>I usually use this wrapper script to launch job arrays on SLURM servers:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="ch">#!/bin/bash</span>
+<span class="c1">#SBATCH --ntasks=1</span>
+<span class="c1">#SBATCH --cpus-per-task=5</span>
+<span class="c1">#SBATCH --mem-per-cpu=500</span>
+<span class="c1">#SBATCH --time=05:00:00</span>
+<span class="c1">#SBATCH --output=logs/%x/%j_%a.log</span>
+
+<span class="nv">study_name</span><span class="o">=</span><span class="si">${</span><span class="nv">SLURM_JOB_NAME</span><span class="si">}</span>
+<span class="nv">time_limit</span><span class="o">=</span><span class="k">$((</span><span class="m">60</span><span class="o">*</span><span class="m">5</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="m">10</span><span class="k">))</span><span class="w"> </span><span class="c1"># in minutes</span>
+
+<span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Running trial for study: </span><span class="si">${</span><span class="nv">study_name</span><span class="si">}</span><span class="s2">, time limit: </span><span class="si">${</span><span class="nv">time_limit</span><span class="si">}</span><span class="s2"> minutes&quot;</span>
+topo-model<span class="w"> </span>study<span class="w"> </span>run<span class="w"> </span><span class="si">${</span><span class="nv">study_name</span><span class="si">}</span><span class="w"> </span>-@<span class="w"> </span><span class="m">5</span><span class="w"> </span>--lazy<span class="w"> </span>--time-limit<span class="w"> </span><span class="si">${</span><span class="nv">time_limit</span><span class="si">}</span>
+</pre></div>
+</div>
+<p>Save this wrapper as <code class="docutils literal notranslate"><span class="pre">run-trials.sh</span></code>. Then, you can launch array jobs for different studies using:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span><span class="nv">study_path</span><span class="o">=</span><span class="s2">&quot;studies/liver/01&quot;</span>
+$<span class="w"> </span>sbatch<span class="w"> </span>--job-name<span class="o">=</span><span class="nv">$study_path</span><span class="w"> </span>--array<span class="o">=</span><span class="m">1</span>-5%20<span class="w"> </span>run-trials.sh
+</pre></div>
+</div>
+<p>Start slow, launching a few jobs to see what sort of memory you require, then scale up! Make sure to adjust the job time if needed.</p>
+<p>To look at the results of a study, you can use <code class="docutils literal notranslate"><span class="pre">topo-model</span> <span class="pre">study</span> <span class="pre">summary</span></code>. You can check out the results by referring to a study via it’s path:</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="o">!</span>topo-model<span class="w"> </span>study<span class="w"> </span>summary<span class="w"> </span><span class="s2">&quot;studies/liver/01&quot;</span><span class="w"> </span>-o<span class="w"> </span>results.csv
+<span class="o">!</span>head<span class="w"> </span>-n<span class="w"> </span><span class="m">3</span><span class="w"> </span>results.csv
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Results saved to: results.csv
+number,value,state,user_attrs_model_path,num_components
+0,0.0023026805200607736,COMPLETE,studies/liver/01/trial=0.pkl,15
+1,,RUNNING,studies/liver/01/trial=1.pkl,16
+</pre></div></div>
+</div>
+<p>Obviously, this is more exciting if you’ve run more trials. I included the results from a full tuning run on the the tutorial data to demonstrate how to choose the best model.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">seaborn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sns</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+
+<span class="n">results</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s2">&quot;tutorial_data/study_results.csv&quot;</span><span class="p">)</span>
+<span class="n">_</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">4</span><span class="p">))</span>
+<span class="n">sns</span><span class="o">.</span><span class="n">scatterplot</span><span class="p">(</span>
+    <span class="n">data</span><span class="o">=</span><span class="n">results</span><span class="p">,</span>
+    <span class="n">x</span><span class="o">=</span><span class="s2">&quot;num_components&quot;</span><span class="p">,</span>
+    <span class="n">y</span><span class="o">=</span><span class="s2">&quot;value&quot;</span><span class="p">,</span>
+    <span class="n">style</span><span class="o">=</span><span class="s2">&quot;state&quot;</span><span class="p">,</span>
+    <span class="n">hue</span><span class="o">=</span><span class="s2">&quot;state&quot;</span><span class="p">,</span>
+    <span class="n">palette</span><span class="o">=</span><span class="n">mu</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">categorical_palette</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span>
+    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Trial status&quot;</span><span class="p">,</span>
+    <span class="n">bbox_to_anchor</span><span class="o">=</span><span class="p">(</span><span class="mf">1.05</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+    <span class="n">loc</span><span class="o">=</span><span class="s1">&#39;upper left&#39;</span>
+<span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
+    <span class="n">xlabel</span><span class="o">=</span><span class="s2">&quot;Number of components&quot;</span><span class="p">,</span>
+    <span class="n">ylabel</span><span class="o">=</span><span class="s2">&quot;Test score </span><span class="se">\u2192</span><span class="s2">&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">sns</span><span class="o">.</span><span class="n">despine</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorials_3.training_models_22_0.png" src="../_images/tutorials_3.training_models_22_0.png" />
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">results</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+</pre></div>
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>number</th>
+      <th>value</th>
+      <th>state</th>
+      <th>user_attrs_model_path</th>
+      <th>num_components</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>93</td>
+      <td>0.030026</td>
+      <td>COMPLETE</td>
+      <td>studies/liver/01/trial=93.pkl</td>
+      <td>19</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>151</td>
+      <td>0.029974</td>
+      <td>COMPLETE</td>
+      <td>studies/liver/01/trial=151.pkl</td>
+      <td>18</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>73</td>
+      <td>0.029966</td>
+      <td>COMPLETE</td>
+      <td>studies/liver/01/trial=73.pkl</td>
+      <td>19</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>130</td>
+      <td>0.029955</td>
+      <td>COMPLETE</td>
+      <td>studies/liver/01/trial=130.pkl</td>
+      <td>17</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>126</td>
+      <td>0.029942</td>
+      <td>COMPLETE</td>
+      <td>studies/liver/01/trial=126.pkl</td>
+      <td>17</td>
+    </tr>
+    <tr>
+      <th>5</th>
+      <td>110</td>
+      <td>0.029941</td>
+      <td>COMPLETE</td>
+      <td>studies/liver/01/trial=110.pkl</td>
+      <td>15</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>85</td>
+      <td>0.029934</td>
+      <td>COMPLETE</td>
+      <td>studies/liver/01/trial=85.pkl</td>
+      <td>19</td>
+    </tr>
+    <tr>
+      <th>7</th>
+      <td>137</td>
+      <td>0.029909</td>
+      <td>PRUNED</td>
+      <td>NaN</td>
+      <td>20</td>
+    </tr>
+    <tr>
+      <th>8</th>
+      <td>97</td>
+      <td>0.029904</td>
+      <td>COMPLETE</td>
+      <td>studies/liver/01/trial=97.pkl</td>
+      <td>19</td>
+    </tr>
+    <tr>
+      <th>9</th>
+      <td>114</td>
+      <td>0.029896</td>
+      <td>COMPLETE</td>
+      <td>studies/liver/01/trial=114.pkl</td>
+      <td>17</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+<p>You can select the best model using the “elbow” method (<code class="docutils literal notranslate"><span class="pre">value</span></code> versus the <code class="docutils literal notranslate"><span class="pre">num_components</span></code>), and load it from the <code class="docutils literal notranslate"><span class="pre">user_attrs_model_path</span></code> column. In this case, you should choose the model with the least topics that achieves close to the maximum score. Above, the best model with 15 components meets these criteria.</p>
+<p><strong>Note:</strong> The “Pruned” models were determined by the optimization engine to be under-performing, and so their execution was terminated to save computational resources!</p>
+<p>If a promising model failed to save for some reason (early termination, memory overflow, etc.) you can re-train it with the same parameters using:</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="o">!</span>topo-model<span class="w"> </span>study<span class="w"> </span>retrain<span class="w"> </span><span class="s2">&quot;studies/liver/01&quot;</span><span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="s2">&quot;best_model.pkl&quot;</span><span class="w"> </span>--lazy<span class="w"> </span>-@<span class="w"> </span><span class="m">5</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+INFO: Mutopia:JIT-compiling model operations ...
+INFO: Mutopia:Initializing model parameters and transformations...
+INFO: Mutopia:Found strand features:
+        GeneStrand, ReplicationStrand
+INFO: Mutopia:Found mesoscale features:[]
+INFO: Mutopia:Found locus features:
+        ATACAccessible, DNase, GeneExpression, GenePosition,
+        H3K27ac, H3K27me3, H3K36me3, H3K4me1,
+        H3K4me3, H3K9me3, NucleotideRatio, RepliseqG1b,
+        RepliseqG2, RepliseqS1, RepliseqS2, RepliseqS3,
+        RepliseqS4
+INFO: Mutopia:Validating datasets...
+INFO: Mutopia:Found n=185 training samples across 1 datasets.
+INFO: Mutopia:Preprocessing training datasets...
+INFO: Mutopia:Preprocessing testing datasets...
+WARNING: Mutopia:Calculating full factor normalizers for updates - this will increase the memory usage, but will reduce variance.
+INFO: Mutopia:Using SVI.
+INFO: Mutopia:Training model with 5 threads.
+INFO: Mutopia:The first few epochs take longer as things get warmed up -
+        expect the time per epoch to decrease about 4-fold.
+INFO: Mutopia:Model will stop training if no improvement in the last 50 epochs.
+INFO: Mutopia:Training usually coverges much sooner than 2000 epochs.
+Epoch: 10/2000 | | [02:06&lt;5:47:50, 10.49s/it] Scores, Best=0.027611, Recent=0.00^C
+
+Aborted!
+</pre></div></div>
+</div>
+<p>To investigate model performance more thoroughly, you can load the <code class="docutils literal notranslate"><span class="pre">Optuna</span></code> study directly using the python API:</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[16]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">study</span><span class="p">,</span> <span class="o">*</span><span class="n">_</span> <span class="o">=</span> <span class="n">mu</span><span class="o">.</span><span class="n">tuning</span><span class="o">.</span><span class="n">load_study</span><span class="p">(</span><span class="s2">&quot;studies/liver/01&quot;</span><span class="p">)</span>
+<span class="n">study</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[16]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+&lt;optuna.study.study.Study at 0x1440d0810&gt;
+</pre></div></div>
+</div>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="4.analyzing_models.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Tutorial 4: Analyzing Topographic Models</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="2.analyzing_gtensors.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Tutorial 2: Analyzing G-Tensors</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2026, Allen W. Lynch
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Tutorial 3: Tuning and training models</a><ul>
+<li><a class="reference internal" href="#Prerequisites">Prerequisites</a></li>
+<li><a class="reference internal" href="#1.-Training-a-MuTopia-model">1. Training a MuTopia model</a><ul>
+<li><a class="reference internal" href="#1.1-Preparing-and-loading-the-data">1.1 Preparing and loading the data</a></li>
+<li><a class="reference internal" href="#1.2-Instantiating-the-model">1.2 Instantiating the model</a><ul>
+<li><a class="reference internal" href="#Rules-of-thumb-for-training-models">Rules of thumb for training models</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#1.3-Training">1.3 Training</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#2.-Model-hyperparameter-tuning">2. Model hyperparameter tuning</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=7a06b15b"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    </body>
+</html>

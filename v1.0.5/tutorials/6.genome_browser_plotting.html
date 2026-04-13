@@ -1,0 +1,855 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html">
+        <link rel="prefetch" href="../_static/mutopia_logo.png" as="image">
+        <link rel="prefetch" href="../_static/mutopia_logo.png" as="image">
+
+    <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
+        <title>Tutorial 6: Genome-browser plotting with a trained model - MuTopia documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=a35ea3b2" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=8fd06a5a" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  --content-width: 85rem;
+  --toc-width: 22rem;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  --content-width: 85rem;
+  --toc-width: 22rem;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  --content-width: 85rem;
+  --toc-width: 22rem;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../index.html"><div class="brand">MuTopia  documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
+  <div class="sidebar-logo-container">
+    <img class="sidebar-logo only-light" src="../_static/mutopia_logo.png" alt="Light Logo"/>
+    <img class="sidebar-logo only-dark" src="../_static/mutopia_logo.png" alt="Dark Logo"/>
+  </div>
+  
+  <span class="sidebar-brand-text">MuTopia  documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Getting started with MuTopia</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="index.html">MuTopia Tutorials</a><input aria-label="Toggle navigation of MuTopia Tutorials" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="1.building_a_gtensor.html">Tutorial 1: Building G-Tensors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="2.analyzing_gtensors.html">Tutorial 2: Analyzing G-Tensors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="3.training_models.html">Tutorial 3: Tuning and training models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="4.analyzing_models.html">Tutorial 4: Analyzing Topographic Models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="5.annotating_vcfs.html">Tutorial 5: Annotating VCFs with a Pre-Trained Model</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../api/index.html">API Reference</a><input aria-label="Toggle navigation of API Reference" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../api/gtensor.html">GTensor API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/model.html">TopographyModel API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/plot.html">Plot API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/track_plot/track_plot.html">mutopia.plot.track_plot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/track_plot/track_plot.html#module-mutopia.plot.track_plot.track_plot">track_plot API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/track_plot/tracks.html">tracks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/track_plot/transforms.html">transforms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/modes/sbs.html">SBS Modality</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/modes/modes.html">Base ModeConfig</a></li>
+</ul>
+</li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../_sources/tutorials/6.genome_browser_plotting.ipynb.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="Tutorial-6:-Genome-browser-plotting-with-a-trained-model">
+<h1>Tutorial 6: Genome-browser plotting with a trained model<a class="headerlink" href="#Tutorial-6:-Genome-browser-plotting-with-a-trained-model" title="Link to this heading">¶</a></h1>
+<p>Tutorial 2 introduced the composable <code class="docutils literal notranslate"><span class="pre">track_plot</span></code> API for drawing genome-browser-style figures from a G-Tensor. Tutorial 4 touched on two model-aware composites (<code class="docutils literal notranslate"><span class="pre">plot_marginal_observed_vs_expected</span></code> and <code class="docutils literal notranslate"><span class="pre">plot_component_rates</span></code>). This tutorial is a comprehensive tour of everything that becomes available <strong>once you have a trained topographic model annotating your G-Tensor</strong> — per-component rates, the topography heatmap, strand-aware gene-expression tracks, gene annotations, and a full
+hypothesis-generation dashboard you can point at any region of the genome.</p>
+<p>We won’t re-teach the primitives from Tutorial 2 (<code class="docutils literal notranslate"><span class="pre">scatterplot</span></code>, <code class="docutils literal notranslate"><span class="pre">line_plot</span></code>, <code class="docutils literal notranslate"><span class="pre">fill_plot</span></code>, <code class="docutils literal notranslate"><span class="pre">stack_plots</span></code>, <code class="docutils literal notranslate"><span class="pre">pipeline</span></code>, <code class="docutils literal notranslate"><span class="pre">select</span></code>, <code class="docutils literal notranslate"><span class="pre">make_view</span></code>, <code class="docutils literal notranslate"><span class="pre">plot_view</span></code>) — glance back at that tutorial if anything feels unfamiliar.</p>
+<section id="Prerequisites">
+<h2>Prerequisites<a class="headerlink" href="#Prerequisites" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>MuTopia package installed</p></li>
+<li><p>The shared tutorial data bundle from the <a class="reference external" href="https://zenodo.org/records/TODO">Zenodo record</a> unpacked to <code class="docutils literal notranslate"><span class="pre">tutorial_data/</span></code> — see <a class="reference external" href="index.html#tutorial-data">Tutorial data</a></p></li>
+<li><p>A trained model at <code class="docutils literal notranslate"><span class="pre">tutorial_data/pretrained_model.pkl</span></code> (shipped in the bundle; also produced by Tutorial 3)</p></li>
+<li><p>A cytoband file at <code class="docutils literal notranslate"><span class="pre">tutorial_data/cytoBand.txt</span></code> and the MANE GTF at <code class="docutils literal notranslate"><span class="pre">tutorial_data/MANE.GRCh38.v1.3.ensembl_genomic.gtf</span></code> (both shipped in the bundle)</p></li>
+</ul>
+</section>
+<section id="What-we'll-build">
+<h2>What we’ll build<a class="headerlink" href="#What-we'll-build" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p><strong>Observed vs predicted</strong> — peel a composite track apart into primitives and back</p></li>
+<li><p><strong>Per-component rates</strong> — ordered, labeled, hierarchically clustered</p></li>
+<li><p><strong>The topography heatmap</strong> — <code class="docutils literal notranslate"><span class="pre">TopographyTransformer</span></code> + <code class="docutils literal notranslate"><span class="pre">plot_topography</span></code> + empirical overlay</p></li>
+<li><p><strong>Feature context</strong> — heatmaps of chromatin features, strand-aware expression, gene annotations</p></li>
+<li><p><strong>A reusable dashboard</strong> — one config, three regions, zero copy-paste</p></li>
+</ol>
+</section>
+<section id="Setup">
+<h2>Setup<a class="headerlink" href="#Setup" title="Link to this heading">¶</a></h2>
+<p>Load the model, annotate the dataset, and rename components up front. Renaming is optional but makes every subsequent plot (and every legend) readable — once we’ve labeled components <code class="docutils literal notranslate"><span class="pre">SBS1</span></code>, <code class="docutils literal notranslate"><span class="pre">SBS5</span></code>, etc., everything downstream inherits those names.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">mutopia.analysis</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mu</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">mutopia.plot.track_plot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tr</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">mu</span><span class="o">.</span><span class="n">load_model</span><span class="p">(</span><span class="s1">&#39;tutorial_data/pretrained_model.pkl&#39;</span><span class="p">)</span>
+<span class="n">data</span>  <span class="o">=</span> <span class="n">mu</span><span class="o">.</span><span class="n">gt</span><span class="o">.</span><span class="n">load_dataset</span><span class="p">(</span><span class="s1">&#39;tutorial_data/Liver.nc&#39;</span><span class="p">,</span> <span class="n">with_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">data</span>  <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">annot_data</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">threads</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">calc_shap</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+<span class="n">components</span> <span class="o">=</span> <span class="n">mu</span><span class="o">.</span><span class="n">gt</span><span class="o">.</span><span class="n">list_components</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+/Users/allen/miniconda3/envs/mutopia-model/lib/python3.12/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
+<span class="ansi-green-fg">INFO    </span> <span class="ansi-blue-fg">Mutopia</span> JIT-compiling model operations ...
+<span class="ansi-green-fg">INFO    </span> <span class="ansi-blue-fg">Mutopia</span> Setting up dataset state ...
+<span class="ansi-green-fg">INFO    </span> <span class="ansi-blue-fg">Mutopia</span> Done ...
+<span class="ansi-green-fg">INFO    </span> <span class="ansi-blue-fg">Mutopia</span> Setting model to prediction mode.
+Estimating contributions: 100%|██████████████████████████████████| 185/185 [00:01&lt;00:00, 152.36it/s]
+<span class="ansi-green-fg">INFO    </span> <span class="ansi-blue-fg">Mutopia</span> Added key to dataset: &#34;contributions&#34;
+<span class="ansi-green-fg">INFO    </span> <span class="ansi-blue-fg">Mutopia</span> Added keys to dataset: Spectra/spectra, Spectra/interactions, Spectra/shared_effects
+<span class="ansi-green-fg">INFO    </span> <span class="ansi-blue-fg">Mutopia</span> Added key: &#34;component_distributions&#34;
+<span class="ansi-green-fg">INFO    </span> <span class="ansi-blue-fg">Mutopia</span> Added key: &#34;component_distributions_locus&#34;
+<span class="ansi-green-fg">INFO    </span> <span class="ansi-blue-fg">Mutopia</span> Added key: &#34;predicted_marginal&#34;
+<span class="ansi-green-fg">INFO    </span> <span class="ansi-blue-fg">Mutopia</span> Added key: &#34;predicted_marginal_locus&#34;
+Reducing samples: 100%|██████████| 184/184 [00:27&lt;00:00,  6.76it/s]
+<span class="ansi-green-fg">INFO    </span> <span class="ansi-blue-fg">Mutopia</span> Added key: &#34;empirical_marginal&#34;
+<span class="ansi-green-fg">INFO    </span> <span class="ansi-blue-fg">Mutopia</span> Added key: &#34;empirical_marginal_locus&#34;
+</pre></div></div>
+</div>
+<p>Inspect the learned spectra (Tutorial 4 covers this in depth) and assign biologically meaningful names in the same order. For a 15-component liver model, the dominant signatures typically line up with SBS1 (clock-like CpG deamination), SBS5 (clock-like), SBS16 (liver-specific), SBS22 (aristolochic acid), SBS40, and a handful of low-activity processes. Use <code class="docutils literal notranslate"><span class="pre">mu.pl.plot_signature_panel(data)</span></code> to decide the mapping for your own model.</p>
+<blockquote>
+<div><p><strong>Tip:</strong> If you’re not ready to commit to a mapping yet, skip this cell — every plot below also works with the raw <code class="docutils literal notranslate"><span class="pre">M0..M14</span></code> labels.</p>
+</div></blockquote>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Replace with the mapping that makes sense for your model.</span>
+<span class="c1"># Check against mu.pl.plot_signature_panel(data) first!</span>
+<span class="n">new_names</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s1">&#39;SBS1&#39;</span><span class="p">,</span> <span class="s1">&#39;SBS5&#39;</span><span class="p">,</span> <span class="s1">&#39;SBS16&#39;</span><span class="p">,</span> <span class="s1">&#39;SBS22&#39;</span><span class="p">,</span> <span class="s1">&#39;SBS40&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;SBS12&#39;</span><span class="p">,</span> <span class="s1">&#39;SBS18&#39;</span><span class="p">,</span> <span class="s1">&#39;SBS4&#39;</span><span class="p">,</span>  <span class="s1">&#39;SBS17b&#39;</span><span class="p">,</span><span class="s1">&#39;SBS6&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;M10&#39;</span><span class="p">,</span>   <span class="s1">&#39;M11&#39;</span><span class="p">,</span>  <span class="s1">&#39;M12&#39;</span><span class="p">,</span>    <span class="s1">&#39;M13&#39;</span><span class="p">,</span>   <span class="s1">&#39;M14&#39;</span><span class="p">,</span>
+<span class="p">]</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">mu</span><span class="o">.</span><span class="n">gt</span><span class="o">.</span><span class="n">rename_components</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">new_names</span><span class="p">)</span>
+<span class="n">components</span> <span class="o">=</span> <span class="n">mu</span><span class="o">.</span><span class="n">gt</span><span class="o">.</span><span class="n">list_components</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<p>Make a single <code class="docutils literal notranslate"><span class="pre">GenomeView</span></code> we can pass into every configuration in this tutorial. We’re picking a gene-rich 5 Mb window on chr2; Step 5 will swap in other views without touching the config.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">view</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">make_view</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s1">&#39;chr2:55_000_000-85_000_000&#39;</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s1">&#39;chr2 gene-rich window&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+<span class="ansi-green-fg">INFO    </span> <span class="ansi-blue-fg">Mutopia</span> Found 4338/388247 regions matching query.
+</pre></div></div>
+</div>
+</section>
+<section id="1.-Observed-vs-predicted:-primitives-→-composite">
+<h2>1. Observed vs predicted: primitives → composite<a class="headerlink" href="#1.-Observed-vs-predicted:-primitives-→-composite" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">plot_marginal_observed_vs_expected</span></code> is the single most useful model-aware track: it overlays the empirical mutation rate (from your samples) on the model’s locus-level prediction. Before we use the composite, let’s build it by hand out of primitives so the machinery is transparent.</p>
+<p>The two variables we need are both added to <code class="docutils literal notranslate"><span class="pre">data</span></code> by <code class="docutils literal notranslate"><span class="pre">model.annot_data</span></code>:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">empirical_marginal_locus</span></code> — observed mutations per locus, summed over context and configuration</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">predicted_marginal_locus</span></code> — model-predicted rate per locus</p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">view.smooth(n)</span></code> is a pipeline step that convolves along the genomic axis of any selected variable.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">manual_config</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">view</span><span class="p">,</span> <span class="n">scalebar_bp</span><span class="p">:</span> <span class="p">(</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">scale_bar</span><span class="p">(</span><span class="n">scalebar_bp</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="s1">&#39;mb&#39;</span><span class="p">),</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">stack_plots</span><span class="p">(</span>
+        <span class="n">tr</span><span class="o">.</span><span class="n">scatterplot</span><span class="p">(</span>
+            <span class="n">tr</span><span class="o">.</span><span class="n">pipeline</span><span class="p">(</span>
+                <span class="n">tr</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s1">&#39;empirical_marginal_locus&#39;</span><span class="p">),</span>
+                <span class="n">view</span><span class="o">.</span><span class="n">smooth</span><span class="p">(</span><span class="mi">20</span><span class="p">),</span>
+                <span class="n">tr</span><span class="o">.</span><span class="n">renorm</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="n">s</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;lightgrey&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Observed&#39;</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="n">tr</span><span class="o">.</span><span class="n">line_plot</span><span class="p">(</span>
+            <span class="n">tr</span><span class="o">.</span><span class="n">pipeline</span><span class="p">(</span>
+                <span class="n">tr</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s1">&#39;predicted_marginal_locus&#39;</span><span class="p">),</span>
+                <span class="n">view</span><span class="o">.</span><span class="n">smooth</span><span class="p">(</span><span class="mi">10</span><span class="p">),</span>
+                <span class="n">tr</span><span class="o">.</span><span class="n">renorm</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="n">color</span><span class="o">=</span><span class="n">mu</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">categorical_palette</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+            <span class="n">linewidth</span><span class="o">=</span><span class="mf">0.75</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Predicted&#39;</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Mutation rate&#39;</span><span class="p">,</span>
+        <span class="n">legend</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">height</span><span class="o">=</span><span class="mf">1.25</span><span class="p">,</span>
+    <span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">manual_config</span><span class="p">,</span> <span class="n">view</span><span class="p">,</span> <span class="n">scalebar_bp</span><span class="o">=</span><span class="mi">1_000_000</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="kc">None</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorials_6.genome_browser_plotting_8_0.png" src="../_images/tutorials_6.genome_browser_plotting_8_0.png" />
+</div>
+</div>
+<p>That’s five lines per track — workable, but it gets repetitive across many regions. The composite does exactly this, with sane defaults:</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">composite_config</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">view</span><span class="p">,</span> <span class="n">scalebar_bp</span><span class="p">:</span> <span class="p">(</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">scale_bar</span><span class="p">(</span><span class="n">scalebar_bp</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="s1">&#39;mb&#39;</span><span class="p">),</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">tracks</span><span class="o">.</span><span class="n">plot_marginal_observed_vs_expected</span><span class="p">(</span><span class="n">view</span><span class="p">,</span> <span class="n">smooth</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">pred_smooth</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mf">1.25</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">composite_config</span><span class="p">,</span> <span class="n">view</span><span class="p">,</span> <span class="n">scalebar_bp</span><span class="o">=</span><span class="mi">1_000_000</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="kc">None</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorials_6.genome_browser_plotting_10_0.png" src="../_images/tutorials_6.genome_browser_plotting_10_0.png" />
+</div>
+</div>
+</section>
+<section id="2.-Per-component-mutation-rates">
+<h2>2. Per-component mutation rates<a class="headerlink" href="#2.-Per-component-mutation-rates" title="Link to this heading">¶</a></h2>
+<p>Once the model has decomposed the mutation rate into <em>k</em> components, each component has its own locus-wise density: <code class="docutils literal notranslate"><span class="pre">component_distributions_locus[component=&lt;name&gt;]</span></code>. <code class="docutils literal notranslate"><span class="pre">plot_component_rates</span></code> returns one <code class="docutils literal notranslate"><span class="pre">fill_plot</span></code> per component, which you can splat into the config tuple.</p>
+<p>The real value comes from <code class="docutils literal notranslate"><span class="pre">order_components</span></code>, which performs hierarchical clustering so visually similar components sit next to each other.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">ordered</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">order_components</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Ordered components:&#39;</span><span class="p">,</span> <span class="n">ordered</span><span class="p">)</span>
+
+<span class="n">rates_config</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">view</span><span class="p">,</span> <span class="n">scalebar_bp</span><span class="p">:</span> <span class="p">(</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">scale_bar</span><span class="p">(</span><span class="n">scalebar_bp</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="s1">&#39;mb&#39;</span><span class="p">),</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">tracks</span><span class="o">.</span><span class="n">plot_marginal_observed_vs_expected</span><span class="p">(</span><span class="n">view</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">spacer</span><span class="p">(</span><span class="mf">0.15</span><span class="p">),</span>
+    <span class="o">*</span><span class="n">tr</span><span class="o">.</span><span class="n">tracks</span><span class="o">.</span><span class="n">plot_component_rates</span><span class="p">(</span><span class="n">view</span><span class="p">,</span> <span class="o">*</span><span class="n">ordered</span><span class="p">,</span> <span class="n">smooth</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mf">0.4</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">rates_config</span><span class="p">,</span> <span class="n">view</span><span class="p">,</span> <span class="n">scalebar_bp</span><span class="o">=</span><span class="mi">1_000_000</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="kc">None</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Ordered components: [&#39;SBS40&#39; &#39;SBS18&#39; &#39;SBS16&#39; &#39;SBS12&#39; &#39;M10&#39; &#39;SBS4&#39; &#39;M11&#39; &#39;SBS5&#39; &#39;M14&#39; &#39;SBS6&#39;
+ &#39;SBS1&#39; &#39;M12&#39; &#39;M13&#39; &#39;SBS17b&#39; &#39;SBS22&#39;]
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorials_6.genome_browser_plotting_12_1.png" src="../_images/tutorials_6.genome_browser_plotting_12_1.png" />
+</div>
+</div>
+<p>If you only care about one component — say you want to zoom in on SBS1 — you can grab it directly via <code class="docutils literal notranslate"><span class="pre">select</span></code>’s keyword selection. Any keyword passed to <code class="docutils literal notranslate"><span class="pre">select</span></code> is forwarded to <code class="docutils literal notranslate"><span class="pre">xarray.DataArray.sel</span></code>, so you can pick along <em>any</em> named dimension:</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">single_config</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">view</span><span class="p">,</span> <span class="n">scalebar_bp</span><span class="p">:</span> <span class="p">(</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">scale_bar</span><span class="p">(</span><span class="n">scalebar_bp</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="s1">&#39;mb&#39;</span><span class="p">),</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">fill_plot</span><span class="p">(</span>
+        <span class="n">tr</span><span class="o">.</span><span class="n">pipeline</span><span class="p">(</span>
+            <span class="n">tr</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s1">&#39;component_distributions_locus&#39;</span><span class="p">,</span> <span class="n">component</span><span class="o">=</span><span class="s1">&#39;SBS1&#39;</span><span class="p">),</span>
+            <span class="n">view</span><span class="o">.</span><span class="n">smooth</span><span class="p">(</span><span class="mi">30</span><span class="p">),</span>
+            <span class="n">tr</span><span class="o">.</span><span class="n">renorm</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="n">label</span><span class="o">=</span><span class="s1">&#39;SBS1 rate&#39;</span><span class="p">,</span>
+        <span class="n">color</span><span class="o">=</span><span class="n">mu</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">categorical_palette</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+        <span class="n">height</span><span class="o">=</span><span class="mf">0.75</span><span class="p">,</span>
+    <span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">single_config</span><span class="p">,</span> <span class="n">view</span><span class="p">,</span> <span class="n">scalebar_bp</span><span class="o">=</span><span class="mi">1_000_000</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="kc">None</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorials_6.genome_browser_plotting_14_0.png" src="../_images/tutorials_6.genome_browser_plotting_14_0.png" />
+</div>
+</div>
+</section>
+<section id="3.-The-topography-heatmap">
+<h2>3. The topography heatmap<a class="headerlink" href="#3.-The-topography-heatmap" title="Link to this heading">¶</a></h2>
+<p>The <strong>topography</strong> is MuTopia’s marquee view: a heatmap whose rows are (mutation type × trinucleotide context × orientation) and whose columns are genomic loci. Each cell is the log-ratio of the predicted per-context mutation rate at that locus to the locus’s overall predicted rate. Rows are hierarchically ordered so patterns associated with the same underlying process land together.</p>
+<p><code class="docutils literal notranslate"><span class="pre">TopographyTransformer</span></code> is a lightweight, scikit-learn-style transformer: <code class="docutils literal notranslate"><span class="pre">.fit(data)</span></code> computes the row ordering and per-row mean/std once over the whole dataset, and <code class="docutils literal notranslate"><span class="pre">.transform(view)</span></code> standardizes a slice on demand. <code class="docutils literal notranslate"><span class="pre">plot_topography</span></code> is the heatmap wrapper.</p>
+<p><strong>Fit once, reuse everywhere</strong> — never refit inside a config.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">topography</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">TopographyTransformer</span><span class="p">(</span><span class="n">data_key</span><span class="o">=</span><span class="s1">&#39;predicted_marginal&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+<span class="n">topo_config</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">view</span><span class="p">,</span> <span class="n">scalebar_bp</span><span class="p">:</span> <span class="p">(</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">scale_bar</span><span class="p">(</span><span class="n">scalebar_bp</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="s1">&#39;mb&#39;</span><span class="p">),</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">tracks</span><span class="o">.</span><span class="n">plot_topography</span><span class="p">(</span><span class="n">topography</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mf">2.0</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">topo_config</span><span class="p">,</span> <span class="n">view</span><span class="p">,</span> <span class="n">scalebar_bp</span><span class="o">=</span><span class="mi">1_000_000</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="kc">None</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorials_6.genome_browser_plotting_16_0.png" src="../_images/tutorials_6.genome_browser_plotting_16_0.png" />
+</div>
+</div>
+</section>
+<section id="4.-Feature-context">
+<h2>4. Feature context<a class="headerlink" href="#4.-Feature-context" title="Link to this heading">¶</a></h2>
+<p>The model tracks above tell you <em>what</em> is happening with mutagenesis. To understand <em>why</em>, you usually want to layer in the underlying genomic features (chromatin, expression, genes).</p>
+<section id="4a.-Chromatin-feature-heatmap">
+<h3>4a. Chromatin feature heatmap<a class="headerlink" href="#4a.-Chromatin-feature-heatmap" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">feature_matrix</span></code> stacks any number of features into a (feature, locus) matrix, which <code class="docutils literal notranslate"><span class="pre">heatmap_plot</span></code> can render with optional hierarchical row clustering. <code class="docutils literal notranslate"><span class="pre">clip</span></code> trims outliers before plotting.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">chromatin_features</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;H3K27ac&#39;</span><span class="p">,</span> <span class="s1">&#39;H3K27me3&#39;</span><span class="p">,</span> <span class="s1">&#39;H3K4me1&#39;</span><span class="p">,</span> <span class="s1">&#39;H3K4me3&#39;</span><span class="p">,</span> <span class="s1">&#39;H3K9me3&#39;</span><span class="p">,</span> <span class="s1">&#39;H3K36me3&#39;</span><span class="p">]</span>
+
+<span class="n">chromatin_config</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">view</span><span class="p">,</span> <span class="n">scalebar_bp</span><span class="p">:</span> <span class="p">(</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">scale_bar</span><span class="p">(</span><span class="n">scalebar_bp</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="s1">&#39;mb&#39;</span><span class="p">),</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">heatmap_plot</span><span class="p">(</span>
+        <span class="n">tr</span><span class="o">.</span><span class="n">pipeline</span><span class="p">(</span>
+            <span class="n">tr</span><span class="o">.</span><span class="n">feature_matrix</span><span class="p">(</span><span class="o">*</span><span class="n">chromatin_features</span><span class="p">),</span>
+            <span class="n">tr</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="mf">0.02</span><span class="p">,</span> <span class="mf">0.98</span><span class="p">),</span>
+            <span class="n">tr</span><span class="o">.</span><span class="n">apply_rows</span><span class="p">(</span><span class="n">tr</span><span class="o">.</span><span class="n">minmax_scale</span><span class="p">),</span>
+        <span class="p">),</span>
+        <span class="n">palette</span><span class="o">=</span><span class="s1">&#39;magma&#39;</span><span class="p">,</span>
+        <span class="n">row_cluster</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Chromatin&#39;</span><span class="p">,</span>
+        <span class="n">yticks</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">height</span><span class="o">=</span><span class="mf">1.25</span><span class="p">,</span>
+    <span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">chromatin_config</span><span class="p">,</span> <span class="n">view</span><span class="p">,</span> <span class="n">scalebar_bp</span><span class="o">=</span><span class="mi">1_000_000</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="kc">None</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorials_6.genome_browser_plotting_18_0.png" src="../_images/tutorials_6.genome_browser_plotting_18_0.png" />
+</div>
+</div>
+</section>
+<section id="4b.-Strand-aware-gene-expression">
+<h3>4b. Strand-aware gene expression<a class="headerlink" href="#4b.-Strand-aware-gene-expression" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">plot_gene_expression_track</span></code> is a composite that combines the <code class="docutils literal notranslate"><span class="pre">GeneExpression</span></code> magnitude feature with the <code class="docutils literal notranslate"><span class="pre">GeneStrand</span></code> feature (+1 / −1 / 0), producing a signed bar plot. With <code class="docutils literal notranslate"><span class="pre">log1p=True</span></code> it applies a symmetric log transform so both strongly-expressed strands are visible at once.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">expression_config</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">view</span><span class="p">,</span> <span class="n">scalebar_bp</span><span class="p">:</span> <span class="p">(</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">scale_bar</span><span class="p">(</span><span class="n">scalebar_bp</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="s1">&#39;mb&#39;</span><span class="p">),</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">tracks</span><span class="o">.</span><span class="n">plot_gene_expression_track</span><span class="p">(</span>
+        <span class="n">expression_key</span><span class="o">=</span><span class="s1">&#39;GeneExpression&#39;</span><span class="p">,</span>
+        <span class="n">strand_key</span><span class="o">=</span><span class="s1">&#39;GeneStrand&#39;</span><span class="p">,</span>
+        <span class="n">log1p</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">height</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+    <span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">expression_config</span><span class="p">,</span> <span class="n">view</span><span class="p">,</span> <span class="n">scalebar_bp</span><span class="o">=</span><span class="mi">1_000_000</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="kc">None</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorials_6.genome_browser_plotting_20_0.png" src="../_images/tutorials_6.genome_browser_plotting_20_0.png" />
+</div>
+</div>
+</section>
+<section id="4c.-Gene-annotation">
+<h3>4c. Gene annotation<a class="headerlink" href="#4c.-Gene-annotation" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">plot_gene_annotation</span></code> drops in a real GTF-backed gene track (built on top of <code class="docutils literal notranslate"><span class="pre">pygenometracks</span></code>), which is the quickest way to make a figure biologically interpretable.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">genes_config</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">view</span><span class="p">,</span> <span class="n">scalebar_bp</span><span class="p">:</span> <span class="p">(</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">scale_bar</span><span class="p">(</span><span class="n">scalebar_bp</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="s1">&#39;mb&#39;</span><span class="p">),</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">tracks</span><span class="o">.</span><span class="n">plot_gene_annotation</span><span class="p">(</span>
+        <span class="n">gtf</span><span class="o">=</span><span class="s1">&#39;MANE.GRCh38.v1.3.ensembl_genomic.gtf&#39;</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Genes&#39;</span><span class="p">,</span>
+        <span class="n">height</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+    <span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">genes_config</span><span class="p">,</span> <span class="n">view</span><span class="p">,</span> <span class="n">scalebar_bp</span><span class="o">=</span><span class="mi">1_000_000</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="kc">None</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+<span class="ansi-green-fg">INFO    </span> <span class="ansi-blue-fg">Mutopia</span> Loading track data from MANE.GRCh38.v1.3.ensembl_genomic.gtf ...
+100%|██████████| 19352/19352 [00:05&lt;00:00, 3382.24it/s]
+DEBUG:pygenometracks.tracks.GenomeTrack:ylim 44.779999999999994,-0.08
+DEBUG:pygenometracks.tracks.GenomeTrack:ylim (np.float64(44.779999999999994), np.float64(-0.08))
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorials_6.genome_browser_plotting_22_1.png" src="../_images/tutorials_6.genome_browser_plotting_22_1.png" />
+</div>
+</div>
+</section>
+</section>
+<section id="5.-The-full-dashboard">
+<h2>5. The full dashboard<a class="headerlink" href="#5.-The-full-dashboard" title="Link to this heading">¶</a></h2>
+<p>Everything above has been a single-purpose figure. The payoff of the configuration-as-function pattern is that you can glue all of these tracks into one dashboard, then point it at any region of the genome with zero changes.</p>
+<p>The dashboard below stacks, top to bottom:</p>
+<ol class="arabic simple">
+<li><p>Scale bar + ideogram (orientation)</p></li>
+<li><p>Observed vs predicted mutation rate (model fit quality)</p></li>
+<li><p>Per-component rates (which signature is active where)</p></li>
+<li><p>Predicted topography heatmap (per-context fine structure)</p></li>
+<li><p>Chromatin heatmap (epigenomic state)</p></li>
+<li><p>Strand-aware gene expression</p></li>
+<li><p>Gene annotation</p></li>
+</ol>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">dashboard</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">view</span><span class="p">,</span> <span class="n">scalebar_bp</span><span class="p">:</span> <span class="p">(</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">scale_bar</span><span class="p">(</span><span class="n">scalebar_bp</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="s1">&#39;mb&#39;</span><span class="p">),</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">ideogram</span><span class="p">(</span><span class="s1">&#39;tutorial_data/cytoBand.txt&#39;</span><span class="p">),</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">spacer</span><span class="p">(</span><span class="mf">0.2</span><span class="p">),</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">tracks</span><span class="o">.</span><span class="n">plot_marginal_observed_vs_expected</span><span class="p">(</span><span class="n">view</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mf">1.25</span><span class="p">),</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">spacer</span><span class="p">(</span><span class="mf">0.15</span><span class="p">),</span>
+    <span class="o">*</span><span class="n">tr</span><span class="o">.</span><span class="n">tracks</span><span class="o">.</span><span class="n">plot_component_rates</span><span class="p">(</span><span class="n">view</span><span class="p">,</span> <span class="o">*</span><span class="n">ordered</span><span class="p">,</span> <span class="n">smooth</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mf">0.35</span><span class="p">),</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">spacer</span><span class="p">(</span><span class="mf">0.2</span><span class="p">),</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">tracks</span><span class="o">.</span><span class="n">plot_topography</span><span class="p">(</span><span class="n">topography</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mf">1.75</span><span class="p">),</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">spacer</span><span class="p">(</span><span class="mf">0.2</span><span class="p">),</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">heatmap_plot</span><span class="p">(</span>
+        <span class="n">tr</span><span class="o">.</span><span class="n">pipeline</span><span class="p">(</span>
+            <span class="n">tr</span><span class="o">.</span><span class="n">feature_matrix</span><span class="p">(</span><span class="o">*</span><span class="n">chromatin_features</span><span class="p">),</span>
+            <span class="n">tr</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="mf">0.02</span><span class="p">,</span> <span class="mf">0.98</span><span class="p">),</span>
+            <span class="n">tr</span><span class="o">.</span><span class="n">apply_rows</span><span class="p">(</span><span class="n">tr</span><span class="o">.</span><span class="n">minmax_scale</span><span class="p">),</span>
+        <span class="p">),</span>
+        <span class="n">palette</span><span class="o">=</span><span class="s1">&#39;magma&#39;</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Chromatin&#39;</span><span class="p">,</span>
+        <span class="n">yticks</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">height</span><span class="o">=</span><span class="mf">1.25</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">spacer</span><span class="p">(</span><span class="mf">0.15</span><span class="p">),</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">tracks</span><span class="o">.</span><span class="n">plot_gene_expression_track</span><span class="p">(</span><span class="n">height</span><span class="o">=</span><span class="mf">0.85</span><span class="p">),</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">tracks</span><span class="o">.</span><span class="n">plot_gene_annotation</span><span class="p">(</span>
+        <span class="n">gtf</span><span class="o">=</span><span class="s1">&#39;MANE.GRCh38.v1.3.ensembl_genomic.gtf&#39;</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Genes&#39;</span><span class="p">,</span>
+        <span class="n">height</span><span class="o">=</span><span class="mf">0.85</span><span class="p">,</span>
+    <span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">dashboard</span><span class="p">,</span> <span class="n">view</span><span class="p">,</span> <span class="n">scalebar_bp</span><span class="o">=</span><span class="mi">1_000_000</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+<span class="kc">None</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+DEBUG:pygenometracks.tracks.GenomeTrack:ylim 44.779999999999994,-0.08
+DEBUG:pygenometracks.tracks.GenomeTrack:ylim (np.float64(44.779999999999994), np.float64(-0.08))
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorials_6.genome_browser_plotting_24_1.png" src="../_images/tutorials_6.genome_browser_plotting_24_1.png" />
+</div>
+</div>
+<p>Now the real demonstration: <em>swap the view, keep the dashboard</em>. Each of these calls produces a completely different figure from the same <code class="docutils literal notranslate"><span class="pre">dashboard</span></code> function. This is the workflow pattern to steal — build a dashboard once, then fly around the genome.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># A heterochromatic desert on chr1 — expect low predicted rate, sparse genes.</span>
+<span class="n">view_desert</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">make_view</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s1">&#39;chr1:80_000_000-95_000_000&#39;</span><span class="p">)</span>
+<span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">dashboard</span><span class="p">,</span> <span class="n">view_desert</span><span class="p">,</span> <span class="n">scalebar_bp</span><span class="o">=</span><span class="mi">1_000_000</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+<span class="kc">None</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+<span class="ansi-green-fg">INFO    </span> <span class="ansi-blue-fg">Mutopia</span> Found 2235/388247 regions matching query.
+DEBUG:pygenometracks.tracks.GenomeTrack:ylim 10.28,-0.08
+DEBUG:pygenometracks.tracks.GenomeTrack:ylim (np.float64(10.28), np.float64(-0.08))
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorials_6.genome_browser_plotting_26_1.png" src="../_images/tutorials_6.genome_browser_plotting_26_1.png" />
+</div>
+</div>
+</section>
+<section id="Appendix:-escape-hatches">
+<h2>Appendix: escape hatches<a class="headerlink" href="#Appendix:-escape-hatches" title="Link to this heading">¶</a></h2>
+<p>The composites above cover the common cases, but you’ll eventually want to drop in something the library doesn’t provide. Three ways out:</p>
+<ul class="simple">
+<li><p><strong>``tr.custom_plot(fn, height=…)``</strong> — wrap a raw function <code class="docutils literal notranslate"><span class="pre">fn(ax,</span> <span class="pre">*,</span> <span class="pre">dataset,</span> <span class="pre">start,</span> <span class="pre">end,</span> <span class="pre">idx,</span> <span class="pre">interval,</span> <span class="pre">**kw)</span></code> and stick it in a config like any other track. This is how every composite is built internally.</p></li>
+<li><p><strong>``tr.columns(a, b, …, width_ratios=[…])``</strong> — put tracks side-by-side instead of stacked. Useful for a narrow summary column next to a wide genome track. Pass <code class="docutils literal notranslate"><span class="pre">...</span></code> (the <code class="docutils literal notranslate"><span class="pre">Ellipsis</span></code>) as a placeholder to leave a column blank.</p></li>
+<li><p><strong>``tr.static_track(track_type=’bigwig’, file=’path/to/file.bw’, height=0.5, **props)``</strong> — wraps an arbitrary <code class="docutils literal notranslate"><span class="pre">pygenometracks</span></code> track. Drops any BigWig/BED/GTF from disk straight into your figure without going through the G-Tensor at all.</p></li>
+</ul>
+<p>Here’s a minimal <code class="docutils literal notranslate"><span class="pre">custom_plot</span></code> example that shades the top 5% mutated loci in the current view. Notice that MuTopia passes the full <code class="docutils literal notranslate"><span class="pre">dataset</span></code>, the <code class="docutils literal notranslate"><span class="pre">start</span></code>/<code class="docutils literal notranslate"><span class="pre">end</span></code> coordinates of each locus in the view, and the integer <code class="docutils literal notranslate"><span class="pre">idx</span></code> selector — that’s the contract every track obeys.</p>
+</section>
+<section id="Next-steps">
+<h2>Next steps<a class="headerlink" href="#Next-steps" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><strong>Tutorial 4</strong> — signature spectra, SHAP feature importance, component interaction matrices. Everything here is a per-region view; Tutorial 4 covers the global view.</p></li>
+<li><p><strong>Tutorial 5</strong> — apply the same trained model to annotate your own VCFs with per-mutation component posteriors.</p></li>
+<li><p>Dig into <code class="docutils literal notranslate"><span class="pre">mutopia/plot/track_plot/tracks.py</span></code> — every composite in this tutorial is ~20 lines and a good template for building your own.</p></li>
+</ul>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          
+          
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2026, Allen W. Lynch
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Tutorial 6: Genome-browser plotting with a trained model</a><ul>
+<li><a class="reference internal" href="#Prerequisites">Prerequisites</a></li>
+<li><a class="reference internal" href="#What-we'll-build">What we’ll build</a></li>
+<li><a class="reference internal" href="#Setup">Setup</a></li>
+<li><a class="reference internal" href="#1.-Observed-vs-predicted:-primitives-→-composite">1. Observed vs predicted: primitives → composite</a></li>
+<li><a class="reference internal" href="#2.-Per-component-mutation-rates">2. Per-component mutation rates</a></li>
+<li><a class="reference internal" href="#3.-The-topography-heatmap">3. The topography heatmap</a></li>
+<li><a class="reference internal" href="#4.-Feature-context">4. Feature context</a><ul>
+<li><a class="reference internal" href="#4a.-Chromatin-feature-heatmap">4a. Chromatin feature heatmap</a></li>
+<li><a class="reference internal" href="#4b.-Strand-aware-gene-expression">4b. Strand-aware gene expression</a></li>
+<li><a class="reference internal" href="#4c.-Gene-annotation">4c. Gene annotation</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#5.-The-full-dashboard">5. The full dashboard</a></li>
+<li><a class="reference internal" href="#Appendix:-escape-hatches">Appendix: escape hatches</a></li>
+<li><a class="reference internal" href="#Next-steps">Next steps</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=7a06b15b"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    </body>
+</html>

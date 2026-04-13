@@ -1,0 +1,2007 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="TopographyModel API" href="model.html"><link rel="prev" title="API Reference" href="index.html">
+        <link rel="prefetch" href="../_static/mutopia_logo.png" as="image">
+        <link rel="prefetch" href="../_static/mutopia_logo.png" as="image">
+
+    <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
+        <title>GTensor API - MuTopia documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=8fd06a5a" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  --content-width: 85rem;
+  --toc-width: 22rem;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  --content-width: 85rem;
+  --toc-width: 22rem;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  --content-width: 85rem;
+  --toc-width: 22rem;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../index.html"><div class="brand">MuTopia  documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
+  <div class="sidebar-logo-container">
+    <img class="sidebar-logo only-light" src="../_static/mutopia_logo.png" alt="Light Logo"/>
+    <img class="sidebar-logo only-dark" src="../_static/mutopia_logo.png" alt="Dark Logo"/>
+  </div>
+  
+  <span class="sidebar-brand-text">MuTopia  documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Getting started with MuTopia</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../tutorials/index.html">MuTopia Tutorials</a><input aria-label="Toggle navigation of MuTopia Tutorials" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/1.building_a_gtensor.html">Tutorial 1: Building G-Tensors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/2.analyzing_gtensors.html">Tutorial 2: Analyzing G-Tensors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/3.training_models.html">Tutorial 3: Tuning and training models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/4.analyzing_models.html">Tutorial 4: Analyzing Topographic Models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/5.annotating_vcfs.html">Tutorial 5: Annotating VCFs with a Pre-Trained Model</a></li>
+</ul>
+</li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">API Reference</a><input aria-label="Toggle navigation of API Reference" checked="" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">GTensor API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html">TopographyModel API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="plot.html">Plot API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="track_plot/track_plot.html">mutopia.plot.track_plot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="track_plot/track_plot.html#module-mutopia.plot.track_plot.track_plot">track_plot API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="track_plot/tracks.html">tracks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="track_plot/transforms.html">transforms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modes/sbs.html">SBS Modality</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modes/modes.html">Base ModeConfig</a></li>
+</ul>
+</li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../_sources/api/gtensor.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="gtensor-api">
+<h1>GTensor API<a class="headerlink" href="#gtensor-api" title="Link to this heading">¶</a></h1>
+<p>The GTensor module for genomic tensor analysis. This module provides functionality for creating, manipulating, and analyzing genomic tensors, including loading datasets, applying transformations, and generating explanations for model components.</p>
+<p>GTensors are hierarchical, multi-dimensional arrays designed to represent complex genomic data structures. They are sliceable along multiple dimensions, and support lazy loading for memory efficiency.</p>
+<p>Use the Gtensor CLI tool to interact with and build GTensor datasets from the command line - the python API is mostly intended for analysis and visualization.</p>
+<p>Below is an interactive example of using GTensors in a Jupyter notebook:</p>
+<div><svg style="position: absolute; width: 0; height: 0; overflow: hidden">
+<defs>
+<symbol id="icon-database" viewBox="0 0 32 32">
+<path d="M16 0c-8.837 0-16 2.239-16 5v4c0 2.761 7.163 5 16 5s16-2.239 16-5v-4c0-2.761-7.163-5-16-5z"></path>
+<path d="M16 17c-8.837 0-16-2.239-16-5v6c0 2.761 7.163 5 16 5s16-2.239 16-5v-6c0 2.761-7.163 5-16 5z"></path>
+<path d="M16 26c-8.837 0-16-2.239-16-5v6c0 2.761 7.163 5 16 5s16-2.239 16-5v-6c0 2.761-7.163 5-16 5z"></path>
+</symbol>
+<symbol id="icon-file-text2" viewBox="0 0 32 32">
+<path d="M28.681 7.159c-0.694-0.947-1.662-2.053-2.724-3.116s-2.169-2.030-3.116-2.724c-1.612-1.182-2.393-1.319-2.841-1.319h-15.5c-1.378 0-2.5 1.121-2.5 2.5v27c0 1.378 1.122 2.5 2.5 2.5h23c1.378 0 2.5-1.122 2.5-2.5v-19.5c0-0.448-0.137-1.23-1.319-2.841zM24.543 5.457c0.959 0.959 1.712 1.825 2.268 2.543h-4.811v-4.811c0.718 0.556 1.584 1.309 2.543 2.268zM28 29.5c0 0.271-0.229 0.5-0.5 0.5h-23c-0.271 0-0.5-0.229-0.5-0.5v-27c0-0.271 0.229-0.5 0.5-0.5 0 0 15.499-0 15.5 0v7c0 0.552 0.448 1 1 1h7v19.5z"></path>
+<path d="M23 26h-14c-0.552 0-1-0.448-1-1s0.448-1 1-1h14c0.552 0 1 0.448 1 1s-0.448 1-1 1z"></path>
+<path d="M23 22h-14c-0.552 0-1-0.448-1-1s0.448-1 1-1h14c0.552 0 1 0.448 1 1s-0.448 1-1 1z"></path>
+<path d="M23 18h-14c-0.552 0-1-0.448-1-1s0.448-1 1-1h14c0.552 0 1 0.448 1 1s-0.448 1-1 1z"></path>
+</symbol>
+</defs>
+</svg>
+<style>/* CSS stylesheet for displaying xarray objects in jupyterlab.
+ *
+ */
+
+:root {
+  --xr-font-color0: var(--jp-content-font-color0, rgba(0, 0, 0, 1));
+  --xr-font-color2: var(--jp-content-font-color2, rgba(0, 0, 0, 0.54));
+  --xr-font-color3: var(--jp-content-font-color3, rgba(0, 0, 0, 0.38));
+  --xr-border-color: var(--jp-border-color2, #e0e0e0);
+  --xr-disabled-color: var(--jp-layout-color3, #bdbdbd);
+  --xr-background-color: var(--jp-layout-color0, white);
+  --xr-background-color-row-even: var(--jp-layout-color1, white);
+  --xr-background-color-row-odd: var(--jp-layout-color2, #eeeeee);
+}
+
+html[theme=dark],
+html[data-theme=dark],
+body[data-theme=dark],
+body.vscode-dark {
+  --xr-font-color0: rgba(255, 255, 255, 1);
+  --xr-font-color2: rgba(255, 255, 255, 0.54);
+  --xr-font-color3: rgba(255, 255, 255, 0.38);
+  --xr-border-color: #1F1F1F;
+  --xr-disabled-color: #515151;
+  --xr-background-color: #111111;
+  --xr-background-color-row-even: #111111;
+  --xr-background-color-row-odd: #313131;
+}
+
+.xr-wrap {
+  display: block !important;
+  min-width: 300px;
+  max-width: 700px;
+}
+
+.xr-text-repr-fallback {
+  /* fallback to plain text repr when CSS is not injected (untrusted notebook) */
+  display: none;
+}
+
+.xr-header {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+  border-bottom: solid 1px var(--xr-border-color);
+}
+
+.xr-header > div,
+.xr-header > ul {
+  display: inline;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.xr-obj-type,
+.xr-array-name {
+  margin-left: 2px;
+  margin-right: 10px;
+}
+
+.xr-obj-type {
+  color: var(--xr-font-color2);
+}
+
+.xr-sections {
+  padding-left: 0 !important;
+  display: grid;
+  grid-template-columns: 150px auto auto 1fr 0 20px 0 20px;
+}
+
+.xr-section-item {
+  display: contents;
+}
+
+.xr-section-item input {
+  display: inline-block;
+  opacity: 0;
+}
+
+.xr-section-item input + label {
+  color: var(--xr-disabled-color);
+}
+
+.xr-section-item input:enabled + label {
+  cursor: pointer;
+  color: var(--xr-font-color2);
+}
+
+.xr-section-item input:focus + label {
+  border: 2px solid var(--xr-font-color0);
+}
+
+.xr-section-item input:enabled + label:hover {
+  color: var(--xr-font-color0);
+}
+
+.xr-section-summary {
+  grid-column: 1;
+  color: var(--xr-font-color2);
+  font-weight: 500;
+}
+
+.xr-section-summary > span {
+  display: inline-block;
+  padding-left: 0.5em;
+}
+
+.xr-section-summary-in:disabled + label {
+  color: var(--xr-font-color2);
+}
+
+.xr-section-summary-in + label:before {
+  display: inline-block;
+  content: '►';
+  font-size: 11px;
+  width: 15px;
+  text-align: center;
+}
+
+.xr-section-summary-in:disabled + label:before {
+  color: var(--xr-disabled-color);
+}
+
+.xr-section-summary-in:checked + label:before {
+  content: '▼';
+}
+
+.xr-section-summary-in:checked + label > span {
+  display: none;
+}
+
+.xr-section-summary,
+.xr-section-inline-details {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.xr-section-inline-details {
+  grid-column: 2 / -1;
+}
+
+.xr-section-details {
+  display: none;
+  grid-column: 1 / -1;
+  margin-bottom: 5px;
+}
+
+.xr-section-summary-in:checked ~ .xr-section-details {
+  display: contents;
+}
+
+.xr-array-wrap {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 20px auto;
+}
+
+.xr-array-wrap > label {
+  grid-column: 1;
+  vertical-align: top;
+}
+
+.xr-preview {
+  color: var(--xr-font-color3);
+}
+
+.xr-array-preview,
+.xr-array-data {
+  padding: 0 5px !important;
+  grid-column: 2;
+}
+
+.xr-array-data,
+.xr-array-in:checked ~ .xr-array-preview {
+  display: none;
+}
+
+.xr-array-in:checked ~ .xr-array-data,
+.xr-array-preview {
+  display: inline-block;
+}
+
+.xr-dim-list {
+  display: inline-block !important;
+  list-style: none;
+  padding: 0 !important;
+  margin: 0;
+}
+
+.xr-dim-list li {
+  display: inline-block;
+  padding: 0;
+  margin: 0;
+}
+
+.xr-dim-list:before {
+  content: '(';
+}
+
+.xr-dim-list:after {
+  content: ')';
+}
+
+.xr-dim-list li:not(:last-child):after {
+  content: ',';
+  padding-right: 5px;
+}
+
+.xr-has-index {
+  font-weight: bold;
+}
+
+.xr-var-list,
+.xr-var-item {
+  display: contents;
+}
+
+.xr-var-item > div,
+.xr-var-item label,
+.xr-var-item > .xr-var-name span {
+  background-color: var(--xr-background-color-row-even);
+  margin-bottom: 0;
+}
+
+.xr-var-item > .xr-var-name:hover span {
+  padding-right: 5px;
+}
+
+.xr-var-list > li:nth-child(odd) > div,
+.xr-var-list > li:nth-child(odd) > label,
+.xr-var-list > li:nth-child(odd) > .xr-var-name span {
+  background-color: var(--xr-background-color-row-odd);
+}
+
+.xr-var-name {
+  grid-column: 1;
+}
+
+.xr-var-dims {
+  grid-column: 2;
+}
+
+.xr-var-dtype {
+  grid-column: 3;
+  text-align: right;
+  color: var(--xr-font-color2);
+}
+
+.xr-var-preview {
+  grid-column: 4;
+}
+
+.xr-index-preview {
+  grid-column: 2 / 5;
+  color: var(--xr-font-color2);
+}
+
+.xr-var-name,
+.xr-var-dims,
+.xr-var-dtype,
+.xr-preview,
+.xr-attrs dt {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 10px;
+}
+
+.xr-var-name:hover,
+.xr-var-dims:hover,
+.xr-var-dtype:hover,
+.xr-attrs dt:hover {
+  overflow: visible;
+  width: auto;
+  z-index: 1;
+}
+
+.xr-var-attrs,
+.xr-var-data,
+.xr-index-data {
+  display: none;
+  background-color: var(--xr-background-color) !important;
+  padding-bottom: 5px !important;
+}
+
+.xr-var-attrs-in:checked ~ .xr-var-attrs,
+.xr-var-data-in:checked ~ .xr-var-data,
+.xr-index-data-in:checked ~ .xr-index-data {
+  display: block;
+}
+
+.xr-var-data > table {
+  float: right;
+}
+
+.xr-var-name span,
+.xr-var-data,
+.xr-index-name div,
+.xr-index-data,
+.xr-attrs {
+  padding-left: 25px !important;
+}
+
+.xr-attrs,
+.xr-var-attrs,
+.xr-var-data,
+.xr-index-data {
+  grid-column: 1 / -1;
+}
+
+dl.xr-attrs {
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 125px auto;
+}
+
+.xr-attrs dt,
+.xr-attrs dd {
+  padding: 0;
+  margin: 0;
+  float: left;
+  padding-right: 10px;
+  width: auto;
+}
+
+.xr-attrs dt {
+  font-weight: normal;
+  grid-column: 1;
+}
+
+.xr-attrs dt:hover span {
+  display: inline-block;
+  background: var(--xr-background-color);
+  padding-right: 10px;
+}
+
+.xr-attrs dd {
+  grid-column: 2;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.xr-icon-database,
+.xr-icon-file-text2,
+.xr-no-icon {
+  display: inline-block;
+  vertical-align: middle;
+  width: 1em;
+  height: 1.5em !important;
+  stroke-width: 0;
+  stroke: currentColor;
+  fill: currentColor;
+}
+</style><pre class='xr-text-repr-fallback'>&lt;xarray.Dataset&gt; Size: 1GB
+Dimensions:                         (configuration: 2, locus: 55220,
+                                     context: 96, component: 18,
+                                     shap_features: 19, shap_component: 18,
+                                     shap_locus: 2000, genome_state: 5,
+                                     feature: 19, sample: 736,
+                                     mesoscale_state: 9)
+Coordinates:
+  * configuration                   (configuration) &lt;U12 96B &#x27;C/T-centered&#x27; &#x27;...
+  * locus                           (locus) int64 442kB 2 3 4 ... 65746 65747
+  * context                         (context) &lt;U7 3kB &#x27;A[C&gt;A]A&#x27; ... &#x27;T[T&gt;C]T&#x27;
+  * component                       (component) &lt;U3 216B &#x27;M0&#x27; &#x27;M1&#x27; ... &#x27;M17&#x27;
+  * shap_features                   (shap_features) &lt;U15 1kB &#x27;ATACAccessible&#x27;...
+  * shap_component                  (shap_component) &lt;U3 216B &#x27;M0&#x27; ... &#x27;M17&#x27;
+  * shap_locus                      (shap_locus) int64 16kB 24008 ... 22805
+  * genome_state                    (genome_state) &lt;U30 600B &#x27;Baseline&#x27; ... &#x27;...
+  * feature                         (feature) &lt;U15 1kB &#x27;ATACAccessible&#x27; ... &#x27;...
+  * sample                          (sample) &lt;U19 56kB &#x27;BR001.purple&#x27; ... &#x27;TC...
+Dimensions without coordinates: mesoscale_state
+Data variables: (12/48)
+    Spectra/interactions            (component, genome_state, context) float64 69kB ...
+    Spectra/shared_effects          (component, genome_state) float64 720B 0....
+    Spectra/spectra                 (component, context, genome_state) float64 69kB ...
+    Regions/chrom                   (locus) &lt;U4 884kB &#x27;chr1&#x27; &#x27;chr1&#x27; ... &#x27;chr1&#x27;
+    Regions/start                   (locus) int64 442kB 819220 ... 248905601
+    Regions/end                     (locus) int64 442kB 820420 ... 248906235
+    ...                              ...
+    State/mesoscale_idx             (configuration, locus) int64 884kB 4 4 ... 4
+    State/log_context_distribution  (component, context, mesoscale_state) float64 124kB ...
+    State/locus_features            (locus, feature) float32 4MB 0.0 ... -0.1123
+    State/log_locus_distribution    (component, locus) float64 8MB -0.6555 .....
+    ploidy                          (sample, locus) float32 0B &lt;COO: nnz=0, fill_value=0.0&gt;
+    X                               (sample, configuration, context, locus) float32 329MB &lt;GCXS: nnz=329103, fill_value=0.0&gt;
+Attributes:
+    name:            breast
+    dtype:           sbs
+    genome_file:     /n/data1/hms/dbmi/park/ctDNA_loci_project/locusregressio...
+    fasta_file:      /n/data1/hms/dbmi/park/SOFTWARE/REFERENCE/hg38/cgap_matc...
+    blacklist_file:  /n/data1/hms/dbmi/park/ctDNA_loci_project/locusregressio...
+    region_size:     10000
+    filename:        retry2.nc
+    regions_file:    ENFORM-Breast.nc.regions.bed</pre><div class='xr-wrap' style='display:none'><div class='xr-header'><div class='xr-obj-type'>G-Tensor: breast</div></div><ul class='xr-sections'><li class='xr-section-item'><input id='section-bb9472d5-f513-4733-b737-c67f7ea9b936' class='xr-section-summary-in' type='checkbox' disabled ><label for='section-bb9472d5-f513-4733-b737-c67f7ea9b936' class='xr-section-summary'  title='Expand/collapse section'>Dimensions:</label><div class='xr-section-inline-details'><ul class='xr-dim-list'><li><span class='xr-has-index'>configuration</span>: 2</li><li><span class='xr-has-index'>locus</span>: 55220</li><li><span class='xr-has-index'>context</span>: 96</li><li><span class='xr-has-index'>component</span>: 18</li><li><span class='xr-has-index'>shap_features</span>: 19</li><li><span class='xr-has-index'>shap_component</span>: 18</li><li><span class='xr-has-index'>shap_locus</span>: 2000</li><li><span class='xr-has-index'>genome_state</span>: 5</li><li><span class='xr-has-index'>feature</span>: 19</li><li><span class='xr-has-index'>sample</span>: 736</li><li><span>mesoscale_state</span>: 9</li></ul></div><div class='xr-section-details'></div></li><li class='xr-section-item'><input id='section-7d9e1776-df8c-4cf5-a1bd-dc054b23e218' class='xr-section-summary-in' type='checkbox'  checked><label for='section-7d9e1776-df8c-4cf5-a1bd-dc054b23e218' class='xr-section-summary' >X: <span>(1)</span></label><div class='xr-section-inline-details'></div><div class='xr-section-details'><ul class='xr-var-list'><li class='xr-var-item'><div class='xr-var-name'><span>X</span></div><div class='xr-var-dims'>(sample, configuration, context, locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>&lt;GCXS: nnz=329103, fill_value=0.0&gt;</div><input id='attrs-73221d3f-a034-430e-892e-2944c595cc1d' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-73221d3f-a034-430e-892e-2944c595cc1d' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-439ec611-8c6f-4a7c-8a7c-a97ae3b326ff' class='xr-var-data-in' type='checkbox'><label for='data-439ec611-8c6f-4a7c-8a7c-a97ae3b326ff' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><table><tbody><tr><th style="text-align: left">Format</th><td style="text-align: left">gcxs</td></tr><tr><th style="text-align: left">Data Type</th><td style="text-align: left">float32</td></tr><tr><th style="text-align: left">Shape</th><td style="text-align: left">(736, 2, 96, 55220)</td></tr><tr><th style="text-align: left">nnz</th><td style="text-align: left">329103</td></tr><tr><th style="text-align: left">Density</th><td style="text-align: left">4.2175126691849206e-05</td></tr><tr><th style="text-align: left">Read-only</th><td style="text-align: left">True</td></tr><tr><th style="text-align: left">Size</th><td style="text-align: left">313.8M</td></tr><tr><th style="text-align: left">Storage ratio</th><td style="text-align: left">0.01</td></tr><tr><th style="text-align: left">Compressed Axes</th><td style="text-align: left">(0, 3)</td></tr></tbody></table></div></li></ul></div></li><li class='xr-section-item'><input id='section-7dcb1ef0-87c8-4652-8e35-22e22fdcbd2b' class='xr-section-summary-in' type='checkbox'  checked><label for='section-7dcb1ef0-87c8-4652-8e35-22e22fdcbd2b' class='xr-section-summary' >Data: <span>(10)</span></label><div class='xr-section-inline-details'></div><div class='xr-section-details'><ul class='xr-var-list'><li class='xr-var-item'><div class='xr-var-name'><span>component_distributions</span></div><div class='xr-var-dims'>(component, locus, configuration, context)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>0.0008162 8.418e-05 ... 0.0004949</div><input id='attrs-1bd9b8e9-d4fd-4880-8fe8-7029c65bb626' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-1bd9b8e9-d4fd-4880-8fe8-7029c65bb626' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-48c312df-24b3-4711-ac90-e9074c446ff6' class='xr-var-data-in' type='checkbox'><label for='data-48c312df-24b3-4711-ac90-e9074c446ff6' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([[[[8.16181360e-04, 8.41755609e-05, 1.13639270e-03, ...,
+          1.12953203e-04, 1.14218077e-04, 3.74800758e-04],
+         [8.16181360e-04, 8.41755609e-05, 1.13639270e-03, ...,
+          1.12953203e-04, 1.14218077e-04, 3.74800758e-04]],
+
+        [[1.23187574e-03, 1.27047548e-04, 1.71517604e-03, ...,
+          1.70482104e-04, 1.72391199e-04, 5.65692899e-04],
+         [1.23187574e-03, 1.27047548e-04, 1.71517604e-03, ...,
+          1.70482104e-04, 1.72391199e-04, 5.65692899e-04]],
+
+        [[1.07886398e-03, 1.11266912e-04, 1.50213332e-03, ...,
+          1.49306448e-04, 1.50978405e-04, 4.95427928e-04],
+         [1.07886398e-03, 1.11266912e-04, 1.50213332e-03, ...,
+          1.49306448e-04, 1.50978405e-04, 4.95427928e-04]],
+
+        ...,
+
+        [[2.28469167e-03, 2.35628031e-04, 3.18104192e-03, ...,
+          3.16183694e-04, 3.19724379e-04, 1.04915921e-03],
+         [2.28469167e-03, 2.35628031e-04, 3.18104192e-03, ...,
+...
+         [1.40159193e-03, 1.19357917e-03, 1.27034518e-03, ...,
+          5.58595289e-04, 3.67310655e-04, 2.58523942e-04]],
+
+        ...,
+
+        [[1.19145133e-03, 1.01462600e-03, 1.07988238e-03, ...,
+          4.74845147e-04, 3.12239776e-04, 2.19763460e-04],
+         [1.19145133e-03, 1.01462600e-03, 1.07988238e-03, ...,
+          4.74845147e-04, 3.12239776e-04, 2.19763460e-04]],
+
+        [[1.13756000e-03, 9.68732696e-04, 1.03103754e-03, ...,
+          4.53367102e-04, 2.98116647e-04, 2.09823193e-04],
+         [1.13756000e-03, 9.68732696e-04, 1.03103754e-03, ...,
+          4.53367102e-04, 2.98116647e-04, 2.09823193e-04]],
+
+        [[2.68330425e-03, 2.28507025e-03, 2.43203621e-03, ...,
+          1.06941327e-03, 7.03204831e-04, 4.94936015e-04],
+         [2.68330425e-03, 2.28507025e-03, 2.43203621e-03, ...,
+          1.06941327e-03, 7.03204831e-04, 4.94936015e-04]]]],
+      dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>component_distributions_locus</span></div><div class='xr-var-dims'>(component, locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>0.001608 0.002517 ... 0.005958</div><input id='attrs-88459a81-f881-4697-9464-236818524a78' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-88459a81-f881-4697-9464-236818524a78' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-b3fd2fdb-8822-43dc-8aac-dde072f8f069' class='xr-var-data-in' type='checkbox'><label for='data-b3fd2fdb-8822-43dc-8aac-dde072f8f069' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([[0.00160757, 0.00251667, 0.00220055, ..., 0.00408187, 0.00212895,
+        0.00060106],
+       [0.00211766, 0.00232938, 0.00241099, ..., 0.00297932, 0.00211661,
+        0.00163246],
+       [0.00315005, 0.00206169, 0.00238894, ..., 0.00303443, 0.0032256 ,
+        0.0049133 ],
+       ...,
+       [0.00109402, 0.00121836, 0.00130745, ..., 0.00434199, 0.00232904,
+        0.00056757],
+       [0.00105494, 0.0006052 , 0.00065257, ..., 0.00296408, 0.00129849,
+        0.00066819],
+       [0.00330446, 0.00255067, 0.00340437, ..., 0.00242862, 0.00213621,
+        0.00595791]], dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>contributions</span></div><div class='xr-var-dims'>(sample, component)</div><div class='xr-var-dtype'>float64</div><div class='xr-var-preview xr-preview'>153.5 22.14 36.92 ... 53.72 95.67</div><input id='attrs-7e217c8b-4e56-4a2a-a5c4-ea534d6ac2e8' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-7e217c8b-4e56-4a2a-a5c4-ea534d6ac2e8' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-0640c654-ad59-47ee-9849-21cf69853883' class='xr-var-data-in' type='checkbox'><label for='data-0640c654-ad59-47ee-9849-21cf69853883' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([[ 153.4715177 ,   22.13884017,   36.91701085, ...,   86.70299598,
+          33.24296395,   71.34830521],
+       [  55.08241008,   49.05304707,   46.57326334, ...,   27.59948763,
+         223.07354553,    8.71553456],
+       [ 207.8377233 , 1058.60078083,  470.59836292, ...,  834.5530926 ,
+          83.26043691,   94.11466044],
+       ...,
+       [ 146.0599038 ,  651.59639144,   37.42808488, ..., 1214.13365932,
+          34.13908786,  140.71908414],
+       [  45.7552755 ,   57.77040488,   15.67352332, ...,   80.22501747,
+          16.02944648,   19.83405096],
+       [  87.59643072,  157.00834041,  381.94371569, ...,  689.56504454,
+          53.7202158 ,   95.67161757]])</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>predicted_marginal</span></div><div class='xr-var-dims'>(locus, configuration, context)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>0.01061 0.01065 ... 0.007632</div><input id='attrs-c6ac2a6f-57b7-46df-8a76-6f2e6768dc6f' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-c6ac2a6f-57b7-46df-8a76-6f2e6768dc6f' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-cad2adc1-407c-4d07-9782-d4a18d9a4bde' class='xr-var-data-in' type='checkbox'><label for='data-cad2adc1-407c-4d07-9782-d4a18d9a4bde' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([[[0.01060738, 0.01065123, 0.01573445, ..., 0.0042932 ,
+         0.00527245, 0.00569849],
+        [0.01060738, 0.01065123, 0.01573445, ..., 0.0042932 ,
+         0.00527245, 0.00569849]],
+
+       [[0.01075247, 0.01121671, 0.0161343 , ..., 0.00424063,
+         0.00546737, 0.00598755],
+        [0.01075247, 0.01121671, 0.0161343 , ..., 0.00424063,
+         0.00546737, 0.00598755]],
+
+       [[0.01126103, 0.01180904, 0.01681324, ..., 0.00452318,
+         0.00580547, 0.00639821],
+        [0.01126103, 0.01180904, 0.01681324, ..., 0.00452318,
+         0.00580547, 0.00639821]],
+
+       ...,
+
+       [[0.02176665, 0.01542303, 0.02608942, ..., 0.00907317,
+         0.00785733, 0.0083876 ],
+        [0.02176665, 0.01542303, 0.02608942, ..., 0.00907317,
+         0.00785733, 0.0083876 ]],
+
+       [[0.01427104, 0.01292776, 0.01901028, ..., 0.00607623,
+         0.0063722 , 0.00714005],
+        [0.01427104, 0.01292776, 0.01901028, ..., 0.00607623,
+         0.0063722 , 0.00714005]],
+
+       [[0.00901599, 0.01133972, 0.0160096 , ..., 0.00440132,
+         0.00667007, 0.00763244],
+        [0.00901599, 0.01133972, 0.0160096 , ..., 0.00440132,
+         0.00667007, 0.00763244]]], dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>predicted_marginal_locus</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>0.002028 0.001898 ... 0.002174</div><input id='attrs-0b863227-39ad-43a0-93df-510fa36a6e68' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-0b863227-39ad-43a0-93df-510fa36a6e68' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-7e59d680-cb02-4231-a991-07a600d86c36' class='xr-var-data-in' type='checkbox'><label for='data-7e59d680-cb02-4231-a991-07a600d86c36' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([0.00202793, 0.0018982 , 0.00206177, ..., 0.00297863, 0.00226454,
+       0.00217435], dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>empirical_marginal</span></div><div class='xr-var-dims'>(configuration, context, locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>0.0 0.0 0.0 0.0 ... 0.0 0.0 0.0 0.0</div><input id='attrs-61180ea1-5bf1-4ccf-8612-2def63842401' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-61180ea1-5bf1-4ccf-8612-2def63842401' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-12201fba-8ee5-4598-93f8-cfab662d5507' class='xr-var-data-in' type='checkbox'><label for='data-12201fba-8ee5-4598-93f8-cfab662d5507' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([[[0.      , 0.      , 0.      , ..., 0.      , 0.      ,
+         0.      ],
+        [0.      , 0.      , 0.      , ..., 0.      , 0.      ,
+         0.      ],
+        [0.      , 0.      , 0.      , ..., 0.003513, 0.      ,
+         0.      ],
+        ...,
+        [0.      , 0.      , 0.      , ..., 0.      , 0.      ,
+         0.      ],
+        [0.      , 0.      , 0.      , ..., 0.      , 0.      ,
+         0.      ],
+        [0.      , 0.      , 0.      , ..., 0.      , 0.      ,
+         0.      ]],
+
+       [[0.      , 0.      , 0.      , ..., 0.      , 0.      ,
+         0.      ],
+        [0.      , 0.      , 0.      , ..., 0.      , 0.      ,
+         0.      ],
+        [0.      , 0.      , 0.      , ..., 0.      , 0.      ,
+         0.      ],
+        ...,
+        [0.      , 0.      , 0.      , ..., 0.      , 0.      ,
+         0.      ],
+        [0.      , 0.      , 0.      , ..., 0.      , 0.      ,
+         0.      ],
+        [0.      , 0.      , 0.      , ..., 0.      , 0.      ,
+         0.      ]]], dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>empirical_locus_marginal</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>0.0 0.0 ... 0.000908 0.001367</div><input id='attrs-afddae81-3604-4c55-aeb1-87f6dfba78e3' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-afddae81-3604-4c55-aeb1-87f6dfba78e3' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-5c757f16-5f63-422f-94a0-9763ec22bfe0' class='xr-var-data-in' type='checkbox'><label for='data-5c757f16-5f63-422f-94a0-9763ec22bfe0' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([0.        , 0.        , 0.00043093, ..., 0.00083119, 0.00090803,
+       0.00136667], dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>SHAP_values</span></div><div class='xr-var-dims'>(shap_component, shap_locus, shap_features)</div><div class='xr-var-dtype'>float64</div><div class='xr-var-preview xr-preview'>0.1228 0.3217 ... 0.4938 -0.6256</div><input id='attrs-dddf5602-323a-4fb4-b456-b87866b478ec' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-dddf5602-323a-4fb4-b456-b87866b478ec' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-58b46c02-a2f8-4055-aa09-33be367457ed' class='xr-var-data-in' type='checkbox'><label for='data-58b46c02-a2f8-4055-aa09-33be367457ed' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([[[ 1.22837441e-01,  3.21652283e-01,  7.09834633e-01, ...,
+          1.36791615e-01,  1.90237902e-01,  1.16650823e-01],
+        [ 1.65678441e-01, -4.21049857e-01,  4.82336636e-01, ...,
+         -1.09218084e-01,  1.14808520e-02, -8.66587654e-02],
+        [ 1.82902677e-01, -6.14474052e-02,  7.10553294e-01, ...,
+         -4.09953165e-02,  2.08118112e-02, -7.88478043e-03],
+        ...,
+        [ 1.29081442e-01, -8.92306592e-02, -2.04736338e-01, ...,
+         -1.13833142e-01, -9.53741930e-02, -3.22041866e-01],
+        [ 1.12114460e-01,  8.12029929e-03, -3.07306229e-01, ...,
+          4.66200991e-02,  8.17315067e-02, -2.68343771e-02],
+        [ 1.42439715e-01,  1.05133274e-02, -2.66116744e-02, ...,
+         -7.87383187e-02,  5.00472210e-02,  3.91414906e-02]],
+
+       [[ 6.02092726e-02, -1.82894087e-01,  3.97642206e-01, ...,
+          2.03133977e-02, -4.21978677e-01, -2.42697578e-01],
+        [ 8.75111640e-02,  7.95553347e-02,  5.87230599e-01, ...,
+         -2.92938814e-02,  2.48315784e-01,  5.56756099e-01],
+        [ 9.14071224e-02,  1.77469764e-01,  6.09212858e-01, ...,
+         -1.27621031e-03, -1.91555363e-01, -8.24380553e-02],
+...
+        [ 9.16641335e-03, -1.16597522e+00, -2.67470273e-01, ...,
+         -8.30427214e-01, -1.41603057e-01, -5.23739703e-01],
+        [ 5.57369250e-03,  1.41663399e+00,  4.55734196e-01, ...,
+          8.95244120e-01,  2.58170102e-01, -4.59576810e-01],
+        [ 6.96594935e-03, -6.73727659e-01,  1.00855999e+00, ...,
+         -1.46101942e-01, -1.43379558e-01, -1.89844717e-01]],
+
+       [[ 1.06622343e+00, -2.15937494e-01,  8.52110860e-01, ...,
+          1.60207648e-01,  4.25544104e-01,  8.92412507e-01],
+        [ 4.25154191e-01,  3.89179708e-01,  1.80773071e-01, ...,
+         -2.49177752e-01, -6.60704054e-01, -1.51076905e+00],
+        [ 5.74709662e-01,  6.13348497e-01,  7.13975670e-01, ...,
+          1.64788821e-01,  3.60036322e-01,  6.84919343e-02],
+        ...,
+        [ 6.91545298e-01, -1.95004554e-01, -8.49691902e-02, ...,
+         -2.70138959e-01,  2.42302979e-01, -3.00372646e+00],
+        [ 9.72820413e-01, -4.99695516e-02, -3.72846840e-01, ...,
+          2.83388820e-01,  4.32839110e-01,  1.00508484e+00],
+        [ 8.53362136e-01, -2.09299562e-02, -8.22562016e-01, ...,
+          1.82472169e-01,  4.93805831e-01, -6.25623146e-01]]])</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>empirical_marginal_locus</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>0.0 0.0 ... 0.000908 0.001367</div><input id='attrs-bcc5e9ef-ae46-40bc-937f-96e47b4bf318' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-bcc5e9ef-ae46-40bc-937f-96e47b4bf318' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-bab46240-3be9-4d76-a735-4f249b98935c' class='xr-var-data-in' type='checkbox'><label for='data-bab46240-3be9-4d76-a735-4f249b98935c' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([0.        , 0.        , 0.00043093, ..., 0.00083119, 0.00090804,
+       0.00136666], dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>ploidy</span></div><div class='xr-var-dims'>(sample, locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>&lt;COO: nnz=0, fill_value=0.0&gt;</div><input id='attrs-fd89d466-ae0b-4fa8-8f0f-0f4e40fbdf6a' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-fd89d466-ae0b-4fa8-8f0f-0f4e40fbdf6a' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-198901fb-b6be-4abb-b639-91c94ee481c5' class='xr-var-data-in' type='checkbox'><label for='data-198901fb-b6be-4abb-b639-91c94ee481c5' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><table><tbody><tr><th style="text-align: left">Format</th><td style="text-align: left">coo</td></tr><tr><th style="text-align: left">Data Type</th><td style="text-align: left">float32</td></tr><tr><th style="text-align: left">Shape</th><td style="text-align: left">(736, 55220)</td></tr><tr><th style="text-align: left">nnz</th><td style="text-align: left">0</td></tr><tr><th style="text-align: left">Density</th><td style="text-align: left">0.0</td></tr><tr><th style="text-align: left">Read-only</th><td style="text-align: left">True</td></tr><tr><th style="text-align: left">Size</th><td style="text-align: left">0</td></tr><tr><th style="text-align: left">Storage ratio</th><td style="text-align: left">0.00</td></tr></tbody></table></div></li></ul></div></li><li class='xr-section-item'><input id='section-ccf50c0d-239a-4258-bba6-cd9437932280' class='xr-section-summary-in' type='checkbox'  ><label for='section-ccf50c0d-239a-4258-bba6-cd9437932280' class='xr-section-summary' >Features: <span>(22)</span></label><div class='xr-section-inline-details'></div><div class='xr-section-details'><ul class='xr-var-list'><li class='xr-var-item'><div class='xr-var-name'><span>Features/GenePosition</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>nan nan nan nan ... nan nan 0.0 0.0</div><input id='attrs-37730ee0-f541-4167-ae2a-e45bbaf876c4' class='xr-var-attrs-in' type='checkbox' ><label for='attrs-37730ee0-f541-4167-ae2a-e45bbaf876c4' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-83e0edb3-00cd-4aad-a6ea-3955072d6e8a' class='xr-var-data-in' type='checkbox'><label for='data-83e0edb3-00cd-4aad-a6ea-3955072d6e8a' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'><dt><span>normalization :</span></dt><dd>minmax</dd><dt><span>group :</span></dt><dd>all</dd><dt><span>active :</span></dt><dd>1</dd></dl></div><div class='xr-var-data'><pre>array([nan, nan, nan, ..., nan,  0.,  0.], dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Features/GeneExpression</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>nan nan nan nan ... nan nan nan nan</div><input id='attrs-faf89797-caa4-4972-b6da-7cebc247a856' class='xr-var-attrs-in' type='checkbox' ><label for='attrs-faf89797-caa4-4972-b6da-7cebc247a856' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-ffcc0e1d-7e0c-4a04-9a22-689a9bc26417' class='xr-var-data-in' type='checkbox'><label for='data-ffcc0e1d-7e0c-4a04-9a22-689a9bc26417' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'><dt><span>normalization :</span></dt><dd>log1p_cpm</dd><dt><span>group :</span></dt><dd>all</dd><dt><span>active :</span></dt><dd>1</dd></dl></div><div class='xr-var-data'><pre>array([nan, nan, nan, ..., nan, nan, nan], dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Features/NucleotideRatio</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>0.3104 0.3104 ... 0.251 0.251</div><input id='attrs-90078432-1605-4cd9-be93-106b692ad6f3' class='xr-var-attrs-in' type='checkbox' ><label for='attrs-90078432-1605-4cd9-be93-106b692ad6f3' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-2df981cb-7ff0-4fdf-b57b-0929ff382cdc' class='xr-var-data-in' type='checkbox'><label for='data-2df981cb-7ff0-4fdf-b57b-0929ff382cdc' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'><dt><span>normalization :</span></dt><dd>standardize</dd><dt><span>group :</span></dt><dd>all</dd><dt><span>active :</span></dt><dd>1</dd></dl></div><div class='xr-var-data'><pre>array([0.310445 , 0.310445 , 0.310445 , ..., 0.3088985, 0.25105  ,
+       0.25105  ], dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Features/BackgroundMutrate</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>4.018e-07 4.821e-07 ... 1.125e-06</div><input id='attrs-010c8b5d-9620-41db-9a97-2f5be915a747' class='xr-var-attrs-in' type='checkbox' ><label for='attrs-010c8b5d-9620-41db-9a97-2f5be915a747' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-fcfbcec3-fbc7-4715-a346-41e2687d46d0' class='xr-var-data-in' type='checkbox'><label for='data-fcfbcec3-fbc7-4715-a346-41e2687d46d0' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'><dt><span>normalization :</span></dt><dd>log1p_cpm</dd><dt><span>group :</span></dt><dd>all</dd><dt><span>active :</span></dt><dd>1</dd></dl></div><div class='xr-var-data'><pre>array([4.017535e-07, 4.821040e-07, 4.821040e-07, ..., 1.721800e-06,
+       1.320045e-06, 1.124910e-06], dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Features/ATACAccessible</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>&lt;U4</div><div class='xr-var-preview xr-preview'>&#x27;none&#x27; &#x27;none&#x27; ... &#x27;none&#x27; &#x27;none&#x27;</div><input id='attrs-53a35fc2-6172-4247-a08f-e26d38cfe6ad' class='xr-var-attrs-in' type='checkbox' ><label for='attrs-53a35fc2-6172-4247-a08f-e26d38cfe6ad' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-de61b066-1e36-4ada-8fae-146dc216506a' class='xr-var-data-in' type='checkbox'><label for='data-de61b066-1e36-4ada-8fae-146dc216506a' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'><dt><span>normalization :</span></dt><dd>categorical</dd><dt><span>group :</span></dt><dd>all</dd><dt><span>active :</span></dt><dd>1</dd><dt><span>classes :</span></dt><dd>[&#x27;none&#x27;, &#x27;Acc&#x27;]</dd></dl></div><div class='xr-var-data'><pre>array([&#x27;none&#x27;, &#x27;none&#x27;, &#x27;none&#x27;, ..., &#x27;none&#x27;, &#x27;none&#x27;, &#x27;none&#x27;], dtype=&#x27;&lt;U4&#x27;)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Features/GeneStrand</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>int8</div><div class='xr-var-preview xr-preview'>0 0 0 0 0 0 0 0 ... 0 0 0 0 0 0 0 0</div><input id='attrs-9f3bc7ee-6122-44dd-9b30-9a6febebe149' class='xr-var-attrs-in' type='checkbox' ><label for='attrs-9f3bc7ee-6122-44dd-9b30-9a6febebe149' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-7ad6cd89-5079-47a9-b95f-fd1906620bb8' class='xr-var-data-in' type='checkbox'><label for='data-7ad6cd89-5079-47a9-b95f-fd1906620bb8' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'><dt><span>normalization :</span></dt><dd>strand</dd><dt><span>group :</span></dt><dd>all</dd><dt><span>active :</span></dt><dd>1</dd></dl></div><div class='xr-var-data'><pre>array([0, 0, 0, ..., 0, 0, 0], dtype=int8)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Features/ReplicationStrand</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>int8</div><div class='xr-var-preview xr-preview'>0 0 0 0 1 1 1 1 ... 0 0 0 0 0 0 0 0</div><input id='attrs-5d645063-ac2d-477f-892b-375fa98e85f5' class='xr-var-attrs-in' type='checkbox' ><label for='attrs-5d645063-ac2d-477f-892b-375fa98e85f5' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-c86f5c66-1af2-4167-82a6-06a93510c4ac' class='xr-var-data-in' type='checkbox'><label for='data-c86f5c66-1af2-4167-82a6-06a93510c4ac' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'><dt><span>normalization :</span></dt><dd>strand</dd><dt><span>group :</span></dt><dd>all</dd><dt><span>active :</span></dt><dd>1</dd></dl></div><div class='xr-var-data'><pre>array([0, 0, 0, ..., 0, 0, 0], dtype=int8)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Features/RepliseqG1b</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>51.0 51.0 52.25 ... 8.336 7.45 7.0</div><input id='attrs-7766c887-08ea-4312-8959-30f44b550912' class='xr-var-attrs-in' type='checkbox' ><label for='attrs-7766c887-08ea-4312-8959-30f44b550912' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-621895bd-7276-4f59-a69a-bf36c68c8202' class='xr-var-data-in' type='checkbox'><label for='data-621895bd-7276-4f59-a69a-bf36c68c8202' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'><dt><span>normalization :</span></dt><dd>quantile</dd><dt><span>group :</span></dt><dd>all</dd><dt><span>active :</span></dt><dd>1</dd></dl></div><div class='xr-var-data'><pre>array([51.     , 51.     , 52.2504 , ...,  8.33616,  7.45013,  7.     ],
+      dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Features/HICEigenvector</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>nan 0.8588 0.8588 ... 0.5943 0.5943</div><input id='attrs-83c4d165-3b8a-4727-a115-81a10289923b' class='xr-var-attrs-in' type='checkbox' ><label for='attrs-83c4d165-3b8a-4727-a115-81a10289923b' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-f92bc559-dfaf-4b5a-848d-5d3bfd3194bf' class='xr-var-data-in' type='checkbox'><label for='data-f92bc559-dfaf-4b5a-848d-5d3bfd3194bf' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'><dt><span>normalization :</span></dt><dd>standardize</dd><dt><span>group :</span></dt><dd>all</dd><dt><span>active :</span></dt><dd>1</dd></dl></div><div class='xr-var-data'><pre>array([     nan, 0.858771, 0.858771, ..., 0.545264, 0.594336, 0.594336],
+      dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Features/RepliseqS3</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>4.0 4.0 4.0 ... 25.66 26.0 26.0</div><input id='attrs-1bcf1836-171f-4990-bcf5-fe9fe7837f79' class='xr-var-attrs-in' type='checkbox' ><label for='attrs-1bcf1836-171f-4990-bcf5-fe9fe7837f79' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-cf5a5113-0cf8-42a3-8894-b1e1722b8b4a' class='xr-var-data-in' type='checkbox'><label for='data-cf5a5113-0cf8-42a3-8894-b1e1722b8b4a' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'><dt><span>normalization :</span></dt><dd>quantile</dd><dt><span>group :</span></dt><dd>all</dd><dt><span>active :</span></dt><dd>1</dd></dl></div><div class='xr-var-data'><pre>array([ 4.    ,  4.    ,  4.    , ..., 25.6638, 26.    , 26.    ],
+      dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Features/RepliseqS2</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>6.0 6.0 6.0 ... 35.0 34.58 35.0</div><input id='attrs-edc56dda-011e-4fa0-8fd6-0de1b33354f5' class='xr-var-attrs-in' type='checkbox' ><label for='attrs-edc56dda-011e-4fa0-8fd6-0de1b33354f5' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-b49369f1-b5db-4e98-a324-63ffb1448248' class='xr-var-data-in' type='checkbox'><label for='data-b49369f1-b5db-4e98-a324-63ffb1448248' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'><dt><span>normalization :</span></dt><dd>quantile</dd><dt><span>group :</span></dt><dd>all</dd><dt><span>active :</span></dt><dd>1</dd></dl></div><div class='xr-var-data'><pre>array([ 6.    ,  6.    ,  6.    , ..., 35.    , 34.5773, 35.    ],
+      dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Features/RepliseqS1</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>28.75 28.0 27.46 ... 15.97 16.0</div><input id='attrs-36667839-f090-43a3-b3dd-d8328b19a99a' class='xr-var-attrs-in' type='checkbox' ><label for='attrs-36667839-f090-43a3-b3dd-d8328b19a99a' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-6c6e4325-6e5d-4611-b140-05526c1456ca' class='xr-var-data-in' type='checkbox'><label for='data-6c6e4325-6e5d-4611-b140-05526c1456ca' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'><dt><span>normalization :</span></dt><dd>quantile</dd><dt><span>group :</span></dt><dd>all</dd><dt><span>active :</span></dt><dd>1</dd></dl></div><div class='xr-var-data'><pre>array([28.7492, 28.    , 27.4639, ..., 15.2016, 15.9725, 16.    ],
+      dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Features/RepliseqS4</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>2.0 2.0 2.0 2.152 ... 8.933 9.0 9.0</div><input id='attrs-2b31317c-d4e9-40c9-8e72-2a32ffff818b' class='xr-var-attrs-in' type='checkbox' ><label for='attrs-2b31317c-d4e9-40c9-8e72-2a32ffff818b' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-43fb9d82-9c98-4e8b-a407-c0c3186eddd7' class='xr-var-data-in' type='checkbox'><label for='data-43fb9d82-9c98-4e8b-a407-c0c3186eddd7' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'><dt><span>normalization :</span></dt><dd>quantile</dd><dt><span>group :</span></dt><dd>all</dd><dt><span>active :</span></dt><dd>1</dd></dl></div><div class='xr-var-data'><pre>array([2.     , 2.     , 2.     , ..., 8.93288, 9.     , 9.     ],
+      dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Features/RepliseqG2</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>9.0 9.0 8.107 ... 7.202 7.0 7.0</div><input id='attrs-fd870357-160f-4aa7-b5fc-04120209ae0f' class='xr-var-attrs-in' type='checkbox' ><label for='attrs-fd870357-160f-4aa7-b5fc-04120209ae0f' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-95c0dab8-c99e-48a3-a361-0a98db6d89f8' class='xr-var-data-in' type='checkbox'><label for='data-95c0dab8-c99e-48a3-a361-0a98db6d89f8' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'><dt><span>group :</span></dt><dd>all</dd><dt><span>normalization :</span></dt><dd>quantile</dd><dt><span>active :</span></dt><dd>1</dd></dl></div><div class='xr-var-data'><pre>array([9.     , 9.     , 8.10679, ..., 7.20164, 7.     , 7.     ],
+      dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Features/DNase</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>0.0888 0.1062 ... 0.03143 0.9611</div><input id='attrs-79d2ba4e-1ca9-40cf-94b7-5685556826db' class='xr-var-attrs-in' type='checkbox' ><label for='attrs-79d2ba4e-1ca9-40cf-94b7-5685556826db' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-9317f1b5-e797-429b-99b9-ced8d55ba8ff' class='xr-var-data-in' type='checkbox'><label for='data-9317f1b5-e797-429b-99b9-ced8d55ba8ff' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'><dt><span>normalization :</span></dt><dd>log1p_cpm</dd><dt><span>group :</span></dt><dd>all</dd><dt><span>active :</span></dt><dd>1</dd></dl></div><div class='xr-var-data'><pre>array([0.0887982 , 0.1061594 , 0.1026488 , ..., 0.03864325, 0.0314343 ,
+       0.961084  ], dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Features/H3K4me3</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>0.2787 0.1536 ... 0.179 105.2</div><input id='attrs-9b1f8cc5-fb20-4c3f-a520-827ed13ef7c9' class='xr-var-attrs-in' type='checkbox' ><label for='attrs-9b1f8cc5-fb20-4c3f-a520-827ed13ef7c9' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-e6a1c51a-cdbe-4140-8c64-2dda2c56ffa9' class='xr-var-data-in' type='checkbox'><label for='data-e6a1c51a-cdbe-4140-8c64-2dda2c56ffa9' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'><dt><span>normalization :</span></dt><dd>log1p_cpm</dd><dt><span>group :</span></dt><dd>all</dd><dt><span>active :</span></dt><dd>1</dd></dl></div><div class='xr-var-data'><pre>array([  0.2786615 ,   0.153628  ,   0.11353715, ...,   0.1348505 ,
+         0.1790165 , 105.2045    ], dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Features/H3K27ac</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>1.967 0.8837 2.086 ... 0.4331 55.81</div><input id='attrs-7bee3a67-222a-4b5d-bedb-9a6991c24807' class='xr-var-attrs-in' type='checkbox' ><label for='attrs-7bee3a67-222a-4b5d-bedb-9a6991c24807' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-dc27e43c-cf60-431b-8227-5e2a8502321a' class='xr-var-data-in' type='checkbox'><label for='data-dc27e43c-cf60-431b-8227-5e2a8502321a' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'><dt><span>group :</span></dt><dd>all</dd><dt><span>normalization :</span></dt><dd>log1p_cpm</dd><dt><span>active :</span></dt><dd>1</dd></dl></div><div class='xr-var-data'><pre>array([ 1.967099 ,  0.8837265,  2.086472 , ...,  0.099964 ,  0.4330815,
+       55.80805  ], dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Features/H3K27me3</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>0.06838 0.1301 ... 0.1438 0.08787</div><input id='attrs-401f6990-7ae7-405f-8630-cbcdcb477175' class='xr-var-attrs-in' type='checkbox' ><label for='attrs-401f6990-7ae7-405f-8630-cbcdcb477175' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-778448a1-3a5d-4870-8473-a96f009eafdf' class='xr-var-data-in' type='checkbox'><label for='data-778448a1-3a5d-4870-8473-a96f009eafdf' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'><dt><span>normalization :</span></dt><dd>log1p_cpm</dd><dt><span>group :</span></dt><dd>all</dd><dt><span>active :</span></dt><dd>1</dd></dl></div><div class='xr-var-data'><pre>array([0.0683846 , 0.13008985, 0.1398076 , ..., 0.694179  , 0.14381555,
+       0.087869  ], dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Features/POLR2A</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>0.2154 0.1579 ... 0.5409 5.66</div><input id='attrs-59dcfdfa-9f1b-4bc9-91e9-416b6f04894a' class='xr-var-attrs-in' type='checkbox' ><label for='attrs-59dcfdfa-9f1b-4bc9-91e9-416b6f04894a' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-e64ac187-e267-45af-80f8-316e355baea0' class='xr-var-data-in' type='checkbox'><label for='data-e64ac187-e267-45af-80f8-316e355baea0' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'><dt><span>normalization :</span></dt><dd>log1p_cpm</dd><dt><span>group :</span></dt><dd>all</dd><dt><span>active :</span></dt><dd>1</dd></dl></div><div class='xr-var-data'><pre>array([0.2154145, 0.157861 , 0.1368415, ..., 0.3974495, 0.540921 ,
+       5.65999  ], dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Features/H3K36me3</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>0.5142 0.4556 ... 0.1691 0.07347</div><input id='attrs-fec8926c-df94-4829-8add-1d69d04408fa' class='xr-var-attrs-in' type='checkbox' ><label for='attrs-fec8926c-df94-4829-8add-1d69d04408fa' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-51915a4e-62a1-45d7-bc50-6707c72c437c' class='xr-var-data-in' type='checkbox'><label for='data-51915a4e-62a1-45d7-bc50-6707c72c437c' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'><dt><span>normalization :</span></dt><dd>log1p_cpm</dd><dt><span>group :</span></dt><dd>all</dd><dt><span>active :</span></dt><dd>1</dd></dl></div><div class='xr-var-data'><pre>array([0.5141509 , 0.45561826, 0.3234962 , ..., 0.1789847 , 0.16908455,
+       0.07346585], dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Features/H3K4me1</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>0.4003 0.2917 ... 0.2302 0.484</div><input id='attrs-50048f15-e024-4dc2-9875-2db7f8145464' class='xr-var-attrs-in' type='checkbox' ><label for='attrs-50048f15-e024-4dc2-9875-2db7f8145464' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-de80c990-8fa5-4a80-9330-f23f4135aef9' class='xr-var-data-in' type='checkbox'><label for='data-de80c990-8fa5-4a80-9330-f23f4135aef9' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'><dt><span>normalization :</span></dt><dd>log1p_cpm</dd><dt><span>group :</span></dt><dd>all</dd><dt><span>active :</span></dt><dd>1</dd></dl></div><div class='xr-var-data'><pre>array([0.400333 , 0.2917165, 0.4549685, ..., 0.148378 , 0.230199 ,
+       0.483956 ], dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Features/H3K9me3</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>0.1035 0.03242 ... 0.1344 0.1639</div><input id='attrs-2fba5ff0-1ae7-4255-acc1-bb7935dedaa2' class='xr-var-attrs-in' type='checkbox' ><label for='attrs-2fba5ff0-1ae7-4255-acc1-bb7935dedaa2' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-04ef2834-10b6-4c33-9bf8-253d27333a00' class='xr-var-data-in' type='checkbox'><label for='data-04ef2834-10b6-4c33-9bf8-253d27333a00' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'><dt><span>normalization :</span></dt><dd>log1p_cpm</dd><dt><span>group :</span></dt><dd>all</dd><dt><span>active :</span></dt><dd>1</dd></dl></div><div class='xr-var-data'><pre>array([0.10352915, 0.03241775, 0.06453654, ..., 0.26354   , 0.1344295 ,
+       0.16391996], dtype=float32)</pre></div></li></ul></div></li><li class='xr-section-item'><input id='section-5708c29e-a7f8-429a-841b-dea7f04875fa' class='xr-section-summary-in' type='checkbox'  ><label for='section-5708c29e-a7f8-429a-841b-dea7f04875fa' class='xr-section-summary' >Regions: <span>(6)</span></label><div class='xr-section-inline-details'></div><div class='xr-section-details'><ul class='xr-var-list'><li class='xr-var-item'><div class='xr-var-name'><span>Regions/chrom</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>&lt;U4</div><div class='xr-var-preview xr-preview'>&#x27;chr1&#x27; &#x27;chr1&#x27; ... &#x27;chr1&#x27; &#x27;chr1&#x27;</div><input id='attrs-1f079d28-54b8-418e-9fb0-bbe6fb7e1550' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-1f079d28-54b8-418e-9fb0-bbe6fb7e1550' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-5010f3d5-9fab-4600-8a5b-ef88c752a728' class='xr-var-data-in' type='checkbox'><label for='data-5010f3d5-9fab-4600-8a5b-ef88c752a728' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([&#x27;chr1&#x27;, &#x27;chr1&#x27;, &#x27;chr1&#x27;, ..., &#x27;chr1&#x27;, &#x27;chr1&#x27;, &#x27;chr1&#x27;], dtype=&#x27;&lt;U4&#x27;)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Regions/start</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>int64</div><div class='xr-var-preview xr-preview'>819220 820420 ... 248905601</div><input id='attrs-31794348-5448-40e1-b6f5-90b5b3c5a03e' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-31794348-5448-40e1-b6f5-90b5b3c5a03e' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-659e7b5a-1b79-4698-b9ad-4513c6db4926' class='xr-var-data-in' type='checkbox'><label for='data-659e7b5a-1b79-4698-b9ad-4513c6db4926' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([   819220,    820420,    820820, ..., 248895801, 248903235,
+       248905601])</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Regions/end</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>int64</div><div class='xr-var-preview xr-preview'>820420 820820 ... 248906235</div><input id='attrs-0a3c4dfc-5f57-44fe-8044-053a6acd2206' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-0a3c4dfc-5f57-44fe-8044-053a6acd2206' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-286aa977-80d8-4a96-a838-269f82401d13' class='xr-var-data-in' type='checkbox'><label for='data-286aa977-80d8-4a96-a838-269f82401d13' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([   820420,    820820,    823620, ..., 248903235, 248905601,
+       248906235])</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Regions/length</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>1.162e+03 400.0 ... 2.366e+03 262.0</div><input id='attrs-e3f26c25-fb98-48cf-aaa9-5fbaec13ada1' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-e3f26c25-fb98-48cf-aaa9-5fbaec13ada1' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-c2d9d17b-34de-4109-ae2e-d6bfcc366d10' class='xr-var-data-in' type='checkbox'><label for='data-c2d9d17b-34de-4109-ae2e-d6bfcc366d10' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([1162.,  400., 2755., ..., 7434., 2366.,  262.], dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Regions/context_frequencies</span></div><div class='xr-var-dims'>(configuration, locus, context)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>28.0 28.0 28.0 39.0 ... 7.0 7.0 7.0</div><input id='attrs-945e3545-b907-49d0-84d5-58582a08e88c' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-945e3545-b907-49d0-84d5-58582a08e88c' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-78b47957-9192-473a-99b9-be495a12c5a5' class='xr-var-data-in' type='checkbox'><label for='data-78b47957-9192-473a-99b9-be495a12c5a5' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([[[ 28.,  28.,  28., ...,  33.,  33.,  33.],
+        [ 12.,  12.,  12., ...,   0.,   0.,   0.],
+        [ 54.,  54.,  54., ...,   3.,   3.,   3.],
+        ...,
+        [202., 202., 202., ..., 154., 154., 154.],
+        [ 48.,  48.,  48., ..., 131., 131., 131.],
+        [  9.,   9.,   9., ...,   4.,   4.,   4.]],
+
+       [[ 31.,  31.,  31., ...,  29.,  29.,  29.],
+        [ 13.,  13.,  13., ...,   2.,   2.,   2.],
+        [ 92.,  92.,  92., ...,   2.,   2.,   2.],
+        ...,
+        [ 65.,  65.,  65., ..., 441., 441., 441.],
+        [ 45.,  45.,  45., ...,  64.,  64.,  64.],
+        [  5.,   5.,   5., ...,   7.,   7.,   7.]]], dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Regions/exposures</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>float64</div><div class='xr-var-preview xr-preview'>1.0 1.0 1.0 1.0 ... 1.0 1.0 1.0 1.0</div><input id='attrs-b27bec31-b97b-466d-973f-f76c5e659347' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-b27bec31-b97b-466d-973f-f76c5e659347' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-f2458ce0-b420-44bd-ab64-08540adb436f' class='xr-var-data-in' type='checkbox'><label for='data-f2458ce0-b420-44bd-ab64-08540adb436f' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([1., 1., 1., ..., 1., 1., 1.])</pre></div></li></ul></div></li><li class='xr-section-item'><input id='section-1b5bde16-ce0c-4a92-8032-05d30700bbf1' class='xr-section-summary-in' type='checkbox'  checked><label for='section-1b5bde16-ce0c-4a92-8032-05d30700bbf1' class='xr-section-summary' >Spectra: <span>(3)</span></label><div class='xr-section-inline-details'></div><div class='xr-section-details'><ul class='xr-var-list'><li class='xr-var-item'><div class='xr-var-name'><span>Spectra/interactions</span></div><div class='xr-var-dims'>(component, genome_state, context)</div><div class='xr-var-dtype'>float64</div><div class='xr-var-preview xr-preview'>0.0 0.0 ... 0.0008534 -9.001e-08</div><input id='attrs-8672e761-fe90-48b3-9e0e-7ac34d533b5a' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-8672e761-fe90-48b3-9e0e-7ac34d533b5a' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-9b9c23f3-5f97-4f19-9ee9-74e7b861486f' class='xr-var-data-in' type='checkbox'><label for='data-9b9c23f3-5f97-4f19-9ee9-74e7b861486f' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([[[ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00, ...,
+          0.00000000e+00,  0.00000000e+00,  0.00000000e+00],
+        [ 1.25569103e-01, -2.74438981e-23,  8.68699530e-02, ...,
+          2.20584828e-12,  8.35952131e-17,  9.79064595e-03],
+        [-6.56238341e-03,  6.76502435e-24,  8.03395748e-03, ...,
+          1.85244925e-07,  3.24932040e-04, -3.17103631e-03],
+        [-9.24484739e-04,  2.01858764e-23,  3.36079264e-01, ...,
+         -7.32777792e-07,  1.79425523e-07, -3.06774761e-03],
+        [ 3.44656300e-03, -3.02597082e-23, -4.08927387e-02, ...,
+          7.15252988e-08, -6.92222654e-11, -4.48850561e-03]],
+
+       [[ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00, ...,
+          0.00000000e+00,  0.00000000e+00,  0.00000000e+00],
+        [ 1.67497975e-01,  1.20315268e-17, -3.04329335e-03, ...,
+         -2.45456205e-03,  2.49722668e-06,  1.44398216e-18],
+        [-3.79539545e-03, -2.78843280e-23,  2.18068398e-03, ...,
+          1.27378431e-03,  8.24853347e-07,  2.10340286e-16],
+        [ 7.00212708e-03,  5.83667693e-17,  5.52890968e-03, ...,
+         -5.53263914e-04, -2.49157892e-04, -2.62695015e-14],
+        [-1.26697786e-02,  7.07673800e-18, -1.16678549e-02, ...,
+...
+          0.00000000e+00,  0.00000000e+00,  0.00000000e+00],
+        [ 2.20674361e-04,  7.14350359e-03,  1.73748979e-02, ...,
+          1.53943966e-02, -4.64778818e-02, -9.79529296e-04],
+        [ 8.97633471e-03,  1.93836952e-03, -9.32580290e-04, ...,
+          2.60083041e-02, -4.47075626e-02, -1.23101987e-02],
+        [-2.18246542e-03, -3.06214586e-03, -1.37384086e-03, ...,
+         -4.78083879e-03, -4.91988887e-03,  9.62061407e-03],
+        [-7.45466329e-03, -6.75784227e-03,  2.53944276e-03, ...,
+         -3.60595545e-03, -7.93239064e-02, -2.39427717e-02]],
+
+       [[ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00, ...,
+          0.00000000e+00,  0.00000000e+00,  0.00000000e+00],
+        [ 2.01493260e-02, -6.74117575e-03,  4.49657345e-04, ...,
+          6.22534381e-06,  2.40479726e-06,  1.57516103e-21],
+        [-4.06513590e-03,  1.08688003e-03,  2.60087433e-03, ...,
+          1.64279615e-03,  5.32233151e-08, -5.03420910e-21],
+        [ 4.56564503e-03,  4.10397702e-03,  1.01609419e-02, ...,
+          1.05784944e-03, -1.09036055e-04, -1.76025675e-08],
+        [-3.81221504e-03,  2.86408643e-03, -2.90163535e-02, ...,
+         -1.77414161e-03,  8.53381541e-04, -9.00125601e-08]]])</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Spectra/shared_effects</span></div><div class='xr-var-dims'>(component, genome_state)</div><div class='xr-var-dtype'>float64</div><div class='xr-var-preview xr-preview'>0.0 -0.0481 ... 0.1101 0.03108</div><input id='attrs-58e6fb0f-fef2-4a73-b35e-408c31ed6e2a' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-58e6fb0f-fef2-4a73-b35e-408c31ed6e2a' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-1138d46e-b088-415c-9f43-21a701aac3e3' class='xr-var-data-in' type='checkbox'><label for='data-1138d46e-b088-415c-9f43-21a701aac3e3' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([[ 0.00000000e+00, -4.81037849e-02, -4.32578066e-01,
+         1.08163034e-02, -7.58048884e-02],
+       [ 0.00000000e+00,  1.95227399e-02, -1.48470488e-01,
+        -7.34079774e-03,  1.22778641e-01],
+       [ 0.00000000e+00, -3.04799516e-02, -4.26108472e-03,
+         2.72764546e-01, -2.76172137e-01],
+       [ 0.00000000e+00, -1.36491367e-01,  9.69064655e-04,
+         6.37503060e-04,  3.11612632e-02],
+       [ 0.00000000e+00, -1.53179445e-01, -9.74470570e-02,
+         7.62877623e-03,  2.47156700e-03],
+       [ 0.00000000e+00, -1.06492720e-01,  2.43080347e-01,
+         1.58301847e-01, -2.00599253e-01],
+       [ 0.00000000e+00, -1.68604766e-02, -1.22141689e-01,
+         1.64560306e-02, -6.10448287e-02],
+       [ 0.00000000e+00,  4.76205361e-01, -3.26899981e-01,
+         7.14483446e-03,  4.63638046e-02],
+       [ 0.00000000e+00,  1.89880476e-01,  7.02495183e-01,
+        -8.66828603e-04,  3.61914412e-02],
+       [ 0.00000000e+00, -9.40706420e-02, -9.13451694e-02,
+         1.03579797e-02, -5.44486202e-02],
+       [ 0.00000000e+00, -1.89652235e-01, -1.92262769e-01,
+        -1.67592295e-02,  9.03654336e-02],
+       [ 0.00000000e+00, -1.32736017e-01, -7.45286526e-02,
+        -7.11487209e-02,  2.00017622e-03],
+       [ 0.00000000e+00, -5.98592042e-03, -9.64007254e-03,
+         1.44524823e-01, -2.26558323e-01],
+       [ 0.00000000e+00,  6.56795525e-02, -2.49137932e-04,
+         1.86812300e-01, -1.04978415e-01],
+       [ 0.00000000e+00,  1.15024217e-01, -1.30468799e-01,
+        -5.14399775e-04, -2.25594875e-02],
+       [ 0.00000000e+00, -1.35600683e-01, -1.85858054e-01,
+        -4.88317332e-03,  1.56289782e-03],
+       [ 0.00000000e+00, -5.06422372e-02, -1.28872607e-01,
+         1.37195055e-02, -4.17557882e-02],
+       [ 0.00000000e+00, -3.81150450e-02, -1.23054178e-01,
+         1.10106366e-01,  3.10751807e-02]])</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>Spectra/spectra</span></div><div class='xr-var-dims'>(component, context, genome_state)</div><div class='xr-var-dtype'>float64</div><div class='xr-var-preview xr-preview'>1.221 1.319 0.7871 ... 7.633 7.053</div><input id='attrs-cbc3266a-8dcc-4f96-b1b8-c2c58f42b0e5' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-cbc3266a-8dcc-4f96-b1b8-c2c58f42b0e5' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-dc349e31-45a9-49c6-b6ff-86299bc48361' class='xr-var-data-in' type='checkbox'><label for='data-dc349e31-45a9-49c6-b6ff-86299bc48361' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([[[1.22106728e+00, 1.31941784e+00, 7.87088049e-01, 1.23320579e+00,
+         1.13583376e+00],
+        [1.25932828e-01, 1.20018376e-01, 8.17095254e-02, 1.27302349e-01,
+         1.16739361e-01],
+        [1.70012707e+00, 1.76732864e+00, 1.11199855e+00, 2.40511703e+00,
+         1.51286525e+00],
+        ...,
+        [3.24354134e-01, 3.09120801e-01, 2.10452094e-01, 3.27881249e-01,
+         3.00675349e-01],
+        [3.27986311e-01, 3.12582392e-01, 2.12877895e-01, 3.31553225e-01,
+         3.04042345e-01],
+        [1.07627024e+00, 1.03581488e+00, 6.96110046e-01, 1.08464217e+00,
+         9.93231202e-01]],
+
+       [[1.16187166e+03, 1.40081319e+03, 9.97768810e+02, 1.16147823e+03,
+         1.29711305e+03],
+        [1.11635767e+02, 1.13836616e+02, 9.62328718e+01, 1.10819272e+02,
+         1.26219207e+02],
+        [4.43026885e+02, 4.50388211e+02, 3.82734162e+02, 4.42224897e+02,
+         4.95090831e+02],
+...
+        [1.28919656e+00, 1.24454669e+00, 1.16317682e+00, 1.30077191e+00,
+         1.23202290e+00],
+        [9.78361730e+00, 8.87811415e+00, 8.22459547e+00, 9.87008928e+00,
+         8.66792636e+00],
+        [1.53090515e+00, 1.45388226e+00, 1.32933173e+00, 1.56705692e+00,
+         1.43355963e+00]],
+
+       [[1.93122719e+01, 1.89684112e+01, 1.70069389e+01, 2.16588199e+01,
+         1.98460245e+01],
+        [1.64461033e+01, 1.57246940e+01, 1.45577176e+01, 1.84358827e+01,
+         1.70138520e+01],
+        [1.75038474e+01, 1.68568199e+01, 1.55174842e+01, 1.97408090e+01,
+         1.75399219e+01],
+        ...,
+        [1.47732826e+01, 1.42208827e+01, 1.30842463e+01, 1.65103017e+01,
+         1.52125593e+01],
+        [9.71433880e+00, 9.35106631e+00, 8.58957189e+00, 1.08438744e+01,
+         1.00295084e+01],
+        [6.83723482e+00, 6.58153723e+00, 6.04559076e+00, 7.63306702e+00,
+         7.05303820e+00]]])</pre></div></li></ul></div></li><li class='xr-section-item'><input id='section-f0c2bf33-9145-4c27-b4bb-daf98b433590' class='xr-section-summary-in' type='checkbox'  ><label for='section-f0c2bf33-9145-4c27-b4bb-daf98b433590' class='xr-section-summary' >State: <span>(6)</span></label><div class='xr-section-inline-details'></div><div class='xr-section-details'><ul class='xr-var-list'><li class='xr-var-item'><div class='xr-var-name'><span>State/normalizers</span></div><div class='xr-var-dims'>(component)</div><div class='xr-var-dtype'>float64</div><div class='xr-var-preview xr-preview'>-26.67 -33.09 ... -27.71 -29.11</div><input id='attrs-3800b0f6-b71a-4893-a462-a3c256ec69c0' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-3800b0f6-b71a-4893-a462-a3c256ec69c0' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-1ff24f55-ead4-42ee-ba2e-f6dca3d8a80e' class='xr-var-data-in' type='checkbox'><label for='data-1ff24f55-ead4-42ee-ba2e-f6dca3d8a80e' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([-26.67246946, -33.08705993, -28.14577253, -27.23268498,
+       -30.92115067, -27.58819187, -29.03191126, -26.21341394,
+       -26.47218838, -29.03107874, -27.23170241, -29.29682437,
+       -24.88008036, -25.88154948, -25.80861274, -26.32767872,
+       -27.71076313, -29.11402454])</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>State/topic_compositions</span></div><div class='xr-var-dims'>(component, sample)</div><div class='xr-var-dtype'>float64</div><div class='xr-var-preview xr-preview'>0.9866 1.31 0.9686 ... 1.024 0.8428</div><input id='attrs-df031b81-f362-40d4-88dd-dd1b1a4d2acc' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-df031b81-f362-40d4-88dd-dd1b1a4d2acc' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-190a21ea-f46e-46ea-b119-084d9cec68b6' class='xr-var-data-in' type='checkbox'><label for='data-190a21ea-f46e-46ea-b119-084d9cec68b6' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([[0.98660812, 1.30991655, 0.96858276, ..., 1.20892512, 0.8542318 ,
+        1.05708114],
+       [0.98219968, 1.04085065, 1.00867219, ..., 0.88416297, 0.93619271,
+        1.11542159],
+       [0.99437413, 0.97373543, 1.08971617, ..., 0.85258992, 1.00881259,
+        1.13399989],
+       ...,
+       [0.99581784, 0.80668588, 1.04100159, ..., 1.10980655, 1.04172925,
+        1.04570226],
+       [1.08037849, 0.8791703 , 1.18917993, ..., 1.00574662, 0.9642266 ,
+        1.11717325],
+       [1.06058621, 0.99303629, 0.80344021, ..., 0.94449919, 1.02351127,
+        0.84283685]])</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>State/mesoscale_idx</span></div><div class='xr-var-dims'>(configuration, locus)</div><div class='xr-var-dtype'>int64</div><div class='xr-var-preview xr-preview'>4 4 4 4 5 5 5 5 ... 4 4 4 4 4 4 4 4</div><input id='attrs-8e6eff88-03ee-4161-b79d-fadc4372465b' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-8e6eff88-03ee-4161-b79d-fadc4372465b' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-f803f301-c935-4da0-ab76-41338a67b2f8' class='xr-var-data-in' type='checkbox'><label for='data-f803f301-c935-4da0-ab76-41338a67b2f8' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([[4, 4, 4, ..., 4, 4, 4],
+       [4, 4, 4, ..., 4, 4, 4]])</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>State/log_context_distribution</span></div><div class='xr-var-dims'>(component, context, mesoscale_state)</div><div class='xr-var-dtype'>float64</div><div class='xr-var-preview xr-preview'>4.596 4.586 4.514 ... 5.456 5.488</div><input id='attrs-8b2cadfa-bd38-4a2b-a53c-cc692626b7b9' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-8b2cadfa-bd38-4a2b-a53c-cc692626b7b9' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-3d29e48b-f6b4-42c0-9593-c316020bb09e' class='xr-var-data-in' type='checkbox'><label for='data-3d29e48b-f6b4-42c0-9593-c316020bb09e' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([[[ 4.5962665 ,  4.58637469,  4.51401636, ...,  4.07966074,
+          4.06976892,  3.99741059],
+        [ 2.19988997,  2.18907366,  2.11326877, ...,  1.81541568,
+          1.80459938,  1.72879449],
+        [ 5.22554881,  4.87865324,  4.76195561, ...,  4.76223853,
+          4.41534296,  4.29864534],
+        ...,
+        [ 2.4939582 ,  2.48314263,  2.40733781, ...,  2.1094841 ,
+          2.09866853,  2.02286371],
+        [ 2.50509506,  2.49427858,  2.41847369, ...,  2.12094571,
+          2.11012923,  2.03432434],
+        [ 3.70010277,  3.69235421,  3.61206082, ...,  3.3026668 ,
+          3.29491825,  3.21462485]],
+
+       [[11.5536536 , 11.55399227, 11.66410113, ..., 11.214367  ,
+         11.21470567, 11.32481453],
+        [ 9.03660751,  9.0439483 ,  9.16672694, ...,  8.86861428,
+          8.87595508,  8.99873372],
+        [10.41748209, 10.41929398, 10.53040476, ..., 10.25471284,
+         10.25652473, 10.36763551],
+...
+        [ 3.88487579,  3.87593712,  3.83057538, ...,  3.81725933,
+          3.80832066,  3.76295892],
+        [ 5.84955455,  5.84075493,  5.71967523, ...,  5.77309449,
+          5.76429488,  5.64321518],
+        [ 4.05474328,  4.03140316,  3.9657046 , ...,  3.96518224,
+          3.94184212,  3.87614356]],
+
+       [[ 7.36663111,  7.2519591 ,  7.27922207, ...,  7.25747752,
+          7.14280551,  7.17006847],
+        [ 7.17862676,  7.06441642,  7.09835569, ...,  7.10151569,
+          6.98730534,  7.02124461],
+        [ 7.2542067 ,  7.13393939,  7.13599822, ...,  7.17141878,
+          7.05115148,  7.0532103 ],
+        ...,
+        [ 6.42304148,  6.31187726,  6.3411783 , ...,  6.33973892,
+          6.2285747 ,  6.25787574],
+        [ 6.00265348,  5.89265615,  5.92458471, ...,  5.91771199,
+          5.80771466,  5.83964322],
+        [ 5.65154045,  5.54143411,  5.5725092 , ...,  5.56660132,
+          5.45649497,  5.48757006]]])</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>State/locus_features</span></div><div class='xr-var-dims'>(locus, feature)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>0.0 0.1433 nan ... 0.8378 -0.1123</div><input id='attrs-fcd3afad-bf84-4b4a-984d-59e1c5e218d1' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-fcd3afad-bf84-4b4a-984d-59e1c5e218d1' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-70648fa3-7f4b-4a8a-ad92-2db07c368337' class='xr-var-data-in' type='checkbox'><label for='data-70648fa3-7f4b-4a8a-ad92-2db07c368337' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([[ 0.        ,  0.14334883,         nan, ...,  0.37237236,
+                nan,  0.12899952],
+       [ 0.        ,  0.3168423 ,         nan, ...,  0.37237236,
+         1.3256534 ,  0.12899952],
+       [ 0.        ,  0.28321943,         nan, ...,  0.37237236,
+         1.3256534 ,  0.12899952],
+       ...,
+       [ 0.        , -0.49613106,         nan, ...,  0.6231408 ,
+         0.7472138 ,  0.12271691],
+       [ 0.        , -0.61278236,         nan, ...,  0.6261261 ,
+         0.83775455, -0.11229002],
+       [ 0.        ,  3.2285004 ,         nan, ...,  0.6261261 ,
+         0.83775455, -0.11229002]], dtype=float32)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>State/log_locus_distribution</span></div><div class='xr-var-dims'>(component, locus)</div><div class='xr-var-dtype'>float64</div><div class='xr-var-preview xr-preview'>-0.6555 -0.2439 ... -0.643 0.2152</div><input id='attrs-e2a6b647-48ff-4cd3-bef7-654bb2256fe3' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-e2a6b647-48ff-4cd3-bef7-654bb2256fe3' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-71f97886-3b5e-4a49-b4ef-d64e88b5874a' class='xr-var-data-in' type='checkbox'><label for='data-71f97886-3b5e-4a49-b4ef-d64e88b5874a' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([[-0.65554925, -0.2438925 , -0.37652196, ...,  0.37380053,
+        -0.22485962, -1.59230489],
+       [-0.1627731 , -0.15052637, -0.1111911 , ...,  0.24952612,
+        -0.05667807, -0.40514609],
+       [ 0.01972296,  0.04950112,  0.06736122, ..., -0.04436633,
+        -0.00244809,  0.48643181],
+       ...,
+       [-0.49480668, -0.46365254, -0.37882031, ...,  0.93277457,
+         0.32210232, -1.15851299],
+       [-0.6184988 , -0.77143883, -0.78516632, ...,  0.34161587,
+        -0.52125367, -1.08819858],
+       [-0.48760334, -0.66247436, -0.43428223, ..., -0.59671871,
+        -0.64300528,  0.21515802]])</pre></div></li></ul></div></li><li class='xr-section-item'><input id='section-a8756cdc-4d11-4020-a3af-6998b20394e8' class='xr-section-summary-in' type='checkbox'  checked><label for='section-a8756cdc-4d11-4020-a3af-6998b20394e8' class='xr-section-summary' >Coordinates: <span>(10)</span></label><div class='xr-section-inline-details'></div><div class='xr-section-details'><ul class='xr-var-list'><li class='xr-var-item'><div class='xr-var-name'><span class='xr-has-index'>configuration</span></div><div class='xr-var-dims'>(configuration)</div><div class='xr-var-dtype'>&lt;U12</div><div class='xr-var-preview xr-preview'>&#x27;C/T-centered&#x27; &#x27;A/G-centered&#x27;</div><input id='attrs-2e2b60b3-a96f-4368-a1b4-c99408132bfb' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-2e2b60b3-a96f-4368-a1b4-c99408132bfb' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-94dffcd1-77b8-41de-bb48-3be804b7ef8c' class='xr-var-data-in' type='checkbox'><label for='data-94dffcd1-77b8-41de-bb48-3be804b7ef8c' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([&#x27;C/T-centered&#x27;, &#x27;A/G-centered&#x27;], dtype=&#x27;&lt;U12&#x27;)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span class='xr-has-index'>locus</span></div><div class='xr-var-dims'>(locus)</div><div class='xr-var-dtype'>int64</div><div class='xr-var-preview xr-preview'>2 3 4 5 ... 65744 65745 65746 65747</div><input id='attrs-3fa25261-47f2-4983-8284-ebe43827d64a' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-3fa25261-47f2-4983-8284-ebe43827d64a' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-973b0119-f027-4c4b-9e71-91514e0507c0' class='xr-var-data-in' type='checkbox'><label for='data-973b0119-f027-4c4b-9e71-91514e0507c0' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([    2,     3,     4, ..., 65745, 65746, 65747])</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span class='xr-has-index'>context</span></div><div class='xr-var-dims'>(context)</div><div class='xr-var-dtype'>&lt;U7</div><div class='xr-var-preview xr-preview'>&#x27;A[C&gt;A]A&#x27; &#x27;A[C&gt;G]A&#x27; ... &#x27;T[T&gt;C]T&#x27;</div><input id='attrs-9f4f0d96-b0f9-476c-9ec9-260b97fee5db' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-9f4f0d96-b0f9-476c-9ec9-260b97fee5db' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-05c2abc8-7c5b-44ea-8c26-9e35137ed673' class='xr-var-data-in' type='checkbox'><label for='data-05c2abc8-7c5b-44ea-8c26-9e35137ed673' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([&#x27;A[C&gt;A]A&#x27;, &#x27;A[C&gt;G]A&#x27;, &#x27;A[C&gt;T]A&#x27;, &#x27;A[C&gt;A]C&#x27;, &#x27;A[C&gt;G]C&#x27;, &#x27;A[C&gt;T]C&#x27;,
+       &#x27;A[C&gt;A]G&#x27;, &#x27;A[C&gt;G]G&#x27;, &#x27;A[C&gt;T]G&#x27;, &#x27;A[C&gt;A]T&#x27;, &#x27;A[C&gt;G]T&#x27;, &#x27;A[C&gt;T]T&#x27;,
+       &#x27;C[C&gt;A]A&#x27;, &#x27;C[C&gt;G]A&#x27;, &#x27;C[C&gt;T]A&#x27;, &#x27;C[C&gt;A]C&#x27;, &#x27;C[C&gt;G]C&#x27;, &#x27;C[C&gt;T]C&#x27;,
+       &#x27;C[C&gt;A]G&#x27;, &#x27;C[C&gt;G]G&#x27;, &#x27;C[C&gt;T]G&#x27;, &#x27;C[C&gt;A]T&#x27;, &#x27;C[C&gt;G]T&#x27;, &#x27;C[C&gt;T]T&#x27;,
+       &#x27;G[C&gt;A]A&#x27;, &#x27;G[C&gt;G]A&#x27;, &#x27;G[C&gt;T]A&#x27;, &#x27;G[C&gt;A]C&#x27;, &#x27;G[C&gt;G]C&#x27;, &#x27;G[C&gt;T]C&#x27;,
+       &#x27;G[C&gt;A]G&#x27;, &#x27;G[C&gt;G]G&#x27;, &#x27;G[C&gt;T]G&#x27;, &#x27;G[C&gt;A]T&#x27;, &#x27;G[C&gt;G]T&#x27;, &#x27;G[C&gt;T]T&#x27;,
+       &#x27;T[C&gt;A]A&#x27;, &#x27;T[C&gt;G]A&#x27;, &#x27;T[C&gt;T]A&#x27;, &#x27;T[C&gt;A]C&#x27;, &#x27;T[C&gt;G]C&#x27;, &#x27;T[C&gt;T]C&#x27;,
+       &#x27;T[C&gt;A]G&#x27;, &#x27;T[C&gt;G]G&#x27;, &#x27;T[C&gt;T]G&#x27;, &#x27;T[C&gt;A]T&#x27;, &#x27;T[C&gt;G]T&#x27;, &#x27;T[C&gt;T]T&#x27;,
+       &#x27;A[T&gt;A]A&#x27;, &#x27;A[T&gt;G]A&#x27;, &#x27;A[T&gt;C]A&#x27;, &#x27;A[T&gt;A]C&#x27;, &#x27;A[T&gt;G]C&#x27;, &#x27;A[T&gt;C]C&#x27;,
+       &#x27;A[T&gt;A]G&#x27;, &#x27;A[T&gt;G]G&#x27;, &#x27;A[T&gt;C]G&#x27;, &#x27;A[T&gt;A]T&#x27;, &#x27;A[T&gt;G]T&#x27;, &#x27;A[T&gt;C]T&#x27;,
+       &#x27;C[T&gt;A]A&#x27;, &#x27;C[T&gt;G]A&#x27;, &#x27;C[T&gt;C]A&#x27;, &#x27;C[T&gt;A]C&#x27;, &#x27;C[T&gt;G]C&#x27;, &#x27;C[T&gt;C]C&#x27;,
+       &#x27;C[T&gt;A]G&#x27;, &#x27;C[T&gt;G]G&#x27;, &#x27;C[T&gt;C]G&#x27;, &#x27;C[T&gt;A]T&#x27;, &#x27;C[T&gt;G]T&#x27;, &#x27;C[T&gt;C]T&#x27;,
+       &#x27;G[T&gt;A]A&#x27;, &#x27;G[T&gt;G]A&#x27;, &#x27;G[T&gt;C]A&#x27;, &#x27;G[T&gt;A]C&#x27;, &#x27;G[T&gt;G]C&#x27;, &#x27;G[T&gt;C]C&#x27;,
+       &#x27;G[T&gt;A]G&#x27;, &#x27;G[T&gt;G]G&#x27;, &#x27;G[T&gt;C]G&#x27;, &#x27;G[T&gt;A]T&#x27;, &#x27;G[T&gt;G]T&#x27;, &#x27;G[T&gt;C]T&#x27;,
+       &#x27;T[T&gt;A]A&#x27;, &#x27;T[T&gt;G]A&#x27;, &#x27;T[T&gt;C]A&#x27;, &#x27;T[T&gt;A]C&#x27;, &#x27;T[T&gt;G]C&#x27;, &#x27;T[T&gt;C]C&#x27;,
+       &#x27;T[T&gt;A]G&#x27;, &#x27;T[T&gt;G]G&#x27;, &#x27;T[T&gt;C]G&#x27;, &#x27;T[T&gt;A]T&#x27;, &#x27;T[T&gt;G]T&#x27;, &#x27;T[T&gt;C]T&#x27;],
+      dtype=&#x27;&lt;U7&#x27;)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span class='xr-has-index'>component</span></div><div class='xr-var-dims'>(component)</div><div class='xr-var-dtype'>&lt;U3</div><div class='xr-var-preview xr-preview'>&#x27;M0&#x27; &#x27;M1&#x27; &#x27;M2&#x27; ... &#x27;M16&#x27; &#x27;M17&#x27;</div><input id='attrs-4b99e425-a88f-4c0a-813e-fca67ca3575c' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-4b99e425-a88f-4c0a-813e-fca67ca3575c' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-e775af6a-dea0-4972-b268-2390d9200cb1' class='xr-var-data-in' type='checkbox'><label for='data-e775af6a-dea0-4972-b268-2390d9200cb1' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([&#x27;M0&#x27;, &#x27;M1&#x27;, &#x27;M2&#x27;, &#x27;M3&#x27;, &#x27;M4&#x27;, &#x27;M5&#x27;, &#x27;M6&#x27;, &#x27;M7&#x27;, &#x27;M8&#x27;, &#x27;M9&#x27;, &#x27;M10&#x27;,
+       &#x27;M11&#x27;, &#x27;M12&#x27;, &#x27;M13&#x27;, &#x27;M14&#x27;, &#x27;M15&#x27;, &#x27;M16&#x27;, &#x27;M17&#x27;], dtype=&#x27;&lt;U3&#x27;)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span class='xr-has-index'>shap_features</span></div><div class='xr-var-dims'>(shap_features)</div><div class='xr-var-dtype'>&lt;U15</div><div class='xr-var-preview xr-preview'>&#x27;ATACAccessible&#x27; ... &#x27;Nucleotide...</div><input id='attrs-6bd32830-c893-43cf-b219-12f626a7d7c1' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-6bd32830-c893-43cf-b219-12f626a7d7c1' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-03e9a1fe-d55a-473b-876e-d307eb396f50' class='xr-var-data-in' type='checkbox'><label for='data-03e9a1fe-d55a-473b-876e-d307eb396f50' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([&#x27;ATACAccessible&#x27;, &#x27;DNase&#x27;, &#x27;GeneExpression&#x27;, &#x27;H3K27ac&#x27;, &#x27;H3K27me3&#x27;,
+       &#x27;H3K36me3&#x27;, &#x27;H3K4me1&#x27;, &#x27;H3K4me3&#x27;, &#x27;H3K9me3&#x27;, &#x27;POLR2A&#x27;, &#x27;GenePosition&#x27;,
+       &#x27;RepliseqG1b&#x27;, &#x27;RepliseqG2&#x27;, &#x27;RepliseqS1&#x27;, &#x27;RepliseqS2&#x27;, &#x27;RepliseqS3&#x27;,
+       &#x27;RepliseqS4&#x27;, &#x27;HICEigenvector&#x27;, &#x27;NucleotideRatio&#x27;], dtype=&#x27;&lt;U15&#x27;)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span class='xr-has-index'>shap_component</span></div><div class='xr-var-dims'>(shap_component)</div><div class='xr-var-dtype'>&lt;U3</div><div class='xr-var-preview xr-preview'>&#x27;M0&#x27; &#x27;M1&#x27; &#x27;M2&#x27; ... &#x27;M16&#x27; &#x27;M17&#x27;</div><input id='attrs-53a641fa-eb90-4d05-b0ad-57751435c160' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-53a641fa-eb90-4d05-b0ad-57751435c160' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-5520e3ae-6eae-4d39-a143-1bb5f05d30c9' class='xr-var-data-in' type='checkbox'><label for='data-5520e3ae-6eae-4d39-a143-1bb5f05d30c9' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([&#x27;M0&#x27;, &#x27;M1&#x27;, &#x27;M2&#x27;, &#x27;M3&#x27;, &#x27;M4&#x27;, &#x27;M5&#x27;, &#x27;M6&#x27;, &#x27;M7&#x27;, &#x27;M8&#x27;, &#x27;M9&#x27;, &#x27;M10&#x27;,
+       &#x27;M11&#x27;, &#x27;M12&#x27;, &#x27;M13&#x27;, &#x27;M14&#x27;, &#x27;M15&#x27;, &#x27;M16&#x27;, &#x27;M17&#x27;], dtype=&#x27;&lt;U3&#x27;)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span class='xr-has-index'>shap_locus</span></div><div class='xr-var-dims'>(shap_locus)</div><div class='xr-var-dtype'>int64</div><div class='xr-var-preview xr-preview'>24008 11878 29922 ... 51624 22805</div><input id='attrs-2d562527-ea76-4610-b666-b70c8dd36fe0' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-2d562527-ea76-4610-b666-b70c8dd36fe0' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-9a903092-a57f-4218-978e-7f28b53cdf03' class='xr-var-data-in' type='checkbox'><label for='data-9a903092-a57f-4218-978e-7f28b53cdf03' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([24008, 11878, 29922, ...,  1591, 51624, 22805])</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span class='xr-has-index'>genome_state</span></div><div class='xr-var-dims'>(genome_state)</div><div class='xr-var-dtype'>&lt;U30</div><div class='xr-var-preview xr-preview'>&#x27;Baseline&#x27; ... &#x27;ReplicationStran...</div><input id='attrs-dc679a2b-757b-4488-90ba-fd18ea626817' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-dc679a2b-757b-4488-90ba-fd18ea626817' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-a1c0cb36-cfb1-4418-8e4c-036bc8feb61c' class='xr-var-data-in' type='checkbox'><label for='data-a1c0cb36-cfb1-4418-8e4c-036bc8feb61c' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([&#x27;Baseline&#x27;, &#x27;GeneStrand:A/G-centered&#x27;, &#x27;GeneStrand:C/T-centered&#x27;,
+       &#x27;ReplicationStrand:A/G-centered&#x27;, &#x27;ReplicationStrand:C/T-centered&#x27;],
+      dtype=&#x27;&lt;U30&#x27;)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span class='xr-has-index'>feature</span></div><div class='xr-var-dims'>(feature)</div><div class='xr-var-dtype'>&lt;U15</div><div class='xr-var-preview xr-preview'>&#x27;ATACAccessible&#x27; ... &#x27;Nucleotide...</div><input id='attrs-5fe59037-7921-4dfd-9374-1a137d031724' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-5fe59037-7921-4dfd-9374-1a137d031724' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-94e02644-3d8b-430c-ac84-b4dfcd4f18b8' class='xr-var-data-in' type='checkbox'><label for='data-94e02644-3d8b-430c-ac84-b4dfcd4f18b8' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([&#x27;ATACAccessible&#x27;, &#x27;DNase&#x27;, &#x27;GeneExpression&#x27;, &#x27;H3K27ac&#x27;, &#x27;H3K27me3&#x27;,
+       &#x27;H3K36me3&#x27;, &#x27;H3K4me1&#x27;, &#x27;H3K4me3&#x27;, &#x27;H3K9me3&#x27;, &#x27;POLR2A&#x27;, &#x27;GenePosition&#x27;,
+       &#x27;RepliseqG1b&#x27;, &#x27;RepliseqG2&#x27;, &#x27;RepliseqS1&#x27;, &#x27;RepliseqS2&#x27;, &#x27;RepliseqS3&#x27;,
+       &#x27;RepliseqS4&#x27;, &#x27;HICEigenvector&#x27;, &#x27;NucleotideRatio&#x27;], dtype=&#x27;&lt;U15&#x27;)</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span class='xr-has-index'>sample</span></div><div class='xr-var-dims'>(sample)</div><div class='xr-var-dtype'>&lt;U19</div><div class='xr-var-preview xr-preview'>&#x27;BR001.purple&#x27; ... &#x27;TCGA-GM-A3XL...</div><input id='attrs-493c4f25-cea6-4dee-8eed-f22003ac7c5a' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-493c4f25-cea6-4dee-8eed-f22003ac7c5a' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-16c02074-9d05-4c57-8042-aa7b79dc5368' class='xr-var-data-in' type='checkbox'><label for='data-16c02074-9d05-4c57-8042-aa7b79dc5368' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([&#x27;BR001.purple&#x27;, &#x27;BR002.purple&#x27;, &#x27;BR003.purple&#x27;, ...,
+       &#x27;TCGA-GI-A2C9.purple&#x27;, &#x27;TCGA-GM-A2DF.purple&#x27;, &#x27;TCGA-GM-A3XL.purple&#x27;],
+      dtype=&#x27;&lt;U19&#x27;)</pre></div></li></ul></div></li><li class='xr-section-item'><input id='section-b00cad71-99cb-42fd-8bfa-c57cb4b4406d' class='xr-section-summary-in' type='checkbox'  ><label for='section-b00cad71-99cb-42fd-8bfa-c57cb4b4406d' class='xr-section-summary' >Indexes: <span>(10)</span></label><div class='xr-section-inline-details'></div><div class='xr-section-details'><ul class='xr-var-list'><li class='xr-var-item'><div class='xr-index-name'><div>configuration</div></div><div class='xr-index-preview'>PandasIndex</div><div></div><input id='index-d44d15b9-7ffa-4e17-9baa-625a17920688' class='xr-index-data-in' type='checkbox'/><label for='index-d44d15b9-7ffa-4e17-9baa-625a17920688' title='Show/Hide index repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-index-data'><pre>PandasIndex(Index([&#x27;C/T-centered&#x27;, &#x27;A/G-centered&#x27;], dtype=&#x27;object&#x27;, name=&#x27;configuration&#x27;))</pre></div></li><li class='xr-var-item'><div class='xr-index-name'><div>locus</div></div><div class='xr-index-preview'>PandasIndex</div><div></div><input id='index-e3b50c47-6f47-4ee9-b2ce-d3c2c4b91ea5' class='xr-index-data-in' type='checkbox'/><label for='index-e3b50c47-6f47-4ee9-b2ce-d3c2c4b91ea5' title='Show/Hide index repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-index-data'><pre>PandasIndex(Index([    2,     3,     4,     5,     6,     7,     8,     9,    12,    13,
+       ...
+       65737, 65738, 65739, 65740, 65741, 65743, 65744, 65745, 65746, 65747],
+      dtype=&#x27;int64&#x27;, name=&#x27;locus&#x27;, length=55220))</pre></div></li><li class='xr-var-item'><div class='xr-index-name'><div>context</div></div><div class='xr-index-preview'>PandasIndex</div><div></div><input id='index-f09b4eb1-9383-4b9b-8b5f-80cbc769ca48' class='xr-index-data-in' type='checkbox'/><label for='index-f09b4eb1-9383-4b9b-8b5f-80cbc769ca48' title='Show/Hide index repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-index-data'><pre>PandasIndex(Index([&#x27;A[C&gt;A]A&#x27;, &#x27;A[C&gt;G]A&#x27;, &#x27;A[C&gt;T]A&#x27;, &#x27;A[C&gt;A]C&#x27;, &#x27;A[C&gt;G]C&#x27;, &#x27;A[C&gt;T]C&#x27;,
+       &#x27;A[C&gt;A]G&#x27;, &#x27;A[C&gt;G]G&#x27;, &#x27;A[C&gt;T]G&#x27;, &#x27;A[C&gt;A]T&#x27;, &#x27;A[C&gt;G]T&#x27;, &#x27;A[C&gt;T]T&#x27;,
+       &#x27;C[C&gt;A]A&#x27;, &#x27;C[C&gt;G]A&#x27;, &#x27;C[C&gt;T]A&#x27;, &#x27;C[C&gt;A]C&#x27;, &#x27;C[C&gt;G]C&#x27;, &#x27;C[C&gt;T]C&#x27;,
+       &#x27;C[C&gt;A]G&#x27;, &#x27;C[C&gt;G]G&#x27;, &#x27;C[C&gt;T]G&#x27;, &#x27;C[C&gt;A]T&#x27;, &#x27;C[C&gt;G]T&#x27;, &#x27;C[C&gt;T]T&#x27;,
+       &#x27;G[C&gt;A]A&#x27;, &#x27;G[C&gt;G]A&#x27;, &#x27;G[C&gt;T]A&#x27;, &#x27;G[C&gt;A]C&#x27;, &#x27;G[C&gt;G]C&#x27;, &#x27;G[C&gt;T]C&#x27;,
+       &#x27;G[C&gt;A]G&#x27;, &#x27;G[C&gt;G]G&#x27;, &#x27;G[C&gt;T]G&#x27;, &#x27;G[C&gt;A]T&#x27;, &#x27;G[C&gt;G]T&#x27;, &#x27;G[C&gt;T]T&#x27;,
+       &#x27;T[C&gt;A]A&#x27;, &#x27;T[C&gt;G]A&#x27;, &#x27;T[C&gt;T]A&#x27;, &#x27;T[C&gt;A]C&#x27;, &#x27;T[C&gt;G]C&#x27;, &#x27;T[C&gt;T]C&#x27;,
+       &#x27;T[C&gt;A]G&#x27;, &#x27;T[C&gt;G]G&#x27;, &#x27;T[C&gt;T]G&#x27;, &#x27;T[C&gt;A]T&#x27;, &#x27;T[C&gt;G]T&#x27;, &#x27;T[C&gt;T]T&#x27;,
+       &#x27;A[T&gt;A]A&#x27;, &#x27;A[T&gt;G]A&#x27;, &#x27;A[T&gt;C]A&#x27;, &#x27;A[T&gt;A]C&#x27;, &#x27;A[T&gt;G]C&#x27;, &#x27;A[T&gt;C]C&#x27;,
+       &#x27;A[T&gt;A]G&#x27;, &#x27;A[T&gt;G]G&#x27;, &#x27;A[T&gt;C]G&#x27;, &#x27;A[T&gt;A]T&#x27;, &#x27;A[T&gt;G]T&#x27;, &#x27;A[T&gt;C]T&#x27;,
+       &#x27;C[T&gt;A]A&#x27;, &#x27;C[T&gt;G]A&#x27;, &#x27;C[T&gt;C]A&#x27;, &#x27;C[T&gt;A]C&#x27;, &#x27;C[T&gt;G]C&#x27;, &#x27;C[T&gt;C]C&#x27;,
+       &#x27;C[T&gt;A]G&#x27;, &#x27;C[T&gt;G]G&#x27;, &#x27;C[T&gt;C]G&#x27;, &#x27;C[T&gt;A]T&#x27;, &#x27;C[T&gt;G]T&#x27;, &#x27;C[T&gt;C]T&#x27;,
+       &#x27;G[T&gt;A]A&#x27;, &#x27;G[T&gt;G]A&#x27;, &#x27;G[T&gt;C]A&#x27;, &#x27;G[T&gt;A]C&#x27;, &#x27;G[T&gt;G]C&#x27;, &#x27;G[T&gt;C]C&#x27;,
+       &#x27;G[T&gt;A]G&#x27;, &#x27;G[T&gt;G]G&#x27;, &#x27;G[T&gt;C]G&#x27;, &#x27;G[T&gt;A]T&#x27;, &#x27;G[T&gt;G]T&#x27;, &#x27;G[T&gt;C]T&#x27;,
+       &#x27;T[T&gt;A]A&#x27;, &#x27;T[T&gt;G]A&#x27;, &#x27;T[T&gt;C]A&#x27;, &#x27;T[T&gt;A]C&#x27;, &#x27;T[T&gt;G]C&#x27;, &#x27;T[T&gt;C]C&#x27;,
+       &#x27;T[T&gt;A]G&#x27;, &#x27;T[T&gt;G]G&#x27;, &#x27;T[T&gt;C]G&#x27;, &#x27;T[T&gt;A]T&#x27;, &#x27;T[T&gt;G]T&#x27;, &#x27;T[T&gt;C]T&#x27;],
+      dtype=&#x27;object&#x27;, name=&#x27;context&#x27;))</pre></div></li><li class='xr-var-item'><div class='xr-index-name'><div>component</div></div><div class='xr-index-preview'>PandasIndex</div><div></div><input id='index-c49b71d9-a9ca-4556-84d6-ea319c47fde8' class='xr-index-data-in' type='checkbox'/><label for='index-c49b71d9-a9ca-4556-84d6-ea319c47fde8' title='Show/Hide index repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-index-data'><pre>PandasIndex(Index([&#x27;M0&#x27;, &#x27;M1&#x27;, &#x27;M2&#x27;, &#x27;M3&#x27;, &#x27;M4&#x27;, &#x27;M5&#x27;, &#x27;M6&#x27;, &#x27;M7&#x27;, &#x27;M8&#x27;, &#x27;M9&#x27;, &#x27;M10&#x27;,
+       &#x27;M11&#x27;, &#x27;M12&#x27;, &#x27;M13&#x27;, &#x27;M14&#x27;, &#x27;M15&#x27;, &#x27;M16&#x27;, &#x27;M17&#x27;],
+      dtype=&#x27;object&#x27;, name=&#x27;component&#x27;))</pre></div></li><li class='xr-var-item'><div class='xr-index-name'><div>shap_features</div></div><div class='xr-index-preview'>PandasIndex</div><div></div><input id='index-792ca75a-ff74-40f3-a3ae-8cda79e3ec70' class='xr-index-data-in' type='checkbox'/><label for='index-792ca75a-ff74-40f3-a3ae-8cda79e3ec70' title='Show/Hide index repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-index-data'><pre>PandasIndex(Index([&#x27;ATACAccessible&#x27;, &#x27;DNase&#x27;, &#x27;GeneExpression&#x27;, &#x27;H3K27ac&#x27;, &#x27;H3K27me3&#x27;,
+       &#x27;H3K36me3&#x27;, &#x27;H3K4me1&#x27;, &#x27;H3K4me3&#x27;, &#x27;H3K9me3&#x27;, &#x27;POLR2A&#x27;, &#x27;GenePosition&#x27;,
+       &#x27;RepliseqG1b&#x27;, &#x27;RepliseqG2&#x27;, &#x27;RepliseqS1&#x27;, &#x27;RepliseqS2&#x27;, &#x27;RepliseqS3&#x27;,
+       &#x27;RepliseqS4&#x27;, &#x27;HICEigenvector&#x27;, &#x27;NucleotideRatio&#x27;],
+      dtype=&#x27;object&#x27;, name=&#x27;shap_features&#x27;))</pre></div></li><li class='xr-var-item'><div class='xr-index-name'><div>shap_component</div></div><div class='xr-index-preview'>PandasIndex</div><div></div><input id='index-4cdc2a36-ef20-4ff6-a3df-74f7bbe5a335' class='xr-index-data-in' type='checkbox'/><label for='index-4cdc2a36-ef20-4ff6-a3df-74f7bbe5a335' title='Show/Hide index repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-index-data'><pre>PandasIndex(Index([&#x27;M0&#x27;, &#x27;M1&#x27;, &#x27;M2&#x27;, &#x27;M3&#x27;, &#x27;M4&#x27;, &#x27;M5&#x27;, &#x27;M6&#x27;, &#x27;M7&#x27;, &#x27;M8&#x27;, &#x27;M9&#x27;, &#x27;M10&#x27;,
+       &#x27;M11&#x27;, &#x27;M12&#x27;, &#x27;M13&#x27;, &#x27;M14&#x27;, &#x27;M15&#x27;, &#x27;M16&#x27;, &#x27;M17&#x27;],
+      dtype=&#x27;object&#x27;, name=&#x27;shap_component&#x27;))</pre></div></li><li class='xr-var-item'><div class='xr-index-name'><div>shap_locus</div></div><div class='xr-index-preview'>PandasIndex</div><div></div><input id='index-cf4c9d32-8b44-4b8e-a2ac-5c284b8aaa33' class='xr-index-data-in' type='checkbox'/><label for='index-cf4c9d32-8b44-4b8e-a2ac-5c284b8aaa33' title='Show/Hide index repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-index-data'><pre>PandasIndex(Index([24008, 11878, 29922, 58006, 41679, 19770, 47306, 65302, 34171, 15806,
+       ...
+       48720, 40978, 32794, 34818, 39979, 56282, 48461,  1591, 51624, 22805],
+      dtype=&#x27;int64&#x27;, name=&#x27;shap_locus&#x27;, length=2000))</pre></div></li><li class='xr-var-item'><div class='xr-index-name'><div>genome_state</div></div><div class='xr-index-preview'>PandasIndex</div><div></div><input id='index-5a9f99f3-9443-4afd-b8ce-b6bf236a447e' class='xr-index-data-in' type='checkbox'/><label for='index-5a9f99f3-9443-4afd-b8ce-b6bf236a447e' title='Show/Hide index repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-index-data'><pre>PandasIndex(Index([&#x27;Baseline&#x27;, &#x27;GeneStrand:A/G-centered&#x27;, &#x27;GeneStrand:C/T-centered&#x27;,
+       &#x27;ReplicationStrand:A/G-centered&#x27;, &#x27;ReplicationStrand:C/T-centered&#x27;],
+      dtype=&#x27;object&#x27;, name=&#x27;genome_state&#x27;))</pre></div></li><li class='xr-var-item'><div class='xr-index-name'><div>feature</div></div><div class='xr-index-preview'>PandasIndex</div><div></div><input id='index-387c0755-7800-452d-9caf-0196f6f74b9e' class='xr-index-data-in' type='checkbox'/><label for='index-387c0755-7800-452d-9caf-0196f6f74b9e' title='Show/Hide index repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-index-data'><pre>PandasIndex(Index([&#x27;ATACAccessible&#x27;, &#x27;DNase&#x27;, &#x27;GeneExpression&#x27;, &#x27;H3K27ac&#x27;, &#x27;H3K27me3&#x27;,
+       &#x27;H3K36me3&#x27;, &#x27;H3K4me1&#x27;, &#x27;H3K4me3&#x27;, &#x27;H3K9me3&#x27;, &#x27;POLR2A&#x27;, &#x27;GenePosition&#x27;,
+       &#x27;RepliseqG1b&#x27;, &#x27;RepliseqG2&#x27;, &#x27;RepliseqS1&#x27;, &#x27;RepliseqS2&#x27;, &#x27;RepliseqS3&#x27;,
+       &#x27;RepliseqS4&#x27;, &#x27;HICEigenvector&#x27;, &#x27;NucleotideRatio&#x27;],
+      dtype=&#x27;object&#x27;, name=&#x27;feature&#x27;))</pre></div></li><li class='xr-var-item'><div class='xr-index-name'><div>sample</div></div><div class='xr-index-preview'>PandasIndex</div><div></div><input id='index-d5aebcb7-0a06-4018-a201-f26cb03a69ea' class='xr-index-data-in' type='checkbox'/><label for='index-d5aebcb7-0a06-4018-a201-f26cb03a69ea' title='Show/Hide index repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-index-data'><pre>PandasIndex(Index([&#x27;BR001.purple&#x27;, &#x27;BR002.purple&#x27;, &#x27;BR003.purple&#x27;, &#x27;BR004.purple&#x27;,
+       &#x27;BR005.purple&#x27;, &#x27;BR006.purple&#x27;, &#x27;BR007.purple&#x27;, &#x27;BR008.purple&#x27;,
+       &#x27;BR009.purple&#x27;, &#x27;BR010.purple&#x27;,
+       ...
+       &#x27;TCGA-E2-A1LL.purple&#x27;, &#x27;TCGA-E9-A1NH.purple&#x27;, &#x27;TCGA-EW-A1P8.purple&#x27;,
+       &#x27;TCGA-EW-A1PB.purple&#x27;, &#x27;TCGA-EW-A1PC.purple&#x27;, &#x27;TCGA-EW-A1PH.purple&#x27;,
+       &#x27;TCGA-EW-A3U0.purple&#x27;, &#x27;TCGA-GI-A2C9.purple&#x27;, &#x27;TCGA-GM-A2DF.purple&#x27;,
+       &#x27;TCGA-GM-A3XL.purple&#x27;],
+      dtype=&#x27;object&#x27;, name=&#x27;sample&#x27;, length=736))</pre></div></li></ul></div></li><li class='xr-section-item'><input id='section-c3bd51fb-2dae-4f4d-bba3-bbee387fbdf1' class='xr-section-summary-in' type='checkbox'  ><label for='section-c3bd51fb-2dae-4f4d-bba3-bbee387fbdf1' class='xr-section-summary' >Attributes: <span>(8)</span></label><div class='xr-section-inline-details'></div><div class='xr-section-details'><dl class='xr-attrs'><dt><span>name :</span></dt><dd>breast</dd><dt><span>dtype :</span></dt><dd>sbs</dd><dt><span>genome_file :</span></dt><dd>/n/data1/hms/dbmi/park/ctDNA_loci_project/locusregression/gtensor_construction/reference_files/hg38/hg38.main-chroms.chromsizes</dd><dt><span>fasta_file :</span></dt><dd>/n/data1/hms/dbmi/park/SOFTWARE/REFERENCE/hg38/cgap_matches/Homo_sapiens_assembly38.fa</dd><dt><span>blacklist_file :</span></dt><dd>/n/data1/hms/dbmi/park/ctDNA_loci_project/locusregression/gtensor_construction/reference_files/hg38/blacklist_method12_v1_comb_sort_merged.no-chromends.bed.gz</dd><dt><span>region_size :</span></dt><dd>10000</dd><dt><span>filename :</span></dt><dd>retry2.nc</dd><dt><span>regions_file :</span></dt><dd>ENFORM-Breast.nc.regions.bed</dd></dl></div></li></ul></div></div><section id="module-mutopia.gtensor.gtensor">
+<span id="gtensor-api-reference"></span><h2>GTensor API Reference<a class="headerlink" href="#module-mutopia.gtensor.gtensor" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.GTensor">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">GTensor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">modality</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chrom</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context_frequencies</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exposures</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#GTensor"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.GTensor" title="Link to this definition">¶</a></dt>
+<dd><p>Create a GTensor dataset for genomic tensor analysis.</p>
+<p>This function constructs an xarray Dataset with the standardized structure
+required for genomic tensor operations, including region coordinates,
+context frequencies, and metadata.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>modality</strong> (<em>object</em>) – Modality object containing coordinate information and mode configuration</p></li>
+<li><p><strong>name</strong> (<em>str</em>) – Name identifier for the dataset</p></li>
+<li><p><strong>chrom</strong> (<em>List</em><em>[</em><em>str</em><em>]</em>) – List of chromosome names for each genomic region</p></li>
+<li><p><strong>start</strong> (<em>List</em><em>[</em><em>int</em><em>]</em>) – List of start positions for each genomic region</p></li>
+<li><p><strong>end</strong> (<em>List</em><em>[</em><em>int</em><em>]</em>) – List of end positions for each genomic region</p></li>
+<li><p><strong>context_frequencies</strong> (<em>xr.DataArray</em>) – Array containing context frequency data for each region</p></li>
+<li><p><strong>exposures</strong> (<em>Union</em><em>[</em><em>None</em><em>, </em><em>NDArray</em><em>[</em><em>np.number</em><em>]</em><em>]</em><em>, </em><em>optional</em>) – Exposure values for each region. If None, defaults to ones</p></li>
+<li><p><strong>dtype</strong> (<em>optional</em>) – Data type for the dataset. If None, uses modality.MODE_ID</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Structured dataset with regions, coordinates, and metadata</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>xr.Dataset</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.annot_empirical_marginal">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">annot_empirical_marginal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'empirical_marginal'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#annot_empirical_marginal"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.annot_empirical_marginal" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate and add empirical marginal mutation rates to a dataset.</p>
+<p>This method computes empirical marginal mutation rates by aggregating observed mutations
+across all samples in the dataset and normalizing by context frequencies and region lengths.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset</strong> (<em>GTensorDataset</em>) – Dataset containing mutation data to analyze</p></li>
+<li><p><strong>key</strong> (<em>str</em><em>, </em><em>default=&quot;empirical_marginal&quot;</em>) – Base name for the mutation rate variables to be added to the dataset.
+Creates two variables: <cite>{key}</cite> and <cite>{key}_locus</cite></p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The input dataset with empirical marginal rates added as new variables:
+- {key}: Marginal mutation rates normalized by context frequencies
+- {key}_locus: Per-locus marginal rates normalized by region length</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>GTensorDataset</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.apply_to_samples">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">apply_to_samples</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">func</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bar</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#apply_to_samples"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.apply_to_samples" title="Link to this definition">¶</a></dt>
+<dd><p>Apply a function to each sample in a dataset with parallel processing.</p>
+<p>This function applies a given function to each sample (region) in the dataset,
+handling the parallelization and aggregation of results. It’s designed for
+operations that need to process each genomic region independently.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>GTensorDataset</em>) – Input dataset or data loader containing samples to process</p></li>
+<li><p><strong>func</strong> (<em>callable</em>) – Function to apply to each sample. Should accept a dataset slice and
+return a result that can be concatenated</p></li>
+<li><p><strong>bar</strong> (<em>bool</em><em>, </em><em>default=True</em>) – Whether to display a progress bar during processing</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dataset containing the concatenated results from all sample applications</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>GTensorDataset</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.dims_except_for">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">dims_except_for</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dims</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">keepdims</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#dims_except_for"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.dims_except_for" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.eager_load">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">eager_load</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#eager_load"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.eager_load" title="Link to this definition">¶</a></dt>
+<dd><p>Load a dataset eagerly with samples but without state information.</p>
+<p>This is a convenience function that loads a dataset with sample data
+but excludes state information for faster access patterns.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>dataset</strong> (<em>str</em><em> or </em><em>path-like</em>) – Path or identifier for the dataset to load</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Eager dataset interface with samples loaded into memory</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>GTensorDataset</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.eager_train_test_load">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">eager_train_test_load</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">test_chroms</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#eager_train_test_load"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.eager_train_test_load" title="Link to this definition">¶</a></dt>
+<dd><p>Load a dataset and perform eager train/test split by chromosomes.</p>
+<p>This convenience function combines eager loading with train/test splitting,
+loading all data into memory for fast access.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset</strong> (<em>str</em><em> or </em><em>path-like</em>) – Path or identifier for the dataset to load</p></li>
+<li><p><strong>*test_chroms</strong> (<em>str</em>) – Chromosome names to reserve for the test set</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Training and testing dataset interfaces</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple[CorpusInterface, CorpusInterface]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.equal_size_quantiles">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">equal_size_quantiles</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_bins</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#equal_size_quantiles"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.equal_size_quantiles" title="Link to this definition">¶</a></dt>
+<dd><p>Create equal-size quantile bins for a variable in the dataset.</p>
+<p>This function bins the values of a specified variable into quantiles of equal
+cumulative region length, which is useful for creating balanced genomic bins.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset</strong> (<em>GTensorDataset</em>) – Dataset containing the variable to bin</p></li>
+<li><p><strong>var_name</strong> (<em>str</em>) – Name of the variable to create quantile bins for</p></li>
+<li><p><strong>n_bins</strong> (<em>int</em><em>, </em><em>default=10</em>) – Number of quantile bins to create</p></li>
+<li><p><strong>key</strong> (<em>str</em><em>, </em><em>optional</em>) – Custom name for the output bin variable. If None, generates name as
+‘{var_name_base}_qbins_{n_bins}’ where var_name_base is the last part
+of var_name after splitting on ‘/’</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The input dataset with quantile bins added as a new variable</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>GTensorDataset</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.excel_report">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">excel_report</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normalization</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'global'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#excel_report"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.excel_report" title="Link to this definition">¶</a></dt>
+<dd><p>Generate a comprehensive Excel report with model results.</p>
+<p>This method creates an Excel file containing signature data, sample contributions,
+and SHAP values (if available) across multiple worksheets.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset</strong> (<em>GTensorDataset</em>) – Dataset containing the model results to export</p></li>
+<li><p><strong>output</strong> (<em>str</em>) – Output file path for the Excel report</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ImportError</strong> – If openpyxl is not installed for Excel writing support</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The Excel file will contain the following sheets:
+- Signature_{name}: Normalized signature data for each component
+- Sample_contributions: Component contributions per sample (if available)
+- SHAP_transformed_features: SHAP feature data (if available)
+- SHAP_original_features: Original feature data for SHAP (if available)
+- SHAP_values_{component}: SHAP values for each component (if available)</p>
+<p>Requires openpyxl to be installed: pip install openpyxl</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.fetch_component">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">fetch_component</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">component_name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#fetch_component"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.fetch_component" title="Link to this definition">¶</a></dt>
+<dd><p>Retrieve the mutational spectrum for a specific component.</p>
+<p>This function extracts the signature spectrum (mutational profile) for a
+specified component from the dataset. The spectrum describes the relative
+frequency of different mutation types for this component.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset</strong> (<em>GTensorDataset</em>) – Dataset containing component spectra</p></li>
+<li><p><strong>component_name</strong> (<em>Union</em><em>[</em><em>str</em><em>, </em><em>int</em><em>]</em>) – Name or index of the component to retrieve</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>DataArray containing the component’s mutational spectrum with
+appropriate dimensions and coordinates</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>xr.DataArray</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the specified component is not found in the dataset</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.fetch_features">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">fetch_features</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">feature_names</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#fetch_features"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.fetch_features" title="Link to this definition">¶</a></dt>
+<dd><p>Extract numerical features from the dataset’s “Features” section.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset</strong> (<em>GTensorDataset</em>) – Dataset containing feature variables under the “Features” group.</p></li>
+<li><p><strong>*feature_names</strong> (<em>str</em>) – Glob patterns or basenames of features to select. When empty, all
+numeric features are returned.</p></li>
+<li><p><strong>source</strong> (<em>str</em><em>, </em><em>optional</em>) – Restrict selection to features within this source directory. When None,
+features from all sources are considered.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A DataArray with dims (“feature”, “locus”) and coords “locus”,
+“feature” (full paths), “feature_name” (basenames), and “source”.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>xarray.DataArray</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>All selected features must share a compatible numeric dtype.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.fetch_interactions">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">fetch_interactions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">component_name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#fetch_interactions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.fetch_interactions" title="Link to this definition">¶</a></dt>
+<dd><p>Retrieve interaction effects for a specific component.</p>
+<p>This function extracts the interaction matrix for a specified component,
+showing how the mutational spectrum varies across different genomic contexts
+(e.g., strand orientation, replication timing, gene regions).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset</strong> (<em>GTensorDataset</em>) – Dataset containing component interaction data</p></li>
+<li><p><strong>component_name</strong> (<em>Union</em><em>[</em><em>str</em><em>, </em><em>int</em><em>]</em>) – Name or index of the component to retrieve</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>DataArray containing the component’s interaction effects with
+appropriate dimensions and coordinates</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>xr.DataArray</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the specified component is not found in the dataset</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.fetch_shared_effects">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">fetch_shared_effects</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">component_name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#fetch_shared_effects"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.fetch_shared_effects" title="Link to this definition">¶</a></dt>
+<dd><p>Retrieve shared effects for a specific component.</p>
+<p>This function extracts the shared effects matrix for a specified component,
+representing effects that are common across different contexts or conditions.
+Shared effects capture baseline mutational patterns that don’t vary with
+genomic features.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset</strong> (<em>GTensorDataset</em>) – Dataset containing component shared effects data</p></li>
+<li><p><strong>component_name</strong> (<em>Union</em><em>[</em><em>str</em><em>, </em><em>int</em><em>]</em>) – Name or index of the component to retrieve</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>DataArray containing the component’s shared effects with
+appropriate dimensions and coordinates</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>xr.DataArray</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the specified component is not found in the dataset</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.fetch_source">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">fetch_source</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#fetch_source"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.fetch_source" title="Link to this definition">¶</a></dt>
+<dd><p>Extract and restructure data for a specific source from a multi-source dataset.</p>
+<p>This function filters and reorganizes a dataset to contain only data relevant to a
+specified source, while maintaining shared features and state variables that are
+common across all sources.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset</strong> (<em>GTensorDataset</em>) – The input dataset containing data from multiple sources, organized with
+hierarchical variable names (e.g., “Features/source/variable”, “State/source/variable”).</p></li>
+<li><p><strong>source</strong> (<em>str</em>) – The name of the source to extract data for. Must be present in the dataset.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A new dataset containing:
+- Source-specific features and state variables (with paths flattened)
+- Shared features and state variables (common to all sources)
+- Other data variables from the original dataset
+- Updated name attribute reflecting the source
+- Source dimension removed if present</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>GTensorDataset</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the specified source is not found in the dataset.</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The function performs the following transformations:
+1. Validates that the source exists in the dataset
+2. Separates source-specific and shared variables from Features and State groups
+3. Creates a rename mapping to flatten source-specific variable paths
+4. Combines source-specific, shared, and other variables into a new dataset
+5. Updates dataset attributes and coordinates while removing source dimension</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.get_explanation">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">get_explanation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">component</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#get_explanation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.get_explanation" title="Link to this definition">¶</a></dt>
+<dd><p>Generate SHAP explanations for a specific model component.</p>
+<p>This function extracts and formats SHAP values for interpretability analysis,
+creating an explanation object that can be used with SHAP visualization tools.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset</strong> (<em>GTensorDataset</em>) – Dataset containing SHAP values and feature information</p></li>
+<li><p><strong>component</strong> (<em>str</em>) – Name of the model component to explain</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>SHAP explanation object with values, features, and display data</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>shap.Explanation</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>ImportError</strong> – If SHAP library is not installed</p></li>
+<li><p><strong>ValueError</strong> – If the specified component doesn’t have SHAP values in the dataset</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.get_shap_summary">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">get_shap_summary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#get_shap_summary"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.get_shap_summary" title="Link to this definition">¶</a></dt>
+<dd><p>Generate a summary of SHAP values for model components.</p>
+<p>This function computes summary statistics for SHAP values across all components,
+including effect sizes (97th percentile of absolute SHAP values) and correlations
+between SHAP values and feature values. This provides a high-level view of which
+features have the strongest associations with each component.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>GTensorDataset</em>) – Dataset containing SHAP values and feature information</p></li>
+<li><p><strong>source</strong> (<em>str</em><em>, </em><em>optional</em>) – Source identifier to analyze. Required if the dataset is a mixture dataset
+with multiple sources.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>DataFrame with columns:
+- component: Component name
+- feature: Feature name
+- effect_size: 97th percentile of absolute SHAP values
+- correlation: Pearson correlation between SHAP values and feature values</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the dataset is a mixture dataset and no source is specified</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.infer_source_celltypes">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">infer_source_celltypes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#infer_source_celltypes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.infer_source_celltypes" title="Link to this definition">¶</a></dt>
+<dd><p>Infer source cell types from feature names and assign to dataset coordinates.</p>
+<p>This function examines the feature names in the dataset to identify unique
+source cell types based on directory structure. It then assigns these
+inferred cell types to the ‘source’ coordinate of the dataset.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>dataset</strong> (<em>GTensorDataset</em>) – Input dataset containing features with potential source information</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dataset with ‘source’ coordinate added, reflecting inferred cell types</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>GTensorDataset</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If no features are found in the dataset to infer sources from</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.is_mixture_dataset">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">is_mixture_dataset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#is_mixture_dataset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.is_mixture_dataset" title="Link to this definition">¶</a></dt>
+<dd><p>Check if a dataset contains data from multiple sources.</p>
+<p>This function determines whether the dataset is a mixture dataset by checking
+if it contains more than one source. Mixture datasets have source-specific
+features and require special handling for analysis.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>dataset</strong> (<em>GTensorDataset</em>) – Input dataset to check</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>True if the dataset contains multiple sources, False otherwise</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.lazy_load">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">lazy_load</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#lazy_load"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.lazy_load" title="Link to this definition">¶</a></dt>
+<dd><p>Load a dataset lazily without samples or state information.</p>
+<p>This is a convenience function that loads a dataset with minimal memory
+footprint by excluding sample data and state information.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>dataset</strong> (<em>str</em><em> or </em><em>path-like</em>) – Path or identifier for the dataset to load</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Lazy dataset interface that loads data on demand</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>GTensorDataset</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.lazy_train_test_load">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">lazy_train_test_load</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">test_chroms</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#lazy_train_test_load"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.lazy_train_test_load" title="Link to this definition">¶</a></dt>
+<dd><p>Load a dataset and perform lazy train/test split by chromosomes.</p>
+<p>This convenience function combines lazy loading with train/test splitting,
+providing memory-efficient access to training and testing data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset</strong> (<em>str</em><em> or </em><em>path-like</em>) – Path or identifier for the dataset to load</p></li>
+<li><p><strong>*test_chroms</strong> (<em>str</em>) – Chromosome names to reserve for the test set</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Training and testing dataset slicers</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple[LazySlicer, LazySlicer]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.list_components">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">list_components</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#list_components"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.list_components" title="Link to this definition">¶</a></dt>
+<dd><p>List all component names in the dataset.</p>
+<p>This function extracts and returns the names of all model components
+(mutational signatures or processes) present in the dataset.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>dataset</strong> (<em>GTensorDataset</em>) – Input dataset containing model components</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>List of component names</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List[str]</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the dataset does not contain a ‘component’ coordinate</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.list_sources">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">list_sources</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#list_sources"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.list_sources" title="Link to this definition">¶</a></dt>
+<dd><p>List all source identifiers in the dataset.</p>
+<p>This function extracts and returns the names of all sources present in the
+dataset. Sources typically represent different cell types, tissues, or
+experimental conditions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>dataset</strong> (<em>GTensorDataset</em>) – Input dataset containing source information</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>List of source names. Returns an empty list if the dataset has no
+‘source’ coordinate defined.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.load_dataset">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">load_dataset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">with_samples</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">with_state</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#load_dataset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.load_dataset" title="Link to this definition">¶</a></dt>
+<dd><p>Load a dataset from disk with configurable loading options.</p>
+<p>This function loads a dataset from disk storage. The loading behavior can be customized
+based on whether samples and state information should be included.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset</strong> (<em>str</em><em> or </em><em>path-like</em>) – Path or identifier for the dataset to load</p></li>
+<li><p><strong>with_samples</strong> (<em>bool</em><em>, </em><em>default=True</em>) – Whether to load sample data along with the dataset structure</p></li>
+<li><p><strong>with_state</strong> (<em>bool</em><em>, </em><em>default=True</em>) – Whether to load state information (model parameters, etc.)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Loaded dataset interface. Returns LazySampleLoader if with_samples=False,
+otherwise returns CorpusInterface</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>GTensorDataset</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.make_mixture_dataset">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">make_mixture_dataset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">datasets</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#make_mixture_dataset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.make_mixture_dataset" title="Link to this definition">¶</a></dt>
+<dd><p>Create a mixed dataset by combining multiple source datasets.</p>
+<p>This function merges multiple datasets, renaming their features and state
+variables to include source identifiers, enabling comparative analysis
+across different data sources.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>**datasets</strong> (<em>GTensorDataset</em>) – Named datasets to combine. Keys become source identifiers.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Combined dataset with source-specific feature namespaces</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>GTensorDataset</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.match_dims">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">match_dims</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">dim_sizes</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#match_dims"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.match_dims" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.mutate_method">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">mutate_method</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#mutate_method"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.mutate_method" title="Link to this definition">¶</a></dt>
+<dd><p>Decorator function to modify a dataset in place for class methods.</p>
+<p>This decorator allows running mutations on a dataset without disrupting
+the interface chains, specifically for methods that take ‘self’ as the
+first parameter.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>func</strong> (<em>callable</em>) – Method that takes self and dataset as first two arguments and
+returns a modified dataset</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Wrapped method that can be used with dataset.mutate()</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>callable</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.num_sources">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">num_sources</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#num_sources"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.num_sources" title="Link to this definition">¶</a></dt>
+<dd><p>Get the number of distinct sources in a dataset.</p>
+<p>This function counts the number of unique sources present in the dataset’s
+‘source’ coordinate, which is useful for determining if the dataset contains
+data from multiple cell types or conditions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>dataset</strong> (<em>GTensorDataset</em>) – Input dataset to query for sources</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Number of distinct sources in the dataset. Returns 0 if no sources
+are defined.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.rename_components">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">rename_components</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">names</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#rename_components"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.rename_components" title="Link to this definition">¶</a></dt>
+<dd><p>Rename the components of the model and update the dataset coordinates accordingly.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset</strong> (<em>GTensorDataset</em>) – The dataset containing model components to be renamed.</p></li>
+<li><p><strong>names</strong> (<em>List</em><em>[</em><em>str</em><em>]</em>) – New names for the components. Must have the same length as the number of components in the model.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The dataset with updated component names in coordinates.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>GTensorDataset</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>ValueError</strong> – If the number of provided names doesn’t match the number of components.</p></li>
+<li><p><strong>KeyError</strong> – If some components in the dataset’s “shap_component” coordinate don’t match the model components.</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>This method also updates the internal _component_names attribute of the model.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.slice_regions">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">slice_regions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">regions</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lazy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#slice_regions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.slice_regions" title="Link to this definition">¶</a></dt>
+<dd><p>Extract genomic regions that overlap with specified intervals.</p>
+<p>This function filters the dataset to include only regions that overlap
+with any of the specified genomic intervals. Intervals can be specified in
+multiple formats: “chr:start-end”, “chr” (entire chromosome), or a comma-separated
+list of such specifications.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset</strong> (<em>GTensorDataset</em>) – Input dataset containing genomic regions</p></li>
+<li><p><strong>regions</strong> (<em>str</em>) – Region specification(s) in formats:
+- “chr:start-end” (e.g., “chr1:1000-2000”)
+- “chr” (entire chromosome, e.g., “chr1”)
+- List of any of the above</p></li>
+<li><p><strong>lazy</strong> (<em>bool</em><em>, </em><em>default=False</em>) – Whether to return a lazy slicer instead of materializing the data</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Filtered dataset containing only overlapping regions</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>GTensorDataset</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If no regions match the specified query intervals</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.slice_samples">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">slice_samples</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">samples</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#slice_samples"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.slice_samples" title="Link to this definition">¶</a></dt>
+<dd><p>Extract a subset of samples from the dataset.</p>
+<p>This function filters the dataset to include only the specified samples,
+enabling focused analysis on particular samples of interest while maintaining
+all other dataset dimensions and attributes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset</strong> (<em>GTensorDataset</em>) – Input dataset containing multiple samples</p></li>
+<li><p><strong>samples</strong> (<em>List</em><em>[</em><em>str</em><em>]</em>) – List of sample names to extract from the dataset. Sample names must
+exist in the dataset’s sample coordinate.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Filtered dataset containing only the specified samples wrapped in a
+SampleSlice interface</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>GTensorDataset</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>KeyError</strong> – If any of the specified samples are not found in the dataset</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>If an empty list is provided, the original dataset is returned unchanged.
+The function uses the mutate pattern to maintain interface chain compatibility.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.train_test_split">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">train_test_split</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">test_chroms</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lazy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#train_test_split"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.train_test_split" title="Link to this definition">¶</a></dt>
+<dd><p>Split a dataset into training and testing sets based on chromosomes.</p>
+<p>This function splits the dataset by chromosomes, with specified chromosomes
+reserved for testing and the remainder used for training. The split can be
+performed eagerly (loading all data) or lazily (for memory efficiency).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset</strong> (<em>GTensorDataset</em>) – Input dataset to split</p></li>
+<li><p><strong>*test_chroms</strong> (<em>Union</em><em>[</em><em>str</em><em>, </em><em>List</em><em>[</em><em>str</em><em>]</em><em>]</em>) – Chromosome names to reserve for the test set. Can be provided as
+multiple string arguments or lists of strings</p></li>
+<li><p><strong>lazy</strong> (<em>bool</em><em>, </em><em>default=False</em>) – Whether to perform lazy splitting. If True, returns LazySlicer objects
+that don’t load data until accessed</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Training and testing dataset interfaces</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple[GTensorDataset, GTensorDataset]</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If no test chromosomes are provided or none of the specified
+    chromosomes are found in the dataset</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.gtensor.gtensor.unstack_regions">
+<span class="sig-prename descclassname"><span class="pre">mutopia.gtensor.gtensor.</span></span><span class="sig-name descname"><span class="pre">unstack_regions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/gtensor/gtensor.html#unstack_regions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.gtensor.gtensor.unstack_regions" title="Link to this definition">¶</a></dt>
+<dd><p>Unstack regions from a compressed format to full coordinate arrays.</p>
+<p>This function expands region data from a compact representation to
+full coordinate arrays, using external region file information to
+reconstruct chromosome, start, and end coordinates.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>dataset</strong> (<em>GTensorDataset</em>) – Dataset with stacked region representation</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dataset with unstacked region coordinates</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>GTensorDataset</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="model.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">TopographyModel API</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="index.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">API Reference</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2026, Allen W. Lynch
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">GTensor API</a><ul>
+<li><a class="reference internal" href="#module-mutopia.gtensor.gtensor">GTensor API Reference</a><ul>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.GTensor"><code class="docutils literal notranslate"><span class="pre">GTensor()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.annot_empirical_marginal"><code class="docutils literal notranslate"><span class="pre">annot_empirical_marginal()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.apply_to_samples"><code class="docutils literal notranslate"><span class="pre">apply_to_samples()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.dims_except_for"><code class="docutils literal notranslate"><span class="pre">dims_except_for()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.eager_load"><code class="docutils literal notranslate"><span class="pre">eager_load()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.eager_train_test_load"><code class="docutils literal notranslate"><span class="pre">eager_train_test_load()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.equal_size_quantiles"><code class="docutils literal notranslate"><span class="pre">equal_size_quantiles()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.excel_report"><code class="docutils literal notranslate"><span class="pre">excel_report()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.fetch_component"><code class="docutils literal notranslate"><span class="pre">fetch_component()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.fetch_features"><code class="docutils literal notranslate"><span class="pre">fetch_features()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.fetch_interactions"><code class="docutils literal notranslate"><span class="pre">fetch_interactions()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.fetch_shared_effects"><code class="docutils literal notranslate"><span class="pre">fetch_shared_effects()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.fetch_source"><code class="docutils literal notranslate"><span class="pre">fetch_source()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.get_explanation"><code class="docutils literal notranslate"><span class="pre">get_explanation()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.get_shap_summary"><code class="docutils literal notranslate"><span class="pre">get_shap_summary()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.infer_source_celltypes"><code class="docutils literal notranslate"><span class="pre">infer_source_celltypes()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.is_mixture_dataset"><code class="docutils literal notranslate"><span class="pre">is_mixture_dataset()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.lazy_load"><code class="docutils literal notranslate"><span class="pre">lazy_load()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.lazy_train_test_load"><code class="docutils literal notranslate"><span class="pre">lazy_train_test_load()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.list_components"><code class="docutils literal notranslate"><span class="pre">list_components()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.list_sources"><code class="docutils literal notranslate"><span class="pre">list_sources()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.load_dataset"><code class="docutils literal notranslate"><span class="pre">load_dataset()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.make_mixture_dataset"><code class="docutils literal notranslate"><span class="pre">make_mixture_dataset()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.match_dims"><code class="docutils literal notranslate"><span class="pre">match_dims()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.mutate_method"><code class="docutils literal notranslate"><span class="pre">mutate_method()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.num_sources"><code class="docutils literal notranslate"><span class="pre">num_sources()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.rename_components"><code class="docutils literal notranslate"><span class="pre">rename_components()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.slice_regions"><code class="docutils literal notranslate"><span class="pre">slice_regions()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.slice_samples"><code class="docutils literal notranslate"><span class="pre">slice_samples()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.train_test_split"><code class="docutils literal notranslate"><span class="pre">train_test_split()</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.gtensor.gtensor.unstack_regions"><code class="docutils literal notranslate"><span class="pre">unstack_regions()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=7a06b15b"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    </body>
+</html>

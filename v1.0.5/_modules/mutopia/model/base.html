@@ -1,0 +1,1376 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../../genindex.html"><link rel="search" title="Search" href="../../../search.html">
+        <link rel="prefetch" href="../../../_static/mutopia_logo.png" as="image">
+        <link rel="prefetch" href="../../../_static/mutopia_logo.png" as="image">
+
+    <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
+        <title>mutopia.model.base - MuTopia documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=8fd06a5a" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  --content-width: 85rem;
+  --toc-width: 22rem;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  --content-width: 85rem;
+  --toc-width: 22rem;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  --content-width: 85rem;
+  --toc-width: 22rem;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../../index.html"><div class="brand">MuTopia  documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../../index.html">
+  <div class="sidebar-logo-container">
+    <img class="sidebar-logo only-light" src="../../../_static/mutopia_logo.png" alt="Light Logo"/>
+    <img class="sidebar-logo only-dark" src="../../../_static/mutopia_logo.png" alt="Dark Logo"/>
+  </div>
+  
+  <span class="sidebar-brand-text">MuTopia  documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started.html">Getting started with MuTopia</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../tutorials/index.html">MuTopia Tutorials</a><input aria-label="Toggle navigation of MuTopia Tutorials" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../tutorials/1.building_a_gtensor.html">Tutorial 1: Building G-Tensors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../tutorials/2.analyzing_gtensors.html">Tutorial 2: Analyzing G-Tensors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../tutorials/3.training_models.html">Tutorial 3: Tuning and training models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../tutorials/4.analyzing_models.html">Tutorial 4: Analyzing Topographic Models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../tutorials/5.annotating_vcfs.html">Tutorial 5: Annotating VCFs with a Pre-Trained Model</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../api/index.html">API Reference</a><input aria-label="Toggle navigation of API Reference" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/gtensor.html">GTensor API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/model.html">TopographyModel API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/plot.html">Plot API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/track_plot/track_plot.html">mutopia.plot.track_plot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/track_plot/track_plot.html#module-mutopia.plot.track_plot.track_plot">track_plot API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/track_plot/tracks.html">tracks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/track_plot/transforms.html">transforms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/modes/sbs.html">SBS Modality</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/modes/modes.html">Base ModeConfig</a></li>
+</ul>
+</li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <h1>Source code for mutopia.model.base</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">xarray</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">xr</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">partial</span><span class="p">,</span> <span class="n">wraps</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">joblib</span><span class="w"> </span><span class="kn">import</span> <span class="n">dump</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseEstimator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">mutopia.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">logger</span><span class="p">,</span> <span class="n">ParContext</span><span class="p">,</span> <span class="n">parallel_map</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mutopia.gtensor</span><span class="w"> </span><span class="kn">import</span> <span class="n">dims_except_for</span><span class="p">,</span> <span class="n">train_test_split</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mutopia.gtensor.validation</span><span class="w"> </span><span class="kn">import</span> <span class="n">check_corpus</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mutopia.gtensor.dtypes</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_mode_config</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.model.optim</span><span class="w"> </span><span class="kn">import</span> <span class="n">fit_model</span> <span class="k">as</span> <span class="n">_fit_model_impl</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.model.model_components</span><span class="w"> </span><span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.model.latent_var_models</span><span class="w"> </span><span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.model.factor_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">FactorModel</span>
+
+<span class="c1"># interfaces</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.mixture_model.mixture_interface</span><span class="w"> </span><span class="kn">import</span> <span class="n">MixtureInterface</span> <span class="k">as</span> <span class="n">MIX</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.model.gtensor_interface</span><span class="w"> </span><span class="kn">import</span> <span class="n">GtensorInterface</span> <span class="k">as</span> <span class="n">GTI</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.mixture_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">DenseMixtureModel</span><span class="p">,</span> <span class="n">SparseMixtureModel</span><span class="p">,</span> <span class="n">SharedExposuresMixtureModel</span>
+
+<span class="c1"># typing helpers</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="c1"># Prefer forward references at runtime; only import for type checkers</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">mutopia.gtensor.gtensor</span><span class="w"> </span><span class="kn">import</span> <span class="n">GTensorDataset</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">numpy.random</span><span class="w"> </span><span class="kn">import</span> <span class="n">RandomState</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">The Model class is a wrapper around a trained model state object, </span>
+<span class="sd">and provides the high-level interface for interacting with the model.</span>
+<span class="sd">This is the entry point for the user to interact with and annotate data.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="n">__all__</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;TopographyModel&quot;</span><span class="p">]</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">DenseSharedMixtureModel</span><span class="p">(</span><span class="n">DenseMixtureModel</span><span class="p">,</span> <span class="n">SharedExposuresMixtureModel</span><span class="p">):</span>
+    <span class="k">pass</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">SparseSharedMixtureModel</span><span class="p">(</span><span class="n">SparseMixtureModel</span><span class="p">,</span> <span class="n">SharedExposuresMixtureModel</span><span class="p">):</span>
+    <span class="k">pass</span>
+
+
+<div class="viewcode-block" id="TopographyModel">
+<a class="viewcode-back" href="../../../api/model.html#mutopia.model.base.TopographyModel">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TopographyModel</span><span class="p">(</span><span class="n">ABC</span><span class="p">,</span> <span class="n">BaseEstimator</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The TopographyModel is the heart of the mutopia modeling framework. It decomposes </span>
+<span class="sd">    genome topography data into discrete components, simultaneously capturing their</span>
+<span class="sd">    genomic distributions and spectra. MuTopia models are memory and compute efficient,</span>
+<span class="sd">    and can be accelerated using multiple-threading. </span>
+
+<span class="sd">    The models mostly work like Scikit-learn estimators. After fitting a model, </span>
+<span class="sd">    you can use it to annotate your data using the `annot_data` method.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    num_components : int, default=15</span>
+<span class="sd">        Number of components in the signature model.</span>
+<span class="sd">    init_components : list, default=[]</span>
+<span class="sd">        List of initial components to use.</span>
+<span class="sd">    fix_components : list, default=[]</span>
+<span class="sd">        List of components to keep fixed during optimization.</span>
+<span class="sd">    seed : int, default=0</span>
+<span class="sd">        Random seed for reproducibility.</span>
+<span class="sd">    context_reg : float, default=0.0001</span>
+<span class="sd">        Regularization parameter for context model.</span>
+<span class="sd">    context_conditioning : float, default=1e-9</span>
+<span class="sd">        Conditioning parameter for context model.</span>
+<span class="sd">    conditioning_alpha : float, default=1e-9</span>
+<span class="sd">        Alpha parameter for conditioning.</span>
+<span class="sd">    pi_prior : float, default=1.0</span>
+<span class="sd">        Prior parameter for pi in the locals model.</span>
+<span class="sd">    tau_prior : float, default=1.0</span>
+<span class="sd">        Prior parameter for tau in the locals model.</span>
+<span class="sd">    locus_model_type : str, default=&quot;gbt&quot;</span>
+<span class="sd">        Type of model for locus. Gradient Boosted Trees by default.</span>
+<span class="sd">    tree_learning_rate : float, default=0.15</span>
+<span class="sd">        Learning rate for tree-based models.</span>
+<span class="sd">    max_depth : int, default=5</span>
+<span class="sd">        Maximum depth of trees in the locus model.</span>
+<span class="sd">    max_trees_per_iter : int, default=25</span>
+<span class="sd">        Maximum number of trees per iteration.</span>
+<span class="sd">    max_leaf_nodes : int, default=31</span>
+<span class="sd">        Maximum number of leaf nodes in each tree.</span>
+<span class="sd">    min_samples_leaf : int, default=30</span>
+<span class="sd">        Minimum number of samples required at a leaf node.</span>
+<span class="sd">    max_features : float, default=1.0</span>
+<span class="sd">        Fraction of features to consider when looking for best split.</span>
+<span class="sd">    n_iter_no_change : int, default=1</span>
+<span class="sd">        Number of iterations with no improvement to wait before early stopping.</span>
+<span class="sd">    use_groups : bool, default=True</span>
+<span class="sd">        Whether to use groups in the model.</span>
+<span class="sd">    add_corpus_intercepts : bool, default=False</span>
+<span class="sd">        Whether to add corpus-specific intercepts.</span>
+<span class="sd">    convolution_width : int, default=0</span>
+<span class="sd">        Width of convolution window.</span>
+<span class="sd">    l2_regularization : float, default=1</span>
+<span class="sd">        L2 regularization strength.</span>
+<span class="sd">    max_iter : int, default=25</span>
+<span class="sd">        Maximum number of iterations for the optimization.</span>
+<span class="sd">    init_variance_theta : float, default=0.03</span>
+<span class="sd">        Initial variance for theta parameters.</span>
+<span class="sd">    init_variance_context : float, default=0.1</span>
+<span class="sd">        Initial variance for context parameters.</span>
+<span class="sd">    empirical_bayes : bool, default=True</span>
+<span class="sd">        Whether to use empirical Bayes for parameter estimation.</span>
+<span class="sd">    begin_prior_updates : int, default=50</span>
+<span class="sd">        Iteration to begin prior updates.</span>
+<span class="sd">    stop_condition : int, default=50</span>
+<span class="sd">        Stopping condition for optimization.</span>
+<span class="sd">    num_epochs : int, default=2000</span>
+<span class="sd">        Number of epochs for training.</span>
+<span class="sd">    locus_subsample : float or None, default=None</span>
+<span class="sd">        Fraction of loci to subsample in each iteration.</span>
+<span class="sd">    batch_subsample : float or None, default=None</span>
+<span class="sd">        Fraction of batches to subsample in each iteration.</span>
+<span class="sd">    threads : int, default=1</span>
+<span class="sd">        Number of threads for parallel execution.</span>
+<span class="sd">    kappa : float, default=0.5</span>
+<span class="sd">        Kappa parameter for optimization.</span>
+<span class="sd">    tau : float, default=1.0</span>
+<span class="sd">        Tau parameter for optimization.</span>
+<span class="sd">    callback : callable or None, default=None</span>
+<span class="sd">        Callback function to be called during optimization.</span>
+<span class="sd">    eval_every : int, default=10</span>
+<span class="sd">        Evaluate model every N iterations.</span>
+<span class="sd">    verbose : int, default=0</span>
+<span class="sd">        Verbosity level (0: quiet, &gt;0: increasingly verbose).</span>
+<span class="sd">    time_limit : float or None, default=None</span>
+<span class="sd">        Time limit for optimization in seconds.</span>
+<span class="sd">    test_chroms : tuple, default=(&quot;chr1&quot;,)</span>
+<span class="sd">        Chromosomes to use for testing.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; import mutopia as mu</span>
+<span class="sd">    &gt;&gt;&gt; data = mu.gt.load_dataset(&quot;example_data.nc&quot;)</span>
+<span class="sd">    &gt;&gt;&gt; # Create and fit a model with subsampling and 15 components</span>
+<span class="sd">    &gt;&gt;&gt; model = data.modality().TopographyModel(locus_subsample=0.125, num_components=15)</span>
+<span class="sd">    &gt;&gt;&gt; model.fit(train_data)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">GT</span><span class="p">:</span> <span class="n">GTI</span> <span class="o">|</span> <span class="n">MIX</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">num_components</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">15</span><span class="p">,</span>
+        <span class="n">init_components</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[],</span>
+        <span class="n">fix_components</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[],</span>
+        <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="c1"># context model</span>
+        <span class="n">context_reg</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0001</span><span class="p">,</span>
+        <span class="n">context_conditioning</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-9</span><span class="p">,</span>
+        <span class="n">conditioning_alpha</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-9</span><span class="p">,</span>
+        <span class="c1"># locals model</span>
+        <span class="n">pi_prior</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+        <span class="n">tau_prior</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+        <span class="n">estep_iterations</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
+        <span class="n">difference_tol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5e-5</span><span class="p">,</span>
+        <span class="n">shared_exposures</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="c1"># locus model</span>
+        <span class="n">locus_model_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;gbt&quot;</span><span class="p">,</span>
+        <span class="n">tree_learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.15</span><span class="p">,</span>
+        <span class="n">max_depth</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
+        <span class="n">max_trees_per_iter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">25</span><span class="p">,</span>
+        <span class="n">max_leaf_nodes</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">31</span><span class="p">,</span>
+        <span class="n">min_samples_leaf</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">30</span><span class="p">,</span>
+        <span class="n">max_features</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+        <span class="n">n_iter_no_change</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="n">use_groups</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">add_corpus_intercepts</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">convolution_width</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="n">l2_regularization</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="n">max_iter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">25</span><span class="p">,</span>
+        <span class="n">init_variance_theta</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.03</span><span class="p">,</span>
+        <span class="n">init_variance_context</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span>
+        <span class="c1"># optimization settings</span>
+        <span class="n">empirical_bayes</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">begin_prior_updates</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
+        <span class="n">stop_condition</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
+        <span class="c1"># optimization settings</span>
+        <span class="n">num_epochs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2000</span><span class="p">,</span>
+        <span class="n">locus_subsample</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">batch_subsample</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">threads</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="n">kappa</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
+        <span class="n">tau</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+        <span class="n">callback</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">eval_every</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+        <span class="n">verbose</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="n">time_limit</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">full_normalizers</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">test_chroms</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;chr1&quot;</span><span class="p">,),</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_components</span> <span class="o">=</span> <span class="n">num_components</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">init_components</span> <span class="o">=</span> <span class="n">init_components</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fix_components</span> <span class="o">=</span> <span class="n">fix_components</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">seed</span> <span class="o">=</span> <span class="n">seed</span>
+        <span class="c1"># context model</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">context_reg</span> <span class="o">=</span> <span class="n">context_reg</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">context_conditioning</span> <span class="o">=</span> <span class="n">context_conditioning</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conditioning_alpha</span> <span class="o">=</span> <span class="n">conditioning_alpha</span>
+        <span class="c1"># locals model</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pi_prior</span> <span class="o">=</span> <span class="n">pi_prior</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tau_prior</span> <span class="o">=</span> <span class="n">tau_prior</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">estep_iterations</span> <span class="o">=</span> <span class="n">estep_iterations</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">difference_tol</span> <span class="o">=</span> <span class="n">difference_tol</span>
+        <span class="c1"># locus model</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">locus_model_type</span> <span class="o">=</span> <span class="n">locus_model_type</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tree_learning_rate</span> <span class="o">=</span> <span class="n">tree_learning_rate</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_depth</span> <span class="o">=</span> <span class="n">max_depth</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_trees_per_iter</span> <span class="o">=</span> <span class="n">max_trees_per_iter</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_leaf_nodes</span> <span class="o">=</span> <span class="n">max_leaf_nodes</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">min_samples_leaf</span> <span class="o">=</span> <span class="n">min_samples_leaf</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_features</span> <span class="o">=</span> <span class="n">max_features</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_iter_no_change</span> <span class="o">=</span> <span class="n">n_iter_no_change</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">use_groups</span> <span class="o">=</span> <span class="n">use_groups</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add_corpus_intercepts</span> <span class="o">=</span> <span class="n">add_corpus_intercepts</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">convolution_width</span> <span class="o">=</span> <span class="n">convolution_width</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">l2_regularization</span> <span class="o">=</span> <span class="n">l2_regularization</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_iter</span> <span class="o">=</span> <span class="n">max_iter</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">init_variance_theta</span> <span class="o">=</span> <span class="n">init_variance_theta</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">init_variance_context</span> <span class="o">=</span> <span class="n">init_variance_context</span>
+        <span class="c1"># optimization settings</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">test_chroms</span> <span class="o">=</span> <span class="n">test_chroms</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">empirical_bayes</span> <span class="o">=</span> <span class="n">empirical_bayes</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">begin_prior_updates</span> <span class="o">=</span> <span class="n">begin_prior_updates</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">stop_condition</span> <span class="o">=</span> <span class="n">stop_condition</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_epochs</span> <span class="o">=</span> <span class="n">num_epochs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">locus_subsample</span> <span class="o">=</span> <span class="n">locus_subsample</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">batch_subsample</span> <span class="o">=</span> <span class="n">batch_subsample</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">threads</span> <span class="o">=</span> <span class="n">threads</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kappa</span> <span class="o">=</span> <span class="n">kappa</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tau</span> <span class="o">=</span> <span class="n">tau</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">callback</span> <span class="o">=</span> <span class="n">callback</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">eval_every</span> <span class="o">=</span> <span class="n">eval_every</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">verbose</span> <span class="o">=</span> <span class="n">verbose</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">time_limit</span> <span class="o">=</span> <span class="n">time_limit</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">shared_exposures</span> <span class="o">=</span> <span class="n">shared_exposures</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">full_normalizers</span> <span class="o">=</span> <span class="n">full_normalizers</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">modality</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_modality&quot;</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span>
+                <span class="s2">&quot;Modality not set. Please set the modality before using it.&quot;</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">get_mode_config</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_modality</span><span class="p">)</span>
+
+<div class="viewcode-block" id="TopographyModel.sample_params">
+<a class="viewcode-back" href="../../../api/model.html#mutopia.model.base.TopographyModel.sample_params">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">sample_params</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">trial</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">extensive</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+
+        <span class="n">params</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">if</span> <span class="n">extensive</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">params</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;l2_regularization&quot;</span><span class="p">:</span> <span class="n">trial</span><span class="o">.</span><span class="n">suggest_float</span><span class="p">(</span>
+                    <span class="s2">&quot;l2_regularization&quot;</span><span class="p">,</span> <span class="mf">1e-5</span><span class="p">,</span> <span class="mf">100.0</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">True</span>
+                <span class="p">),</span>
+                <span class="s2">&quot;tree_learning_rate&quot;</span><span class="p">:</span> <span class="n">trial</span><span class="o">.</span><span class="n">suggest_float</span><span class="p">(</span>
+                    <span class="s2">&quot;tree_learning_rate&quot;</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.2</span>
+                <span class="p">),</span>
+                <span class="s2">&quot;init_variance_theta&quot;</span><span class="p">:</span> <span class="n">trial</span><span class="o">.</span><span class="n">suggest_float</span><span class="p">(</span>
+                    <span class="s2">&quot;init_variance_theta&quot;</span><span class="p">,</span> <span class="mf">0.03</span><span class="p">,</span> <span class="mf">0.1</span>
+                <span class="p">),</span>
+                <span class="s2">&quot;empirical_bayes&quot;</span><span class="p">:</span> <span class="n">trial</span><span class="o">.</span><span class="n">suggest_categorical</span><span class="p">(</span>
+                    <span class="s2">&quot;empirical_bayes&quot;</span><span class="p">,</span> <span class="p">[</span><span class="kc">True</span><span class="p">,</span> <span class="kc">False</span><span class="p">]</span>
+                <span class="p">),</span>
+                <span class="s2">&quot;max_features&quot;</span><span class="p">:</span> <span class="n">trial</span><span class="o">.</span><span class="n">suggest_categorical</span><span class="p">(</span>
+                    <span class="s2">&quot;max_features&quot;</span><span class="p">,</span> <span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.75</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">]</span>
+                <span class="p">)</span>
+            <span class="p">}</span>
+
+        <span class="k">if</span> <span class="n">extensive</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">params</span><span class="p">[</span><span class="s2">&quot;convolution_width&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">trial</span><span class="o">.</span><span class="n">suggest_categorical</span><span class="p">(</span>
+                <span class="s2">&quot;convolution_width&quot;</span><span class="p">,</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+            <span class="p">)</span>
+            <span class="n">params</span><span class="p">[</span><span class="s2">&quot;context_conditioning&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">trial</span><span class="o">.</span><span class="n">suggest_float</span><span class="p">(</span>
+                <span class="s2">&quot;context_conditioning&quot;</span><span class="p">,</span> <span class="mf">1e-9</span><span class="p">,</span> <span class="mf">1e-5</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">True</span>
+            <span class="p">)</span>
+            <span class="n">params</span><span class="p">[</span><span class="s2">&quot;conditioning_alpha&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">trial</span><span class="o">.</span><span class="n">suggest_float</span><span class="p">(</span>
+                <span class="s2">&quot;conditioning_alpha&quot;</span><span class="p">,</span> <span class="mf">1e-9</span><span class="p">,</span> <span class="mf">1e-5</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">True</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">extensive</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">params</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;context_reg&quot;</span><span class="p">:</span> <span class="n">trial</span><span class="o">.</span><span class="n">suggest_float</span><span class="p">(</span>
+                        <span class="s2">&quot;context_reg&quot;</span><span class="p">,</span> <span class="mf">1e-5</span><span class="p">,</span> <span class="mf">5e-2</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">True</span>
+                    <span class="p">),</span>
+                    <span class="s2">&quot;init_variance_context&quot;</span><span class="p">:</span> <span class="n">trial</span><span class="o">.</span><span class="n">suggest_float</span><span class="p">(</span>
+                        <span class="s2">&quot;init_variance_context&quot;</span><span class="p">,</span> <span class="mf">0.025</span><span class="p">,</span> <span class="mf">0.15</span>
+                    <span class="p">),</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">extensive</span> <span class="o">&gt;</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="n">params</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;batch_subsample&quot;</span><span class="p">:</span> <span class="n">trial</span><span class="o">.</span><span class="n">suggest_categorical</span><span class="p">(</span>
+                        <span class="s2">&quot;batch_subsample&quot;</span><span class="p">,</span>
+                        <span class="p">[</span>
+                            <span class="kc">None</span><span class="p">,</span>
+                            <span class="mf">0.0625</span><span class="p">,</span>
+                            <span class="mf">0.125</span><span class="p">,</span>
+                            <span class="mf">0.25</span><span class="p">,</span>
+                        <span class="p">],</span>
+                    <span class="p">),</span>
+                    <span class="s2">&quot;locus_subsample&quot;</span><span class="p">:</span> <span class="n">trial</span><span class="o">.</span><span class="n">suggest_categorical</span><span class="p">(</span>
+                        <span class="s2">&quot;locus_subsample&quot;</span><span class="p">,</span>
+                        <span class="p">[</span>
+                            <span class="kc">None</span><span class="p">,</span>
+                            <span class="mf">0.0625</span><span class="p">,</span>
+                            <span class="mf">0.125</span><span class="p">,</span>
+                            <span class="mf">0.25</span><span class="p">,</span>
+                        <span class="p">],</span>
+                    <span class="p">),</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">extensive</span> <span class="o">&gt;</span> <span class="mi">4</span><span class="p">:</span>
+            <span class="n">params</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;conditioning_alpha&quot;</span><span class="p">:</span> <span class="n">trial</span><span class="o">.</span><span class="n">suggest_float</span><span class="p">(</span>
+                        <span class="s2">&quot;conditioning_alpha&quot;</span><span class="p">,</span> <span class="mf">1e-10</span><span class="p">,</span> <span class="mf">1e-7</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">True</span>
+                    <span class="p">),</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">params</span></div>
+
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_init_factor_model</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">train_corpuses</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">GTensorDataset</span><span class="p">],</span>
+        <span class="n">random_state</span><span class="p">:</span> <span class="s2">&quot;RandomState&quot;</span><span class="p">,</span>
+        <span class="n">GT</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kw</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FactorModel</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_init_locals_model</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">train_datasets</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">GTensorDataset</span><span class="p">],</span>
+        <span class="n">random_state</span><span class="p">:</span> <span class="s2">&quot;RandomState&quot;</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+
+        <span class="n">is_sparse</span> <span class="o">=</span> <span class="n">train_datasets</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">X</span><span class="o">.</span><span class="n">is_sparse</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">corpus</span><span class="o">.</span><span class="n">X</span><span class="o">.</span><span class="n">is_sparse</span><span class="p">()</span> <span class="o">==</span> <span class="n">is_sparse</span> <span class="k">for</span> <span class="n">corpus</span> <span class="ow">in</span> <span class="n">train_datasets</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;All corpuses must be either sparse or dense - mixing is not allowed!&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">is_mixture</span> <span class="o">=</span> <span class="n">MIX</span><span class="o">.</span><span class="n">is_mixture_corpus</span><span class="p">(</span><span class="n">train_datasets</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span>
+            <span class="n">MIX</span><span class="o">.</span><span class="n">is_mixture_corpus</span><span class="p">(</span><span class="n">corpus</span><span class="p">)</span> <span class="o">==</span> <span class="n">is_mixture</span> <span class="k">for</span> <span class="n">corpus</span> <span class="ow">in</span> <span class="n">train_datasets</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;All corpuses must be either multi-source or single-source - mixing is not allowed!&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">is_mixture</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;** Inferring mixture of epigenomes model **&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">is_mixture</span><span class="p">:</span>
+            <span class="n">locals_model</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">SparseSharedMixtureModel</span> <span class="k">if</span> <span class="n">is_sparse</span> <span class="k">else</span> <span class="n">DenseSharedMixtureModel</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">locals_model</span> <span class="o">=</span> <span class="n">LDAUpdateSparse</span> <span class="k">if</span> <span class="n">is_sparse</span> <span class="k">else</span> <span class="n">LDAUpdateDense</span>
+
+        <span class="c1"># instantiate the locals model</span>
+        <span class="n">locals_model</span> <span class="o">=</span> <span class="n">locals_model</span><span class="p">(</span>
+            <span class="n">train_datasets</span><span class="p">,</span>
+            <span class="n">n_components</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">num_components</span><span class="p">,</span>
+            <span class="n">random_state</span><span class="o">=</span><span class="n">random_state</span><span class="p">,</span>
+            <span class="n">prior_alpha</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">pi_prior</span><span class="p">,</span>
+            <span class="n">prior_tau</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">tau_prior</span><span class="p">,</span>
+            <span class="n">estep_iterations</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">estep_iterations</span><span class="p">,</span>
+            <span class="n">difference_tol</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">difference_tol</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">locals_model</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_train_test_split</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">datasets</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">GTensorDataset</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">GTensorDataset</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">GTensorDataset</span><span class="p">,</span> <span class="o">...</span><span class="p">]]:</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span>
+            <span class="nb">zip</span><span class="p">(</span>
+                <span class="o">*</span><span class="nb">map</span><span class="p">(</span>
+                    <span class="k">lambda</span> <span class="n">dataset</span><span class="p">:</span> <span class="n">train_test_split</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">test_chroms</span><span class="p">),</span>
+                    <span class="n">datasets</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="TopographyModel.init_model">
+<a class="viewcode-back" href="../../../api/model.html#mutopia.model.base.TopographyModel.init_model">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">init_model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">train_datasets</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">GTensorDataset</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">TopographyModel</span><span class="p">:</span>
+
+        <span class="n">random_state</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">RandomState</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">seed</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">locals_model_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_init_locals_model</span><span class="p">(</span>
+            <span class="n">train_datasets</span><span class="p">,</span>
+            <span class="n">random_state</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="c1"># borrow the GT from the locals model</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">GT</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">locals_model_</span><span class="o">.</span><span class="n">GT</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">factor_model_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_init_factor_model</span><span class="p">(</span>
+            <span class="n">train_datasets</span><span class="p">,</span>
+            <span class="n">random_state</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">GT</span><span class="p">,</span>
+            <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">get_params</span><span class="p">(),</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+
+
+<div class="viewcode-block" id="TopographyModel.fit">
+<a class="viewcode-back" href="../../../api/model.html#mutopia.model.base.TopographyModel.fit">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">train_datasets</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">GTensorDataset</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">GTensorDataset</span><span class="p">]],</span>
+        <span class="n">test_datasets</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">GTensorDataset</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">GTensorDataset</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TopographyModel</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Fit the model to the provided training datasets.</span>
+
+<span class="sd">        This method fits the model using a combination of local and factor models.</span>
+<span class="sd">        If test datasets are not provided, it automatically splits the training</span>
+<span class="sd">        data into train and test partitions.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        train_datasets : GTensorDataset or sequence of GTensorDataset</span>
+<span class="sd">            One or more datasets to use for training the model.</span>
+<span class="sd">        test_datasets : GTensorDataset or sequence of GTensorDataset, optional</span>
+<span class="sd">            Datasets to use for testing the model. If None, a portion of the</span>
+<span class="sd">            training datasets will be used for testing.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        TopographyModel</span>
+<span class="sd">            The fitted estimator.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        This method sets the following attributes:</span>
+<span class="sd">        - ``modality_`` : The modality of the training datasets</span>
+<span class="sd">        - ``factor_model_`` : The fitted factor model</span>
+<span class="sd">        - ``locals_model_`` : The fitted locals model</span>
+<span class="sd">        - ``test_scores_`` : Performance metrics on test datasets</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">train_datasets</span><span class="p">,</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="nb">list</span><span class="p">)):</span>
+            <span class="n">train_datasets</span> <span class="o">=</span> <span class="p">(</span><span class="n">train_datasets</span><span class="p">,)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_modality</span> <span class="o">=</span> <span class="n">train_datasets</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;dtype&quot;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">test_datasets</span><span class="p">,</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="nb">list</span><span class="p">))</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">test_datasets</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">test_datasets</span> <span class="o">=</span> <span class="p">(</span><span class="n">test_datasets</span><span class="p">,)</span>
+        <span class="k">elif</span> <span class="n">test_datasets</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="p">(</span>
+            <span class="nb">isinstance</span><span class="p">(</span><span class="n">test_datasets</span><span class="p">,</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="nb">list</span><span class="p">))</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">test_datasets</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span>
+        <span class="p">):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Splitting train/test partitions...&quot;</span><span class="p">)</span>
+            <span class="n">train_datasets</span><span class="p">,</span> <span class="n">test_datasets</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_train_test_split</span><span class="p">(</span><span class="n">train_datasets</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">factor_model_</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">locals_model_</span>
+        <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+            <span class="c1"># initialize the models if not already done</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">init_model</span><span class="p">(</span><span class="n">train_datasets</span><span class="p">)</span>
+
+        <span class="n">n_preset_components</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">init_components</span><span class="p">)</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fix_components</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_component_names</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">fix_components</span>
+            <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">init_components</span>
+            <span class="o">+</span> <span class="p">[</span><span class="s2">&quot;M</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_preset_components</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_components</span><span class="p">)]</span>
+        <span class="p">)</span>
+
+        <span class="n">random_state</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">RandomState</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">seed</span><span class="p">)</span>
+
+        <span class="n">params</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_params</span><span class="p">()</span>
+        <span class="n">params</span><span class="p">[</span><span class="s2">&quot;empirical_bayes&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">empirical_bayes</span> <span class="ow">and</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_components</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">factor_model_</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">locals_model_</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">test_scores_</span><span class="p">)</span> <span class="o">=</span> <span class="n">_fit_model_impl</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">GT</span><span class="p">,</span>
+            <span class="n">train_datasets</span><span class="p">,</span>
+            <span class="n">test_datasets</span><span class="p">,</span>
+            <span class="n">random_state</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">factor_model_</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">locals_model_</span><span class="p">,</span>
+            <span class="o">**</span><span class="n">params</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">alpha_</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">locals_model_</span><span class="o">.</span><span class="n">alpha</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">n_components</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_components</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">component_names</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_component_names</span><span class="p">[:</span><span class="bp">self</span><span class="o">.</span><span class="n">n_components</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="s2">&quot;M</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_components</span><span class="p">)]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_check_corpus</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dataset</span><span class="p">:</span> <span class="n">GTensorDataset</span><span class="p">,</span> <span class="n">enforce_sample</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">check_corpus</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
+        <span class="c1"># if enforce_sample:</span>
+        <span class="c1">#    check_dims(dataset, self.factor_model_)</span>
+        <span class="n">dataset</span><span class="p">[</span><span class="s2">&quot;Regions/exposures&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dataset</span><span class="p">[</span><span class="s2">&quot;Regions/exposures&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="kc">False</span>
+        <span class="p">)</span>
+        <span class="n">dataset</span><span class="p">[</span><span class="s2">&quot;Regions/context_frequencies&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dataset</span><span class="p">[</span>
+            <span class="s2">&quot;Regions/context_frequencies&quot;</span>
+        <span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+<div class="viewcode-block" id="TopographyModel.setup_corpus">
+<a class="viewcode-back" href="../../../api/model.html#mutopia.model.base.TopographyModel.setup_corpus">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">setup_corpus</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dataset</span><span class="p">:</span> <span class="n">GTensorDataset</span><span class="p">,</span> <span class="n">threads</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GTensorDataset</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Set up the corpus dataset with initial state and update normalization factors.</span>
+
+<span class="sd">        This method initializes the dataset state using the factor and locals models,</span>
+<span class="sd">        updates the state from scratch, and then applies normalizers to all expanded datasets.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        dataset : GTensorDataset</span>
+<span class="sd">            The dataset to be set up for modeling</span>
+<span class="sd">        threads : int, optional</span>
+<span class="sd">            The number of threads to use for parallel processing, by default 1</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        GTensorDataset</span>
+<span class="sd">            The initialized and normalized dataset</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Setting up dataset state ...&quot;</span><span class="p">)</span>
+
+        <span class="n">dataset</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">GT</span><span class="o">.</span><span class="n">init_state</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">factor_model_</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">locals_model_</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">ParContext</span><span class="p">(</span><span class="n">threads</span><span class="p">)</span> <span class="k">as</span> <span class="n">par</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">GT</span><span class="o">.</span><span class="n">update_state</span><span class="p">(</span>
+                <span class="n">dataset</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">factor_model_</span><span class="p">,</span>
+                <span class="n">from_scratch</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="n">par_context</span><span class="o">=</span><span class="n">par</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Done ...&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">dataset</span></div>
+
+
+<div class="viewcode-block" id="TopographyModel.save">
+<a class="viewcode-back" href="../../../api/model.html#mutopia.model.base.TopographyModel.save">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Save the model to a file.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        path : str</span>
+<span class="sd">            The file path where the model should be saved.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; model.save(&quot;my_model.pkl&quot;)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">for</span> <span class="n">model</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">factor_model_</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="n">model</span><span class="o">.</span><span class="n">prepare_to_save</span><span class="p">()</span>
+
+        <span class="n">dump</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TopographyModel.annot_components">
+<a class="viewcode-back" href="../../../api/model.html#mutopia.model.base.TopographyModel.annot_components">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">annot_components</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dataset</span><span class="p">:</span> <span class="n">GTensorDataset</span><span class="p">,</span> <span class="n">normalization</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;global&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GTensorDataset</span><span class="p">:</span>
+
+        <span class="n">spectra</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">factor_model_</span><span class="o">.</span><span class="n">format_component</span><span class="p">(</span><span class="n">component</span><span class="p">,</span> <span class="n">normalization</span><span class="o">=</span><span class="n">normalization</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">component</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_components</span><span class="p">)</span>
+            <span class="p">],</span>
+            <span class="n">dim</span><span class="o">=</span><span class="s2">&quot;component&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">factor_model_</span><span class="o">.</span><span class="n">has_interactions</span><span class="p">:</span>
+            <span class="n">component_xrs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;Spectra/spectra&quot;</span><span class="p">:</span> <span class="n">spectra</span><span class="p">}</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">interactions</span><span class="p">,</span> <span class="n">shared_effects</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span>
+                <span class="nb">zip</span><span class="p">(</span>
+                    <span class="o">*</span><span class="p">[</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">factor_model_</span><span class="o">.</span><span class="n">format_interactions</span><span class="p">(</span><span class="n">component</span><span class="p">)</span>
+                        <span class="k">for</span> <span class="n">component</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_components</span><span class="p">)</span>
+                    <span class="p">]</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+
+            <span class="n">interactions</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span>
+                <span class="n">interactions</span><span class="p">,</span>
+                <span class="n">dim</span><span class="o">=</span><span class="s2">&quot;component&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">shared_effects</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span>
+                <span class="n">shared_effects</span><span class="p">,</span>
+                <span class="n">dim</span><span class="o">=</span><span class="s2">&quot;component&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">component_xrs</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;Spectra/spectra&quot;</span><span class="p">:</span> <span class="n">spectra</span><span class="p">,</span>
+                <span class="s2">&quot;Spectra/interactions&quot;</span><span class="p">:</span> <span class="n">interactions</span><span class="p">,</span>
+                <span class="s2">&quot;Spectra/shared_effects&quot;</span><span class="p">:</span> <span class="n">shared_effects</span><span class="p">,</span>
+            <span class="p">}</span>
+        
+
+        <span class="n">dataset</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">mutate</span><span class="p">(</span>
+            <span class="k">lambda</span> <span class="n">ds</span><span class="p">:</span> <span class="p">(</span>
+                <span class="p">(</span>
+                    <span class="n">ds</span><span class="o">.</span><span class="n">assign_coords</span><span class="p">(</span><span class="n">component</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;component&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">component_names</span><span class="p">))</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="s2">&quot;component&quot;</span> <span class="ow">in</span> <span class="n">ds</span><span class="o">.</span><span class="n">coords</span>
+                    <span class="k">else</span> <span class="n">ds</span>
+                <span class="p">)</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span>
+                    <span class="o">**</span><span class="n">component_xrs</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Added keys to dataset: &quot;</span> <span class="o">+</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">component_xrs</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">dataset</span></div>
+
+
+<div class="viewcode-block" id="TopographyModel.annot_contributions">
+<a class="viewcode-back" href="../../../api/model.html#mutopia.model.base.TopographyModel.annot_contributions">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">annot_contributions</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">dataset</span><span class="p">:</span> <span class="n">GTensorDataset</span><span class="p">,</span>
+        <span class="n">threads</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="n">key</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;contributions&quot;</span><span class="p">,</span>
+        <span class="n">locus_subsample</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">svi_kw</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GTensorDataset</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Calculate and add component contributions to a dataset.</span>
+
+<span class="sd">        This method computes the contributions of each component to the dataset using the locals model</span>
+<span class="sd">        and adds them as a new variable to the dataset.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        dataset : GTensorDataset</span>
+<span class="sd">            Dataset to analyze and annotate with contributions</span>
+<span class="sd">        threads : int, default=1</span>
+<span class="sd">            Number of parallel threads to use for computation</span>
+<span class="sd">        key : str, default=&quot;contributions&quot;</span>
+<span class="sd">            Name of the variable to store contributions in the dataset</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        GTensorDataset</span>
+<span class="sd">            The input dataset with the calculated contributions added as a new variable</span>
+<span class="sd">            with the specified key name and dimensions (&#39;sample&#39;, &#39;component&#39;)</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        If the dataset does not have corpus state initialized, this method will</span>
+<span class="sd">        automatically set it up using setup_corpus().</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_corpus</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">GT</span><span class="o">.</span><span class="n">has_corpusstate</span><span class="p">(</span><span class="n">dataset</span><span class="p">):</span>
+            <span class="n">dataset</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">setup_corpus</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
+
+        <span class="n">contributions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">locals_model_</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
+            <span class="n">dataset</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">factor_model_</span><span class="p">,</span>
+            <span class="n">threads</span><span class="o">=</span><span class="n">threads</span><span class="p">,</span>
+            <span class="n">locus_subsample</span><span class="o">=</span><span class="n">locus_subsample</span><span class="p">,</span>
+            <span class="o">**</span><span class="n">svi_kw</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">dataset</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">mutate</span><span class="p">(</span>
+            <span class="k">lambda</span> <span class="n">ds</span><span class="p">:</span> <span class="p">(</span>
+                <span class="n">ds</span><span class="o">.</span><span class="n">assign_coords</span><span class="p">(</span>
+                    <span class="p">{</span>
+                        <span class="s2">&quot;component&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">component_names</span><span class="p">,</span>
+                        <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">GT</span><span class="o">.</span><span class="n">list_sources</span><span class="p">(</span><span class="n">dataset</span><span class="p">),</span>
+                    <span class="p">}</span>
+                <span class="p">)</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span>
+                    <span class="p">{</span>
+                        <span class="n">key</span><span class="p">:</span> <span class="n">contributions</span><span class="p">,</span>
+                    <span class="p">}</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Added key to dataset: &quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s1">&quot;&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">dataset</span></div>
+
+
+<div class="viewcode-block" id="TopographyModel.annot_component_distributions">
+<a class="viewcode-back" href="../../../api/model.html#mutopia.model.base.TopographyModel.annot_component_distributions">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">annot_component_distributions</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">dataset</span><span class="p">:</span> <span class="n">GTensorDataset</span><span class="p">,</span>
+        <span class="n">threads</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="n">key</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;component_distributions&quot;</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GTensorDataset</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Calculate and add component distributions to a dataset.</span>
+
+<span class="sd">        This method computes the probability distributions for each component across</span>
+<span class="sd">        genomic contexts and adds them as new variables to the dataset.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        dataset : GTensorDataset</span>
+<span class="sd">            Dataset to analyze and annotate with component distributions</span>
+<span class="sd">        threads : int, default=1</span>
+<span class="sd">            Number of parallel threads to use for computation</span>
+<span class="sd">        key : str, default=&quot;component_distributions&quot;</span>
+<span class="sd">            Name of the variable to store distributions in the dataset.</span>
+<span class="sd">            Per-locus distributions will be stored with the name &quot;{key}_locus&quot;</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        GTensorDataset</span>
+<span class="sd">            The input dataset with the calculated component distributions added as new variables:</span>
+<span class="sd">            - key: Full distributions with dimensions (&#39;source&#39;, &#39;component&#39;, ...)</span>
+<span class="sd">            - {key}_locus: Per-locus distributions normalized by region length</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        If the dataset does not have corpus state initialized, this method will</span>
+<span class="sd">        automatically set it up using setup_corpus().</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_corpus</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">GT</span><span class="o">.</span><span class="n">has_corpusstate</span><span class="p">(</span><span class="n">dataset</span><span class="p">):</span>
+            <span class="n">dataset</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">setup_corpus</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">ParContext</span><span class="p">(</span><span class="n">threads</span><span class="p">)</span> <span class="k">as</span> <span class="n">par</span><span class="p">:</span>
+            <span class="n">X</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">xr</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span>
+                    <span class="p">[</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">factor_model_</span><span class="o">.</span><span class="n">_get_log_mutation_rate_tensor</span><span class="p">(</span>
+                            <span class="n">ds</span><span class="p">,</span>
+                            <span class="n">par_context</span><span class="o">=</span><span class="n">par</span><span class="p">,</span>
+                            <span class="n">with_context</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                        <span class="p">)</span>
+                        <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">ds</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">GT</span><span class="o">.</span><span class="n">expand_datasets</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
+                    <span class="p">],</span>
+                    <span class="n">dim</span><span class="o">=</span><span class="s2">&quot;source&quot;</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="s2">&quot;source&quot;</span><span class="p">,</span> <span class="s2">&quot;component&quot;</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">assign_coords</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">GT</span><span class="o">.</span><span class="n">list_sources</span><span class="p">(</span><span class="n">dataset</span><span class="p">))</span>
+                <span class="o">.</span><span class="n">pipe</span><span class="p">(</span>
+                    <span class="k">lambda</span> <span class="n">X</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">X</span> <span class="o">-</span> <span class="n">X</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">skipna</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+                    <span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
+                    <span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="n">dataset</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">X</span>
+
+        <span class="n">dataset</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">_locus&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="p">(</span><span class="n">X</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">GT</span><span class="o">.</span><span class="n">get_freqs</span><span class="p">(</span><span class="n">dataset</span><span class="p">))</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span>
+                <span class="n">dim</span><span class="o">=</span><span class="n">dims_except_for</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">dims</span><span class="p">,</span> <span class="s2">&quot;source&quot;</span><span class="p">,</span> <span class="s2">&quot;locus&quot;</span><span class="p">,</span> <span class="s2">&quot;component&quot;</span><span class="p">)</span>
+            <span class="p">)</span>
+            <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">GT</span><span class="o">.</span><span class="n">get_regions</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span><span class="o">.</span><span class="n">length</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Added key: &quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s1">&quot;&#39;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Added key: &quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s1">_locus&quot;&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">dataset</span></div>
+
+
+<div class="viewcode-block" id="TopographyModel.annot_marginal_prediction">
+<a class="viewcode-back" href="../../../api/model.html#mutopia.model.base.TopographyModel.annot_marginal_prediction">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">annot_marginal_prediction</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">dataset</span><span class="p">:</span> <span class="n">GTensorDataset</span><span class="p">,</span>
+        <span class="n">threads</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="n">key</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;predicted_marginal&quot;</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GTensorDataset</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Calculate and add marginal predictions to a dataset.</span>
+
+<span class="sd">        This method computes marginal mutation rate predictions by marginalizing over</span>
+<span class="sd">        component distributions weighted by their contributions.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        dataset : GTensorDataset</span>
+<span class="sd">            Dataset to analyze and annotate with marginal predictions</span>
+<span class="sd">        threads : int, default=1</span>
+<span class="sd">            Number of parallel threads to use for computation</span>
+<span class="sd">        key : str, default=&quot;predicted_marginal&quot;</span>
+<span class="sd">            Name of the variable to store marginal predictions in the dataset.</span>
+<span class="sd">            Per-locus marginal predictions will be stored with the name &quot;{key}_locus&quot;</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        GTensorDataset</span>
+<span class="sd">            The input dataset with marginal predictions added as new variables:</span>
+<span class="sd">            - key: Marginal mutation rate predictions</span>
+<span class="sd">            - {key}_locus: Per-locus marginal predictions normalized by region length</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        This method requires &#39;component_distributions&#39; and &#39;contributions&#39; to be present</span>
+<span class="sd">        in the dataset. If they are missing, they will be calculated automatically.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_corpus</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">enforce_sample</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">GT</span><span class="o">.</span><span class="n">has_corpusstate</span><span class="p">(</span><span class="n">dataset</span><span class="p">):</span>
+            <span class="n">dataset</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">setup_corpus</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">dataset</span><span class="p">[</span><span class="s2">&quot;component_distributions&quot;</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="n">dataset</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">annot_component_distributions</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">threads</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">dataset</span><span class="p">[</span><span class="s2">&quot;contributions&quot;</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="n">dataset</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">annot_contributions</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">threads</span><span class="p">)</span>
+
+        <span class="n">prior</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">DataArray</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">locals_model_</span><span class="o">.</span><span class="n">get_alpha</span><span class="p">(</span><span class="n">dataset</span><span class="p">),</span>
+            <span class="n">dims</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;component&quot;</span><span class="p">,),</span>
+        <span class="p">)</span>
+        
+        <span class="n">marginal_exposures</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">dataset</span><span class="p">[</span><span class="s2">&quot;contributions&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="n">prior</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="s2">&quot;sample&quot;</span><span class="p">)</span>
+
+        <span class="n">marginal</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">factor_model_</span><span class="o">.</span><span class="n">_log_marginalize_mutrate</span><span class="p">(</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">dataset</span><span class="p">[</span><span class="s2">&quot;component_distributions&quot;</span><span class="p">]),</span>
+            <span class="n">marginal_exposures</span>
+        <span class="p">)</span>
+
+        <span class="n">dataset</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">marginal</span> <span class="o">-</span> <span class="n">marginal</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">skipna</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+            <span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">dataset</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">_locus&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">marginal</span><span class="p">)</span> <span class="o">*</span> <span class="n">dataset</span><span class="p">[</span><span class="s2">&quot;Regions/context_frequencies&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span>
+                <span class="n">dim</span><span class="o">=</span><span class="n">dims_except_for</span><span class="p">(</span><span class="n">marginal</span><span class="o">.</span><span class="n">dims</span><span class="p">,</span> <span class="s2">&quot;source&quot;</span><span class="p">,</span> <span class="s2">&quot;locus&quot;</span><span class="p">)</span>
+            <span class="p">)</span>
+            <span class="o">/</span> <span class="n">dataset</span><span class="p">[</span><span class="s2">&quot;Regions/length&quot;</span><span class="p">]</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Added key: &quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s1">&quot;&#39;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Added key: &quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s1">_locus&quot;&#39;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">dataset</span></div>
+
+
+<div class="viewcode-block" id="TopographyModel.annot_SHAP_values">
+<a class="viewcode-back" href="../../../api/model.html#mutopia.model.base.TopographyModel.annot_SHAP_values">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">annot_SHAP_values</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">dataset</span><span class="p">:</span> <span class="n">GTensorDataset</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">components</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span>
+        <span class="n">threads</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="n">scan</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">n_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2000</span><span class="p">,</span>
+        <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">42</span><span class="p">,</span>
+        <span class="n">key</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;SHAP_values&quot;</span><span class="p">,</span>
+        <span class="n">source</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GTensorDataset</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Calculate and add SHAP values to explain component predictions.</span>
+
+<span class="sd">        This method uses SHAP (SHapley Additive exPlanations) to compute feature</span>
+<span class="sd">        importance values for understanding how genomic features contribute to</span>
+<span class="sd">        component predictions.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        dataset : GTensorDataset</span>
+<span class="sd">            Dataset to analyze and annotate with SHAP values</span>
+<span class="sd">        *components : int or str</span>
+<span class="sd">            Component indices or names to calculate SHAP values for. If none provided,</span>
+<span class="sd">            calculates for all components.</span>
+<span class="sd">        threads : int, default=1</span>
+<span class="sd">            Number of parallel threads to use for computation</span>
+<span class="sd">        scan : bool, default=False</span>
+<span class="sd">            If True, calculates SHAP values for all loci. If False, subsamples loci.</span>
+<span class="sd">        n_samples : int, default=2000</span>
+<span class="sd">            Number of loci to subsample when scan=False</span>
+<span class="sd">        seed : int, default=42</span>
+<span class="sd">            Random seed for reproducible subsampling</span>
+<span class="sd">        key : str, default=&quot;SHAP_values&quot;</span>
+<span class="sd">            Name of the variable to store SHAP values in the dataset</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        GTensorDataset</span>
+<span class="sd">            The input dataset with SHAP values added as a new variable with the specified</span>
+<span class="sd">            key name and dimensions (&#39;shap_component&#39;, &#39;locus&#39; or &#39;shap_locus&#39;, &#39;shap_features&#39;)</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ImportError</span>
+<span class="sd">            If the SHAP library is not installed</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        This method requires the SHAP library to be installed. Install with:</span>
+<span class="sd">        pip install shap</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">GT</span><span class="o">.</span><span class="n">is_mixture_corpus</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span> <span class="ow">and</span> <span class="n">source</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;If you&#39;re working with a mixture corpus, you must choose a &#39;source&#39; celltype from which to annotate SHAP values&quot;</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="kn">import</span><span class="w"> </span><span class="nn">shap</span>
+        <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span><span class="s2">&quot;SHAP is required to calculate SHAP values&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_corpus</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">enforce_sample</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">GT</span><span class="o">.</span><span class="n">has_corpusstate</span><span class="p">(</span><span class="n">dataset</span><span class="p">):</span>
+            <span class="n">dataset</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">setup_corpus</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">scan</span><span class="p">:</span>
+            <span class="n">subset_loci</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">RandomState</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span>
+                <span class="n">dataset</span><span class="o">.</span><span class="n">locus</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="n">n_samples</span><span class="p">,</span> <span class="mi">50</span><span class="p">),</span> <span class="n">replace</span><span class="o">=</span><span class="kc">False</span>
+            <span class="p">)</span>
+            <span class="n">subset</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">isel</span><span class="p">(</span><span class="n">locus</span><span class="o">=</span><span class="n">subset_loci</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">subset</span> <span class="o">=</span> <span class="n">dataset</span>
+
+        <span class="n">n_loci</span> <span class="o">=</span> <span class="n">subset</span><span class="o">.</span><span class="n">sizes</span><span class="p">[</span><span class="s2">&quot;locus&quot;</span><span class="p">]</span>
+        <span class="n">locus_model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">factor_model_</span><span class="o">.</span><span class="n">models</span><span class="p">[</span><span class="s2">&quot;theta_model&quot;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">GT</span><span class="o">.</span><span class="n">is_mixture_corpus</span><span class="p">(</span><span class="n">dataset</span><span class="p">):</span>
+            <span class="n">subset</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">GT</span><span class="o">.</span><span class="n">fetch_source</span><span class="p">(</span><span class="n">subset</span><span class="p">,</span> <span class="n">source</span><span class="p">)</span>
+
+        <span class="n">X</span> <span class="o">=</span> <span class="n">locus_model</span><span class="o">.</span><span class="n">_fetch_feature_matrix</span><span class="p">(</span><span class="n">subset</span><span class="p">)</span>
+
+        <span class="n">background_idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">RandomState</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">X</span><span class="p">),</span> <span class="n">size</span><span class="o">=</span><span class="nb">min</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">X</span><span class="p">)),</span> <span class="n">replace</span><span class="o">=</span><span class="kc">False</span>
+        <span class="p">)</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_component_shap</span><span class="p">(</span><span class="n">k</span><span class="p">):</span>
+
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Calculating SHAP values for </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">component_names</span><span class="p">[</span><span class="n">k</span><span class="p">]</span><span class="si">}</span><span class="s2"> ...&quot;</span><span class="p">)</span>
+
+            <span class="n">shaps</span> <span class="o">=</span> <span class="n">shap</span><span class="o">.</span><span class="n">TreeExplainer</span><span class="p">(</span>
+                <span class="n">locus_model</span><span class="o">.</span><span class="n">rate_models</span><span class="p">[</span><span class="n">k</span><span class="p">],</span>
+                <span class="n">X</span><span class="p">[</span><span class="n">background_idx</span><span class="p">],</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">shap_values</span><span class="p">(</span>
+                <span class="n">X</span><span class="p">,</span>
+                <span class="n">check_additivity</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                <span class="n">approximate</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">squeeze</span><span class="p">(</span><span class="n">shaps</span><span class="p">)</span>
+
+        <span class="n">use_components</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span>
+            <span class="n">components</span> <span class="k">if</span> <span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="n">components</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_components</span><span class="p">))</span>
+        <span class="p">)</span>
+
+        <span class="n">shap_matrix</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+            <span class="n">parallel_map</span><span class="p">(</span>
+                <span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">_component_shap</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">use_components</span><span class="p">),</span> <span class="n">threads</span><span class="o">=</span><span class="n">threads</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="n">features</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">coords</span><span class="p">[</span><span class="s2">&quot;feature&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">data</span>
+        <span class="n">coords</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;shap_features&quot;</span><span class="p">:</span> <span class="n">features</span><span class="p">,</span>
+            <span class="s2">&quot;shap_component&quot;</span><span class="p">:</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">component_names</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">use_components</span><span class="p">],</span>
+        <span class="p">}</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">scan</span><span class="p">:</span>
+            <span class="n">coords</span><span class="p">[</span><span class="s2">&quot;shap_locus&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">subset</span><span class="o">.</span><span class="n">locus</span><span class="o">.</span><span class="n">data</span>
+
+        <span class="n">shap_matrix</span> <span class="o">=</span> <span class="n">shap_matrix</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">use_components</span><span class="p">),</span> <span class="n">n_loci</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+
+        <span class="n">dataset</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">DataArray</span><span class="p">(</span>
+            <span class="n">shap_matrix</span><span class="p">,</span>
+            <span class="n">dims</span><span class="o">=</span><span class="p">(</span>
+                <span class="s2">&quot;shap_component&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;locus&quot;</span> <span class="k">if</span> <span class="n">scan</span> <span class="k">else</span> <span class="s2">&quot;shap_locus&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;shap_features&quot;</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="n">coords</span><span class="o">=</span><span class="n">coords</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Added key: &quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s1">&quot;&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">dataset</span></div>
+
+
+<div class="viewcode-block" id="TopographyModel.annot_data">
+<a class="viewcode-back" href="../../../api/model.html#mutopia.model.base.TopographyModel.annot_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">annot_data</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> 
+        <span class="n">dataset</span><span class="p">:</span> <span class="n">GTensorDataset</span><span class="p">,</span> 
+        <span class="n">subset_region</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">threads</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> 
+        <span class="n">source</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> 
+        <span class="n">calc_shap</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GTensorDataset</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Annotate a dataset with comprehensive model analysis information.</span>
+
+<span class="sd">        This method applies a series of annotation functions to enrich the dataset with</span>
+<span class="sd">        various types of model-derived insights including component analysis, contribution</span>
+<span class="sd">        calculations, SHAP values, component distributions, and marginal predictions.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            dataset: The input dataset to be annotated with model analysis information.</span>
+<span class="sd">            threads (int, optional): Number of threads to use for parallel processing</span>
+<span class="sd">                in annotation functions that support multithreading. Defaults to 1.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            The annotated dataset containing the original data plus all computed</span>
+<span class="sd">            annotations from the applied annotation functions.</span>
+
+<span class="sd">        Note:</span>
+<span class="sd">            The annotation functions are applied sequentially in the following order:</span>
+<span class="sd">            1. Component annotations</span>
+<span class="sd">            2. Contribution annotations</span>
+<span class="sd">            3. SHAP value annotations</span>
+<span class="sd">            4. Component distribution annotations</span>
+<span class="sd">            5. Marginal prediction annotations</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">mutopia.gtensor</span><span class="w"> </span><span class="kn">import</span> <span class="n">annot_empirical_marginal</span><span class="p">,</span> <span class="n">slice_regions</span>
+        
+        <span class="n">_annot_fns</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">setup_corpus</span><span class="p">,</span>
+            <span class="n">partial</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">annot_contributions</span><span class="p">,</span> <span class="n">threads</span><span class="o">=</span><span class="n">threads</span><span class="p">),</span>
+            <span class="k">lambda</span> <span class="n">ds</span><span class="p">:</span> <span class="n">slice_regions</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">subset_region</span><span class="p">)</span> <span class="k">if</span> <span class="n">subset_region</span> <span class="k">else</span> <span class="n">ds</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">annot_components</span><span class="p">,</span>
+            <span class="n">partial</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">annot_SHAP_values</span><span class="p">,</span> <span class="n">threads</span><span class="o">=</span><span class="n">threads</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">)</span> <span class="k">if</span> <span class="n">calc_shap</span> <span class="k">else</span> <span class="k">lambda</span> <span class="n">ds</span><span class="p">:</span> <span class="n">ds</span><span class="p">,</span>
+            <span class="n">partial</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">annot_component_distributions</span><span class="p">,</span> <span class="n">threads</span><span class="o">=</span><span class="n">threads</span><span class="p">),</span>
+            <span class="n">partial</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">annot_marginal_prediction</span><span class="p">,</span> <span class="n">threads</span><span class="o">=</span><span class="n">threads</span><span class="p">),</span>
+            <span class="n">annot_empirical_marginal</span><span class="p">,</span>
+        <span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">fn</span> <span class="ow">in</span> <span class="n">_annot_fns</span><span class="p">:</span>
+            <span class="n">dataset</span> <span class="o">=</span> <span class="n">fn</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">dataset</span></div>
+</div>
+
+</pre></div>
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          
+          
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2026, Allen W. Lynch
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer no-toc">
+      
+      
+      
+    </aside>
+  </div>
+</div><script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../_static/copybutton.js?v=7a06b15b"></script>
+    <script src="../../../_static/design-tabs.js?v=f930bc37"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    </body>
+</html>
