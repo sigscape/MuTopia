@@ -67,7 +67,7 @@ needs (``bedtools``, ``bcftools``, ``tabix``, UCSC ``bigWigAverageOverBed``):
 
    uv venv --python 3.11 .venv
    source .venv/bin/activate
-   uv pip install "git+https://github.com/AllenWLynch/Mutopia.git@imports"
+   uv pip install mutopia
 
 **With conda**
 
@@ -75,7 +75,7 @@ needs (``bedtools``, ``bcftools``, ``tabix``, UCSC ``bigWigAverageOverBed``):
 
    conda create -n mutopia -c conda-forge -y python=3.11
    conda activate mutopia
-   pip install "git+https://github.com/AllenWLynch/Mutopia.git@imports"
+   pip install mutopia
 
 Verify the CLI tools are on your ``PATH``:
 

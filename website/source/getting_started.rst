@@ -39,14 +39,13 @@ If you don't have uv yet, install it with the official one-liner:
 
    curl -LsSf https://astral.sh/uv/install.sh | sh
 
-Then create a Python 3.11 virtual environment and install MuTopia directly from
-GitHub:
+Then create a Python 3.11 virtual environment and install MuTopia from PyPI:
 
 .. code-block:: bash
 
    uv venv --python 3.11 .venv
    source .venv/bin/activate
-   uv pip install "git+https://github.com/AllenWLynch/Mutopia.git@imports"
+   uv pip install mutopia
 
 **With conda**
 
@@ -57,7 +56,7 @@ the pinned scikit-learn version:
 
    conda create -n mutopia -c conda-forge -y python=3.11
    conda activate mutopia
-   pip install "git+https://github.com/AllenWLynch/Mutopia.git@imports"
+   pip install mutopia
 
 Verifying the installation
 --------------------------

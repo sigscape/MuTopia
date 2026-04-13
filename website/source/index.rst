@@ -91,7 +91,7 @@ MuTopia requires Python 3.11 due to a pinned scikit-learn dependency.
 .. code-block:: bash
 
    uv venv --python 3.11 .venv && source .venv/bin/activate
-   uv pip install "git+https://github.com/AllenWLynch/Mutopia.git@imports"
+   uv pip install mutopia
 
 Conda works too — see :doc:`getting_started` for both options. Verify the install:
 
