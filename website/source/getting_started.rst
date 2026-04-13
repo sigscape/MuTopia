@@ -5,32 +5,71 @@ Getting started with MuTopia
 Installation
 ------------
 
-Install MuTopia from github using pip. First create a new environment - we have a hard requirement on scikit-learn because we used 
-some internal APIs to make speed up training with gradient boosting trees.
+MuTopia requires Python 3.11 and has a pinned dependency on scikit-learn 1.4.2
+because it uses some internal GBT APIs for fast gradient-boosted tree training.
+We recommend `uv <https://docs.astral.sh/uv/>`_ to manage the environment — it
+resolves and installs dependencies significantly faster than pip alone, and its
+lockfile-based workflow makes it easy to reproduce exact environments across machines.
+
+**With uv (recommended)**
+
+If you don't have uv yet, install it with the official one-liner:
 
 .. code-block:: bash
-    
-    $ conda create --name mutopia -c conda-forge -y python=3.11 && conda activate mutopia
-    $ pip install git+https://github.com/AllenWLynch/Mutopia.git@imports
 
-Check that the command line tools are installed:
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+
+Then create a Python 3.11 virtual environment and install MuTopia directly from
+GitHub:
 
 .. code-block:: bash
 
-    $ gtensor --help
-    $ topo-model --help
+   uv venv --python 3.11 .venv
+   source .venv/bin/activate
+   uv pip install "git+https://github.com/AllenWLynch/Mutopia.git@imports"
+
+**With conda**
+
+If you prefer conda, create a fresh environment first to avoid conflicts with
+the pinned scikit-learn version:
+
+.. code-block:: bash
+
+   conda create -n mutopia -c conda-forge -y python=3.11
+   conda activate mutopia
+   pip install "git+https://github.com/AllenWLynch/Mutopia.git@imports"
+
+Verifying the installation
+--------------------------
+
+Check that the three command-line tools are available:
+
+.. code-block:: bash
+
+   gtensor --help
+   topo-model --help
+   mutopia --help
+
+If any of these fail, make sure the virtual environment is active and that its
+``bin/`` directory is on your ``PATH``.
 
 
 Data
 ----
 
-1. Genomic features: You can download or collect genomic features in whatever formats you like. MuTopia can ingest bedfiles, bigWig files, and bedGraphfiles. See the tutorial on building G-Tensors for more details.
-2. Reference genome annotations: MuTopia needs some reference genome annotations including a fasta file, chromsizes files, and a blacklist. For the human hg38 genome, you can get these essential materials from the tutorial data!
-3. Mutation data: MuTopia supports VCF and BCF files. It's easiest if those files are split by sample. 
+1. **Genomic features** — Collect feature tracks in BED, bedGraph, or bigWig
+   format. MuTopia can ingest any combination of these; see the G-Tensor tutorial
+   for details.
+2. **Reference genome annotations** — MuTopia needs a FASTA file, a chromsizes
+   file, and a blacklist. For hg38 these are included in the tutorial data bundle.
+3. **Mutation data** — MuTopia accepts VCF and BCF files. Files split one sample
+   per file work best, though multi-sample VCFs are supported via ``-name``.
+
 
 Basic workflow
 --------------
 
-1. Build G-Tensors from genomic features using the `gtensor` command line tool or the `mutopia.gtensor` module.
-2. Train topographical mutational models using the `topo-model` command line.
-3. Analyze trained models using the interactive python `mutopia.analysis` module.
+1. **Build G-Tensors** from genomic features and mutation VCFs using ``gtensor compose``.
+2. **Train topographic models** on the G-Tensor using ``topo-model train``.
+3. **Analyze trained models** interactively with the ``mutopia.analysis`` Python API.
+4. **Annotate new samples** by running ``mutopia sbs annotate-vcf`` on any VCF.

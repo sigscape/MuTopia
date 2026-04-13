@@ -7,6 +7,8 @@ API Reference
    gtensor
    model
    plot
-   track_plot/index
-   modes/index
-
+   track_plot/track_plot
+   track_plot/tracks
+   track_plot/transforms
+   modes/sbs
+   modes/modes
