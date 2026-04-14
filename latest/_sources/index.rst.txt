@@ -59,15 +59,25 @@ Quick example
 Installation
 ------------
 
-We recommend `uv <https://docs.astral.sh/uv/>`_ for fast, reproducible installs.
 MuTopia requires Python 3.11 due to a pinned scikit-learn dependency.
+
+The easiest install is via `bioconda <https://bioconda.github.io/recipes/mutopia/README.html>`_,
+which also pulls in the bioinformatics tool dependencies (``bedtools``,
+``bcftools``, ``tabix``, ``samtools``):
+
+.. code-block:: bash
+
+   conda create -n mutopia -c conda-forge -c bioconda -y python=3.11 mutopia
+   conda activate mutopia
+
+Or with `uv <https://docs.astral.sh/uv/>`_ for a fast pip-based install:
 
 .. code-block:: bash
 
    uv venv --python 3.11 .venv && source .venv/bin/activate
    uv pip install mutopia
 
-Conda works too — see :doc:`getting_started` for both options. Verify the install:
+See :doc:`getting_started` for the full set of options. Verify the install:
 
 .. code-block:: bash
 

@@ -47,16 +47,17 @@ Then create a Python 3.11 virtual environment and install MuTopia from PyPI:
    source .venv/bin/activate
    uv pip install mutopia
 
-**With conda**
+**With conda / bioconda**
 
-If you prefer conda, create a fresh environment first to avoid conflicts with
-the pinned scikit-learn version:
+MuTopia is published on `bioconda <https://bioconda.github.io/recipes/mutopia/README.html>`_,
+which pulls in the bioinformatics tool dependencies (``bedtools``,
+``bcftools``, ``tabix``, ``samtools``) automatically. Create a fresh
+environment to avoid conflicts with the pinned scikit-learn version:
 
 .. code-block:: bash
 
-   conda create -n mutopia -c conda-forge -y python=3.11
+   conda create -n mutopia -c conda-forge -c bioconda -y python=3.11 mutopia
    conda activate mutopia
-   pip install mutopia
 
 Verifying the installation
 --------------------------

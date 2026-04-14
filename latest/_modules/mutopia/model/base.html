@@ -213,6 +213,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../../tutorials/3.training_models.html">Tutorial 3: Tuning and training models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../tutorials/4.analyzing_models.html">Tutorial 4: Analyzing Topographic Models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../tutorials/5.annotating_vcfs.html">Tutorial 5: Annotating VCFs with a Pre-Trained Model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../tutorials/6.genome_browser_plotting.html">Tutorial 6: Genome-browser plotting with a trained model</a></li>
 </ul>
 </li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../../api/index.html">API Reference</a><input aria-label="Toggle navigation of API Reference" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
@@ -980,6 +981,28 @@
 
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Added key to dataset: &quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s1">&quot;&#39;</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">dataset</span></div>
+
+    
+<div class="viewcode-block" id="TopographyModel.needs_setup">
+<a class="viewcode-back" href="../../../api/model.html#mutopia.model.base.TopographyModel.needs_setup">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">needs_setup</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dataset</span><span class="p">:</span> <span class="n">GTensorDataset</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Check if the dataset needs to be set up with corpus state.</span>
+
+<span class="sd">        This method checks if the dataset has the necessary corpus state initialized</span>
+<span class="sd">        for modeling. If not, it indicates that the dataset needs to be set up.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        dataset : GTensorDataset</span>
+<span class="sd">            The dataset to check for corpus state initialization.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        bool</span>
+<span class="sd">            True if the dataset needs to be set up (i.e., corpus state is not initialized), False otherwise.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">GT</span><span class="o">.</span><span class="n">has_corpusstate</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="TopographyModel.annot_component_distributions">

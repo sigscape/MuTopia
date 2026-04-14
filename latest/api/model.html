@@ -214,6 +214,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../tutorials/3.training_models.html">Tutorial 3: Tuning and training models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../tutorials/4.analyzing_models.html">Tutorial 4: Analyzing Topographic Models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../tutorials/5.annotating_vcfs.html">Tutorial 5: Annotating VCFs with a Pre-Trained Model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/6.genome_browser_plotting.html">Tutorial 6: Genome-browser plotting with a trained model</a></li>
 </ul>
 </li>
 <li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">API Reference</a><input aria-label="Toggle navigation of API Reference" checked="" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
@@ -548,6 +549,25 @@ training datasets will be used for testing.</p></li>
 <dd></dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="mutopia.model.base.TopographyModel.needs_setup">
+<span class="sig-name descname"><span class="pre">needs_setup</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/model/base.html#TopographyModel.needs_setup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.model.base.TopographyModel.needs_setup" title="Link to this definition">¶</a></dt>
+<dd><p>Check if the dataset needs to be set up with corpus state.</p>
+<p>This method checks if the dataset has the necessary corpus state initialized
+for modeling. If not, it indicates that the dataset needs to be set up.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>dataset</strong> (<em>GTensorDataset</em>) – The dataset to check for corpus state initialization.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>True if the dataset needs to be set up (i.e., corpus state is not initialized), False otherwise.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="mutopia.model.base.TopographyModel.sample_params">
 <span class="sig-name descname"><span class="pre">sample_params</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">trial</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extensive</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/mutopia/model/base.html#TopographyModel.sample_params"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.model.base.TopographyModel.sample_params" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
@@ -706,6 +726,7 @@ updates the state from scratch, and then applies normalizers to all expanded dat
 <li><a class="reference internal" href="#mutopia.model.base.TopographyModel.init_model"><code class="docutils literal notranslate"><span class="pre">TopographyModel.init_model()</span></code></a></li>
 <li><a class="reference internal" href="#mutopia.model.base.TopographyModel.modality"><code class="docutils literal notranslate"><span class="pre">TopographyModel.modality</span></code></a></li>
 <li><a class="reference internal" href="#mutopia.model.base.TopographyModel.n_components"><code class="docutils literal notranslate"><span class="pre">TopographyModel.n_components</span></code></a></li>
+<li><a class="reference internal" href="#mutopia.model.base.TopographyModel.needs_setup"><code class="docutils literal notranslate"><span class="pre">TopographyModel.needs_setup()</span></code></a></li>
 <li><a class="reference internal" href="#mutopia.model.base.TopographyModel.sample_params"><code class="docutils literal notranslate"><span class="pre">TopographyModel.sample_params()</span></code></a></li>
 <li><a class="reference internal" href="#mutopia.model.base.TopographyModel.save"><code class="docutils literal notranslate"><span class="pre">TopographyModel.save()</span></code></a></li>
 <li><a class="reference internal" href="#mutopia.model.base.TopographyModel.set_fit_request"><code class="docutils literal notranslate"><span class="pre">TopographyModel.set_fit_request()</span></code></a></li>

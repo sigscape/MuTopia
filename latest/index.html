@@ -214,6 +214,7 @@
 <li class="toctree-l2"><a class="reference internal" href="tutorials/3.training_models.html">Tutorial 3: Tuning and training models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tutorials/4.analyzing_models.html">Tutorial 4: Analyzing Topographic Models</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tutorials/5.annotating_vcfs.html">Tutorial 5: Annotating VCFs with a Pre-Trained Model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorials/6.genome_browser_plotting.html">Tutorial 6: Genome-browser plotting with a trained model</a></li>
 </ul>
 </li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="api/index.html">API Reference</a><input aria-label="Toggle navigation of API Reference" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
@@ -333,13 +334,20 @@ mutopia<span class="w"> </span>sbs<span class="w"> </span>annotate-vcf<span clas
 </section>
 <section id="installation">
 <h2>Installation<a class="headerlink" href="#installation" title="Link to this heading">¶</a></h2>
-<p>We recommend <a class="reference external" href="https://docs.astral.sh/uv/">uv</a> for fast, reproducible installs.
-MuTopia requires Python 3.11 due to a pinned scikit-learn dependency.</p>
+<p>MuTopia requires Python 3.11 due to a pinned scikit-learn dependency.</p>
+<p>The easiest install is via <a class="reference external" href="https://bioconda.github.io/recipes/mutopia/README.html">bioconda</a>,
+which also pulls in the bioinformatics tool dependencies (<code class="docutils literal notranslate"><span class="pre">bedtools</span></code>,
+<code class="docutils literal notranslate"><span class="pre">bcftools</span></code>, <code class="docutils literal notranslate"><span class="pre">tabix</span></code>, <code class="docutils literal notranslate"><span class="pre">samtools</span></code>):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>mutopia<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span>-c<span class="w"> </span>bioconda<span class="w"> </span>-y<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.11<span class="w"> </span>mutopia
+conda<span class="w"> </span>activate<span class="w"> </span>mutopia
+</pre></div>
+</div>
+<p>Or with <a class="reference external" href="https://docs.astral.sh/uv/">uv</a> for a fast pip-based install:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>uv<span class="w"> </span>venv<span class="w"> </span>--python<span class="w"> </span><span class="m">3</span>.11<span class="w"> </span>.venv<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">source</span><span class="w"> </span>.venv/bin/activate
 uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>mutopia
 </pre></div>
 </div>
-<p>Conda works too — see <a class="reference internal" href="getting_started.html"><span class="doc">Getting started with MuTopia</span></a> for both options. Verify the install:</p>
+<p>See <a class="reference internal" href="getting_started.html"><span class="doc">Getting started with MuTopia</span></a> for the full set of options. Verify the install:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gtensor<span class="w"> </span>--help<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>topo-model<span class="w"> </span>--help<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>mutopia<span class="w"> </span>--help
 </pre></div>
 </div>

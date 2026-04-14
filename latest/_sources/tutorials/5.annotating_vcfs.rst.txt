@@ -12,7 +12,7 @@ By the end you will have:
 
 - Downloaded a pre-trained model for a tumor type of interest
 - Run ``topo-model setup`` to pre-compute locus-level predictions
-- Run ``mutopia sbs annotate-vcf`` against an example liver-cancer VCF
+- Run ``mutopia-sbs annotate-vcf`` against an example liver-cancer VCF
 - An output VCF with per-mutation component posteriors and per-sample
   component fractions in the header
 
@@ -51,19 +51,22 @@ Step 1: Download a pre-trained model
 -------------------------------------
 
 MuTopia ships pre-trained models for several tumor types on the
-`Zenodo record <https://zenodo.org/records/TODO>`_. For each tumor type
+`Zenodo record <https://zenodo.org/records/18803136>`_. For each tumor type
 ``<tumor_type>`` there are two files at the record root:
 
 - ``<tumor_type>.nc`` — the reference G-Tensor the model was trained on
   (provides locus coordinates, genomic features, and the trinucleotide
   context for every 10 kb window in hg38).
+- ``<tumor_type>.nc.regions.bed`` — the sidecar BED file that lists the
+  genomic coordinates of each locus in the G-Tensor. MuTopia expects it to
+  live next to the ``.nc`` file.
 - ``<tumor_type>.model.pkl`` — the trained topographic model itself.
 
 Available tumor types include (non-exhaustive):
 
 .. code-block:: text
 
-   Liver       Breast      Lung        Skin
+   Liver-HCC   Breast      Lung        Skin
    Colorectal  Pancreas    Prostate    Stomach
 
 Pick one that matches your samples. For this walkthrough we use the liver
@@ -71,13 +74,18 @@ model, which pairs naturally with the example VCF in Step 3.
 
 .. code-block:: bash
 
-   TUMOR=Liver
-   ZENODO=https://zenodo.org/records/TODO/files
+   TUMOR=Liver-HCC
+   ZENODO=https://zenodo.org/records/18803136/files
 
-   mkdir -p tutorial_data && cd tutorial_data
-   wget -O ${TUMOR}.nc        ${ZENODO}/${TUMOR}.nc
-   wget -O ${TUMOR}.model.pkl ${ZENODO}/${TUMOR}.model.pkl
-   cd ..
+   wget -O ${TUMOR}.nc             ${ZENODO}/${TUMOR}.nc
+   wget -O ${TUMOR}.nc.regions.bed ${ZENODO}/${TUMOR}.nc.regions.bed
+   wget -O ${TUMOR}.model.pkl      ${ZENODO}/${TUMOR}.model.pkl
+
+.. note::
+
+   Every G-Tensor has a sidecar ``<name>.nc.regions.bed`` file that records
+   the genomic coordinates of each locus. MuTopia resolves it by path
+   relative to the ``.nc`` file, so keep both files next to each other.
 
 .. note::
 
@@ -98,9 +106,9 @@ against the raw dataset.
 .. code-block:: bash
 
    topo-model setup \
-       tutorial_data/Liver.model.pkl \
-       tutorial_data/Liver.nc \
-       tutorial_data/Liver_setup.nc \
+       Liver-HCC.model.pkl \
+       Liver-HCC.nc \
+       Liver-HCC_setup.nc \
        -@ 4
 
 
@@ -108,38 +116,60 @@ Step 3: Annotate a VCF
 ----------------------
 
 To make this tutorial fully reproducible without requiring you to bring your
-own sample, we also host a single example VCF at the Zenodo record root:
+own sample, we also host a single example VCF:
 
 - ``CHC197.sample.hg38.vcf.gz`` — whole-genome somatic SNVs from a LICA-FR
   liver cancer sample (PCAWG donor CHC197), lifted to hg38. Roughly 12k PASS
   SNVs, ~260 KB.
 
-Download it and run the annotator:
+You will also need an hg38 reference FASTA. MuTopia does not ship one — point
+``-fa`` at whichever copy you already have (e.g. the one you use with
+``bcftools``/``samtools``). The FASTA must be indexed (``hg38.fa.fai`` next to
+it); run ``samtools faidx hg38.fa`` once if it isn't.
+
+Download the example VCF and run the annotator:
 
 .. code-block:: bash
 
-   wget -O tutorial_data/CHC197.sample.hg38.vcf.gz \
-       https://zenodo.org/records/TODO/files/CHC197.sample.hg38.vcf.gz
+   wget -O CHC197.sample.hg38.vcf.gz \
+       https://github.com/sigscape/MuTopia/releases/download/v1.0.5/CHC197.sample.hg38.vcf.gz
 
-   mutopia sbs annotate-vcf \
-       tutorial_data/Liver.model.pkl \
-       tutorial_data/Liver_setup.nc \
-       tutorial_data/CHC197.sample.hg38.vcf.gz \
+   mutopia-sbs annotate-vcf \
+       Liver-HCC.model.pkl \
+       Liver-HCC_setup.nc \
+       CHC197.sample.hg38.vcf.gz \
+       -fa /path/to/hg38.fa \
+       -w VAF \
+       --no-pass-only \
+       --no-cluster \
        -o CHC197_annotated.vcf
 
-If you have your own background mutation-rate bedgraph (used to cluster
-kataegis-like adjacent mutations before ingestion), supply it with ``-m``:
+A few notes on the flags:
+
+- ``-fa`` supplies the hg38 reference FASTA so MuTopia can resolve the
+  trinucleotide context of each mutation.
+- ``-w VAF`` tells MuTopia to read the variant allele fraction from the
+  ``VAF`` ``INFO`` field and use it as a per-mutation weight. (The example
+  VCF already carries ``VAF=...`` on every record; for your own data, pick
+  whichever INFO tag your caller emits.)
+- ``--no-pass-only`` keeps every record in the VCF, not just those with
+  ``FILTER=PASS``. The example VCF has an empty ``FILTER`` column on every
+  row, so without this flag nothing would make it through.
+- ``--no-cluster`` skips MuTopia's kataegis clustering pre-pass. You can
+  drop it if you also supply a background mutation-rate bedgraph via
+  ``-m``:
 
 .. code-block:: bash
 
-   mutopia sbs annotate-vcf \
-       tutorial_data/Liver.model.pkl \
-       tutorial_data/Liver_setup.nc \
-       tutorial_data/CHC197.sample.hg38.vcf.gz \
-       -m tutorial_data/mutation-rate.hg38.bedgraph.gz \
+   mutopia-sbs annotate-vcf \
+       Liver-HCC.model.pkl \
+       Liver-HCC_setup.nc \
+       CHC197.sample.hg38.vcf.gz \
+       -fa /path/to/hg38.fa \
+       -w VAF \
+       --no-pass-only \
+       -m mutation-rate.hg38.bedgraph.gz \
        -o CHC197_annotated.vcf
-
-If you omit ``-m``, also pass ``--no-cluster`` to skip the clustering step.
 
 While running, progress messages are printed to stderr:
 
@@ -213,10 +243,14 @@ Provide a BED file of assayed regions with ``--white-list``:
 
 .. code-block:: bash
 
-   mutopia sbs annotate-vcf \
-       tutorial_data/Liver.model.pkl \
-       tutorial_data/Liver_setup.nc \
+   mutopia-sbs annotate-vcf \
+       Liver-HCC.model.pkl \
+       Liver-HCC_setup.nc \
        sample.vcf.gz \
+       -fa /path/to/hg38.fa \
+       -w VAF \
+       --no-pass-only \
+       --no-cluster \
        --white-list capture_targets.bed \
        -o sample_annotated.vcf
 
@@ -243,10 +277,14 @@ If your VCF contains calls for multiple samples, specify which one to annotate:
 
 .. code-block:: bash
 
-   mutopia sbs annotate-vcf \
-       tutorial_data/Liver.model.pkl \
-       tutorial_data/Liver_setup.nc \
+   mutopia-sbs annotate-vcf \
+       Liver-HCC.model.pkl \
+       Liver-HCC_setup.nc \
        cohort.vcf.gz \
+       -fa /path/to/hg38.fa \
+       -w VAF \
+       --no-pass-only \
+       --no-cluster \
        -name SAMPLE_ID \
        -o SAMPLE_ID_annotated.vcf
 
@@ -256,14 +294,15 @@ Additional options
 
 .. code-block:: text
 
+   -fa, --fasta FILE               Reference genome FASTA (required)
+   -w, --weight-tag TAG            INFO tag to use as per-mutation weight (e.g. "VAF")
    -m, --mutation-rate-file FILE   Background mutation rate bedgraph (for clustering)
    --no-cluster                    Skip kataegis mutation clustering
+   --no-pass-only                  Include non-PASS variants
    -name, --sample-name NAME       Sample name in multi-sample VCF
    -chr, --chr-prefix PREFIX       Chromosome prefix to add (e.g. "chr")
-   -fa, --fasta FILE               Override reference genome FASTA
    -@, --threads N                 Parallel threads (default: 1)
-   --no-pass-only                  Include non-PASS variants
    --skip-sort                     Skip VCF sorting (VCF must be lexicographically sorted)
    -o, --output FILE               Output VCF path (default: stdout)
 
-Run ``mutopia sbs annotate-vcf --help`` for the full option reference.
+Run ``mutopia-sbs annotate-vcf --help`` for the full option reference.
