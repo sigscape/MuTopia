@@ -24,8 +24,7 @@ unpack it once before starting any tutorial:
 This produces a ``tutorial_data/`` directory that every tutorial references.
 
 The same Zenodo record also hosts standalone **pre-trained models** for several
-tumor types (``<tumor_type>.nc`` and ``<tumor_type>.model.pkl``) and an example
-VCF (``CHC197.sample.hg38.vcf.gz``) used by Tutorial 5. These live at the
+tumor types (``<tumor_type>.nc``, ``<tumor_type>.nc.regions.bed`` and ``<tumor_type>.model.pkl``). These live at the
 record root and can be downloaded individually — see Tutorial 5 for details.
 
 .. toctree::

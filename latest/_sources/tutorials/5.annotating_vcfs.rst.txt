@@ -52,7 +52,7 @@ Step 1: Download a pre-trained model
 
 MuTopia ships pre-trained models for several tumor types on the
 `Zenodo record <https://zenodo.org/records/18803136>`_. For each tumor type
-``<tumor_type>`` there are two files at the record root:
+``<tumor_type>`` there are three files at the record root:
 
 - ``<tumor_type>.nc`` — the reference G-Tensor the model was trained on
   (provides locus coordinates, genomic features, and the trinucleotide
@@ -61,13 +61,6 @@ MuTopia ships pre-trained models for several tumor types on the
   genomic coordinates of each locus in the G-Tensor. MuTopia expects it to
   live next to the ``.nc`` file.
 - ``<tumor_type>.model.pkl`` — the trained topographic model itself.
-
-Available tumor types include (non-exhaustive):
-
-.. code-block:: text
-
-   Liver-HCC   Breast      Lung        Skin
-   Colorectal  Pancreas    Prostate    Stomach
 
 Pick one that matches your samples. For this walkthrough we use the liver
 model, which pairs naturally with the example VCF in Step 3.

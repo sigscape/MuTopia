@@ -33,55 +33,39 @@ profiles.
       which topographic processes are driving mutagenes. Go a step further and annotate
       each mutation with its most likely generating process. 
 
-Quick example
--------------
+Five minutes to MuTopia
+-----------------------
 
-.. code-block:: python
+The fastest way to get started is to:
 
-   import mutopia.analysis as mu
-
-   # Load a pre-trained model and annotate a G-Tensor
-   model = mu.load_model("model.pkl")
-   data  = mu.gt.load_dataset("Liver.nc", with_samples=False)
-   data  = model.annot_data(data, threads=8, calc_shap=True)
-
-   # Signature panels, SHAP summary, and track plots
-   mu.pl.plot_signature_panel(data)
-   mu.pl.plot_shap_summary(data, scale=40)
+1. Pull the docker.
+2. Download a pre-trained model from our `Zenodo repository. <https://zenodo.org/records/18803136>`_
+3. Apply it to your mutation data. The `annotate-vcf` command infers which topographical mutational processes are active in your sample and annotates each mutation with its most likely generating process.
 
 .. code-block:: bash
 
-   # Annotate a VCF with per-mutation component posteriors
-   mutopia sbs annotate-vcf model.pkl Liver_setup.nc sample.vcf.gz \
-       -m mutation-rate.hg38.bedgraph.gz \
-       -o sample_annotated.vcf
+   docker pull allenlynch/mutopia:latest
+   
+   TUMOR_TYPE="Liver-HCC"
+   FASTA="path/to/hg38.fasta"
 
-Installation
-------------
+   ZENODO="https://zenodo.org/records/18803136/files" 
+   MODEL=${TUMOR_TYPE}.model.pkl
+   DATA=${TUMOR_TYPE}.nc
+   wget ${ZENODO}/${MODEL}
+   wget ${ZENODO}/${DATA}
+   wget ${ZENODO}/${DATA}.regions.bed
 
-MuTopia requires Python 3.11 due to a pinned scikit-learn dependency.
+   VCF=CHC197.sample.hg38.vcf.gz
+   wget -O ${VCF} https://github.com/sigscape/MuTopia/releases/download/v1.0.5/CHC197.sample.hg38.vcf.gz
 
-The easiest install is via `bioconda <https://bioconda.github.io/recipes/mutopia/README.html>`_,
-which also pulls in the bioinformatics tool dependencies (``bedtools``,
-``bcftools``, ``tabix``, ``samtools``):
+   topo-model setup ${MODEL} ${DATA} ${TUMOR_TYPE}.setup.nc -@ 4
+   
+   mutopia-sbs annotate-vcf ${MODEL} ${TUMOR_TYPE}.setup.nc ${VCF} --no-pass-only --no-clsuter -fa ${FASTA} -w VAF -o annotated.vcf
 
-.. code-block:: bash
-
-   conda create -n mutopia -c conda-forge -c bioconda -y python=3.11 mutopia
-   conda activate mutopia
-
-Or with `uv <https://docs.astral.sh/uv/>`_ for a fast pip-based install:
-
-.. code-block:: bash
-
-   uv venv --python 3.11 .venv && source .venv/bin/activate
-   uv pip install mutopia
-
-See :doc:`getting_started` for the full set of options. Verify the install:
-
-.. code-block:: bash
-
-   gtensor --help && topo-model --help && mutopia --help
+MuTopia can do a lot more than just data annotation. 
+Check out the tutorials for walkthroughs on data munging, 
+model training, and mutational topography analysis!
 
 .. toctree::
    :maxdepth: 2
