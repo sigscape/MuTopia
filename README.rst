@@ -35,13 +35,16 @@ needs (``bedtools``, ``bcftools``, ``tabix``, UCSC ``bigWigAverageOverBed``):
    source .venv/bin/activate
    uv pip install mutopia
 
-**With conda**
+**With conda / bioconda**
+
+MuTopia is published on `bioconda <https://bioconda.github.io/recipes/mutopia/README.html>`_,
+which pulls in the bioinformatics tool dependencies (``bedtools``,
+``bcftools``, ``tabix``, ``samtools``) automatically:
 
 .. code-block:: bash
 
-   conda create -n mutopia -c conda-forge -y python=3.11
+   conda create -n mutopia -c conda-forge -c bioconda -y python=3.11 mutopia
    conda activate mutopia
-   pip install mutopia
 
 Verify the CLI tools are on your ``PATH``:
 
