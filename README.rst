@@ -54,37 +54,40 @@ Verify the CLI tools are on your ``PATH``:
    topo-model --help
    mutopia --help
 
-Quick start
------------
+
+Five minutes to MuTopia
+-----------------------
+
+The fastest way to get started is to:
+
+1. Pull the docker.
+2. Download a pre-trained model from our `Zenodo repository. <https://zenodo.org/records/18803136>`_
+3. Apply it to your mutation data. The `annotate-vcf` command infers which topographical mutational processes are active in your sample and annotates each mutation with its most likely generating process.
 
 .. code-block:: bash
 
-   # 1. Build a G-Tensor from genomic features and mutation VCFs
-   gtensor compose config.yaml -w 8
+   docker pull allenlynch/mutopia:latest
+   
+   TUMOR_TYPE="Liver-HCC"
+   FASTA="path/to/hg38.fasta"
 
-   # 2. Split into train / test by chromosome
-   gtensor split data.nc chr1
+   ZENODO="https://zenodo.org/records/18803136/files" 
+   MODEL=${TUMOR_TYPE}.model.pkl
+   DATA=${TUMOR_TYPE}.nc
+   wget ${ZENODO}/${MODEL}
+   wget ${ZENODO}/${DATA}
+   wget ${ZENODO}/${DATA}.regions.bed
 
-   # 3. Train a topographic model
-   topo-model train -ds data.train.nc data.test.nc -k 15 -o model.pkl -@ 8 --lazy
+   VCF=CHC197.sample.hg38.vcf.gz
+   wget -O ${VCF} https://github.com/sigscape/MuTopia/releases/download/v1.0.5/CHC197.sample.hg38.vcf.gz
 
-   # 4. Analyze results in Python
-   python - << 'EOF'
-   import mutopia.analysis as mu
+   topo-model setup ${MODEL} ${DATA} ${TUMOR_TYPE}.setup.nc -@ 4
+   
+   mutopia-sbs annotate-vcf ${MODEL} ${TUMOR_TYPE}.setup.nc ${VCF} --no-pass-only --no-clsuter -fa ${FASTA} -w VAF -o annotated.vcf
 
-   model = mu.load_model("model.pkl")
-   data  = mu.gt.load_dataset("data.nc", with_samples=False)
-   data  = model.annot_data(data, threads=8, calc_shap=True)
-
-   mu.pl.plot_signature_panel(data)
-   mu.pl.plot_shap_summary(data, scale=40)
-   EOF
-
-   # 5. Annotate individual sample VCFs
-   topo-model setup model.pkl data.nc data_setup.nc -@ 8
-   mutopia sbs annotate-vcf model.pkl data_setup.nc sample.vcf.gz \
-       -m mutation-rate.bedgraph.gz \
-       -o sample_annotated.vcf
+MuTopia can do a lot more than just data annotation. 
+Check out the tutorials for walkthroughs on data munging, 
+model training, and mutational topography analysis!
 
 Documentation
 -------------
