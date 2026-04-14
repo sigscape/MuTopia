@@ -2,37 +2,9 @@ MuTopia — Mutational Topography Modeling
 =========================================
 
 **MuTopia** learns *topographic models* of somatic mutation: it simultaneously
-decomposes a cancer cohort's mutation counts into distinct processes (signatures)
+decomposes a cohort's mutation counts into distinct processes (signatures)
 **and** explains how local genomic context shapes each signature's activity across
 the genome.
-
-Unlike standard signature tools that produce per-sample counts, MuTopia produces:
-
-- A genome-wide **topographic map** of each mutational process at 10 kb resolution
-- **SHAP feature attributions** linking signature activity to chromatin, replication
-  timing, sequence composition, and any other genomic track you supply
-- **Per-mutation posterior probabilities** annotated directly in VCF files
-- Accurate refitting for **targeted panel and exome** sequencing via exposure correction
-
-Features
---------
-
-==========================================  ================================================
-Feature                                     Description
-==========================================  ================================================
-G-Tensors                                   Spatially-indexed data structure integrating
-                                            genomic feature tracks with mutation calls
-Topographic NMF                             Gradient-boosted local models + iterative NMF
-                                            learn signature × context interactions
-SHAP interpretability                       Built-in SHAP beeswarm, interaction matrix,
-                                            and track-plot visualizations
-VCF annotation                              ``mutopia sbs annotate-vcf`` assigns every
-                                            mutation a posterior over components
-Panel/exome support                         Whitelist BED corrects exposure for
-                                            non-whole-genome sequencing
-Hyperparameter tuning                       Optuna-based study management via ``topo-model study``
-Genome track plots                          Composable genome-browser figures in matplotlib
-==========================================  ================================================
 
 Installation
 ------------
