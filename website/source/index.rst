@@ -61,7 +61,7 @@ The fastest way to get started is to:
 
    topo-model setup ${MODEL} ${DATA} ${TUMOR_TYPE}.setup.nc -@ 4
    
-   mutopia-sbs annotate-vcf ${MODEL} ${TUMOR_TYPE}.setup.nc ${VCF} --no-pass-only --no-clsuter -fa ${FASTA} -w VAF -o annotated.vcf
+   mutopia-sbs annotate-vcf ${MODEL} ${TUMOR_TYPE}.setup.nc ${VCF} --no-pass-only --no-cluster -fa ${FASTA} -w VAF -o annotated.vcf
 
 MuTopia can do a lot more than just data annotation. 
 Check out the tutorials for walkthroughs on data munging, 
