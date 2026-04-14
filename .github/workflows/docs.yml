@@ -2,8 +2,12 @@ name: Deploy docs
 
 # Deploys to the gh-pages branch (incremental — old versions are never wiped).
 #
-# Push to main       → website/latest/
-# Push vX.Y.Z tag    → website/vX.Y.Z/  +  website/stable/  +  root redirect
+# Push to main       → website/latest/  +  root redirect (→ latest/)
+# Push vX.Y.Z tag    → website/vX.Y.Z/  +  website/stable/
+#
+# The root of the site always redirects to /latest/, so doc-only main pushes
+# are visible immediately without a version bump. /stable/ and /vX.Y.Z/ are
+# still maintained for anyone who wants version-pinned docs.
 #
 # One-time repo setup required:
 #   Settings → Pages → Source: "Deploy from a branch" → branch: gh-pages, / (root)
@@ -78,7 +82,7 @@ jobs:
           target-folder: ${{ steps.vars.outputs.dest }}
           clean: false
 
-      # ── On a tagged release: also update stable/ and the root redirect ─────
+      # ── On a tagged release: also update stable/ ──────────────────────────
       - name: Deploy to stable/
         if: steps.vars.outputs.is_release == 'true'
         uses: JamesIves/github-pages-deploy-action@v4
@@ -88,8 +92,9 @@ jobs:
           target-folder: stable
           clean: false
 
+      # ── Root redirect: always points at /latest/ so doc-only main pushes ──
+      #    go live immediately. Rewritten on every build.
       - name: Build root redirect
-        if: steps.vars.outputs.is_release == 'true'
         run: |
           mkdir /tmp/root
           cat > /tmp/root/index.html << 'HTML'
@@ -97,13 +102,12 @@ jobs:
           <html>
           <meta charset="utf-8">
           <title>MuTopia Documentation</title>
-          <meta http-equiv="refresh" content="0; URL=stable/">
-          <link rel="canonical" href="stable/">
+          <meta http-equiv="refresh" content="0; URL=latest/">
+          <link rel="canonical" href="latest/">
           </html>
           HTML
 
       - name: Deploy root redirect
-        if: steps.vars.outputs.is_release == 'true'
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           branch: gh-pages
