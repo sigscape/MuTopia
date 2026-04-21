@@ -42,6 +42,8 @@ The fastest way to get started is to:
 2. Download a pre-trained model from our `Zenodo repository. <https://zenodo.org/records/18803136>`_
 3. Apply it to your mutation data. The `annotate-vcf` command infers which topographical mutational processes are active in your sample and annotates each mutation with its most likely generating process.
 
+*Note: this is just an example VCF, so the results aren't meaningful.*
+
 .. code-block:: bash
 
    docker pull allenlynch/mutopia:latest
@@ -59,9 +61,11 @@ The fastest way to get started is to:
    VCF=CHC197.sample.hg38.vcf.gz
    wget -O ${VCF} https://github.com/sigscape/MuTopia/releases/download/v1.0.5/CHC197.sample.hg38.vcf.gz
 
-   topo-model setup ${MODEL} ${DATA} ${TUMOR_TYPE}.setup.nc -@ 4
-   
-   mutopia-sbs annotate-vcf ${MODEL} ${TUMOR_TYPE}.setup.nc ${VCF} --no-pass-only --no-cluster -fa ${FASTA} -w VAF -o annotated.vcf
+   docker run --rm -v "$PWD":/workspace allenlynch/mutopia:latest \
+      topo-model setup ${MODEL} ${DATA} ${TUMOR_TYPE}.setup.nc -@ 4
+
+   docker run --rm -v "$PWD":/workspace allenlynch/mutopia:latest \
+      mutopia-sbs annotate-vcf ${MODEL} ${TUMOR_TYPE}.setup.nc ${VCF} --no-pass-only --no-cluster -fa ${FASTA} -w VAF -o annotated.vcf
 
 MuTopia can do a lot more than just data annotation. 
 Check out the tutorials for walkthroughs on data munging, 
