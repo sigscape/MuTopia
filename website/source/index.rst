@@ -64,8 +64,8 @@ The fastest way to get started is to:
    docker run --rm -v "$PWD":/workspace allenlynch/mutopia:latest \
       topo-model setup ${MODEL} ${DATA} ${TUMOR_TYPE}.setup.nc -@ 4
 
-   docker run --rm -v "$PWD":/workspace allenlynch/mutopia:latest \
-      mutopia-sbs annotate-vcf ${MODEL} ${TUMOR_TYPE}.setup.nc ${VCF} --no-pass-only --no-cluster -fa ${FASTA} -w VAF -o annotated.vcf
+   docker run --rm -v "$PWD":/workspace -v "$(dirname ${FASTA})":/fasta allenlynch/mutopia:latest \
+      mutopia-sbs annotate-vcf ${MODEL} ${TUMOR_TYPE}.setup.nc ${VCF} --no-pass-only --no-cluster -fa /fasta/$(basename ${FASTA}) -w VAF -o annotated.vcf
 
 MuTopia can do a lot more than just data annotation. 
 Check out the tutorials for walkthroughs on data munging, 
