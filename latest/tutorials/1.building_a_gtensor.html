@@ -403,7 +403,7 @@ chr1    817239  817623  Peak
 </ul>
 <p>Finally, the <code class="docutils literal notranslate"><span class="pre">gex</span></code> normalization is a little bit special. It must be applied when you’re working with expression-style data since it normalizes the data per gene rather than across loci. If you don’t specify <code class="docutils literal notranslate"><span class="pre">gex</span></code> for expression data, the values won’t be comparable across celltypes.</p>
 <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">mutopia.analysis</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mu</span>
@@ -412,10 +412,12 @@ chr1    817239  817623  Peak
 <span class="n">template</span><span class="o">=</span><span class="s2">&quot;&quot;&quot;</span>
 <span class="s2">name: {{name}}</span>
 <span class="s2">dtype: SBS</span>
-<span class="s2">chromsizes: {{chromsizes}}</span>
-<span class="s2">blacklist: {{blacklist}}</span>
-<span class="s2">fasta: {{fasta}}</span>
 <span class="s2">region_size: {{region_size}}</span>
+
+<span class="s2">genome:</span>
+<span class="s2">  chromsizes: {{chromsizes}}</span>
+<span class="s2">  blacklist: {{blacklist}}</span>
+<span class="s2">  fasta: {{fasta}}</span>
 
 <span class="s2">features:</span>
 <span class="s2">  GCContent:</span>
@@ -475,16 +477,18 @@ chr1    817239  817623  Peak
 <p>Now we’ll populate our template with actual file paths and configuration values. The <code class="docutils literal notranslate"><span class="pre">fill_jinja_template</span></code> function takes our template and replaces the placeholders with real values. I like to define configuration files for each celltype so I can dynamically generate config files for different scenarios.</p>
 <p><strong>Note</strong>: If you don’t have to preprocess your data in any way (like it’s available as a bigWig, ready to ingest), you can simply provide a URL! MuTopia will download it for you.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">mutopia.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">fill_jinja_template</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">FASTA</span> <span class="o">=</span>  <span class="c1"># TODO: add path to FASTA file here</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">mutopia.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">fill_jinja_template</span>
 
 <span class="n">config</span> <span class="o">=</span> <span class="n">fill_jinja_template</span><span class="p">(</span>
     <span class="n">template</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">&quot;example_gtensor&quot;</span><span class="p">,</span>
     <span class="n">chromsizes</span><span class="o">=</span><span class="s2">&quot;tutorial_data/hg38.mainchroms.sizes&quot;</span><span class="p">,</span>
-    <span class="n">fasta</span><span class="o">=</span><span class="s2">&quot;tutorial_data/hg38.fa&quot;</span><span class="p">,</span>
+    <span class="n">fasta</span><span class="o">=</span><span class="n">FASTA</span><span class="p">,</span>
     <span class="n">blacklist</span><span class="o">=</span><span class="s2">&quot;tutorial_data/hg38-blacklist.v2.sorted.bed.gz&quot;</span><span class="p">,</span>
     <span class="n">region_size</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span>
     <span class="n">files</span><span class="o">=</span><span class="p">{</span>
@@ -507,10 +511,12 @@ chr1    817239  817623  Peak
 
 name: example_gtensor
 dtype: SBS
-chromsizes: tutorial_data/hg38.mainchroms.sizes
-blacklist: tutorial_data/hg38-blacklist.v2.sorted.bed.gz
-fasta: tutorial_data/hg38.fa
 region_size: 10000
+
+genome:
+  chromsizes: tutorial_data/hg38.mainchroms.sizes
+  blacklist: tutorial_data/hg38-blacklist.v2.sorted.bed.gz
+  fasta: path/to/hg38.fa
 
 features:
   GCContent:
@@ -562,10 +568,10 @@ features:
 </ol>
 <p>The <code class="docutils literal notranslate"><span class="pre">-w</span> <span class="pre">1</span></code> flag specifies using 1 worker process. For larger datasets, you can increase this number to parallelize the work. This command runs a luigi command in the background which can resume the pipeline upon any failures.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="o">!</span>gtensor<span class="w"> </span>compose<span class="w"> </span>example_gtensor.yaml<span class="w"> </span>-w<span class="w"> </span><span class="m">1</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="o">!</span>gtensor<span class="w"> </span>compose<span class="w"> </span>example_gtensor.yaml<span class="w"> </span>-w<span class="w"> </span><span class="m">1</span><span class="w"> </span>-o<span class="w"> </span>example_gtensor
 </pre></div>
 </div>
 </div>
@@ -637,10 +643,10 @@ INFO: Mutopia:Added feature: ATAC_accessible
 </div>
 <p><strong>Note:</strong> Make sure the command above runs to completion, you can check by executing it again and making sure it does not try to launch additional tasks.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="o">!</span>gtensor<span class="w"> </span>compose<span class="w"> </span>example_gtensor.yaml<span class="w"> </span>-w<span class="w"> </span><span class="m">1</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="o">!</span>gtensor<span class="w"> </span>compose<span class="w"> </span>example_gtensor.yaml<span class="w"> </span>-w<span class="w"> </span><span class="m">1</span><span class="w"> </span>-o<span class="w"> </span>example_gtensor
 </pre></div>
 </div>
 </div>
