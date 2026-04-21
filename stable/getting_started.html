@@ -302,12 +302,13 @@ docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </
 uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>mutopia
 </pre></div>
 </div>
-<p><strong>With conda</strong></p>
-<p>If you prefer conda, create a fresh environment first to avoid conflicts with
-the pinned scikit-learn version:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>mutopia<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span>-y<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.11
+<p><strong>With conda / bioconda</strong></p>
+<p>MuTopia is published on <a class="reference external" href="https://bioconda.github.io/recipes/mutopia/README.html">bioconda</a>,
+which pulls in the bioinformatics tool dependencies (<code class="docutils literal notranslate"><span class="pre">bedtools</span></code>,
+<code class="docutils literal notranslate"><span class="pre">bcftools</span></code>, <code class="docutils literal notranslate"><span class="pre">tabix</span></code>, <code class="docutils literal notranslate"><span class="pre">samtools</span></code>) automatically. Create a fresh
+environment to avoid conflicts with the pinned scikit-learn version:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>mutopia<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span>-c<span class="w"> </span>bioconda<span class="w"> </span>-y<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.11<span class="w"> </span>mutopia
 conda<span class="w"> </span>activate<span class="w"> </span>mutopia
-pip<span class="w"> </span>install<span class="w"> </span>mutopia
 </pre></div>
 </div>
 </section>

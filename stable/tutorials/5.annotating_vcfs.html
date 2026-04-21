@@ -313,7 +313,7 @@ record — see the next section.</p>
 <h2>Step 1: Download a pre-trained model<a class="headerlink" href="#step-1-download-a-pre-trained-model" title="Link to this heading">¶</a></h2>
 <p>MuTopia ships pre-trained models for several tumor types on the
 <a class="reference external" href="https://zenodo.org/records/18803136">Zenodo record</a>. For each tumor type
-<code class="docutils literal notranslate"><span class="pre">&lt;tumor_type&gt;</span></code> there are two files at the record root:</p>
+<code class="docutils literal notranslate"><span class="pre">&lt;tumor_type&gt;</span></code> there are three files at the record root:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">&lt;tumor_type&gt;.nc</span></code> — the reference G-Tensor the model was trained on
 (provides locus coordinates, genomic features, and the trinucleotide
@@ -323,11 +323,6 @@ genomic coordinates of each locus in the G-Tensor. MuTopia expects it to
 live next to the <code class="docutils literal notranslate"><span class="pre">.nc</span></code> file.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">&lt;tumor_type&gt;.model.pkl</span></code> — the trained topographic model itself.</p></li>
 </ul>
-<p>Available tumor types include (non-exhaustive):</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Liver-HCC   Breast      Lung        Skin
-Colorectal  Pancreas    Prostate    Stomach
-</pre></div>
-</div>
 <p>Pick one that matches your samples. For this walkthrough we use the liver
 model, which pairs naturally with the example VCF in Step 3.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">TUMOR</span><span class="o">=</span>Liver-HCC

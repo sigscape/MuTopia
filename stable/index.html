@@ -311,39 +311,40 @@ each mutation with its most likely generating process.</p>
 </div>
 </div>
 </div>
-<section id="quick-example">
-<h2>Quick example<a class="headerlink" href="#quick-example" title="Link to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">mutopia.analysis</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mu</span>
+<section id="five-minutes-to-mutopia">
+<h2>Five minutes to MuTopia<a class="headerlink" href="#five-minutes-to-mutopia" title="Link to this heading">¶</a></h2>
+<p>The fastest way to get started is to:</p>
+<ol class="arabic simple">
+<li><p>Pull the docker.</p></li>
+<li><p>Download a pre-trained model from our <a class="reference external" href="https://zenodo.org/records/18803136">Zenodo repository.</a></p></li>
+<li><p>Apply it to your mutation data. The <cite>annotate-vcf</cite> command infers which topographical mutational processes are active in your sample and annotates each mutation with its most likely generating process.</p></li>
+</ol>
+<p><em>Note: this is just an example VCF, so the results aren’t meaningful.</em></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>docker<span class="w"> </span>pull<span class="w"> </span>allenlynch/mutopia:latest
 
-<span class="c1"># Load a pre-trained model and annotate a G-Tensor</span>
-<span class="n">model</span> <span class="o">=</span> <span class="n">mu</span><span class="o">.</span><span class="n">load_model</span><span class="p">(</span><span class="s2">&quot;model.pkl&quot;</span><span class="p">)</span>
-<span class="n">data</span>  <span class="o">=</span> <span class="n">mu</span><span class="o">.</span><span class="n">gt</span><span class="o">.</span><span class="n">load_dataset</span><span class="p">(</span><span class="s2">&quot;Liver.nc&quot;</span><span class="p">,</span> <span class="n">with_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-<span class="n">data</span>  <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">annot_data</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">threads</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">calc_shap</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="nv">TUMOR_TYPE</span><span class="o">=</span><span class="s2">&quot;Liver-HCC&quot;</span>
+<span class="nv">FASTA</span><span class="o">=</span><span class="s2">&quot;path/to/hg38.fasta&quot;</span>
 
-<span class="c1"># Signature panels, SHAP summary, and track plots</span>
-<span class="n">mu</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">plot_signature_panel</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
-<span class="n">mu</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">plot_shap_summary</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mi">40</span><span class="p">)</span>
+<span class="nv">ZENODO</span><span class="o">=</span><span class="s2">&quot;https://zenodo.org/records/18803136/files&quot;</span>
+<span class="nv">MODEL</span><span class="o">=</span><span class="si">${</span><span class="nv">TUMOR_TYPE</span><span class="si">}</span>.model.pkl
+<span class="nv">DATA</span><span class="o">=</span><span class="si">${</span><span class="nv">TUMOR_TYPE</span><span class="si">}</span>.nc
+wget<span class="w"> </span><span class="si">${</span><span class="nv">ZENODO</span><span class="si">}</span>/<span class="si">${</span><span class="nv">MODEL</span><span class="si">}</span>
+wget<span class="w"> </span><span class="si">${</span><span class="nv">ZENODO</span><span class="si">}</span>/<span class="si">${</span><span class="nv">DATA</span><span class="si">}</span>
+wget<span class="w"> </span><span class="si">${</span><span class="nv">ZENODO</span><span class="si">}</span>/<span class="si">${</span><span class="nv">DATA</span><span class="si">}</span>.regions.bed
+
+<span class="nv">VCF</span><span class="o">=</span>CHC197.sample.hg38.vcf.gz
+wget<span class="w"> </span>-O<span class="w"> </span><span class="si">${</span><span class="nv">VCF</span><span class="si">}</span><span class="w"> </span>https://github.com/sigscape/MuTopia/releases/download/v1.0.5/CHC197.sample.hg38.vcf.gz
+
+docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-v<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">&quot;</span>:/workspace<span class="w"> </span>allenlynch/mutopia:latest<span class="w"> </span><span class="se">\</span>
+<span class="w">   </span>topo-model<span class="w"> </span>setup<span class="w"> </span><span class="si">${</span><span class="nv">MODEL</span><span class="si">}</span><span class="w"> </span><span class="si">${</span><span class="nv">DATA</span><span class="si">}</span><span class="w"> </span><span class="si">${</span><span class="nv">TUMOR_TYPE</span><span class="si">}</span>.setup.nc<span class="w"> </span>-@<span class="w"> </span><span class="m">4</span>
+
+docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-v<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">&quot;</span>:/workspace<span class="w"> </span>allenlynch/mutopia:latest<span class="w"> </span><span class="se">\</span>
+<span class="w">   </span>mutopia-sbs<span class="w"> </span>annotate-vcf<span class="w"> </span><span class="si">${</span><span class="nv">MODEL</span><span class="si">}</span><span class="w"> </span><span class="si">${</span><span class="nv">TUMOR_TYPE</span><span class="si">}</span>.setup.nc<span class="w"> </span><span class="si">${</span><span class="nv">VCF</span><span class="si">}</span><span class="w"> </span>--no-pass-only<span class="w"> </span>--no-cluster<span class="w"> </span>-fa<span class="w"> </span><span class="si">${</span><span class="nv">FASTA</span><span class="si">}</span><span class="w"> </span>-w<span class="w"> </span>VAF<span class="w"> </span>-o<span class="w"> </span>annotated.vcf
 </pre></div>
 </div>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Annotate a VCF with per-mutation component posteriors</span>
-mutopia<span class="w"> </span>sbs<span class="w"> </span>annotate-vcf<span class="w"> </span>model.pkl<span class="w"> </span>Liver_setup.nc<span class="w"> </span>sample.vcf.gz<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-m<span class="w"> </span>mutation-rate.hg38.bedgraph.gz<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-o<span class="w"> </span>sample_annotated.vcf
-</pre></div>
-</div>
-</section>
-<section id="installation">
-<h2>Installation<a class="headerlink" href="#installation" title="Link to this heading">¶</a></h2>
-<p>We recommend <a class="reference external" href="https://docs.astral.sh/uv/">uv</a> for fast, reproducible installs.
-MuTopia requires Python 3.11 due to a pinned scikit-learn dependency.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>uv<span class="w"> </span>venv<span class="w"> </span>--python<span class="w"> </span><span class="m">3</span>.11<span class="w"> </span>.venv<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">source</span><span class="w"> </span>.venv/bin/activate
-uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>mutopia
-</pre></div>
-</div>
-<p>Conda works too — see <a class="reference internal" href="getting_started.html"><span class="doc">Getting started with MuTopia</span></a> for both options. Verify the install:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gtensor<span class="w"> </span>--help<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>topo-model<span class="w"> </span>--help<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>mutopia<span class="w"> </span>--help
-</pre></div>
-</div>
+<p>MuTopia can do a lot more than just data annotation.
+Check out the tutorials for walkthroughs on data munging,
+model training, and mutational topography analysis!</p>
 <div class="toctree-wrapper compound">
 </div>
 </section>
@@ -395,8 +396,7 @@ uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </s
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">MuTopia — Mutational Topography Inference and Analysis</a><ul>
-<li><a class="reference internal" href="#quick-example">Quick example</a></li>
-<li><a class="reference internal" href="#installation">Installation</a></li>
+<li><a class="reference internal" href="#five-minutes-to-mutopia">Five minutes to MuTopia</a></li>
 </ul>
 </li>
 </ul>
