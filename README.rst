@@ -98,13 +98,3 @@ Documentation
 
 Full documentation, tutorials, and API reference are at
 `sigscape.github.io/MuTopia <https://sigscape.github.io/MuTopia>`_.
-
-Citation
---------
-
-If you use MuTopia in your research, please cite:
-
-.. code-block:: text
-
-   Lynch AW, et al. (2025). MuTopia: topographic modeling of mutational processes
-   across the cancer genome. [Preprint]
