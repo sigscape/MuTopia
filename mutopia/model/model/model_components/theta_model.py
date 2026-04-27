@@ -160,8 +160,15 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         X = self._check_input(self._fetch_feature_matrix(corpus))
 
         for k in range(self.n_components):
-            CS.fetch_val(corpus, "log_locus_distribution")[k].data[:] = self._predict(
-                k, corpus, from_scratch=from_scratch, X=X, check_input=False
+            # STABILITY: clip raw theta predictions so exp() stays within float32.
+            # exp(30) ~ 1e13; with context_freqs ~ 1e-3 and ~3e5 loci the
+            # downstream product stays well under float32 max (~3.4e38).
+            CS.fetch_val(corpus, "log_locus_distribution")[k].data[:] = np.clip(
+                self._predict(
+                    k, corpus, from_scratch=from_scratch, X=X, check_input=False
+                ),
+                -30.0,
+                30.0,
             )
 
     """

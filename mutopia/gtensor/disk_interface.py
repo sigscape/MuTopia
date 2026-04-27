@@ -356,11 +356,20 @@ def write_dataset(dataset, filename, bar=True, write_samples: bool = True):
 
     special_vars = [v for v in ["X", "ploidy"] if v in dataset.data_vars]
 
+    def _dtype_for_encoding(dtype):
+        # netCDF4 cannot store numpy `object` arrays directly; route them through
+        # the VLEN-string type. Anything else is passed through unchanged.
+        return str if dtype == object else dtype
+
     # write base data (coords, index, attrs)
-    (
-        dataset.drop_vars(list(dataset.data_vars)).to_netcdf(
-            filename, group="/", mode="w", **WRITE_KW
-        )
+    root = dataset.drop_vars(list(dataset.data_vars))
+    root_encoding = {
+        name: {"dtype": str}
+        for name, coord in root.variables.items()
+        if coord.dtype == object
+    }
+    root.to_netcdf(
+        filename, group="/", mode="w", encoding=root_encoding, **WRITE_KW
     )
 
     for section_name, section in (dataset.drop_vars(special_vars)).sections:
@@ -378,11 +387,19 @@ def write_dataset(dataset, filename, bar=True, write_samples: bool = True):
 
         section = section.rename({k: k.replace("/", ".") for k in section.data_vars})
 
+        encoding = {
+            k: {"dtype": _dtype_for_encoding(v.dtype)}
+            for k, v in section.data_vars.items()
+        }
+        for name, coord in section.coords.items():
+            if coord.dtype == object:
+                encoding[name] = {"dtype": str}
+
         section.to_netcdf(
             filename,
             group="/" + section_name.lower(),
             mode="a",
-            encoding={k: {"dtype": v.dtype} for k, v in section.data_vars.items()},
+            encoding=encoding,
             **WRITE_KW,
         )
 

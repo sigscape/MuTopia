@@ -89,9 +89,62 @@ def _fast_exp_offsets(
 
 def _get_exp_offsets_k_c(factor_model, k, corpus):
 
-    (normalizer, context_offsets, locus_offsets) = _fast_exp_offsets(
-        *_get_args(k, corpus)
+    # STABILITY: max-subtract in log-space before exp to avoid inf*0 -> NaN in the
+    # numba kernel. The Poisson M-step absorbs uniform offset rescaling via
+    # get_poisson_targets_weights, so we only have to undo the shift on the
+    # scalar normalizer (in log-space, where it cannot overflow).
+    state = corpus.sections["State"]
+    log_locus = np.ascontiguousarray(
+        state.log_locus_distribution.isel(component=k).data, dtype=np.float32
     )
+    log_context = np.ascontiguousarray(
+        state.log_context_distribution.isel(component=k)
+        .transpose(..., "context")
+        .data,
+        dtype=np.float32,
+    )
+
+    finite_locus = log_locus[np.isfinite(log_locus)]
+    finite_context = log_context[np.isfinite(log_context)]
+    Lmax = np.float32(finite_locus.max()) if finite_locus.size else np.float32(0.0)
+    Cmax = np.float32(finite_context.max()) if finite_context.size else np.float32(0.0)
+
+    locus_effects = contig_f32(np.exp(log_locus - Lmax))
+    context_effects = np.exp(log_context - Cmax).astype(np.float32, copy=False)
+
+    context_freqs = (
+        corpus.sections["Regions"]
+        .context_frequencies.transpose("locus", "context", "configuration")
+        .data.reshape(-1, 192)
+    )
+    exposures = corpus.sections["Regions"].exposures.data
+    idx_selector = state.mesoscale_idx.data.T
+
+    (normalizer, context_offsets, locus_offsets) = _fast_exp_offsets(
+        context_freqs, exposures, locus_effects, context_effects, idx_selector,
+    )
+
+    # STABILITY: restore the max-subtraction purely in log-space.
+    normalizer = float(normalizer) - float(Lmax) - float(Cmax)
+
+    # STABILITY: fall back to the previous normalizer instead of poisoning state
+    # if the slice was degenerate (e.g. empty normalizer, stale NaNs in inputs).
+    if not (
+        np.isfinite(normalizer)
+        and np.all(np.isfinite(locus_offsets))
+        and np.all(np.isfinite(context_offsets))
+    ):
+        logger.warning(
+            f"Non-finite exp-offsets for component {k} on corpus "
+            f"{factor_model.GT.get_name(corpus)}; falling back to previous normalizer."
+        )
+        normalizer = float(factor_model.get_normalizers(corpus)[k])
+        locus_offsets = np.nan_to_num(
+            locus_offsets, nan=0.0, posinf=0.0, neginf=0.0
+        )
+        context_offsets = np.nan_to_num(
+            context_offsets, nan=0.0, posinf=0.0, neginf=0.0
+        )
 
     return (
         normalizer,
