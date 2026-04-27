@@ -17,7 +17,7 @@ clean:
 
 sync-notebooks:
 	@echo "Syncing notebooks from $(TUTORIALDIR) to $(SOURCEDIR)/tutorials..."
-	@cp $(TUTORIALDIR)/*.ipynb $(SOURCEDIR)/tutorials/
+	@cp $(TUTORIALDIR)/*.ipynb $(SOURCEDIR)/tutorials/ 2>/dev/null || true
 
 html: sync-notebooks
 	@$(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)

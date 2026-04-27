@@ -485,6 +485,13 @@ def study():
     default=0,
     help="How extensively to tune hyperparameters: -e (basic), -ee (moderate), -eee (extensive)",
 )
+@click.option(
+    "-eval",
+    "--eval-every",
+    type=click.IntRange(1, 1000),
+    default=5,
+    help="Evaluate model performance every N training epochs during optimization",
+)
 def _create_study(
     study_name: str,
     *,
@@ -494,6 +501,7 @@ def _create_study(
     seed: int = 0,
     save_model: bool = False,
     extensive: int = 0,
+    eval_every=5,
     **model_kw,
 ):
     """
@@ -544,7 +552,7 @@ def _create_study(
         create_study(
             train=list(train),
             test=list(test),
-            eval_every=5,
+            eval_every=eval_every,
             min_components=min_components,
             max_components=max_components,
             study_name=study_name,
@@ -763,6 +771,38 @@ def retrain(
         raise click.ClickException(f"Retraining failed: {str(e)}")
 
 
+@model.command("setup", short_help="Initialize dataset state from trained model")
+@click.argument("model", type=click.Path(exists=True), metavar="MODEL_FILE")
+@click.argument("dataset", type=click.Path(exists=True), metavar="DATASET_FILE")
+@click.argument("output", type=click.Path(writable=True), metavar="OUTPUT_FILE")
+@click.option(
+    "-@",
+    "--threads",
+    type=click.IntRange(1, 1000),
+    default=1,
+    help="Number of parallel threads for setup",
+)
+def setup(
+    model: str,
+    dataset: str,
+    output: str,
+    threads: int = 1,
+):
+    """
+    Initialize dataset state using a trained model.
+
+    Applies model state (locus predictions, normalizers) to a dataset
+    without computing contributions, SHAP values, or other annotations.
+
+    Examples:
+        topo-model setup model.pkl data.nc data_with_state.nc
+
+        topo-model setup model.pkl data.nc out.nc -@ 8
+    """
+    from .model_core import setup
+    setup(model, dataset, output, threads=threads)
+
+
 @model.command("annot", short_help="Annotate dataset using trained model")
 @click.argument("model", type=click.Path(exists=True), metavar="MODEL_FILE")
 @click.argument("dataset", type=click.Path(exists=True), metavar="DATASET_FILE")
@@ -855,13 +895,91 @@ def score(
 @click.argument("model", type=click.Path(exists=True), metavar="MODEL_FILE")
 @click.argument("dataset", type=click.Path(exists=True), metavar="DATASET_FILE")
 @click.argument("output", type=click.Path(writable=True), metavar="OUTPUT_FILE")
-def add_model_state(
+@click.option("--region", type=str, default=None, help="Genomic region to subset (e.g. 'chr1:1-100000000')")
+@click.option(
+    "-@", "--threads",
+    type=click.IntRange(1, 1000),
+    default=1,
+    help="Number of parallel threads",
+)
+@click.option(
+    "-lsub", "--locus-subsample",
+    type=click.FloatRange(0.0, 1.0),
+    default=1 / 128,
+    show_default=True,
+    help="Fraction of loci per SVI step",
+)
+@click.option(
+    "--min-steps",
+    type=click.IntRange(1, 100000),
+    default=30,
+    show_default=True,
+    help="Minimum averaging steps before checking convergence",
+)
+@click.option(
+    "--max-steps",
+    type=click.IntRange(1, 100000),
+    default=500,
+    show_default=True,
+    help="Maximum averaging steps per sample",
+)
+@click.option(
+    "--tol",
+    type=click.FloatRange(0.0, 1.0),
+    default=0.01,
+    show_default=True,
+    help="Relative SE convergence threshold",
+)
+@click.option("--seed", type=int, default=42, help="Random seed")
+@click.option(
+    "--lazy/--eager",
+    type=bool,
+    default=False,
+    is_flag=True,
+    help="Use lazy loading to reduce memory usage",
+)
+def predict(
     model: str,
     dataset: str,
     output: str,
+    region: Optional[str] = None,
+    threads: int = 1,
+    locus_subsample: float = 1 / 128,
+    min_steps: int = 30,
+    max_steps: int = 500,
+    tol: float = 0.01,
+    seed: int = 42,
+    lazy: bool = False,
 ):
-    from .model_core import add_model_state
-    add_model_state(model, dataset, output)
+    """
+    Estimate per-sample contributions using stochastic variational inference.
+
+    Uses Polyak averaging over random locus subsets for memory-efficient
+    inference on large datasets. Converges when the sampling variance of
+    the proportion estimates drops below the tolerance.
+
+    Examples:
+        topo-model predict model.pkl data.nc annotated.nc
+
+        topo-model predict model.pkl data.nc out.nc -@ 10 --locus-subsample 0.01
+
+        topo-model predict model.pkl data.nc out.nc --region chr1 --lazy
+    """
+    from .model_core import predict as _predict
+
+    _predict(
+        model_path=model,
+        dataset_path=dataset,
+        output_path=output,
+        region=region,
+        threads=threads,
+        lazy=lazy,
+        locus_subsample=locus_subsample,
+        min_steps=min_steps,
+        max_steps=max_steps,
+        relative_tol=tol,
+        seed=seed,
+    )
 
 
 @model.group("tools")

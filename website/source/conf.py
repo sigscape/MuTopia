@@ -26,6 +26,7 @@ extensions = [
     'sphinx.ext.viewcode',
     'nbsphinx',
     'sphinx_copybutton',
+    'sphinx_design',
 ]
 
 autosummary_generate = True
@@ -76,8 +77,6 @@ html_theme_options = {
     # Branding
     'light_logo': 'mutopia_logo.png',
     'dark_logo': 'mutopia_logo.png',
-    # Set default theme to light mode (auto, light, or dark)
-    'theme_color': 'light',
     # Also configurable via CSS variables; set here for both themes
     'light_css_variables': {
         'content-width': '85rem',

@@ -444,6 +444,116 @@ def _just_next_Nk(Nks):
     return _next_Nk
 
 
+def polyak_predict(step_fn, init_nk, n_loci, locus_subsample,
+                   min_steps=30, max_steps=500, relative_tol=0.01, seed=42,
+                   sample_name=None):
+    """
+    Stochastic prediction with Polyak averaging and variance-based convergence.
+
+    Repeatedly draws random locus subsets, runs E-step to convergence on each,
+    and averages the resulting Nk estimates (Polyak averaging). Uses Welford's
+    online algorithm to track the sampling variance of the estimator. Stops when
+    the relative standard error of the mean drops below ``relative_tol``.
+
+    Parameters
+    ----------
+    step_fn : callable(locus_indices, warm_start_nk) -> nk_estimate
+        Given a 1-D array of locus indices and a warm-start Nk, returns the
+        MAP Nk from running the E-step on that locus subset.
+    init_nk : np.ndarray
+        Initial Nk estimate (shape preserved in output).
+    n_loci : int
+        Total number of loci in the dataset.
+    locus_subsample : float
+        Fraction of loci to draw per step.
+    min_steps : int
+        Minimum number of steps before checking convergence.
+    max_steps : int
+        Hard upper bound on the number of steps.
+    relative_tol : float
+        Convergence threshold: ``||SE(mean)|| / ||mean|| < relative_tol``.
+    seed : int
+        Random seed for reproducibility.
+    sample_name : str, optional
+        Sample identifier for progress logging.
+
+    Returns
+    -------
+    np.ndarray
+        Polyak-averaged Nk estimate with the same shape as ``init_nk``.
+    """
+    rng = np.random.RandomState(seed)
+    n_subset = max(1, int(locus_subsample * n_loci))
+    original_shape = init_nk.shape
+    d = init_nk.size
+    label = sample_name or "sample"
+
+    nk_mean = np.zeros(d, dtype=np.float32)
+    # Welford accumulators for the *proportion* (Nk / sum(Nk))
+    prop_mean = np.zeros(d, dtype=np.float32)
+    prop_m2 = np.zeros(d, dtype=np.float32)
+    warm_start = init_nk.copy()
+    rel_se = float("inf")
+    nk_history = []
+
+    pbar = tqdm(
+        range(1, max_steps + 1),
+        desc=f"  {label}",
+        ncols=100,
+        leave=False,
+        postfix={"rel_se": "n/a"},
+    )
+
+    try:
+        for t in pbar:
+            loci = rng.choice(n_loci, n_subset, replace=False)
+            nk_t = step_fn(loci, warm_start).ravel()
+            nk_history.append(nk_t.copy())
+
+            # Running mean of raw Nk (used as the final estimate)
+            nk_mean += (nk_t - nk_mean) / t
+
+            # Welford's algorithm on the normalized proportions
+            nk_sum = nk_t.sum()
+            prop_t = nk_t / nk_sum if nk_sum > 0 else nk_t
+            delta = prop_t - prop_mean
+            prop_mean += delta / t
+            delta2 = prop_t - prop_mean
+            prop_m2 += delta * delta2
+
+            warm_start = nk_mean.reshape(original_shape).copy()
+
+            if t >= 2:
+                # SE of the mean proportion
+                sample_var = prop_m2 / (t - 1)
+                se = np.sqrt(sample_var / t)
+                rel_se = np.linalg.norm(se) / (np.linalg.norm(prop_mean) + 1e-10)
+                pbar.set_postfix(rel_se=f"{rel_se:.4f}")
+                if t >= min_steps and rel_se < relative_tol:
+                    pbar.close()
+                    logger.info(
+                        f"{label}: converged after {t} steps (rel_se={rel_se:.6f})"
+                    )
+                    break
+        else:
+            pbar.close()
+            logger.warning(
+                f"{label}: reached max_steps={max_steps} without converging "
+                f"(rel_se={rel_se:.6f}, tol={relative_tol})"
+            )
+    except KeyboardInterrupt:
+        pbar.close()
+        logger.info(
+            f"{label}: interrupted after {t} steps (rel_se={rel_se:.6f})"
+        )
+
+    result = nk_mean.reshape(original_shape)
+    # Attach history as a list of per-step Nk estimates for diagnostics.
+    # Access via: polyak_predict.last_history after the call returns.
+    polyak_predict.last_history = np.array(nk_history).reshape(-1, *original_shape)
+    return result
+
+
 class LocalsModel:
 
     def __init__(
@@ -574,13 +684,54 @@ class LocalsModel:
             )
             return Nks
 
+    def _predict_svi(
+        self,
+        dataset,
+        factor_model,
+        threads=1,
+        locus_subsample=1 / 128,
+        min_steps=30,
+        max_steps=500,
+        relative_tol=0.01,
+        seed=42,
+    ):
+        with predict_mode(self):
+            predict_fns = self._get_svi_predict_fns(
+                dataset,
+                factor_model,
+                locus_subsample=locus_subsample,
+                min_steps=min_steps,
+                max_steps=max_steps,
+                relative_tol=relative_tol,
+                seed=seed,
+            )
+
+            logger.info(
+                f"SVI predict: {len(dataset.list_samples())} samples, "
+                f"locus_subsample={locus_subsample}, tol={relative_tol}"
+            )
+
+            Nks = np.array(list(parallel_map(predict_fns, threads=threads)))
+            return Nks
+
     def predict(
         self,
         dataset,
         factor_model,
         threads=1,
+        locus_subsample=None,
+        **svi_kw,
     ):
-        Nks = self._predict(dataset, factor_model=factor_model, threads=threads)
+        if locus_subsample is not None:
+            Nks = self._predict_svi(
+                dataset,
+                factor_model,
+                threads=threads,
+                locus_subsample=locus_subsample,
+                **svi_kw,
+            )
+        else:
+            Nks = self._predict(dataset, factor_model=factor_model, threads=threads)
         n_sources = self.GT.n_sources(dataset)
         Nks = Nks.reshape((-1, n_sources, self.n_components)).transpose((1, 0, 2))
         return DataArray(Nks, dims=("source", "sample", "component"))

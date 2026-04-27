@@ -5,7 +5,7 @@ structure of the datasets.
 """
 
 import os
-from mutopia.utils import parallel_gen
+from mutopia.utils import parallel_gen, logger
 from mutopia.gtensor import CorpusInterface, mutate_method
 from ..model.gtensor_interface import GtensorInterface
 import numpy as np

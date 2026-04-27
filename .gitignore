@@ -2,6 +2,7 @@ __pycache__/
 data/
 *.db
 *.ipynb
+!website/source/tutorials/*.ipynb
 **/.ipynb_checkpoints/
 build/
 *.nc

@@ -35,6 +35,12 @@ def make_continous_features_bigwig(
 
     if not len(vals) > 1:
         raise RuntimeError(f"No values found in {bigwig_file} for {regions_file}")
+    
+    if np.isnan(vals).all():
+        raise RuntimeError(f"All values are NaN in {bigwig_file} for {regions_file}, cannot use as a feature.")
+    
+    if np.nanvar(vals) == 0.0:
+        raise RuntimeError(f"All values are the same in {bigwig_file} for {regions_file}, cannot use as a feature.")
 
     return vals
 
@@ -73,7 +79,10 @@ def make_continuous_features_bed(
     vals = array(list(map(lambda x: x[1], data)))
     if not len(vals) > 1:
         raise RuntimeError(f"No values found in {bed_file} for {regions_file}")
-
+    if np.isnan(vals).all():
+        raise RuntimeError(f"All values are NaN in {bed_file} for {regions_file}, cannot use as a feature.")
+    if np.nanvar(vals) == 0.0:
+        raise RuntimeError(f"All values are the same in {bed_file} for {regions_file}, cannot use as a feature.")
     return vals
 
 
@@ -248,6 +257,13 @@ def make_discrete_features(
             f"\tFound classes: {classes}"
         )
     
+    if len(classes) == 0:
+        raise RuntimeError(
+            f"No classes found in {bed_file} for {regions_file}. Did you specify the correct column of your bed file?"
+            f"\tFile: {bed_file}"
+            f"\tColumn: {column}"
+        )
+    
     if class_priority is None:
         class_priority = sorted(list(classes))
     else:
@@ -281,4 +297,10 @@ def make_strand_features(
     }
     vals = np.array([VAL_MAP[v] for v in vals])
 
+    if np.isnan(vals).all():
+        raise RuntimeError(f"All values are NaN in {bed_file} for {regions_file}, cannot use as a feature.")
+    
+    if np.all(vals == 0):
+        raise RuntimeError(f"All values are the same in {bed_file} for {regions_file}, cannot use as a feature.")
+    
     return vals

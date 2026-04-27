@@ -694,6 +694,8 @@ class TopographyModel(ABC, BaseEstimator):
         dataset: GTensorDataset,
         threads: int = 1,
         key: str = "contributions",
+        locus_subsample: float = None,
+        **svi_kw,
     ) -> GTensorDataset:
         """
         Calculate and add component contributions to a dataset.
@@ -731,6 +733,8 @@ class TopographyModel(ABC, BaseEstimator):
             dataset,
             self.factor_model_,
             threads=threads,
+            locus_subsample=locus_subsample,
+            **svi_kw,
         )
 
         dataset = dataset.mutate(
@@ -750,6 +754,25 @@ class TopographyModel(ABC, BaseEstimator):
 
         logger.info(f'Added key to dataset: "{key}"')
         return dataset
+    
+    def needs_setup(self, dataset: GTensorDataset) -> bool:
+        """
+        Check if the dataset needs to be set up with corpus state.
+
+        This method checks if the dataset has the necessary corpus state initialized
+        for modeling. If not, it indicates that the dataset needs to be set up.
+
+        Parameters
+        ----------
+        dataset : GTensorDataset
+            The dataset to check for corpus state initialization.
+
+        Returns
+        -------
+        bool
+            True if the dataset needs to be set up (i.e., corpus state is not initialized), False otherwise.
+        """
+        return not self.GT.has_corpusstate(dataset)
 
     def annot_component_distributions(
         self,

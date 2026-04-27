@@ -331,6 +331,13 @@ class ContiguousDuplicatesToNanTransformer:
             ),
             axis=0,
         )
+        all_nan_cols = X.columns[X.isna().all()].tolist()
+        if all_nan_cols:
+            logger.warning(
+                f"After masking contiguous duplicates, {len(all_nan_cols)} feature(s) "
+                f"are entirely NaN (all values were contiguous duplicates): "
+                f"{str_wrapped_list(all_nan_cols)}"
+            )
         return super().fit(X, y)
 
 

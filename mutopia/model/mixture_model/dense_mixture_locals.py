@@ -3,6 +3,8 @@ from functools import reduce, partial
 from .base import *
 from ..model.model_components.base import _svi_update_fn
 from ..model.latent_var_models import LDAUpdateDense
+from ..model.latent_var_models.base import polyak_predict
+from mutopia.gtensor import LocusSlice
 
 logsafe_exp_transform = lambda x: np.nan_to_num(
     np.exp(x - np.nanmax(x)), nan=0.0, neginf=0.0
@@ -168,6 +170,60 @@ class DenseMixtureModel(LDAUpdateDense):
         )
 
         return updates
+
+    def _get_svi_predict_fns(
+        self,
+        dataset,
+        factor_model,
+        locus_subsample,
+        min_steps,
+        max_steps,
+        relative_tol,
+        seed,
+    ):
+        mixture_kw = self._get_mixture_kw(dataset)
+        init_fn = self._get_sample_init_fn(dataset)
+        n_loci = dataset.sizes["locus"]
+
+        same_exposure = self.same_exposures
+        estep_iters = self.estep_iterations
+        tol = np.float32(self.difference_tol)
+        dtype = self.dtype
+        alpha = mixture_kw["alpha"]
+        tau = mixture_kw["tau"]
+        component_map = mixture_kw["component_map"]
+        fraction_map = mixture_kw["fraction_map"]
+        n_sources = len(tau)
+        n_components = self.n_components
+
+        for i, (sample_name, sample) in enumerate(self.GT.iter_samples(dataset)):
+            weights = self._get_weights(sample)
+            init_nk = init_fn(sample)
+
+            def _make_step(model, ds, fm, w, ls):
+                def step_fn(loci, warm_start):
+                    sliced = LocusSlice(ds, locus=loci, keep_features=False)
+                    cll = model._conditional_observation_likelihood(
+                        sliced, fm, logsafe=True, with_context=False,
+                    )
+                    cll = np.ascontiguousarray(cll, dtype=dtype)
+                    w_slice = np.ascontiguousarray(w[..., loci], dtype=dtype) / ls
+                    nk = np.ascontiguousarray(warm_start.ravel(), dtype=dtype)
+                    return iterative_update(
+                        estep_iters, tol, same_exposure,
+                        alpha, tau, component_map, fraction_map,
+                        cll, w_slice, nk,
+                    ).reshape(n_sources, n_components)
+                return step_fn
+
+            yield partial(
+                polyak_predict,
+                _make_step(self, dataset, factor_model, weights, locus_subsample),
+                init_nk, n_loci, locus_subsample,
+                min_steps=min_steps, max_steps=max_steps,
+                relative_tol=relative_tol, seed=seed + i,
+                sample_name=sample_name,
+            )
 
     def reduce_model_sstats(
         self, model, carry, dataset, *, weighted_posterior, Nk, **sample_sstats

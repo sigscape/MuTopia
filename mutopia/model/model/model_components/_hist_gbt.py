@@ -53,7 +53,9 @@ class ShrunkTreePredictor:
 
 
 @njit(nogil=True)
-def _fit_bias(*, y_train, raw_predictions, intercept_train, intercept_val):
+def _fit_bias(
+    *, y_train, raw_predictions, sample_weight_train, intercept_train, intercept_val
+):
     """
     Parameters
     ----------
@@ -63,6 +65,8 @@ def _fit_bias(*, y_train, raw_predictions, intercept_train, intercept_val):
     raw_predictions : array-like of shape (n_samples, n_trees_per_iteration)
         The raw predictions of the model so far, speeds up calculations
         since these are not recomputed.
+    sample_weight_train : array-like of shape (n_samples,)
+        Sample weights (exposure) for each training observation.
     intercept_train : array-like of shape (n_samples,)
         A vector of int-encoded labels which indicate from which corpus
         a given observation is from.
@@ -76,8 +80,9 @@ def _fit_bias(*, y_train, raw_predictions, intercept_train, intercept_val):
     mean_pred = np.zeros(n_corpuses, dtype=raw_predictions.dtype)
 
     for i in range(n_train):
-        mean_y[intercept_train[i]] += y_train[i]
-        mean_pred[intercept_train[i]] += np.exp(raw_predictions[i, 0])
+        w = sample_weight_train[i]
+        mean_y[intercept_train[i]] += w * y_train[i]
+        mean_pred[intercept_train[i]] += w * np.exp(raw_predictions[i, 0])
 
     bias = np.log(mean_y) - np.log(mean_pred)
 
@@ -394,6 +399,7 @@ class BaseCustomBinnedGradientBooster(BaseHistGradientBoosting):
             bias_t_train, bias_t_val = _fit_bias(
                 y_train=y_train,
                 raw_predictions=raw_predictions,
+                sample_weight_train=sample_weight_train,
                 intercept_train=intercept_train,
                 intercept_val=intercept_val,
             )

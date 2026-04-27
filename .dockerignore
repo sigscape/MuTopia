@@ -1,0 +1,34 @@
+# Large data and output directories
+tutorials/
+website/build/
+encode_analysis/
+mgh_data/
+notebooks/
+downloads/
+pipeline/
+
+# Data files
+*.nc
+*.pkl
+*.bcf
+*.bam
+*.fastq
+*.tar.gz
+*.bed.gz
+*.bedgraph.gz
+*.bw
+
+# Python artifacts
+__pycache__/
+*.egg-info/
+*.pyc
+.pytest_cache/
+
+# Build artifacts
+build/
+dist/
+
+# IDE / OS
+.DS_Store
+.vscode/
+.idea/
