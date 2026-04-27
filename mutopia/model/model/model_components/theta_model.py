@@ -25,6 +25,8 @@ from ._feature_tranformer import (
     StratifiedTransformer,
 )
 
+def _get_corpus_dim(corpus):
+    return CS.get_dims(corpus)["locus"]
 
 class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
 
@@ -177,7 +179,7 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
         return get_corpus_intercepts(
             corpuses,
             self.corpus_encoder_,
-            n_repeats=lambda corpus: CS.get_dims(corpus)["locus"],
+            n_repeats=_get_corpus_dim,
         )
 
     def _get_intercept_design(self, *corpuses):
@@ -250,12 +252,16 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
 
     def format_component(self, k, normalization="none"):
         return 0.0
+    
 
+
+def _feature_name_combiner(feature_name, category):
+    return f"{feature_name}:{category}"
 
 class LinearThetaModel(ThetaModel):
 
     categorical_encoder = partial(OneHotEncoder, sparse_output=False, drop="first", 
-                                  feature_name_combiner=lambda fname, cat: f"{fname}:{cat}")
+                                  feature_name_combiner=_feature_name_combiner)
 
     def __init__(self, corpuses, l2_regularization=0.1, **kw):
         super().__init__(

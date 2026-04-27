@@ -14,7 +14,7 @@ from mutopia.gtensor.disk_interface import (
     list_samples,
 )
 from .pipeline_config import GTensorConfig, ProcessingConfig, FeatureConfig
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs, unquote
 import shutil
 from mutopia.cli.gensor_core import (
     create_gtensor,
@@ -93,6 +93,16 @@ class DownloadTask(luigi.Task):
         """Determine the local path to download the file to."""
         parsed_url = urlparse(self.url)
         filename = os.path.basename(parsed_url.path)
+        # For URLs with query-parameter filenames (e.g. GEO/NCBI), extract
+        # the filename from the 'file' query param if the path yields nothing.
+        if not filename or filename == "download" or filename == "download/":
+            query_file = parse_qs(parsed_url.query).get("file", [None])[0]
+            if query_file:
+                filename = unquote(query_file)
+        if not filename:
+            # Last resort: hash the URL for a stable unique name
+            import hashlib
+            filename = hashlib.md5(self.url.encode()).hexdigest()
         return os.path.join("gtensor__tempfiles/downloads", filename)
 
     def output(self):
@@ -401,7 +411,8 @@ class IngestSampleTask(luigi.Task):
         params.pop("file", None)  # Remove file as it's not needed here
         logger.info(
             f"Ingesting sample '{self.sample_id}' from file '{file_path}' "
-            f"into GTensor '{gtensor_path}'"
+            f"into GTensor '{gtensor_path}'. "
+            f"Clustering will be performed: {params['cluster']}. "
         )
         add_sample(**params)
 

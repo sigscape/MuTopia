@@ -420,7 +420,6 @@ class TopographyModel(ABC, BaseEstimator):
 
         return self
 
-
     def fit(
         self,
         train_datasets: Union[GTensorDataset, Sequence[GTensorDataset]],
@@ -575,6 +574,65 @@ class TopographyModel(ABC, BaseEstimator):
             model.prepare_to_save()
 
         dump(self, path)
+
+    def score(
+        self,
+        dataset: "GTensorDataset",
+        test_chroms: Sequence[str] = ("chr2",),
+        threads: int = 1,
+    ) -> float:
+        """
+        Score the model on a dataset using cross-validation by locus.
+
+        Splits the dataset by chromosome into train and test partitions,
+        fits local variables (per-sample component contributions) on the
+        train loci, then evaluates reconstruction quality on the held-out
+        test loci using those fitted locals.
+
+        Parameters
+        ----------
+        dataset : GTensorDataset
+            The dataset to score.
+        test_chroms : sequence of str, default=("chr2",)
+            Chromosomes to hold out for testing.
+        threads : int, default=1
+            Number of parallel threads.
+
+        Returns
+        -------
+        float
+            Pseudo-R² score (1 - deviance_fit / deviance_null) on test loci.
+        """
+        self._check_corpus(dataset)
+
+        train_loci, test_loci = train_test_split(dataset, *test_chroms)
+
+        train_loci = self.setup_corpus(train_loci, threads=threads)
+        test_loci = self.setup_corpus(test_loci, threads=threads)
+
+        # Fit local variables on train loci
+        sample_names = list(train_loci.list_samples())
+        contributions = self.locals_model_.predict(
+            train_loci, self.factor_model_, threads=threads
+        )
+        sample_idx = {name: i for i, name in enumerate(sample_names)}
+
+        # Build exposures function from fitted contributions
+        def exposures_fn(dataset, sample_name):
+            return (
+                contributions.isel(sample=sample_idx[sample_name])
+                .transpose(..., "component")
+                .data.ravel()
+            )
+
+        # Score on test loci using train-fitted locals
+        with ParContext(threads) as par:
+            return self.locals_model_.score(
+                self.factor_model_,
+                [test_loci],
+                exposures_fn=exposures_fn,
+                par_context=par,
+            )
 
     def annot_components(self, dataset: GTensorDataset, normalization: str = "global") -> GTensorDataset:
 

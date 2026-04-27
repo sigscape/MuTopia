@@ -140,7 +140,12 @@ studies/%/presets.02/: staged/%.train.nc staged/%.test.nc
 	topo-model study create $@ -ds $^ -lsub 0.2 -creg 0.00025 --save-model -ee -stop 100 $$PARAMS
 
 studies/%/presets.04/: staged/%.train.nc staged/%.test.nc
-	@mkdir -p studies/$*/presets.02
+	@mkdir -p studies/$*/presets.04
+	PARAMS=$$(python bin/params_from_config.py $*); \
+	topo-model study create $@ -ds $^ -lsub 0.2 --save-model -ee -stop 50 $$PARAMS
+
+studies/%/presets.05/: staged/%.train.nc staged/%.test.nc
+	@mkdir -p studies/$*/presets.05
 	PARAMS=$$(python bin/params_from_config.py $*); \
 	topo-model study create $@ -ds $^ -lsub 0.2 --save-model -ee -stop 50 $$PARAMS
 
@@ -331,9 +336,67 @@ analyses/%/base_annotation.nc:
 		--wait \
 		--wrap="python bin/base_annotation.py --model studies/$$STUDY_NAME/$$STUDY_ID/trial=$$MODEL_ID.pkl --base-gtensor gtensors/Lung-All.nc --output $@"
 
+# Alternative base annotations: impute mutation rates onto other tumor types' epigenomes.
+# Add new bases to ALT_BASES to extend coverage; each generates
+# analyses/%/base_annotations/<BASE>.nc via the shared recipe below.
+ALT_BASES := Breast-All Kidney-All
+
+define ALT_BASE_RECIPE
+	@mkdir -p $(dir $@)
+	@FULL_PATH="$*"; \
+	STUDY_NAME=$$(echo $$FULL_PATH | cut -d'/' -f1); \
+	STUDY_ID=$$(echo $$FULL_PATH | cut -d'/' -f2); \
+	MODEL_ID=$$(echo $$FULL_PATH | cut -d'/' -f3); \
+	BASE=$(notdir $(basename $@)); \
+	sbatch \
+		--mem=5G \
+		--cpus-per-task=5 \
+		--ntasks=1 \
+		--time=30:00 \
+		--job-name=$@ \
+		--output=%x.log \
+		--partition=short,park \
+		--account=park \
+		--wait \
+		--wrap="python bin/base_annotation.py \
+			--model studies/$$STUDY_NAME/$$STUDY_ID/trial=$$MODEL_ID.pkl \
+			--base-gtensor gtensors/$$BASE.nc \
+			--output $@"
+endef
+
+analyses/%/base_annotations/Breast-All.nc:
+	$(ALT_BASE_RECIPE)
+
+analyses/%/base_annotations/Kidney-All.nc:
+	$(ALT_BASE_RECIPE)
+
 joint_summary.tar.gz:
 	tar -cvf $@ $$(for model in $$(cat models.txt); do echo "analyses/$$model/annotated.shap.nc" "analyses/$$model/base_annotation.nc analyses/$$model/analysis.ipynb"; done) meta_analysis.ipynb models.txt
 
 joint_summary.doga.tar.gz:
 	tar -cvf $@ $$(for model in $$(cat models.txt); do echo "analyses/$$model/base_annotation.nc*.gz analyses/$$model/annotated.shap.nc"; done) analyses/joint_collection/*
 
+annotated.tar.gz:
+	tar -cvf $@ $$(for model in $$(cat models.txt); do echo "analyses/$$model/annotated.nc"; done)
+
+# Packages Lung-All base annotation (original), two alt-base annotations (Breast-All, Kidney-All),
+# and annotated.nc (same-tumor imputation — already contains component_distributions via annot_data).
+multi_base_annotations.tar.gz:
+	tar -cvf $@ $$(for model in $$(cat models.txt); do \
+		echo "analyses/$$model/base_annotation.nc"; \
+		echo "analyses/$$model/base_annotations/Breast-All.nc"; \
+		echo "analyses/$$model/base_annotations/Kidney-All.nc"; \
+		echo "analyses/$$model/annotated.nc"; \
+	done)
+
+# a model has the format "tumor_type/preset.04/model_id", and we need to add "studies/tumor_type/presets.04/trial=model_id.pkl" to the tarball for each model in models.txt.
+# let's also rename it to "tumor_type.model.pkl" in the tarball to avoid having a deep directory structure in the tarball.
+models.tar.gz:
+	mkdir -p temp_models && \
+	for model in $$(cat models.txt); do \
+		STUDY_NAME=$$(echo $$model | cut -d'/' -f1); \
+		MODEL_ID=$$(echo $$model | cut -d'/' -f3); \
+		cp studies/$$STUDY_NAME/presets.04/trial=$$MODEL_ID.pkl temp_models/$$STUDY_NAME.model.pkl; \
+	done && \
+	tar -cvf $@ -C temp_models . && \
+	rm -rf temp_models
