@@ -556,6 +556,15 @@ class TopographyModel(ABC, BaseEstimator):
         logger.info("Done ...")
         return dataset
 
+    def __getstate__(self) -> Dict[str, Any]:
+        # The callback is a training-loop hook (e.g. an Optuna pruning callback)
+        # that frequently closes over the training datasets. It has no role in
+        # the trained model's state and must not pin training data into the
+        # pickle.
+        state = self.__dict__.copy()
+        state["callback"] = None
+        return state
+
     def save(self, path: str) -> None:
         """
         Save the model to a file.

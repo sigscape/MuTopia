@@ -193,7 +193,7 @@ class AsCSR(BaseAccessor):
 
 
 @xr.register_dataarray_accessor("asdense")
-class AsCSR(BaseAccessor):
+class AsDense(BaseAccessor):
     def __call__(self):
         try:
             self._xrds.data = self._xrds.data.todense()
@@ -209,13 +209,13 @@ class IsSparse(BaseAccessor):
 
 
 @xr.register_dataset_accessor("list_samples")
-class FetchSample(BaseAccessor):
+class ListSamples(BaseAccessor):
     def __call__(self):
         return self._xrds.sample.values
 
 
 @xr.register_dataset_accessor("mutate")
-class FetchSample(BaseAccessor):
+class Mutate(BaseAccessor):
     def __call__(self, fn):
         return fn(self._xrds)
 
@@ -228,7 +228,7 @@ class FetchSample(BaseAccessor):
 
 
 @xr.register_dataset_accessor("iter_samples")
-class FetchSample(BaseAccessor):
+class IterSamples(BaseAccessor):
     def __call__(self, subset=None):
         load_samples = subset or self._xrds.list_samples()
         for sample_name in load_samples:
