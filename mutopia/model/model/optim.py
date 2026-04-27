@@ -2,6 +2,7 @@ from tqdm import trange
 from functools import partial
 from math import isnan
 import time
+import numpy as np  # STABILITY: for finite-checks on normalizers
 
 from mutopia.utils import logger, str_wrapped_list, timer_wrapper, ParContext
 from mutopia.gtensor import (
@@ -16,6 +17,19 @@ from mutopia.gtensor.validation import (
 from .factor_model import FactorModel
 from .latent_var_models.base import LocalsModel
 from .gtensor_interface import GtensorInterface
+
+
+def _check_normalizers_finite(normalizers, where):
+    # STABILITY: fail fast with an actionable error instead of letting NaNs
+    # quietly poison factor_model._normalizers through _svi_update_fn.
+    for name, norm in normalizers.items():
+        if not np.all(np.isfinite(norm)):
+            raise ValueError(
+                f"Non-finite normalizer values in '{where}' for dataset '{name}': "
+                f"{norm}. This usually means exp-offsets produced inf/NaN — check "
+                "log_locus_distribution / log_context_distribution for drift, "
+                "raise regularization, or raise locus_subsample."
+            )
 
 
 def VI_step(
@@ -36,9 +50,10 @@ def VI_step(
     )
 
     offsets, normalizers = factor_model.get_exp_offsets_dict(**args)
+    _check_normalizers_finite(normalizers, "VI_step")  # STABILITY
 
     """
-    In the previous "offsets" step, new normalizers were calculated. 
+    In the previous "offsets" step, new normalizers were calculated.
     Now we need to transer the normalizers to the full data set.
     """
     factor_model.update_normalizers(datasets, normalizers)
@@ -108,6 +123,7 @@ def SVI_step(
     Get the offsets from the sliced data.
     """
     offsets, normalizers = timer_wrapper(factor_model.get_exp_offsets_dict)(**args)
+    _check_normalizers_finite(normalizers, "SVI_step(slices)")  # STABILITY
 
     if full_normalizers:
         """
@@ -120,6 +136,7 @@ def SVI_step(
             datasets=datasets,
             par_context=par_context,
         )
+        _check_normalizers_finite(normalizers, "SVI_step(full)")  # STABILITY
 
         factor_model.update_normalizers(datasets, normalizers)
     else:
@@ -381,7 +398,9 @@ def fit_model(
 
     with ParContext(threads, verbose) as par:
 
-        # factor_model.init_normalizers(train_datasets, par_context=par)
+        # STABILITY: seed the normalizers from the full training data so early
+        # SVI epochs don't start from zero while theta predictions are non-trivial.
+        factor_model.init_normalizers(train_datasets, par_context=par)
 
         try:
             progress_bar = trange(
