@@ -38,7 +38,7 @@ System requirements
 
 **Hardware**
 
-MuTopia runs on commodity CPU hardware — no GPU required.
+MuTopia runs on CPU hardware — no GPU required.
 Training a 15-component model on a cohort of ~200 WGS samples uses
 ~8 GB RAM with default settings; inference and annotation use <4 GB.
 
@@ -46,9 +46,7 @@ Installation
 ------------
 
 MuTopia requires **Python 3.11** due to a pinned scikit-learn dependency (1.4.2)
-used for fast gradient-boosted tree training. We recommend
-`uv <https://docs.astral.sh/uv/>`_ — it resolves and installs the full dependency
-set in seconds and keeps environments reproducible across machines.
+used for fast gradient-boosted tree training.
 
 **With Docker (zero setup)** — ~2 minutes:
 
@@ -56,17 +54,6 @@ set in seconds and keeps environments reproducible across machines.
 
    docker pull allenlynch/mutopia:latest
    docker run --rm -v "$PWD":/workspace allenlynch/mutopia:latest gtensor --help
-
-**With uv (recommended for native installs)** — under 30 seconds:
-
-.. code-block:: bash
-
-   # Install uv if you don't have it
-   curl -LsSf https://astral.sh/uv/install.sh | sh
-
-   uv venv --python 3.11 .venv
-   source .venv/bin/activate
-   uv pip install mutopia
 
 **With conda / bioconda** — 2–4 minutes:
 
@@ -78,6 +65,17 @@ which pulls in the bioinformatics tool dependencies (``bedtools``,
 
    conda create -n mutopia -c conda-forge -c bioconda -y python=3.11 mutopia
    conda activate mutopia
+
+**With uv (you must install bioinformatic dependencies separately)** — under 30 seconds:
+
+.. code-block:: bash
+
+   # Install uv if you don't have it
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+
+   uv venv --python 3.11 .venv
+   source .venv/bin/activate
+   uv pip install mutopia
 
 Verify the CLI tools are on your ``PATH``:
 
@@ -123,9 +121,7 @@ likely generating process.
 
 **Expected output:** ``annotated.vcf`` is a copy of the input VCF with new
 ``INFO`` fields per record giving the most likely component (signature) for
-that mutation and its posterior probability. The full set of annotation fields
-is described in the
-`annotate-vcf reference <https://sigscape.github.io/MuTopia/stable/cli/mutopia-sbs.html>`_.
+that mutation and its posterior probability.
 
 **Expected run time:** ~2–3 minutes end-to-end (annotation itself ~30 seconds;
 the rest is the one-time G-Tensor download).
@@ -138,11 +134,11 @@ To run on your own data:
 1. **Annotate a VCF with a pre-trained model** — follow the demo above,
    replacing ``CHC197.sample.hg38.vcf.gz`` with your VCF and choosing the
    tumor-type-matched model from the Zenodo repository.
-2. **Train a new model on your cohort** — see Tutorial 3 for the end-to-end
+2. **Train a new model on your cohort** — see Tutorials 1-3 for the end-to-end
    workflow (build G-Tensor → split → train → score).
-3. **Analyze a trained model** — see Tutorial 4 for component plots, SHAP
-   feature attribution, and marginal predictions, and Tutorial 5 for
-   genome-browser visualization.
+3. **Analyze a trained model** — see Tutorial 4 for signature plots, SHAP
+   feature attribution, and marginal predictions. See Tutorial 5 for
+   genome-browser visualizations.
 
 Preprint
 --------
