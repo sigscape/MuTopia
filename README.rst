@@ -1,5 +1,5 @@
-MuTopia — Mutational Topography Modeling
-=========================================
+MuTopia — Mutational Topography Inference and Analysis
+======================================================
 
 **MuTopia** learns *topographic models* of somatic mutation: it simultaneously
 decomposes a cohort's mutation counts into distinct processes (signatures)
