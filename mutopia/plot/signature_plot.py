@@ -50,7 +50,7 @@ def _plot_linear_signature(
 
     for i, (label, s) in enumerate(signatures.items()):
         ax.bar(
-            height=[v / 1 for v in s],
+            height=[v / extent for v in s],
             x=range(i, n_bars, n_sigs),
             color=_get_color(i),
             **plot_kw,
