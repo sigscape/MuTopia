@@ -691,7 +691,6 @@
         <span class="k">return</span> <span class="bp">self</span></div>
 
 
-
 <div class="viewcode-block" id="TopographyModel.fit">
 <a class="viewcode-back" href="../../../api/model.html#mutopia.model.base.TopographyModel.fit">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
@@ -834,6 +833,15 @@
         <span class="k">return</span> <span class="n">dataset</span></div>
 
 
+    <span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="c1"># The callback is a training-loop hook (e.g. an Optuna pruning callback)</span>
+        <span class="c1"># that frequently closes over the training datasets. It has no role in</span>
+        <span class="c1"># the trained model&#39;s state and must not pin training data into the</span>
+        <span class="c1"># pickle.</span>
+        <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">state</span><span class="p">[</span><span class="s2">&quot;callback&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="n">state</span>
+
 <div class="viewcode-block" id="TopographyModel.save">
 <a class="viewcode-back" href="../../../api/model.html#mutopia.model.base.TopographyModel.save">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -854,6 +862,68 @@
             <span class="n">model</span><span class="o">.</span><span class="n">prepare_to_save</span><span class="p">()</span>
 
         <span class="n">dump</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TopographyModel.score">
+<a class="viewcode-back" href="../../../api/model.html#mutopia.model.base.TopographyModel.score">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">score</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">dataset</span><span class="p">:</span> <span class="s2">&quot;GTensorDataset&quot;</span><span class="p">,</span>
+        <span class="n">test_chroms</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;chr2&quot;</span><span class="p">,),</span>
+        <span class="n">threads</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Score the model on a dataset using cross-validation by locus.</span>
+
+<span class="sd">        Splits the dataset by chromosome into train and test partitions,</span>
+<span class="sd">        fits local variables (per-sample component contributions) on the</span>
+<span class="sd">        train loci, then evaluates reconstruction quality on the held-out</span>
+<span class="sd">        test loci using those fitted locals.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        dataset : GTensorDataset</span>
+<span class="sd">            The dataset to score.</span>
+<span class="sd">        test_chroms : sequence of str, default=(&quot;chr2&quot;,)</span>
+<span class="sd">            Chromosomes to hold out for testing.</span>
+<span class="sd">        threads : int, default=1</span>
+<span class="sd">            Number of parallel threads.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        float</span>
+<span class="sd">            Pseudo-R² score (1 - deviance_fit / deviance_null) on test loci.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_corpus</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
+
+        <span class="n">train_loci</span><span class="p">,</span> <span class="n">test_loci</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="o">*</span><span class="n">test_chroms</span><span class="p">)</span>
+
+        <span class="n">train_loci</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">setup_corpus</span><span class="p">(</span><span class="n">train_loci</span><span class="p">,</span> <span class="n">threads</span><span class="o">=</span><span class="n">threads</span><span class="p">)</span>
+        <span class="n">test_loci</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">setup_corpus</span><span class="p">(</span><span class="n">test_loci</span><span class="p">,</span> <span class="n">threads</span><span class="o">=</span><span class="n">threads</span><span class="p">)</span>
+
+        <span class="c1"># Fit local variables on train loci</span>
+        <span class="n">sample_names</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">train_loci</span><span class="o">.</span><span class="n">list_samples</span><span class="p">())</span>
+        <span class="n">contributions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">locals_model_</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
+            <span class="n">train_loci</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">factor_model_</span><span class="p">,</span> <span class="n">threads</span><span class="o">=</span><span class="n">threads</span>
+        <span class="p">)</span>
+        <span class="n">sample_idx</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">sample_names</span><span class="p">)}</span>
+
+        <span class="c1"># Build exposures function from fitted contributions</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">exposures_fn</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">sample_name</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">(</span>
+                <span class="n">contributions</span><span class="o">.</span><span class="n">isel</span><span class="p">(</span><span class="n">sample</span><span class="o">=</span><span class="n">sample_idx</span><span class="p">[</span><span class="n">sample_name</span><span class="p">])</span>
+                <span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="s2">&quot;component&quot;</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Score on test loci using train-fitted locals</span>
+        <span class="k">with</span> <span class="n">ParContext</span><span class="p">(</span><span class="n">threads</span><span class="p">)</span> <span class="k">as</span> <span class="n">par</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">locals_model_</span><span class="o">.</span><span class="n">score</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">factor_model_</span><span class="p">,</span>
+                <span class="p">[</span><span class="n">test_loci</span><span class="p">],</span>
+                <span class="n">exposures_fn</span><span class="o">=</span><span class="n">exposures_fn</span><span class="p">,</span>
+                <span class="n">par_context</span><span class="o">=</span><span class="n">par</span><span class="p">,</span>
+            <span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="TopographyModel.annot_components">
