@@ -24,17 +24,59 @@ All workflow files live in `.github/workflows/`.
 
 | File | Triggers | What it does |
 |---|---|---|
+| `tests.yml` | push to `main`/`imports`, any PR | Installs the package and runs the fast pytest suite. Gates merges (when branch protection is enabled). |
 | `docs.yml` | push to `main`, `v*.*.*` tag | Builds Sphinx docs → deploys to `gh-pages` branch. Main → `/latest/`. Tag → `/vX.Y.Z/` + `/stable/` + root redirect. |
-| `publish.yml` | `v*.*.*` tag | Builds sdist + wheel → publishes to PyPI via trusted publishing (no secrets). |
+| `publish.yml` | `v*.*.*` tag | Runs the test suite, then builds sdist + wheel → publishes to PyPI via trusted publishing (no secrets). Build fails closed if tests fail. |
 | `docker.yml` | push to `main`, `v*.*.*` tag | Builds multi-arch image (linux/amd64, linux/arm64) → pushes to Docker Hub. Main → `:edge`. Tag → `:X.Y.Z`, `:X.Y`, `:X`, `:latest`. |
+
+## Tests
+
+The fast suite (~25 s) runs on every push and PR via `tests.yml`. Locally:
+
+```bash
+conda activate mutopia-model
+pip install -e '.[testing]'
+pytest tests/                       # full fast suite
+pytest tests/test_inference.py -v   # one file, verbose
+pytest tests/ --runslow             # add the slow training tier
+```
+
+### Fixtures
+
+| Tier | Source | Where | Cached |
+|---|---|---|---|
+| Fast | `sigscape/MuTopia` release `test-fixtures` | `tests/fixtures/` | yes |
+| Slow | Zenodo record `18803136` (`Liver-HCC.nc`) | `tests/fixtures/zenodo/` | yes |
+
+Both are downloaded on first use by `tests/conftest.py`. To regenerate the
+fast-tier fixtures from the tutorial gtensor:
+
+```bash
+python tests/build_chr22_fixture.py
+# then upload tests/fixtures/*.nc and *.pkl to a new release on sigscape/MuTopia
+# update FIXTURE_RELEASE_TAG in tests/conftest.py and the cache key in tests.yml
+```
+
+### Versioning
+
+`mutopia.__version__` is derived from `git describe` at install/build time:
+
+- Tagged build (`v1.0.5`) → `1.0.5`
+- Dev build between tags → e.g. `1.0.6.dev3+gabc1234`
+
+The `mutopia/_version.py` file is generated at build and is gitignored. Never
+edit it. Anyone reading `mutopia/__init__.py` will see the runtime resolver,
+not a literal.
 
 ## Cutting a release
 
-1. Bump the version in `setup.cfg` (or `pyproject.toml`, whichever holds it).
-2. Commit: `git commit -am "bump version 1.0.5"`
-3. Push: `git push sigscape main`
-4. Tag: `git tag v1.0.5`
-5. Push the tag: `git push sigscape v1.0.5`
+The version comes from the git tag via `setuptools_scm` — there is no version
+literal to bump in source.
+
+1. Make sure `sigscape/main` is green and contains the commits you want to ship.
+2. Sync local main: `git fetch sigscape && git checkout main && git merge --ff-only sigscape/main`
+3. Tag: `git tag v1.0.5`
+4. Push the tag: `git push sigscape v1.0.5`
 
 That triggers, in parallel:
 
