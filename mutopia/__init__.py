@@ -1,1 +1,6 @@
-__version__ = "1.0.7"
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__ = version("mutopia")
+except PackageNotFoundError:
+    __version__ = "0.0.0+unknown"
