@@ -1,0 +1,911 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="tracks" href="tracks.html"><link rel="prev" title="Plot API" href="../plot.html">
+        <link rel="prefetch" href="../../_static/mutopia_logo.png" as="image">
+        <link rel="prefetch" href="../../_static/mutopia_logo.png" as="image">
+
+    <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
+        <title>mutopia.plot.track_plot - MuTopia documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=8fd06a5a" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  --content-width: 85rem;
+  --toc-width: 22rem;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  --content-width: 85rem;
+  --toc-width: 22rem;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  --content-width: 85rem;
+  --toc-width: 22rem;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../index.html"><div class="brand">MuTopia  documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
+  <div class="sidebar-logo-container">
+    <img class="sidebar-logo only-light" src="../../_static/mutopia_logo.png" alt="Light Logo"/>
+    <img class="sidebar-logo only-dark" src="../../_static/mutopia_logo.png" alt="Dark Logo"/>
+  </div>
+  
+  <span class="sidebar-brand-text">MuTopia  documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started.html">Getting started with MuTopia</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../tutorials/index.html">MuTopia Tutorials</a><input aria-label="Toggle navigation of MuTopia Tutorials" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/1.building_a_gtensor.html">Tutorial 1: Building G-Tensors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/2.analyzing_gtensors.html">Tutorial 2: Analyzing G-Tensors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/3.training_models.html">Tutorial 3: Tuning and training models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/4.analyzing_models.html">Tutorial 4: Analyzing Topographic Models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/5.annotating_vcfs.html">Tutorial 5: Annotating VCFs with a Pre-Trained Model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/6.genome_browser_plotting.html">Tutorial 6: Genome-browser plotting with a trained model</a></li>
+</ul>
+</li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../index.html">API Reference</a><input aria-label="Toggle navigation of API Reference" checked="" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../gtensor.html">GTensor API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../model.html">TopographyModel API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../plot.html">Plot API</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">mutopia.plot.track_plot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-mutopia.plot.track_plot.track_plot">track_plot API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tracks.html">tracks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="transforms.html">transforms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../modes/sbs.html">SBS Modality</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../modes/modes.html">Base ModeConfig</a></li>
+</ul>
+</li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../../_sources/api/track_plot/track_plot.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="module-mutopia.plot.track_plot">
+<span id="mutopia-plot-track-plot"></span><h1>mutopia.plot.track_plot<a class="headerlink" href="#module-mutopia.plot.track_plot" title="Link to this heading">¶</a></h1>
+<p>Genome track plotting utilities for visualizing genomic data.</p>
+<p>This module provides functions for creating genome browser-style visualizations
+with multiple data tracks including line plots, heatmaps, and genomic annotations.</p>
+<p>To plot a genome view from a G-Tensor object, first define a view, and a configuration.
+A configuration is a Python function which describes the layout of the plot, but does
+not reference any specific data. For example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">mutopia.plot.track_plot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tr</span>
+
+<span class="n">view</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">make_view</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">&quot;chr1:100000-200000&quot;</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Example Region&quot;</span><span class="p">)</span>
+
+<span class="n">config</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">view</span><span class="p">:</span> <span class="p">(</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">scale_bar</span><span class="p">(</span><span class="n">length</span><span class="o">=</span><span class="mf">1e7</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="s2">&quot;mb&quot;</span><span class="p">),</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">ideogram</span><span class="p">(</span><span class="n">cytobands_file</span><span class="o">=</span><span class="s2">&quot;path/to/cytobands.txt&quot;</span><span class="p">),</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">line_plot</span><span class="p">(</span>
+        <span class="n">tr</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s2">&quot;Features/H3K9me3&quot;</span><span class="p">),</span>
+        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;H3K9me3&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+
+<span class="n">ax</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">view</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>You can create multi-column layouts and overlayed plots using <code class="docutils literal notranslate"><span class="pre">tr.columns(...)</span></code> and
+<code class="docutils literal notranslate"><span class="pre">tr.stack_plots(...)</span></code>, respectively:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">mutopia.plot.track_plot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tr</span>
+
+<span class="n">view</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">make_view</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">&quot;chr1:100000-200000&quot;</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Example Region&quot;</span><span class="p">)</span>
+
+<span class="n">config</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">view</span><span class="p">:</span> <span class="p">(</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">columns</span><span class="p">(</span>
+        <span class="o">...</span><span class="p">,</span>  <span class="c1"># Ellipsis to leave a blank column</span>
+        <span class="n">tr</span><span class="o">.</span><span class="n">line_plot</span><span class="p">(</span><span class="n">tr</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s2">&quot;Regions/exposures&quot;</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Exposure&quot;</span><span class="p">),</span>
+    <span class="p">),</span>
+    <span class="n">tr</span><span class="o">.</span><span class="n">columns</span><span class="p">(</span>
+        <span class="n">tr</span><span class="o">.</span><span class="n">stack_plots</span><span class="p">(</span>
+            <span class="n">tr</span><span class="o">.</span><span class="n">line_plot</span><span class="p">(</span><span class="n">tr</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s2">&quot;Regions/length&quot;</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Length&quot;</span><span class="p">),</span>
+            <span class="n">tr</span><span class="o">.</span><span class="n">fill_plot</span><span class="p">(</span><span class="n">tr</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s2">&quot;Regions/exposures&quot;</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Exposure&quot;</span><span class="p">),</span>
+            <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Overlayed Tracks&quot;</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="o">...</span><span class="p">,</span>
+    <span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">ax</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">view</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This way, the configuration can be reused for different datasets or regions of the genome.</p>
+</section>
+<section id="module-mutopia.plot.track_plot.track_plot">
+<span id="track-plot-api"></span><h1>track_plot API<a class="headerlink" href="#module-mutopia.plot.track_plot.track_plot" title="Link to this heading">¶</a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.plot.track_plot.track_plot.bar_plot">
+<span class="sig-prename descclassname"><span class="pre">mutopia.plot.track_plot.track_plot.</span></span><span class="sig-name descname"><span class="pre">bar_plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">accessor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">height</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">yticks</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax_fn</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;function</span> <span class="pre">&lt;lambda&gt;&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'#acacacff'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/mutopia/plot/track_plot/track_plot.html#bar_plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.plot.track_plot.track_plot.bar_plot" title="Link to this definition">¶</a></dt>
+<dd><p>Create a bar plot track for discrete genomic data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>accessor</strong> (<em>callable</em>) – Function to extract data from dataset</p></li>
+<li><p><strong>label</strong> (<em>str</em><em>, </em><em>optional</em>) – Track label</p></li>
+<li><p><strong>height</strong> (<em>float</em><em>, </em><em>default 1</em>) – Track height in figure units</p></li>
+<li><p><strong>yticks</strong> (<em>bool</em><em>, </em><em>default False</em>) – Whether to show y-axis ticks</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Track name</p></li>
+<li><p><strong>ax_fn</strong> (<em>callable</em>) – Function for additional axis customization</p></li>
+<li><p><strong>color</strong> (<em>str</em><em> or </em><em>array-like</em><em>, </em><em>default &quot;#acacacff&quot;</em>) – Bar color(s)</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments passed to plt.bar</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Bar plot function.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>callable</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">mutopia.plot.track_plot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tr</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cfg</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="n">tr</span><span class="o">.</span><span class="n">bar_plot</span><span class="p">(</span><span class="n">tr</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s2">&quot;Regions/length&quot;</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Length&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">cfg</span><span class="p">,</span> <span class="n">tr</span><span class="o">.</span><span class="n">make_view</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">&quot;chr1:1-1_000_000&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.plot.track_plot.track_plot.categorical_plot">
+<span class="sig-prename descclassname"><span class="pre">mutopia.plot.track_plot.track_plot.</span></span><span class="sig-name descname"><span class="pre">categorical_plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">accessor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">height</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">palette</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'tab10'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">edgecolor</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax_fn</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;function</span> <span class="pre">&lt;lambda&gt;&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/mutopia/plot/track_plot/track_plot.html#categorical_plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.plot.track_plot.track_plot.categorical_plot" title="Link to this definition">¶</a></dt>
+<dd><p>Create a categorical data track with colored rectangles.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>accessor</strong> (<em>callable</em>) – Function to extract categorical data from dataset</p></li>
+<li><p><strong>order</strong> (<em>list</em><em>, </em><em>optional</em>) – Order of categories for display</p></li>
+<li><p><strong>label</strong> (<em>str</em><em>, </em><em>optional</em>) – Track label</p></li>
+<li><p><strong>height</strong> (<em>float</em><em>, </em><em>default 1</em>) – Track height in figure units</p></li>
+<li><p><strong>palette</strong> (<em>str</em><em> or </em><em>list</em><em>, </em><em>default &quot;tab10&quot;</em>) – Color palette name or list of colors</p></li>
+<li><p><strong>edgecolor</strong> (<em>str</em><em>, </em><em>optional</em>) – Edge color for rectangles</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Track name</p></li>
+<li><p><strong>ax_fn</strong> (<em>callable</em>) – Function for additional axis customization</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments passed to plt.Rectangle</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Categorical plot function.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>callable</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">mutopia.plot.track_plot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tr</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cfg</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="n">tr</span><span class="o">.</span><span class="n">categorical_plot</span><span class="p">(</span><span class="n">tr</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s2">&quot;Regions/chrom&quot;</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">cfg</span><span class="p">,</span> <span class="n">tr</span><span class="o">.</span><span class="n">make_view</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">&quot;chr1:1-1_000_000&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.plot.track_plot.track_plot.center_at_zero">
+<span class="sig-prename descclassname"><span class="pre">mutopia.plot.track_plot.track_plot.</span></span><span class="sig-name descname"><span class="pre">center_at_zero</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ax</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/mutopia/plot/track_plot/track_plot.html#center_at_zero"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.plot.track_plot.track_plot.center_at_zero" title="Link to this definition">¶</a></dt>
+<dd><p>Center the y-axis of the plot at zero.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>ax</strong> (<em>matplotlib.axes.Axes</em>) – The axes to modify.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>matplotlib.axes.Axes</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.plot.track_plot.track_plot.columns">
+<span class="sig-prename descclassname"><span class="pre">mutopia.plot.track_plot.track_plot.</span></span><span class="sig-name descname"><span class="pre">columns</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">plotting_fns</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">height</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/mutopia/plot/track_plot/track_plot.html#columns"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.plot.track_plot.track_plot.columns" title="Link to this definition">¶</a></dt>
+<dd><p>Create a multi-column track container.</p>
+<p>Use this to lay out multiple plotting tracks side-by-side within a
+single row. Pass plotting callables for each column. Use <code class="docutils literal notranslate"><span class="pre">...</span></code>
+(Ellipsis) to leave a blank column in the layout.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>*plotting_fns</strong> (<em>callable</em><em> | </em><em>Ellipsis</em>) – Plotting callables to place in each column (e.g.,
+<code class="docutils literal notranslate"><span class="pre">line_plot(...)</span></code>, <code class="docutils literal notranslate"><span class="pre">heatmap_plot(...)</span></code>). Use <code class="docutils literal notranslate"><span class="pre">...</span></code> to skip a column.</p></li>
+<li><p><strong>height</strong> (<em>float</em><em>, </em><em>default 1</em>) – Track row height in figure units.</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Optional track name for referencing.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A plotting callable that receives an array of Axes for the row and
+draws each column.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>callable</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">mutopia.plot.track_plot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tr</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">view</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">make_view</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">&quot;chr1:1_000_000-1_100_000&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cfg</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="n">tr</span><span class="o">.</span><span class="n">columns</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">tr</span><span class="o">.</span><span class="n">line_plot</span><span class="p">(</span><span class="n">tr</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s2">&quot;Regions/length&quot;</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Length&quot;</span><span class="p">),</span>
+<span class="gp">... </span>    <span class="o">...</span><span class="p">,</span>  <span class="c1"># leave middle column blank</span>
+<span class="gp">... </span>    <span class="n">tr</span><span class="o">.</span><span class="n">bar_plot</span><span class="p">(</span><span class="n">tr</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s2">&quot;Regions/exposures&quot;</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Exposure&quot;</span><span class="p">),</span>
+<span class="gp">... </span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">cfg</span><span class="p">,</span> <span class="n">view</span><span class="p">,</span> <span class="n">width_ratios</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mf">0.6</span><span class="p">,</span> <span class="mf">1.2</span><span class="p">])</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.plot.track_plot.track_plot.custom_plot">
+<span class="sig-prename descclassname"><span class="pre">mutopia.plot.track_plot.track_plot.</span></span><span class="sig-name descname"><span class="pre">custom_plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">height</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/mutopia/plot/track_plot/track_plot.html#custom_plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.plot.track_plot.track_plot.custom_plot" title="Link to this definition">¶</a></dt>
+<dd><p>Create a custom plotting track from a user-defined function.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fn</strong> (<em>callable</em>) – Custom plotting function that takes an axes object</p></li>
+<li><p><strong>height</strong> (<em>float</em><em>, </em><em>default 1</em>) – Track height in figure units</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Track name</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Custom plot function.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>callable</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.plot.track_plot.track_plot.fill_plot">
+<span class="sig-prename descclassname"><span class="pre">mutopia.plot.track_plot.track_plot.</span></span><span class="sig-name descname"><span class="pre">fill_plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">accessor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">height</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">yticks</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'#acacacff'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax_fn</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;function</span> <span class="pre">&lt;lambda&gt;&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/mutopia/plot/track_plot/track_plot.html#fill_plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.plot.track_plot.track_plot.fill_plot" title="Link to this definition">¶</a></dt>
+<dd><p>Create a filled area plot track.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>accessor</strong> (<em>callable</em>) – Function to extract data from dataset</p></li>
+<li><p><strong>label</strong> (<em>str</em><em>, </em><em>optional</em>) – Track label</p></li>
+<li><p><strong>height</strong> (<em>float</em><em>, </em><em>default 1</em>) – Track height in figure units</p></li>
+<li><p><strong>yticks</strong> (<em>bool</em><em>, </em><em>default False</em>) – Whether to show y-axis ticks</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Track name</p></li>
+<li><p><strong>color</strong> (<em>str</em><em>, </em><em>default &quot;#acacacff&quot;</em>) – Fill color</p></li>
+<li><p><strong>ax_fn</strong> (<em>callable</em>) – Function for additional axis customization</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments passed to plt.fill_between</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Fill plot function.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>callable</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">mutopia.plot.track_plot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tr</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cfg</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="n">tr</span><span class="o">.</span><span class="n">fill_plot</span><span class="p">(</span><span class="n">tr</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s2">&quot;Regions/length&quot;</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Length&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">cfg</span><span class="p">,</span> <span class="n">tr</span><span class="o">.</span><span class="n">make_view</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">&quot;chr1:1-1_000_000&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.plot.track_plot.track_plot.heatmap_plot">
+<span class="sig-prename descclassname"><span class="pre">mutopia.plot.track_plot.track_plot.</span></span><span class="sig-name descname"><span class="pre">heatmap_plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">accessor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">palette</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;matplotlib.colors.LinearSegmentedColormap</span> <span class="pre">object&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">yticks</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">height</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">row_cluster</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cluster_kw</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cbar</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cbar_kw</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax_fn</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;function</span> <span class="pre">&lt;lambda&gt;&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/mutopia/plot/track_plot/track_plot.html#heatmap_plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.plot.track_plot.track_plot.heatmap_plot" title="Link to this definition">¶</a></dt>
+<dd><p>Create a heatmap track for matrix data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>accessor</strong> (<em>callable</em>) – Function to extract 2D data from dataset</p></li>
+<li><p><strong>palette</strong> (<em>str</em><em> or </em><em>colormap</em><em>, </em><em>default diverging_palette</em>) – Color palette for heatmap</p></li>
+<li><p><strong>label</strong> (<em>str</em><em>, </em><em>optional</em>) – Track label</p></li>
+<li><p><strong>yticks</strong> (<em>bool</em><em>, </em><em>default True</em>) – Whether to show y-axis tick labels</p></li>
+<li><p><strong>height</strong> (<em>float</em><em>, </em><em>default 1</em>) – Track height in figure units</p></li>
+<li><p><strong>row_cluster</strong> (<em>bool</em><em>, </em><em>default False</em>) – Whether to cluster rows hierarchically</p></li>
+<li><p><strong>cluster_kw</strong> (<em>dict</em><em>, </em><em>default {}</em>) – Keyword arguments for clustering</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Track name</p></li>
+<li><p><strong>cbar</strong> (<em>bool</em><em>, </em><em>default True</em>) – Whether to show colorbar</p></li>
+<li><p><strong>cbar_kw</strong> (<em>dict</em><em>, </em><em>default {}</em>) – Keyword arguments for colorbar</p></li>
+<li><p><strong>ax_fn</strong> (<em>callable</em>) – Function for additional axis customization</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments passed to plt.pcolormesh</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Heatmap plotting function.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>callable</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">mutopia.plot.track_plot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tr</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cfg</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="n">tr</span><span class="o">.</span><span class="n">heatmap_plot</span><span class="p">(</span><span class="n">tr</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s2">&quot;Some/Matrix&quot;</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Matrix&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">cfg</span><span class="p">,</span> <span class="n">tr</span><span class="o">.</span><span class="n">make_view</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">&quot;chr1:1-1_000_000&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.plot.track_plot.track_plot.ideogram">
+<span class="sig-prename descclassname"><span class="pre">mutopia.plot.track_plot.track_plot.</span></span><span class="sig-name descname"><span class="pre">ideogram</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cytobands_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">height</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.15</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/mutopia/plot/track_plot/track_plot.html#ideogram"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.plot.track_plot.track_plot.ideogram" title="Link to this definition">¶</a></dt>
+<dd><p>Create an ideogram track showing chromosome bands.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cytobands</strong> (<em>pandas.DataFrame</em>) – DataFrame with columns ‘chrom’, ‘start’, ‘end’, ‘band’, ‘stain’</p></li>
+<li><p><strong>height</strong> (<em>float</em><em>, </em><em>default 0.15</em>) – Track height in figure units</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Track name</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments passed to plt.Rectangle</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Ideogram plotting function.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>callable</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">mutopia.plot.track_plot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tr</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cfg</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="n">tr</span><span class="o">.</span><span class="n">ideogram</span><span class="p">(</span><span class="s2">&quot;/path/to/cytoBand.txt.gz&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">cfg</span><span class="p">,</span> <span class="n">tr</span><span class="o">.</span><span class="n">make_view</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">&quot;chr1:1-5_000_000&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.plot.track_plot.track_plot.line_plot">
+<span class="sig-prename descclassname"><span class="pre">mutopia.plot.track_plot.track_plot.</span></span><span class="sig-name descname"><span class="pre">line_plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">accessor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">height</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">yticks</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fill</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'#acacacff'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax_fn</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;function</span> <span class="pre">&lt;lambda&gt;&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/mutopia/plot/track_plot/track_plot.html#line_plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.plot.track_plot.track_plot.line_plot" title="Link to this definition">¶</a></dt>
+<dd><p>Create a line plot track for continuous genomic data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>accessor</strong> (<em>callable</em>) – Function to extract data from dataset</p></li>
+<li><p><strong>label</strong> (<em>str</em><em>, </em><em>optional</em>) – Track label</p></li>
+<li><p><strong>height</strong> (<em>float</em><em>, </em><em>default 1</em>) – Track height in figure units</p></li>
+<li><p><strong>yticks</strong> (<em>bool</em><em>, </em><em>default False</em>) – Whether to show y-axis ticks</p></li>
+<li><p><strong>fill</strong> (<em>bool</em><em>, </em><em>default False</em>) – Whether to fill area under the line</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Track name for referencing</p></li>
+<li><p><strong>color</strong> (<em>str</em><em>, </em><em>default &quot;#acacacff&quot;</em>) – Line color</p></li>
+<li><p><strong>ax_fn</strong> (<em>callable</em>) – Function for additional axis customization</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments passed to plt.plot</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Line plot function.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>callable</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">mutopia.plot.track_plot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tr</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cfg</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="n">tr</span><span class="o">.</span><span class="n">line_plot</span><span class="p">(</span><span class="n">tr</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s2">&quot;Regions/length&quot;</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Length&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">cfg</span><span class="p">,</span> <span class="n">tr</span><span class="o">.</span><span class="n">make_view</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">&quot;chr1:1-1_000_000&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.plot.track_plot.track_plot.make_view">
+<span class="sig-prename descclassname"><span class="pre">mutopia.plot.track_plot.track_plot.</span></span><span class="sig-name descname"><span class="pre">make_view</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">region</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/mutopia/plot/track_plot/track_plot.html#make_view"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.plot.track_plot.track_plot.make_view" title="Link to this definition">¶</a></dt>
+<dd><p>Create a GenomeView for a specific genomic region.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset</strong> (<em>GTensorDataset</em>) – Input genomic dataset (or interface) containing Regions coordinates.</p></li>
+<li><p><strong>region</strong> (<em>str</em><em>, </em><em>optional</em>) – Region spec like “chr1:100000-200000”. If None and dataset has a single
+chromosome, the full range for that chromosome is used.</p></li>
+<li><p><strong>title</strong> (<em>str</em><em>, </em><em>optional</em>) – Optional figure title used by plot_view.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Configured genome view object.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>GenomeView</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">mutopia.plot.track_plot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tr</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">view</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">make_view</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">&quot;chr1:1_000_000-1_200_000&quot;</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">&quot;chr1 slice&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.plot.track_plot.track_plot.plot_view">
+<span class="sig-prename descclassname"><span class="pre">mutopia.plot.track_plot.track_plot.</span></span><span class="sig-name descname"><span class="pre">plot_view</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">configuration</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">view</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">width</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">7</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gridpsec_kw</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{'hspace':</span> <span class="pre">0.1,</span> <span class="pre">'wspace':</span> <span class="pre">0.1}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">width_ratios</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/mutopia/plot/track_plot/track_plot.html#plot_view"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.plot.track_plot.track_plot.plot_view" title="Link to this definition">¶</a></dt>
+<dd><p>Render a genome view using a configuration of track functions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>configuration</strong> (<em>callable</em>) – A function that takes the GenomeView and returns one or more track
+callables (e.g., line_plot(…), heatmap_plot(…)).</p></li>
+<li><p><strong>view</strong> (<em>GenomeView</em>) – The genome view produced by make_view.</p></li>
+<li><p><strong>width</strong> (<em>float</em><em>, </em><em>default 7</em>) – Figure width in inches.</p></li>
+<li><p><strong>gridpsec_kw</strong> (<em>dict</em><em>, </em><em>optional</em>) – GridSpec kwargs for inter-row/column spacing.</p></li>
+<li><p><strong>width_ratios</strong> (<em>sequence</em><em> of </em><em>float</em><em>, </em><em>optional</em>) – Relative column widths for multi-column layouts.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The rendered figure.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>matplotlib.figure.Figure</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">mutopia.plot.track_plot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tr</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">view</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">make_view</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">&quot;chr1:1_000_000-1_100_000&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cfg</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="n">tr</span><span class="o">.</span><span class="n">line_plot</span><span class="p">(</span><span class="n">tr</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s2">&quot;Regions/length&quot;</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Length&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">cfg</span><span class="p">,</span> <span class="n">view</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.plot.track_plot.track_plot.scale_bar">
+<span class="sig-prename descclassname"><span class="pre">mutopia.plot.track_plot.track_plot.</span></span><span class="sig-name descname"><span class="pre">scale_bar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">length</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">height</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'kb'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/mutopia/plot/track_plot/track_plot.html#scale_bar"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.plot.track_plot.track_plot.scale_bar" title="Link to this definition">¶</a></dt>
+<dd><p>Create a scale bar track showing genomic distance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>length</strong> (<em>int</em><em>, </em><em>default 10000</em>) – Length of scale bar in base pairs</p></li>
+<li><p><strong>height</strong> (<em>float</em><em>, </em><em>default 0.1</em>) – Track height in figure units</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Track name</p></li>
+<li><p><strong>label</strong> (<em>str</em><em>, </em><em>optional</em>) – Track label</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Scale bar plotting function.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>callable</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">mutopia.plot.track_plot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tr</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cfg</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="n">tr</span><span class="o">.</span><span class="n">scale_bar</span><span class="p">(</span><span class="n">length</span><span class="o">=</span><span class="mi">100_000</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="s2">&quot;kb&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">cfg</span><span class="p">,</span> <span class="n">tr</span><span class="o">.</span><span class="n">make_view</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">&quot;chr1:1-2_000_000&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.plot.track_plot.track_plot.scatterplot">
+<span class="sig-prename descclassname"><span class="pre">mutopia.plot.track_plot.track_plot.</span></span><span class="sig-name descname"><span class="pre">scatterplot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">accessor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">height</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">yticks</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">c</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax_fn</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;function</span> <span class="pre">&lt;lambda&gt;&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/mutopia/plot/track_plot/track_plot.html#scatterplot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.plot.track_plot.track_plot.scatterplot" title="Link to this definition">¶</a></dt>
+<dd><p>Create a scatter plot track for point data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>accessor</strong> (<em>callable</em>) – Function to extract data from dataset</p></li>
+<li><p><strong>label</strong> (<em>str</em><em>, </em><em>optional</em>) – Track label</p></li>
+<li><p><strong>height</strong> (<em>float</em><em>, </em><em>default 1</em>) – Track height in figure units</p></li>
+<li><p><strong>yticks</strong> (<em>bool</em><em>, </em><em>default False</em>) – Whether to show y-axis ticks</p></li>
+<li><p><strong>c</strong> (<em>str</em><em> or </em><em>array-like</em><em>, </em><em>optional</em>) – Point colors</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Track name</p></li>
+<li><p><strong>ax_fn</strong> (<em>callable</em>) – Function for additional axis customization</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments passed to plt.scatter</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Scatter plot function.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>callable</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">mutopia.plot.track_plot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tr</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cfg</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="n">tr</span><span class="o">.</span><span class="n">scatterplot</span><span class="p">(</span><span class="n">tr</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s2">&quot;Regions/length&quot;</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Length&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">cfg</span><span class="p">,</span> <span class="n">tr</span><span class="o">.</span><span class="n">make_view</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">&quot;chr1:1-1_000_000&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.plot.track_plot.track_plot.spacer">
+<span class="sig-prename descclassname"><span class="pre">mutopia.plot.track_plot.track_plot.</span></span><span class="sig-name descname"><span class="pre">spacer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">height</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/mutopia/plot/track_plot/track_plot.html#spacer"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.plot.track_plot.track_plot.spacer" title="Link to this definition">¶</a></dt>
+<dd><p>Insert an empty spacer track to separate other tracks.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>height</strong> (<em>float</em><em>, </em><em>default 0.1</em>) – Spacer height in figure units.</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Optional track name.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Plotting callable that renders an empty row.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>callable</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">mutopia.plot.track_plot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tr</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cfg</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="p">(</span><span class="n">tr</span><span class="o">.</span><span class="n">line_plot</span><span class="p">(</span><span class="n">tr</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s2">&quot;Regions/length&quot;</span><span class="p">)),</span> <span class="n">tr</span><span class="o">.</span><span class="n">spacer</span><span class="p">(</span><span class="mf">0.25</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">_</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">cfg</span><span class="p">,</span> <span class="n">tr</span><span class="o">.</span><span class="n">make_view</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">&quot;chr1:1-2_000_000&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.plot.track_plot.track_plot.stack_plots">
+<span class="sig-prename descclassname"><span class="pre">mutopia.plot.track_plot.track_plot.</span></span><span class="sig-name descname"><span class="pre">stack_plots</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*plotting_fns</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">height</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">legend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax_fn</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;function</span> <span class="pre">&lt;lambda&gt;&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/mutopia/plot/track_plot/track_plot.html#stack_plots"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.plot.track_plot.track_plot.stack_plots" title="Link to this definition">¶</a></dt>
+<dd><p>Combine multiple plotting functions into a single track.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>*plotting_fns</strong> – Variable number of plotting functions to stack</p></li>
+<li><p><strong>height</strong> (<em>float</em><em>, </em><em>default 1</em>) – Track height in figure units</p></li>
+<li><p><strong>label</strong> (<em>str</em><em>, </em><em>optional</em>) – Track label for y-axis</p></li>
+<li><p><strong>legend</strong> (<em>bool</em><em>, </em><em>default True</em>) – Whether to show legend</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Track name for referencing</p></li>
+<li><p><strong>ax_fn</strong> (<em>callable</em>) – Function to apply final customizations to axes</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Combined plotting function.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>callable</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">mutopia.plot.track_plot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tr</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cfg</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="n">tr</span><span class="o">.</span><span class="n">stack_plots</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">tr</span><span class="o">.</span><span class="n">line_plot</span><span class="p">(</span><span class="n">tr</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s2">&quot;Regions/length&quot;</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Length&quot;</span><span class="p">),</span>
+<span class="gp">... </span>    <span class="n">tr</span><span class="o">.</span><span class="n">line_plot</span><span class="p">(</span><span class="n">tr</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s2">&quot;Regions/exposures&quot;</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Exposure&quot;</span><span class="p">),</span>
+<span class="gp">... </span>    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Tracks&quot;</span>
+<span class="gp">... </span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">cfg</span><span class="p">,</span> <span class="n">tr</span><span class="o">.</span><span class="n">make_view</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">&quot;chr1:1-1_000_000&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.plot.track_plot.track_plot.static_track">
+<span class="sig-prename descclassname"><span class="pre">mutopia.plot.track_plot.track_plot.</span></span><span class="sig-name descname"><span class="pre">static_track</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">track_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">height</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">yticks</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax_fn</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;function</span> <span class="pre">&lt;lambda&gt;&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**properties</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/mutopia/plot/track_plot/track_plot.html#static_track"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.plot.track_plot.track_plot.static_track" title="Link to this definition">¶</a></dt>
+<dd><p>Create a static track using pygenometracks.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>track_type</strong> (<em>str</em>) – Type of track (e.g., ‘GtfTrack’, ‘BedTrack’, ‘BigwigTrack’)</p></li>
+<li><p><strong>file</strong> (<em>str</em>) – Path to the data file</p></li>
+<li><p><strong>height</strong> (<em>float</em><em>, </em><em>default 1</em>) – Track height in figure units</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Track name</p></li>
+<li><p><strong>label</strong> (<em>str</em><em>, </em><em>optional</em>) – Track label</p></li>
+<li><p><strong>yticks</strong> (<em>bool</em><em>, </em><em>default False</em>) – Whether to show y-axis ticks</p></li>
+<li><p><strong>ax_fn</strong> (<em>callable</em>) – Function for additional axis customization</p></li>
+<li><p><strong>**properties</strong> – Additional properties passed to the track</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Static track plotting function.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>callable</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">mutopia.plot.track_plot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tr</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cfg</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="n">tr</span><span class="o">.</span><span class="n">static_track</span><span class="p">(</span><span class="s2">&quot;BigWigTrack&quot;</span><span class="p">,</span> <span class="s2">&quot;/path/to/signal.bw&quot;</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Signal&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">cfg</span><span class="p">,</span> <span class="n">tr</span><span class="o">.</span><span class="n">make_view</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">&quot;chr1:1-1_000_000&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.plot.track_plot.track_plot.text_banner">
+<span class="sig-prename descclassname"><span class="pre">mutopia.plot.track_plot.track_plot.</span></span><span class="sig-name descname"><span class="pre">text_banner</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">label</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">height</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.15</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/mutopia/plot/track_plot/track_plot.html#text_banner"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.plot.track_plot.track_plot.text_banner" title="Link to this definition">¶</a></dt>
+<dd><p>Create a simple text banner track with a horizontal rule.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>label</strong> (<em>str</em>) – Text to display centered across the track.</p></li>
+<li><p><strong>height</strong> (<em>float</em><em>, </em><em>default 0.15</em>) – Track height in figure units.</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Optional track name.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Plotting callable for use inside a plot_view configuration.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>callable</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">mutopia.plot.track_plot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tr</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cfg</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="n">tr</span><span class="o">.</span><span class="n">text_banner</span><span class="p">(</span><span class="s2">&quot;My Region&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">_</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">cfg</span><span class="p">,</span> <span class="n">tr</span><span class="o">.</span><span class="n">make_view</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">&quot;chr1:1-2_000_000&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mutopia.plot.track_plot.track_plot.xaxis_plot">
+<span class="sig-prename descclassname"><span class="pre">mutopia.plot.track_plot.track_plot.</span></span><span class="sig-name descname"><span class="pre">xaxis_plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">height</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/mutopia/plot/track_plot/track_plot.html#xaxis_plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mutopia.plot.track_plot.track_plot.xaxis_plot" title="Link to this definition">¶</a></dt>
+<dd><p>Create a track showing genomic coordinates on x-axis.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>height</strong> (<em>float</em><em>, </em><em>default 0.1</em>) – Track height in figure units</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Track name</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>X-axis plotting function.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>callable</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">mutopia.plot.track_plot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tr</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cfg</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="n">tr</span><span class="o">.</span><span class="n">xaxis_plot</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">tr</span><span class="o">.</span><span class="n">plot_view</span><span class="p">(</span><span class="n">cfg</span><span class="p">,</span> <span class="n">tr</span><span class="o">.</span><span class="n">make_view</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">region</span><span class="o">=</span><span class="s2">&quot;chr1:1-2_000_000&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="tracks.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">tracks</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="../plot.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Plot API</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2026, Allen W. Lynch
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer no-toc">
+      
+      
+      
+    </aside>
+  </div>
+</div><script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=7a06b15b"></script>
+    <script src="../../_static/design-tabs.js?v=f930bc37"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    </body>
+</html>
