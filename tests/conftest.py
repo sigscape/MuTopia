@@ -14,6 +14,31 @@ from pathlib import Path
 
 import pytest
 
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--runslow",
+        action="store_true",
+        default=False,
+        help="Run tests marked @pytest.mark.slow (training, convergence).",
+    )
+
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers", "slow: marks tests that take >30s (deselect with default pytest run)"
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    if config.getoption("--runslow"):
+        return
+    skip_slow = pytest.mark.skip(reason="needs --runslow option to run")
+    for item in items:
+        if "slow" in item.keywords:
+            item.add_marker(skip_slow)
+
+
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
 
 # Update both the tag and the asset list when fixtures are rebuilt.
