@@ -841,7 +841,57 @@ def annot(
     annot(model, dataset, output, region=region, threads=threads, calc_shap=calc_shap, celltype=celltype)
 
 
-@model.command("predict", short_help="Estimate sample contributions via SVI")
+@model.command("score", short_help="Score model on held-out loci")
+@click.argument("model", type=click.Path(exists=True), metavar="MODEL_FILE")
+@click.argument("dataset", type=click.Path(exists=True), metavar="DATASET_FILE")
+@click.option(
+    "--test-chrom",
+    type=str,
+    multiple=True,
+    default=("chr2",),
+    help="Chromosome(s) to hold out for testing (default: chr2)",
+)
+@click.option(
+    "-@",
+    "--threads",
+    type=click.IntRange(1, 1000),
+    default=1,
+    help="Number of parallel threads",
+)
+def score(
+    model: str,
+    dataset: str,
+    test_chrom: tuple,
+    threads: int = 1,
+):
+    """
+    Score a trained model on a dataset using cross-validation by locus.
+
+    Fits per-sample local variables on non-held-out chromosomes, then
+    evaluates reconstruction quality (pseudo-R²) on the held-out chromosomes.
+
+    Examples:
+        # Score with default held-out chromosome (chr2)
+        model score trained_model.pkl data.nc
+
+        # Hold out multiple chromosomes
+        model score trained_model.pkl data.nc --test-chrom chr1 --test-chrom chr2
+
+        # Score with parallel threads
+        model score trained_model.pkl data.nc --threads 8
+    """
+    from .model_core import score_model
+
+    result = score_model(
+        model_path=model,
+        dataset_path=dataset,
+        test_chroms=test_chrom,
+        threads=threads,
+    )
+    click.echo(f"{result:.6f}")
+
+
+@model.command("add-model-state", short_help="Add model state to dataset")
 @click.argument("model", type=click.Path(exists=True), metavar="MODEL_FILE")
 @click.argument("dataset", type=click.Path(exists=True), metavar="DATASET_FILE")
 @click.argument("output", type=click.Path(writable=True), metavar="OUTPUT_FILE")

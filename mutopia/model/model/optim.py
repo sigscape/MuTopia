@@ -38,7 +38,7 @@ def VI_step(
     offsets, normalizers = factor_model.get_exp_offsets_dict(**args)
 
     """
-    In the previous "offsets" step, new normalizers were calculated. 
+    In the previous "offsets" step, new normalizers were calculated.
     Now we need to transer the normalizers to the full data set.
     """
     factor_model.update_normalizers(datasets, normalizers)
@@ -381,7 +381,9 @@ def fit_model(
 
     with ParContext(threads, verbose) as par:
 
-        # factor_model.init_normalizers(train_datasets, par_context=par)
+        # STABILITY: seed the normalizers from the full training data so early
+        # SVI epochs don't start from zero while theta predictions are non-trivial.
+        factor_model.init_normalizers(train_datasets, par_context=par)
 
         try:
             progress_bar = trange(

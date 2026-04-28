@@ -168,6 +168,20 @@ def add_model_state(model_path: str, dataset_path: str, output_path: str):
     disk.write_dataset(dataset, output_path)
 
 
+def score_model(
+    model_path: str,
+    dataset_path: str,
+    test_chroms: tuple = ("chr2",),
+    threads: int = 1,
+) -> float:
+    import mutopia.analysis as mu
+
+    model = mu.load_model(model_path)
+    dataset = gt.eager_load(dataset_path)
+
+    return model.score(dataset, test_chroms=test_chroms, threads=threads)
+
+
 def simulate_from_model(
     model_path: str,
     dataset_path: str,

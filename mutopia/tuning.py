@@ -235,7 +235,7 @@ def load_study_data(study, lazy=False):
 
     return train, test
 
-def _model_report_callback(trial, factor_model, epoch, test_scores,*, data):
+def _model_report_callback(trial, factor_model, epoch, test_scores):
     """
     Callback function for reporting trial progress to Optuna.
 
@@ -264,13 +264,6 @@ def _model_report_callback(trial, factor_model, epoch, test_scores,*, data):
         trial.report(test_scores[-1], epoch)
         if trial.should_prune():
             raise optuna.TrialPruned()
-
-    #locals = factor_model.GT.fetch_locals(data)
-    #print("EPOCH ", epoch, ": VARIANCE=", var(locals.values))
-    #path = os.path.join("generated/studies/healthy.length.full.03", f"trial-{trial.number}_locals", f"epoch-{epoch}.csv")
-    #os.makedirs(os.path.dirname(path), exist_ok=True)
-    #print(f"Saving locals to {path}")
-    #locals.to_dataframe().to_csv(path)
 
 
 def _get_save_model_fn(study):
@@ -378,7 +371,7 @@ def _objective(
         + "\n\t".join([f"{key}: {value}" for key, value in params.items()])
     )
 
-    callback = partial(_model_report_callback, trial, data=train[0])
+    callback = partial(_model_report_callback, trial)
 
     model.set_params(
         **params,
