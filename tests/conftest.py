@@ -113,3 +113,46 @@ def test_dataset(test_nc_path: Path):
     import mutopia.analysis as mu
 
     return mu.gt.eager_load(str(test_nc_path))
+
+
+# ---------------------------------------------------------------------------
+# Full-scale (Zenodo) fixtures — only requested by slow-tier tests.
+# ---------------------------------------------------------------------------
+
+ZENODO_RECORD = "18803136"
+ZENODO_BASE_URL = f"https://zenodo.org/records/{ZENODO_RECORD}/files"
+ZENODO_CACHE_DIR = FIXTURE_DIR / "zenodo"
+ZENODO_TUMOR_TYPE = "Liver-HCC"
+
+
+def _ensure_zenodo_asset(name: str) -> Path:
+    path = ZENODO_CACHE_DIR / name
+    if path.exists():
+        return path
+
+    ZENODO_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    url = f"{ZENODO_BASE_URL}/{name}"
+    print(f"[fixtures] downloading {name} from Zenodo (large; first run only)")
+    try:
+        urllib.request.urlretrieve(url, path)
+    except Exception as e:
+        if path.exists():
+            path.unlink()
+        pytest.skip(
+            f"Could not download Zenodo asset {name} from {url} ({e}). "
+            f"Slow-tier tests require network access to zenodo.org."
+        )
+    return path
+
+
+@pytest.fixture(scope="session")
+def zenodo_liver_path() -> Path:
+    return _ensure_zenodo_asset(f"{ZENODO_TUMOR_TYPE}.nc")
+
+
+@pytest.fixture(scope="session")
+def zenodo_liver_split(zenodo_liver_path: Path):
+    """Train/test split of the full Liver-HCC gtensor by holding out chr1."""
+    from mutopia.gtensor import lazy_train_test_load
+
+    return lazy_train_test_load(str(zenodo_liver_path), "chr1")
