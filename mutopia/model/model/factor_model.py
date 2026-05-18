@@ -65,7 +65,27 @@ class FactorModel:
         learning_rate=1.0,
         use_parallel=True,
     ):
+        import os as _os
+        import numpy as _np
+        from mutopia.utils import logger as _logger
         datasets = self.GT.to_datasets(*datasets)
+
+        if _os.environ.get("MUTOPIA_DIAGNOSE", "0") != "0":
+            for model_name in self.models:
+                ss = sstats[model_name + "_sstats"]
+                of = offsets[model_name + "_offsets"]
+                for corpus_name in ss:
+                    for k in range(self.n_components):
+                        t = _np.asarray(ss[corpus_name][k]).ravel()
+                        e = _np.asarray(of[corpus_name][k]).ravel()
+                        _logger.info(
+                            f"[diag-mstep] {model_name} corpus={corpus_name} k={k}: "
+                            f"target sum={float(_np.nansum(t)):.4g} "
+                            f"nan={int(_np.isnan(t).sum())} zeros={int((t==0).sum())}/{t.size}; "
+                            f"eta sum={float(_np.nansum(e)):.4g} "
+                            f"nan={int(_np.isnan(e).sum())} zeros={int((e==0).sum())}/{e.size} "
+                            f"min={float(_np.nanmin(e)):.4g}"
+                        )
 
         update_fns = chain.from_iterable(
             (

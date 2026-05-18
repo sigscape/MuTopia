@@ -446,7 +446,7 @@ def _just_next_Nk(Nks):
 
 def polyak_predict(step_fn, init_nk, n_loci, locus_subsample,
                    min_steps=30, max_steps=500, relative_tol=0.01, seed=42,
-                   sample_name=None):
+                   sample_name=None, source_names=None, log_every=5):
     """
     Stochastic prediction with Polyak averaging and variance-based convergence.
 
@@ -487,6 +487,9 @@ def polyak_predict(step_fn, init_nk, n_loci, locus_subsample,
     original_shape = init_nk.shape
     d = init_nk.size
     label = sample_name or "sample"
+    print(f"[polyak_predict] {label}: n_loci={n_loci}, n_subset={n_subset}, "
+          f"min_steps={min_steps}, max_steps={max_steps}, tol={relative_tol}",
+          flush=True)
 
     nk_mean = np.zeros(d, dtype=np.float32)
     # Welford accumulators for the *proportion* (Nk / sum(Nk))
@@ -510,6 +513,8 @@ def polyak_predict(step_fn, init_nk, n_loci, locus_subsample,
             nk_t = step_fn(loci, warm_start).ravel()
             nk_history.append(nk_t.copy())
 
+            inner_residual = getattr(step_fn, "_last_residual", None)
+
             # Running mean of raw Nk (used as the final estimate)
             nk_mean += (nk_t - nk_mean) / t
 
@@ -523,23 +528,44 @@ def polyak_predict(step_fn, init_nk, n_loci, locus_subsample,
 
             warm_start = nk_mean.reshape(original_shape).copy()
 
+            # Periodic source-fraction log
+            if t % log_every == 0:
+                src_counts = nk_mean.reshape(original_shape).sum(axis=-1)
+                total = src_counts.sum()
+                if total > 0:
+                    fracs = src_counts / total
+                    if source_names is not None:
+                        frac_str = "  ".join(
+                            f"{n}={f:.3f}" for n, f in
+                            sorted(zip(source_names, fracs), key=lambda x: -x[1])
+                        )
+                    else:
+                        frac_str = "  ".join(f"src{i}={f:.3f}" for i, f in
+                                             enumerate(np.sort(fracs)[::-1]))
+                    logger.info(f"{label} t={t}/{max_steps}  {frac_str}")
+
             if t >= 2:
                 # SE of the mean proportion
                 sample_var = prop_m2 / (t - 1)
                 se = np.sqrt(sample_var / t)
                 rel_se = np.linalg.norm(se) / (np.linalg.norm(prop_mean) + 1e-10)
-                pbar.set_postfix(rel_se=f"{rel_se:.4f}")
+                postfix = {"rel_se": f"{rel_se:.4f}"}
+                if inner_residual is not None:
+                    postfix["inner_resid"] = f"{inner_residual:.2e}"
+                pbar.set_postfix(postfix)
                 if t >= min_steps and rel_se < relative_tol:
                     pbar.close()
                     logger.info(
-                        f"{label}: converged after {t} steps (rel_se={rel_se:.6f})"
+                        f"{label}: converged after {t} steps "
+                        f"(rel_se={rel_se:.6f}, last inner residual={inner_residual:.2e})"
                     )
                     break
         else:
             pbar.close()
             logger.warning(
                 f"{label}: reached max_steps={max_steps} without converging "
-                f"(rel_se={rel_se:.6f}, tol={relative_tol})"
+                f"(rel_se={rel_se:.6f}, tol={relative_tol}, "
+                f"last inner residual={inner_residual:.2e})"
             )
     except KeyboardInterrupt:
         pbar.close()
@@ -694,8 +720,13 @@ class LocalsModel:
         max_steps=500,
         relative_tol=0.01,
         seed=42,
+        estep_iterations=100_000,
+        difference_tol=1e-5,
     ):
-        with predict_mode(self):
+        print(f"[_predict_svi] estep_iterations={estep_iterations}, "
+              f"difference_tol={difference_tol}, locus_subsample={locus_subsample}, "
+              f"min_steps={min_steps}, max_steps={max_steps}", flush=True)
+        with predict_mode(self, estep_iterations=estep_iterations, difference_tol=difference_tol):
             predict_fns = self._get_svi_predict_fns(
                 dataset,
                 factor_model,

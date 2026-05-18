@@ -1,3 +1,4 @@
+import os
 from functools import partial, reduce
 import numpy as np
 from xarray import DataArray
@@ -333,11 +334,28 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         )
 
     def _get_log_context_distribution(self, corpus_state):
-        return np.array(
+        raw = np.array(
             [self._format_component(k) for k in range(self.n_components)],
             dtype=self.dtype,
             order="C",
         )
+        n_nan = int(np.isnan(raw).sum())
+        n_high = int((raw > 30.0).sum())
+        n_low = int((raw < -30.0).sum())
+        if n_nan or n_high or n_low:
+            logger.warning(
+                f"context._get_log_context_distribution: "
+                f"raw min={np.nanmin(raw):.3f} max={np.nanmax(raw):.3f} "
+                f"nan={n_nan} clipped_high={n_high} clipped_low={n_low} "
+                f"coefs_abs_max={np.nanmax(np.abs(self._coefs)):.3f}"
+            )
+        elif os.environ.get("MUTOPIA_DIAGNOSE", "0") != "0":
+            logger.info(
+                f"[diag] context_dist: min={raw.min():.3f} max={raw.max():.3f} "
+                f"coefs_abs_max={np.abs(self._coefs).max():.3f}"
+            )
+        # Clip so exp() of this stays within float32 (exp(30) ~ 1e13).
+        return np.clip(raw, -30.0, 30.0)
 
     def update_corpusstate(self, corpus, **kwargs):
         CS.fetch_val(corpus, "log_context_distribution").data[:] = (

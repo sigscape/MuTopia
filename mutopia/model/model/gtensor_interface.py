@@ -35,6 +35,8 @@ class GtensorInterface:
 
     @classmethod
     def list_sources(cls, dataset):
+        if "source" in dataset.coords:
+            return dataset.coords["source"].values.tolist()
         return [cls.get_name(dataset)]
 
     @classmethod

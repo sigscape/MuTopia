@@ -1,6 +1,8 @@
 import inspect
+import os
 from functools import partial
 import numpy as np
+from mutopia.utils import logger
 from sklearn.linear_model import PoissonRegressor
 from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
 from sklearn.base import clone
@@ -159,9 +161,28 @@ class ThetaModel(RateModel, SparseDataBase, DenseDataBase):
 
         X = self._check_input(self._fetch_feature_matrix(corpus))
 
+        diagnose = os.environ.get("MUTOPIA_DIAGNOSE", "0") != "0"
         for k in range(self.n_components):
-            CS.fetch_val(corpus, "log_locus_distribution")[k].data[:] = self._predict(
+            raw = self._predict(
                 k, corpus, from_scratch=from_scratch, X=X, check_input=False
+            )
+            n_nan = int(np.isnan(raw).sum())
+            n_high = int((raw > 30.0).sum())
+            n_low = int((raw < -30.0).sum())
+            if n_nan or n_high or n_low:
+                logger.warning(
+                    f"theta._predict k={k} corpus={CS.get_name(corpus)}: "
+                    f"raw min={np.nanmin(raw):.3f} max={np.nanmax(raw):.3f} "
+                    f"nan={n_nan} clipped_high={n_high} clipped_low={n_low}"
+                )
+            elif diagnose:
+                logger.info(
+                    f"[diag] theta._predict k={k}: "
+                    f"min={raw.min():.3f} max={raw.max():.3f} mean={raw.mean():.3f}"
+                )
+            # Clip so exp() of this stays within float32 (exp(30) ~ 1e13).
+            CS.fetch_val(corpus, "log_locus_distribution")[k].data[:] = np.clip(
+                raw, -30.0, 30.0
             )
 
     """
@@ -389,7 +410,7 @@ class GBTThetaModel(ThetaModel):
             interaction_cst=interaction_groups if use_groups else None,
             verbose=False,
             learning_rate=tree_learning_rate,
-            random_state=1776,
+            random_state=random_state,
             **tree_kw,
         )
 
