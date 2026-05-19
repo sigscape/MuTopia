@@ -177,6 +177,11 @@ class GtensorInterface:
             "Regions/context_frequencies"
         ].transpose(..., "locus")
 
+        # context_frequencies may contain genuine zeros where a k-mer does not
+        # appear in the reference at a given locus. In an internally
+        # consistent G-Tensor, the observed weight at those same cells is also
+        # zero, so the deviance term is 0 * log(0) = NaN and nansum drops it.
+        # No floor needed; do not silently regularize the data.
         dataset["Regions/context_frequencies"].data = asfortranarray(
             dataset["Regions/context_frequencies"].data,
             dtype=float32,

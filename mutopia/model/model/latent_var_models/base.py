@@ -1,3 +1,4 @@
+import os
 from abc import abstractmethod
 from xarray import DataArray
 from tqdm import tqdm
@@ -785,6 +786,17 @@ class LocalsModel:
         )
 
         d_fit, d_null = list(zip(*parallel_gen(dev_fns, par_context, ordered=False)))
+
+        if os.environ.get("MUTOPIA_DIAGNOSE", "0") != "0":
+            df = np.asarray(d_fit, dtype=np.float64)
+            dn = np.asarray(d_null, dtype=np.float64)
+            logger.info(
+                f"[diag-score] n_samples={len(df)} "
+                f"d_fit nan={int(np.isnan(df).sum())} inf={int(np.isinf(df).sum())} "
+                f"min={float(np.nanmin(df)):.4g} max={float(np.nanmax(df)):.4g} sum={float(np.nansum(df)):.4g}; "
+                f"d_null nan={int(np.isnan(dn).sum())} inf={int(np.isinf(dn).sum())} "
+                f"min={float(np.nanmin(dn)):.4g} max={float(np.nanmax(dn)):.4g} sum={float(np.nansum(dn)):.4g}"
+            )
 
         return 1 - sum(d_fit) / sum(d_null)
 

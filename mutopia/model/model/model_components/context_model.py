@@ -95,7 +95,8 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
 
         if len(fix_components) > 0 or len(init_components) > 0:
             self.init_from_signatures(
-                corpus.modality().load_components(*fix_components, *init_components)
+                corpus.modality().load_components(*fix_components, *init_components),
+                pseudocount=np.array([1e-8]*len(fix_components) + [5e-3]*len(init_components))[:, None],
             )
 
         optim_kw = dict(
@@ -274,8 +275,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
 
         return sstats.astype(self.dtype, copy=False)
 
-    def init_from_signatures(self, signatures):
-
+    def init_from_signatures(self, signatures, pseudocount=5e-3):
         num_loaded = signatures.shape[0]
 
         if num_loaded > self.n_components:
@@ -291,7 +291,7 @@ class StrandedContextModel(RateModel, SparseDataBase, DenseDataBase):
         )
 
         context_effects = context_effects / context_effects.sum(axis=1, keepdims=True)
-        log_eff = np.log(context_effects + 5e-3)
+        log_eff = np.log(context_effects + pseudocount)
         log_eff -= np.mean(log_eff, axis=1, keepdims=True)
 
         k = min(num_loaded, self.n_components)
