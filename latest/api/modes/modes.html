@@ -372,6 +372,33 @@ pipeline methods <code class="docutils literal notranslate"><span class="pre">ge
 </dl>
 </dd></dl>
 
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">component_spectra</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normalization</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'none'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/mutopia/modalities/mode_config.html#ModeConfig.component_spectra"><span class="viewcode-link"><span class="pre">[source]</span></span></a></dt>
+<dd><p>Per-component reference spectra, from a fitted model or a gTensor.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>source</strong> (<a class="reference internal" href="../model.html#mutopia.model.base.TopographyModel" title="mutopia.model.base.TopographyModel"><em>TopographyModel</em></a><em> or </em><em>gTensor Dataset</em>) – A fitted model — spectra are read straight off its context model, so
+no dataset is needed — or a dataset already annotated with
+<code class="docutils literal notranslate"><span class="pre">Spectra/spectra</span></code> by <code class="docutils literal notranslate"><span class="pre">model.annot_components</span></code>.</p></li>
+<li><p><strong>normalization</strong> (<em>{&quot;global&quot;</em><em>, </em><em>&quot;weighted&quot;</em><em>, </em><em>&quot;none&quot;}</em><em>, </em><em>default=&quot;none&quot;</em>) – <code class="docutils literal notranslate"><span class="pre">&quot;none&quot;</span></code> gives a per-context mutation <em>rate</em>, which is the
+convention the bundled signature database uses (see
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">match_components()</span></code>).  <code class="docutils literal notranslate"><span class="pre">&quot;global&quot;</span></code> weights by the context
+distribution, giving a COSMIC-style probability over the 96 channels.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p>xarray.DataArray with dims <code class="docutils literal notranslate"><span class="pre">(component,</span> <span class="pre">context)</span></code>.  Modalities whose</p></li>
+<li><p>spectra carry extra state (SBS mesoscale <code class="docutils literal notranslate"><span class="pre">genome_state</span></code>) return the</p></li>
+<li><p><em>baseline state, which is the one comparable to a reference database.</em></p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
 <dl class="py property">
 <dt class="sig sig-object py">
 <span class="property"><span class="k"><span class="pre">abstract</span></span><span class="w"> </span><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">coords</span></span></dt>
@@ -435,6 +462,49 @@ modality metadata attached via attributes.</p>
 <dd class="field-odd"><p>xarray.DataArray</p>
 </dd>
 </dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">match_components</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">reference</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">top_k</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normalization</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'none'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/mutopia/modalities/mode_config.html#ModeConfig.match_components"><span class="viewcode-link"><span class="pre">[source]</span></span></a></dt>
+<dd><p>Match component spectra against the modality’s reference database.</p>
+<p>Cosine similarity between each component’s spectrum and each reference
+signature.  This is a <em>spectrum</em> comparison and says nothing about where a
+component sits in the genome — pair it with
+<code class="docutils literal notranslate"><span class="pre">mutopia.analysis.TopographyUMAP</span></code> for the topographic half.</p>
+<p>Both sides are compared as per-context mutation <strong>rates</strong>, with the
+trinucleotide composition of the genome divided out.  That is the
+convention the bundled database uses: its SBS1 places 98% of its mass on
+<code class="docutils literal notranslate"><span class="pre">N[C&gt;T]G</span></code>, and only after multiplying by the genome’s trinucleotide
+frequencies does it return to COSMIC’s published ~87%.  Published COSMIC
+profiles are genome-specific precisely because they bake that composition
+in; comparing a model rate against such a profile directly would
+systematically favour signatures concentrated in common contexts.  Hence
+the <code class="docutils literal notranslate"><span class="pre">normalization=&quot;none&quot;</span></code> default — do not change it to <code class="docutils literal notranslate"><span class="pre">&quot;global&quot;</span></code>
+without converting the database to match.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>source</strong> (<a class="reference internal" href="../model.html#mutopia.model.base.TopographyModel" title="mutopia.model.base.TopographyModel"><em>TopographyModel</em></a><em> or </em><em>gTensor Dataset</em>)</p></li>
+<li><p><strong>*reference</strong> (<em>str</em>) – Reference signature names to compare against.  Defaults to the whole
+database (<code class="xref py py-attr docutils literal notranslate"><span class="pre">available_components</span></code>).</p></li>
+<li><p><strong>top_k</strong> (<em>int</em><em>, </em><em>default=3</em>) – Matches to report per component.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Long form: <code class="docutils literal notranslate"><span class="pre">component</span></code>, <code class="docutils literal notranslate"><span class="pre">rank</span></code>, <code class="docutils literal notranslate"><span class="pre">reference</span></code>, <code class="docutils literal notranslate"><span class="pre">cosine_similarity</span></code>.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pandas.DataFrame</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">mutopia.analysis</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mu</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="n">mu</span><span class="o">.</span><span class="n">load_model</span><span class="p">(</span><span class="s2">&quot;cohort.model.pkl&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mu</span><span class="o">.</span><span class="n">modalities</span><span class="o">.</span><span class="n">SBS</span><span class="o">.</span><span class="n">match_components</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">top_k</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mu</span><span class="o">.</span><span class="n">modalities</span><span class="o">.</span><span class="n">SBS</span><span class="o">.</span><span class="n">match_components</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s2">&quot;SBS4&quot;</span><span class="p">,</span> <span class="s2">&quot;SBS6&quot;</span><span class="p">,</span> <span class="n">top_k</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</pre></div>
+</div>
 </dd></dl>
 
 <dl class="py method">

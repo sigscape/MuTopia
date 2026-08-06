@@ -389,7 +389,9 @@
                 <span class="n">cached</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">getsize</span><span class="p">(</span><span class="n">cached</span><span class="p">)</span> <span class="o">/</span> <span class="mf">1e6</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">cached</span>
 
-<span class="n">_METADATA_FIELDS</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;tumor_type&quot;</span><span class="p">,</span> <span class="s2">&quot;class&quot;</span><span class="p">,</span> <span class="s2">&quot;cluster_id&quot;</span><span class="p">,</span> <span class="s2">&quot;cluster_name&quot;</span><span class="p">)</span>
+<span class="c1">#: ``name`` is the expert-curated annotation and is richer than ``class``</span>
+<span class="c1">#: (e.g. &quot;SBS92:early replicating&quot;, &quot;SBS85/SBS84&quot;); prefer it for labels.</span>
+<span class="n">_METADATA_FIELDS</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;tumor_type&quot;</span><span class="p">,</span> <span class="s2">&quot;class&quot;</span><span class="p">,</span> <span class="s2">&quot;name&quot;</span><span class="p">,</span> <span class="s2">&quot;cluster_id&quot;</span><span class="p">,</span> <span class="s2">&quot;cluster_name&quot;</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_require_umap</span><span class="p">():</span>
