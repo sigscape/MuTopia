@@ -162,7 +162,7 @@ def iterative_update(
         if check_tol < tol:
             break
 
-    return Nk  # , t, check_tol
+    return Nk
 
 
 @reshape_output

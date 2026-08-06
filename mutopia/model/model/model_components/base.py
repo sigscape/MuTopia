@@ -108,12 +108,41 @@ def get_reg_params(l1_rate, l2_rate):
 def get_poisson_targets_weights(target, eta):
 
     with np.errstate(all="ignore"):
-        m = np.nanmean(target / eta)
+        # Upcast to float64. With float32 inputs, components whose responsibility
+        # decays exponentially can hit the denormal threshold (~1e-38) within a
+        # few dozen epochs; target/eta then underflows to 0 and produces NaN
+        # sample_weights downstream. Float64 pushes the threshold to ~1e-308.
+        target64 = np.asarray(target, dtype=np.float64)
+        eta64 = np.asarray(eta, dtype=np.float64)
 
-        sample_weights = eta * m
+        m = np.nanmean(target64 / eta64)
+
+        sample_weights = eta64 * m
+
+        if not np.isfinite(m) or not np.any(sample_weights > 0):
+            logger.warning(
+                f"get_poisson_targets_weights degenerate (component likely "
+                f"collapsed past float64 denormal): "
+                f"target n={target.size} sum={float(np.nansum(target64)):.4g} "
+                f"min={float(np.nanmin(target64)):.4g} max={float(np.nanmax(target64)):.4g}; "
+                f"eta sum={float(np.nansum(eta64)):.4g} "
+                f"min={float(np.nanmin(eta64)):.4g} max={float(np.nanmax(eta64)):.4g}; "
+                f"m={m}. Returning zero-update weights."
+            )
+            # No-op-ish update: tiny positive targets + unit weights.
+            # sklearn's HistGradientBoosting with loss='poisson' requires
+            # sum(y) > 0, so we can't use exact zero. A tiny constant lets the
+            # regression fit a near-zero predictor; with SVI shrinkage
+            # (learning_rate blend with the previous coef), the dead component
+            # is effectively frozen rather than updated to garbage.
+            tiny = np.finfo(np.float64).tiny  # ~2.2e-308
+            return (
+                np.full_like(target64, tiny),
+                np.ones_like(eta64),
+            )
 
         return (
-            np.nan_to_num(target / sample_weights, nan=0.0),
+            np.nan_to_num(target64 / sample_weights, nan=0.0),
             sample_weights / sample_weights[sample_weights > 0].mean(),
         )
 

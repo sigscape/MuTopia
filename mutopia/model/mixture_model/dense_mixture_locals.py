@@ -195,6 +195,7 @@ class DenseMixtureModel(LDAUpdateDense):
         fraction_map = mixture_kw["fraction_map"]
         n_sources = len(tau)
         n_components = self.n_components
+        source_names = list(self.GT.list_sources(dataset))
 
         for i, (sample_name, sample) in enumerate(self.GT.iter_samples(dataset)):
             weights = self._get_weights(sample)
@@ -209,11 +210,24 @@ class DenseMixtureModel(LDAUpdateDense):
                     cll = np.ascontiguousarray(cll, dtype=dtype)
                     w_slice = np.ascontiguousarray(w[..., loci], dtype=dtype) / ls
                     nk = np.ascontiguousarray(warm_start.ravel(), dtype=dtype)
-                    return iterative_update(
+                    nk_out = iterative_update(
                         estep_iters, tol, same_exposure,
                         alpha, tau, component_map, fraction_map,
                         cll, w_slice, nk,
-                    ).reshape(n_sources, n_components)
+                    )
+                    # L1 distance between warm-start and output proportions.
+                    # Bounded in [0, 2]; measures how far the warm start was from the
+                    # converged estimate. Decays as the outer loop's running mean improves.
+                    nk_sum = np.sum(nk_out)
+                    nk_warm_sum = np.sum(nk)
+                    if nk_sum > 0 and nk_warm_sum > 0:
+                        step_fn._last_residual = float(
+                            np.abs(nk_out / nk_sum - nk / nk_warm_sum).sum()
+                        )
+                    else:
+                        step_fn._last_residual = float("inf")
+                    return nk_out.reshape(n_sources, n_components)
+                step_fn._last_residual = float("inf")
                 return step_fn
 
             yield partial(
@@ -223,6 +237,7 @@ class DenseMixtureModel(LDAUpdateDense):
                 min_steps=min_steps, max_steps=max_steps,
                 relative_tol=relative_tol, seed=seed + i,
                 sample_name=sample_name,
+                source_names=source_names,
             )
 
     def reduce_model_sstats(

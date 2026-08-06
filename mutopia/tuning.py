@@ -363,8 +363,12 @@ def _objective(
 
     params.update(param_sampling_fn(trial))
 
-    #if "init_components" in params and params["num_components"] < len(params["init_components"]):
-    #    params["init_components"] = params["init_components"][:params["num_components"]]
+    # When a trial samples fewer components than the init list, truncate the init
+    # set to num_components (keeping the highest-priority signatures) so preset
+    # components never exceed the model dimension - otherwise low-K trials get
+    # more init+fix components than num_components and _component_names breaks.
+    if "init_components" in params and params["num_components"] < len(params["init_components"]):
+        params["init_components"] = params["init_components"][:params["num_components"]]
 
     logger.info(
         f"Running trial {trial.number} with params:\n\t"

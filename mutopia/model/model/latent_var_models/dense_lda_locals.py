@@ -1,8 +1,10 @@
+import os
 from xarray import DataArray
 import numpy as np
 from functools import partial
 import warnings
 from mutopia.gtensor import match_dims
+from mutopia.utils import logger
 from ..model_components.base import _svi_update_fn
 from .base import *
 
@@ -28,6 +30,13 @@ def _deviance_sample(
     mutation_rate = Nk @ conditional_likelihood
     mutrate_norm = np.sum(mutation_rate)
     y_sum = np.sum(weights)
+
+    # No per-cell flooring here -- doing so biases the deviance score.
+    # `logsafe=True` upstream ensures conditional_likelihood is in (0, 1]
+    # (max-subtracted), which is an algebraically-invariant rewrite of the
+    # multinomial deviance, so this kernel produces an unbiased score.
+    # If something does go to log(0), that is a genuine model failure
+    # worth seeing as -inf rather than a fabricated finite penalty.
 
     # saturated
     d_sat = np.nansum(weights * np.log(weights)) - y_sum * np.log(y_sum)
@@ -196,17 +205,22 @@ class LDAUpdateDense(LocalsModel):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
 
+            # logsafe=True: max-subtract before exp() so very large or very
+            # small log-rates don't overflow/underflow when exponentiated.
+            # The max-subtraction is a uniform scale on conditional_likelihood
+            # and mutrate_norm; it cancels out in (d_sat - d_fit).
             conditional_likelihood = self._conditional_observation_likelihood(
                 dataset,
                 factor_model,
-                logsafe=False,
+                logsafe=True,
                 with_context=True,
                 par_context=None,
             )
 
+            freqs = self.GT.get_freqs(dataset)
             LOG_context_effects = (
                 match_dims(
-                    np.log(self.GT.get_freqs(dataset)),
+                    np.log(freqs),
                     **{d: dataset.sizes[d] for d in sample_dims},
                 )
                 .transpose(*sample_dims)
@@ -221,14 +235,41 @@ class LDAUpdateDense(LocalsModel):
             dtype=self.dtype,
         )
 
+        # Cells where the reference has zero k-mer count cannot be modelled
+        # (log(0) = -inf in the deviance). They're not a G-Tensor bug but a
+        # legitimate ref/read mismatch (SNVs, sequencing errors, soft-clipped
+        # bases). We mask them by zeroing the corresponding weight; the kernel
+        # then computes 0 * log(0) = NaN at those cells and `nansum` drops the
+        # term. The eval is reported on the model-evaluable subset.
+        consistent_mask = (
+            match_dims(freqs, **{d: dataset.sizes[d] for d in sample_dims})
+            .transpose(*sample_dims)
+            .data.reshape(-1) > 0
+        )
+        consistent_mask = self.to_contig(consistent_mask.astype(self.dtype))
+
         LOG_context_effects = self.to_contig(LOG_context_effects.reshape(-1))
 
         for sample_name, sample in self.GT.iter_samples(dataset):
 
+            raw_w = self._get_weights(sample).reshape(-1)
+            masked_w = self.to_contig(raw_w * consistent_mask)
+
+            if os.environ.get("MUTOPIA_DIAGNOSE", "0") != "0":
+                dropped = float(raw_w.sum() - masked_w.sum())
+                total = float(raw_w.sum())
+                if total > 0 and dropped / total > 0:
+                    logger.info(
+                        f"[diag-mask] sample={sample_name}: dropped "
+                        f"{dropped:.4g}/{total:.4g} ({100*dropped/total:.3f}%) "
+                        f"of observed weight in cells where context_freq=0 "
+                        f"(ref/read mismatch -- e.g. SNVs, sequencing errors)"
+                    )
+
             yield partial(
                 _deviance_sample,
                 conditional_likelihood,
-                self.to_contig(self._get_weights(sample).reshape(-1)),
+                masked_w,
                 self.to_contig(
                     (exposures_fn or self.GT.fetch_topic_compositions)(
                         dataset, sample_name

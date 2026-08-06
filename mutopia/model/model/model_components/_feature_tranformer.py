@@ -308,7 +308,11 @@ class CPMTransformer(BaseEstimator, TransformerMixin, OneToOneFeatureMixin):
         return X / self.normalizers_ * 1e6
 
 
-@njit("float32[:](float32[:])")
+# Lazy signature (not an eager "float32[:](float32[:])"): pandas .values can hand
+# back a read-only float32 view under newer numpy, which the eager writable-array
+# signature rejected ("No matching definition for ... readonly array"). The body
+# copies its input and never mutates it, so accepting readonly is safe.
+@njit(nogil=True)
 def _mask_contiguous_duplicates(arr):
     if len(arr) == 0:
         return arr
