@@ -122,6 +122,14 @@ def test_save_load_round_trip(toy_reference, tmp_path):
     est = TopographyUMAP(n_neighbors=4).fit((X, names), metadata=metadata, bins=bins)
     path = est.save(tmp_path / "ref.npz", provenance={"test": True})
 
+    # Every label column must land as fixed-width unicode, not object.  An
+    # object array is stored as a pickle, which load() rejects outright with
+    # allow_pickle=False -- and whether astype(str) produces one depends on the
+    # installed pandas, so the round trip alone would not catch a regression.
+    with np.load(path, allow_pickle=False) as art:
+        for field in ("component", "tumor_type", "class", "cluster_id"):
+            assert art[field].dtype.kind == "U", f"{field} is {art[field].dtype}"
+
     back = TopographyUMAP.load(path, verify=False)
     assert list(back.components_) == list(names)
     np.testing.assert_allclose(back.embedding_, est.embedding_)

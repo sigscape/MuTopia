@@ -130,6 +130,19 @@ def _ensure_artifact(path=None, download=True):
 _METADATA_FIELDS = ("tumor_type", "class", "name", "cluster_id", "cluster_name")
 
 
+def _as_unicode(values):
+    """Coerce a label column to a fixed-width unicode array.
+
+    ``Series.values.astype(str)`` is not enough: under pandas 3 a string column
+    comes back as a ``StringArray``, and ``astype(str)`` on that yields an
+    *object* ndarray.  ``np.savez_compressed`` then stores it as a pickle, and
+    :meth:`TopographyUMAP.load` refuses it with ``allow_pickle=False``.
+    Building from a list of Python strings pins the dtype to ``<U`` on every
+    pandas version.
+    """
+    return np.array([str(v) for v in values], dtype=np.str_)
+
+
 def _require_umap():
     try:
         import umap
@@ -838,13 +851,13 @@ class TopographyUMAP(BaseEstimator):
             bin_chrom=self.bin_chrom_,
             bin_start=self.bin_start_,
             bin_length=self.bin_length_,
-            component=self.components_,
+            component=_as_unicode(self.components_),
             params=json.dumps({**self.get_params()}),
             provenance=json.dumps(provenance or {}),
         )
         for field in _METADATA_FIELDS:
             if field in self.metadata_:
-                payload[field] = self.metadata_[field].values.astype(str)
+                payload[field] = _as_unicode(self.metadata_[field])
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
         np.savez_compressed(path, **payload)
         logger.info("wrote %s (%.1f MB)", path, os.path.getsize(path) / 1e6)
