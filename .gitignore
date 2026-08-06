@@ -17,3 +17,7 @@ encode_analysis/first_pass/
 encode_analysis/second_pass/
 encode_analysis/gtensor__tempfiles/
 encode_analysis/staged/
+
+# Topography UMAP reference: the feature matrix is a release asset
+# (see DEVELOPING.md); the small coordinates fixture is committed.
+mutopia/analysis/reference/*.npz

@@ -57,6 +57,49 @@ python tests/build_chr22_fixture.py
 # update FIXTURE_RELEASE_TAG in tests/conftest.py and the cache key in tests.yml
 ```
 
+## Topography UMAP reference artifact
+
+`mutopia.analysis.topography_umap` projects components from a new model into the
+published pan-cancer UMAP. It loads two files:
+
+| File | Size | Where |
+|---|---|---|
+| `pancan_topography_umap.coords.tsv` | ~15 kB | committed, ships in the wheel |
+| `pancan_topography_umap.npz` | ~11 MB | release asset, downloaded on first use |
+
+Same arrangement as the test fixtures, and for the same reason. The npz is
+gitignored; `load_reference_umap()` downloads it from the
+`topography-umap-reference` release and caches it under `~/.cache/mutopia`
+(override with `MUTOPIA_CACHE_DIR`). A source checkout that has already built the
+artifact in place uses that copy instead. `load_reference_coordinates()` needs
+neither the download nor `umap-learn`.
+
+To rebuild both files:
+
+```bash
+conda activate mutopia-model      # or any env with the umap extra installed
+pip install -e '.[umap]'
+python tools/build_reference_artifact.py \
+    --collected-data data/pancan/collected_data.4.pkl \
+    --annotations   data/pancan/02.04.final_annotations.tsv
+
+# then upload the npz to the sigscape/MuTopia release tagged
+# `topography-umap-reference`, commit the regenerated coords.tsv, and bump
+# ARTIFACT_RELEASE_TAG in mutopia/analysis/topography_umap.py if you cut a new tag
+```
+
+The build validates float16 storage (checking it leaves every projection
+unchanged) and round-trips the result before writing. It preserves the published
+`UMAP1`/`UMAP2` coordinates verbatim rather than re-deriving them — they are not
+bit-reproducible under current umap-learn, and pinning them keeps the published
+figures authoritative without affecting projection validity.
+
+**Environment caveat:** no single env currently runs the whole test suite.
+`umap-learn` is needed for the projector tests, while unpickling trained models
+requires the `scikit-learn==1.4.2` pin. Install the `umap` extra into
+`mutopia-model` to get both; `tests/test_topography_umap.py` skips rather than
+fails when either is missing.
+
 ### Versioning
 
 `mutopia.__version__` is derived from `git describe` at install/build time:
