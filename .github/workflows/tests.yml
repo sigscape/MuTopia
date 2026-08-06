@@ -18,9 +18,12 @@ jobs:
           cache: pip
 
       - name: Install package
+        # The umap extra is needed as well as testing: without umap-learn the
+        # whole TopographyUMAP suite skips, so the run goes green having never
+        # exercised it.
         run: |
           python -m pip install --upgrade pip
-          pip install -e '.[testing]'
+          pip install -e '.[testing,umap]'
 
       - name: Cache test fixtures
         uses: actions/cache@v4
