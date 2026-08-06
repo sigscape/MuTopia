@@ -125,7 +125,9 @@ def _ensure_artifact(path=None, download=True):
                 cached, os.path.getsize(cached) / 1e6)
     return cached
 
-_METADATA_FIELDS = ("tumor_type", "class", "cluster_id", "cluster_name")
+#: ``name`` is the expert-curated annotation and is richer than ``class``
+#: (e.g. "SBS92:early replicating", "SBS85/SBS84"); prefer it for labels.
+_METADATA_FIELDS = ("tumor_type", "class", "name", "cluster_id", "cluster_name")
 
 
 def _require_umap():

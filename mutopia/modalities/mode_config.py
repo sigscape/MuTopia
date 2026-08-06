@@ -137,6 +137,129 @@ class ModeConfig(ABC):
             },
         )
 
+    def component_spectra(self, source, normalization: str = "none") -> xr.DataArray:
+        """Per-component reference spectra, from a fitted model or a gTensor.
+
+        Parameters
+        ----------
+        source : TopographyModel or gTensor Dataset
+            A fitted model — spectra are read straight off its context model, so
+            no dataset is needed — or a dataset already annotated with
+            ``Spectra/spectra`` by ``model.annot_components``.
+        normalization : {"global", "weighted", "none"}, default="none"
+            ``"none"`` gives a per-context mutation *rate*, which is the
+            convention the bundled signature database uses (see
+            :meth:`match_components`).  ``"global"`` weights by the context
+            distribution, giving a COSMIC-style probability over the 96 channels.
+
+        Returns
+        -------
+        xarray.DataArray with dims ``(component, context)``.  Modalities whose
+        spectra carry extra state (SBS mesoscale ``genome_state``) return the
+        baseline state, which is the one comparable to a reference database.
+        """
+        import numpy as np
+
+        spectra = getattr(source, "factor_model_", None)
+        if spectra is not None:                       # a fitted model
+            context_model = source.factor_model_.models["context_model"]
+            spectra = xr.concat(
+                [context_model.format_component(k, normalization)
+                 for k in range(source.n_components)],
+                dim="component",
+            ).assign_coords(component=list(source.component_names))
+        else:                                          # a gTensor
+            names = set(getattr(source, "data_vars", source))
+            if "Spectra/spectra" not in names:
+                raise AttributeError(
+                    "The dataset has no `Spectra/spectra`. Run "
+                    "`model.annot_components(data)` first, or pass the model itself."
+                )
+            spectra = source["Spectra/spectra"]
+
+        for dim, baseline in (("genome_state", "Baseline"), ("source", None)):
+            if dim in spectra.dims:
+                spectra = (
+                    spectra.sel({dim: baseline}, drop=True) if baseline is not None
+                    and baseline in spectra[dim].values
+                    else spectra.isel({dim: 0}, drop=True)
+                )
+
+        # `format_component` returns log-space values; exponentiate relative to
+        # each component's max for numerical safety before normalizing.
+        spectra = spectra.transpose("component", "context")
+        spectra = np.exp(spectra - spectra.max("context"))
+        return spectra / spectra.sum("context")
+
+    def match_components(
+        self,
+        source,
+        *reference: str,
+        top_k: int = 3,
+        normalization: str = "none",
+    ):
+        """Match component spectra against the modality's reference database.
+
+        Cosine similarity between each component's spectrum and each reference
+        signature.  This is a *spectrum* comparison and says nothing about where a
+        component sits in the genome — pair it with
+        ``mutopia.analysis.TopographyUMAP`` for the topographic half.
+
+        Both sides are compared as per-context mutation **rates**, with the
+        trinucleotide composition of the genome divided out.  That is the
+        convention the bundled database uses: its SBS1 places 98% of its mass on
+        ``N[C>T]G``, and only after multiplying by the genome's trinucleotide
+        frequencies does it return to COSMIC's published ~87%.  Published COSMIC
+        profiles are genome-specific precisely because they bake that composition
+        in; comparing a model rate against such a profile directly would
+        systematically favour signatures concentrated in common contexts.  Hence
+        the ``normalization="none"`` default — do not change it to ``"global"``
+        without converting the database to match.
+
+        Parameters
+        ----------
+        source : TopographyModel or gTensor Dataset
+        *reference : str
+            Reference signature names to compare against.  Defaults to the whole
+            database (:attr:`available_components`).
+        top_k : int, default=3
+            Matches to report per component.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Long form: ``component``, ``rank``, ``reference``, ``cosine_similarity``.
+
+        Examples
+        --------
+        >>> import mutopia.analysis as mu
+        >>> model = mu.load_model("cohort.model.pkl")
+        >>> mu.modalities.SBS.match_components(model, top_k=1)
+        >>> mu.modalities.SBS.match_components(model, "SBS4", "SBS6", top_k=2)
+        """
+        import numpy as np
+        import pandas as pd
+
+        spectra = self.component_spectra(source, normalization=normalization)
+        names = list(reference) or self.available_components
+        ref = self.load_components(*names).reindex(context=spectra["context"].values)
+
+        A = np.asarray(spectra.values, dtype=np.float64)
+        B = np.asarray(ref.values, dtype=np.float64)
+        B = B / np.linalg.norm(B, axis=1, keepdims=True)
+        A = A / np.linalg.norm(A, axis=1, keepdims=True)
+        sim = A @ B.T
+
+        k = min(top_k, len(names))
+        order = np.argsort(-sim, axis=1)[:, :k]
+        components = [str(c) for c in spectra["component"].values]
+        return pd.DataFrame({
+            "component": np.repeat(components, k),
+            "rank": np.tile(np.arange(1, k + 1), len(components)),
+            "reference": np.array(names)[order.ravel()],
+            "cosine_similarity": np.take_along_axis(sim, order, axis=1).ravel(),
+        })
+
     @classmethod
     @abstractmethod
     def get_context_frequencies(

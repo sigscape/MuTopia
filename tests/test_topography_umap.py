@@ -239,3 +239,71 @@ def test_annot_component_rates_components_differ(trained_model, train_dataset):
     X = X / X.sum(1, keepdims=True)
     D = cosine_distances(X)
     assert D[np.triu_indices(len(X), k=1)].max() > 1e-3
+
+
+# ------------------------------------------------- COSMIC signature matching
+
+
+def test_match_components_against_database(trained_model):
+    """Component spectra match the bundled signature database."""
+    import mutopia.analysis as mu
+
+    SBS = mu.modalities.SBS
+    matches = SBS.match_components(trained_model, top_k=2)
+
+    assert {"component", "rank", "reference", "cosine_similarity"} <= set(matches.columns)
+    assert len(matches) == trained_model.n_components * 2
+    assert set(matches["reference"]) <= set(SBS.available_components)
+    # cosine similarity of two non-negative spectra is in [0, 1]
+    assert matches["cosine_similarity"].between(0, 1).all()
+    # ranks must be ordered best-first within each component
+    assert matches.groupby("component")["cosine_similarity"].apply(
+        lambda s: s.is_monotonic_decreasing
+    ).all()
+
+
+def test_match_components_restricted_to_named_references(trained_model):
+    import mutopia.analysis as mu
+
+    names = ["SBS1", "SBS4", "SBS5"]
+    matches = mu.modalities.SBS.match_components(trained_model, *names, top_k=1)
+    assert set(matches["reference"]) <= set(names)
+    assert len(matches) == trained_model.n_components
+
+
+def test_component_spectra_are_normalized_rates(trained_model):
+    """Spectra are probability vectors over the 96 contexts."""
+    import numpy as np
+    import mutopia.analysis as mu
+
+    spectra = mu.modalities.SBS.component_spectra(trained_model)
+    assert spectra.dims == ("component", "context")
+    assert spectra.sizes["context"] == 96
+    values = np.asarray(spectra.values)
+    assert (values >= 0).all()
+    np.testing.assert_allclose(values.sum(axis=1), 1.0, rtol=1e-5)
+
+
+def test_database_stores_context_normalized_rates():
+    """The bundled database has the trinucleotide composition divided out.
+
+    SBS1 is C>T at methylated CpG.  In COSMIC's published convention -- which
+    bakes in the genome's trinucleotide composition, which is why those profiles
+    are genome-specific -- roughly 87% of SBS1's mass sits on N[C>T]G.  The
+    bundled database puts ~98% there, i.e. it stores per-context rates.  Matching
+    must therefore compare rate against rate; see `ModeConfig.match_components`.
+    """
+    import numpy as np
+    import mutopia.analysis as mu
+
+    SBS = mu.modalities.SBS
+    contexts = SBS.coords["context"][1]
+    sbs1 = SBS.load_components("SBS1").sel(component="SBS1")
+    values = np.asarray(sbs1.reindex(context=contexts).values, dtype=float)
+    values = values / values.sum()
+
+    cpg = [i for i, c in enumerate(contexts) if c[2:5] == "C>T" and c[-1] == "G"]
+    assert values[cpg].sum() > 0.95, (
+        "SBS1 is not concentrated on N[C>T]G as expected for a rate-convention "
+        "database; the matching normalization may need revisiting"
+    )

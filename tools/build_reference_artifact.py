@@ -141,6 +141,9 @@ def main(argv=None):
     metadata = pd.DataFrame(index=ann.index)
     metadata["tumor_type"] = ann["tumor_type"].astype(str)
     metadata["class"] = ann["class"].astype(str)
+    # The expert-curated annotation; falls back to `class` when absent.
+    metadata["name"] = (ann["name"] if "name" in ann.columns
+                        else ann["class"]).astype(str)
     metadata["cluster_id"] = ann["cluster_id"].astype(str)
     metadata["cluster_name"] = metadata["cluster_id"].map(TOPO_NAMES).fillna("")
     unnamed = sorted(set(metadata.loc[metadata.cluster_name == "", "cluster_id"]))
