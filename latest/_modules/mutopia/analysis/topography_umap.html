@@ -1,0 +1,1292 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../../genindex.html"><link rel="search" title="Search" href="../../../search.html">
+        <link rel="prefetch" href="../../../_static/mutopia_logo.png" as="image">
+        <link rel="prefetch" href="../../../_static/mutopia_logo.png" as="image">
+
+    <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
+        <title>mutopia.analysis.topography_umap - MuTopia documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=8fd06a5a" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  --content-width: 85rem;
+  --toc-width: 22rem;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  --content-width: 85rem;
+  --toc-width: 22rem;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  --content-width: 85rem;
+  --toc-width: 22rem;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../../index.html"><div class="brand">MuTopia  documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../../index.html">
+  <div class="sidebar-logo-container">
+    <img class="sidebar-logo only-light" src="../../../_static/mutopia_logo.png" alt="Light Logo"/>
+    <img class="sidebar-logo only-dark" src="../../../_static/mutopia_logo.png" alt="Dark Logo"/>
+  </div>
+  
+  <span class="sidebar-brand-text">MuTopia  documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started.html">Getting started with MuTopia</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../tutorials/index.html">MuTopia Tutorials</a><input aria-label="Toggle navigation of MuTopia Tutorials" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../tutorials/1.building_a_gtensor.html">Tutorial 1: Building G-Tensors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../tutorials/2.analyzing_gtensors.html">Tutorial 2: Analyzing G-Tensors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../tutorials/3.training_models.html">Tutorial 3: Tuning and training models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../tutorials/4.analyzing_models.html">Tutorial 4: Analyzing Topographic Models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../tutorials/5.annotating_vcfs.html">Tutorial 5: Annotating VCFs with a Pre-Trained Model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../tutorials/6.genome_browser_plotting.html">Tutorial 6: Genome-browser plotting with a trained model</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../api/index.html">API Reference</a><input aria-label="Toggle navigation of API Reference" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/gtensor.html">GTensor API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/model.html">TopographyModel API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/topography_umap.html">Topography UMAP API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/plot.html">Plot API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/track_plot/track_plot.html">mutopia.plot.track_plot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/track_plot/track_plot.html#module-mutopia.plot.track_plot.track_plot">track_plot API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/track_plot/tracks.html">tracks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/track_plot/transforms.html">transforms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/modes/sbs.html">SBS Modality</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/modes/modes.html">Base ModeConfig</a></li>
+</ul>
+</li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <h1>Source code for mutopia.analysis.topography_umap</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Project MuTopia model components into a reference topography UMAP space.</span>
+
+<span class="sd">A MuTopia component&#39;s *topography* is its normalized mutation-rate profile across</span>
+<span class="sd">genomic bins -- ``component_distributions_locus``, written by</span>
+<span class="sd">:meth:`mutopia.model.base.TopographyModel.annot_component_distributions`.  Two</span>
+<span class="sd">components trained on different cohorts can be compared directly in that space,</span>
+<span class="sd">which is what lets signatures be matched across tumor types.</span>
+
+<span class="sd">:class:`TopographyUMAP` freezes such a space: a reference matrix of components, a</span>
+<span class="sd">2D UMAP layout of them, and their curated annotations.  New components are placed</span>
+<span class="sd">into the same layout with :meth:`~TopographyUMAP.transform`.</span>
+
+<span class="sd">    &gt;&gt;&gt; import mutopia.analysis as mu</span>
+<span class="sd">    &gt;&gt;&gt; ref = mu.load_reference_umap()</span>
+<span class="sd">    &gt;&gt;&gt; data = mu.gt.load_dataset(&quot;my_cohort.annotated.nc&quot;, with_samples=False)</span>
+<span class="sd">    &gt;&gt;&gt; ref.transform(data)</span>
+<span class="sd">    &gt;&gt;&gt; ref.kneighbors(data, k=5)</span>
+
+<span class="sd">Requires the optional ``umap-learn`` dependency (``pip install mutopia[umap]``).</span>
+
+<span class="sd">Notes</span>
+<span class="sd">-----</span>
+<span class="sd">The 2D coordinates are for display.  UMAP&#39;s ``transform`` is an approximate</span>
+<span class="sd">re-optimization of new points against a frozen reference layout, and a reference</span>
+<span class="sd">built from a few hundred components is sparse.  The nearest-neighbour table and</span>
+<span class="sd">the cluster vote -- both computed in the full-dimensional cosine space, not in the</span>
+<span class="sd">embedding -- are the defensible readouts.  Always check ``is_outlier`` /</span>
+<span class="sd">``outlier_score``: a component unlike anything in the reference is still assigned</span>
+<span class="sd">a plausible-looking coordinate and cluster.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">urllib.request</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseEstimator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.neighbors</span><span class="w"> </span><span class="kn">import</span> <span class="n">LocalOutlierFactor</span><span class="p">,</span> <span class="n">NearestNeighbors</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.utils.validation</span><span class="w"> </span><span class="kn">import</span> <span class="n">check_is_fitted</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;TopographyUMAP&quot;</span><span class="p">,</span> <span class="s2">&quot;load_reference_umap&quot;</span><span class="p">,</span> <span class="s2">&quot;load_reference_coordinates&quot;</span><span class="p">,</span>
+           <span class="s2">&quot;annot_component_rates&quot;</span><span class="p">,</span> <span class="s2">&quot;REFERENCE_ARTIFACT&quot;</span><span class="p">,</span> <span class="s2">&quot;REFERENCE_COORDINATES&quot;</span><span class="p">]</span>
+
+
+<span class="c1">#: Rows of the feature matrix are normalized to sum to this value.  Cosine</span>
+<span class="c1">#: distance is scale-invariant so the constant is cosmetic for the fit, but it</span>
+<span class="c1">#: keeps the stored matrix inside float16&#39;s normal range (values ~1e0 rather than</span>
+<span class="c1">#: ~1e-5, which would fall into the subnormal band and lose precision).</span>
+<span class="n">_ROW_SCALE</span> <span class="o">=</span> <span class="mf">100_000.0</span>
+
+<span class="n">_LOCUS_KEY</span> <span class="o">=</span> <span class="s2">&quot;component_distributions_locus&quot;</span>
+
+<span class="n">REFERENCE_ARTIFACT</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">),</span> <span class="s2">&quot;reference&quot;</span><span class="p">,</span> <span class="s2">&quot;pancan_topography_umap.npz&quot;</span>
+<span class="p">)</span>
+
+<span class="c1">#: Canonical layout only -- component, annotations, UMAP1, UMAP2.  A few tens of</span>
+<span class="c1">#: kB, no feature matrix, and no umap-learn needed to read it.  Ships in the wheel.</span>
+<span class="n">REFERENCE_COORDINATES</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">),</span> <span class="s2">&quot;reference&quot;</span><span class="p">,</span> <span class="s2">&quot;pancan_topography_umap.coords.tsv&quot;</span>
+<span class="p">)</span>
+
+<span class="c1">#: The feature matrix is ~11 MB, so it is a release asset rather than a committed</span>
+<span class="c1">#: file -- the same arrangement `tests/conftest.py` uses for the test fixtures.</span>
+<span class="c1">#: Update both when the artifact is rebuilt (see DEVELOPING.md).</span>
+<span class="n">ARTIFACT_RELEASE_TAG</span> <span class="o">=</span> <span class="s2">&quot;topography-umap-reference&quot;</span>
+<span class="n">ARTIFACT_BASE_URL</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="sa">f</span><span class="s2">&quot;https://github.com/sigscape/MuTopia/releases/download/</span><span class="si">{</span><span class="n">ARTIFACT_RELEASE_TAG</span><span class="si">}</span><span class="s2">&quot;</span>
+<span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_cache_path</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Where a downloaded artifact is cached.</span>
+
+<span class="sd">    Never inside the installed package: site-packages is often read-only, and</span>
+<span class="sd">    writing there would make the install differ from what was shipped.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">root</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;MUTOPIA_CACHE_DIR&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expanduser</span><span class="p">(</span><span class="s2">&quot;~&quot;</span><span class="p">),</span> <span class="s2">&quot;.cache&quot;</span><span class="p">,</span> <span class="s2">&quot;mutopia&quot;</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_ensure_artifact</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">download</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Resolve the reference artifact, downloading it once if needed.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No reference artifact at </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">path</span>
+
+    <span class="n">name</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">REFERENCE_ARTIFACT</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">candidate</span> <span class="ow">in</span> <span class="p">(</span><span class="n">REFERENCE_ARTIFACT</span><span class="p">,</span> <span class="n">_cache_path</span><span class="p">(</span><span class="n">name</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">candidate</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">candidate</span>
+
+    <span class="n">cached</span> <span class="o">=</span> <span class="n">_cache_path</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+    <span class="n">url</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">ARTIFACT_BASE_URL</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">download</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Reference artifact not found locally and download=False. &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Fetch </span><span class="si">{</span><span class="n">url</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">cached</span><span class="si">}</span><span class="s2">, or build it with &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;`python tools/build_reference_artifact.py --help`.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">cached</span><span class="p">),</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">tmp</span> <span class="o">=</span> <span class="n">cached</span> <span class="o">+</span> <span class="s2">&quot;.part&quot;</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;downloading reference artifact from </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">url</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">urllib</span><span class="o">.</span><span class="n">request</span><span class="o">.</span><span class="n">urlretrieve</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">tmp</span><span class="p">)</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">tmp</span><span class="p">,</span> <span class="n">cached</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">tmp</span><span class="p">):</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">tmp</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Could not download the reference artifact from </span><span class="si">{</span><span class="n">url</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">err</span><span class="si">}</span><span class="s2">). &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Download it manually to </span><span class="si">{</span><span class="n">cached</span><span class="si">}</span><span class="s2">, or rebuild it with &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;`python tools/build_reference_artifact.py --help`.&quot;</span>
+        <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">err</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;cached reference artifact at </span><span class="si">%s</span><span class="s2"> (</span><span class="si">%.1f</span><span class="s2"> MB)&quot;</span><span class="p">,</span>
+                <span class="n">cached</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">getsize</span><span class="p">(</span><span class="n">cached</span><span class="p">)</span> <span class="o">/</span> <span class="mf">1e6</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">cached</span>
+
+<span class="n">_METADATA_FIELDS</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;tumor_type&quot;</span><span class="p">,</span> <span class="s2">&quot;class&quot;</span><span class="p">,</span> <span class="s2">&quot;cluster_id&quot;</span><span class="p">,</span> <span class="s2">&quot;cluster_name&quot;</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_require_umap</span><span class="p">():</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">umap</span>
+    <span class="k">except</span> <span class="ne">ImportError</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>  <span class="c1"># pragma: no cover - exercised only without the extra</span>
+        <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
+            <span class="s2">&quot;TopographyUMAP requires the optional `umap-learn` dependency. &quot;</span>
+            <span class="s2">&quot;Install it with `pip install mutopia[umap]`.&quot;</span>
+        <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">err</span>
+    <span class="k">return</span> <span class="n">umap</span>
+
+
+<div class="viewcode-block" id="annot_component_rates">
+<a class="viewcode-back" href="../../../api/topography_umap.html#mutopia.analysis.topography_umap.annot_component_rates">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">annot_component_rates</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dataset</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">threads</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">_LOCUS_KEY</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluate a trained model&#39;s component locus rates on *any* gTensor&#39;s axis.</span>
+
+<span class="sd">    ``model.annot_component_distributions`` routes through ``setup_corpus``, which</span>
+<span class="sd">    initializes the *locals* model and therefore iterates the dataset&#39;s samples.</span>
+<span class="sd">    Datasets written with ``write_samples=False`` have no ``raw`` group, so that</span>
+<span class="sd">    path raises ``ValueError: Sample ... not found`` — for every model, not just</span>
+<span class="sd">    unusual ones.  Component locus distributions depend only on the factor model</span>
+<span class="sd">    (context + theta), so this initializes just that half and skips the</span>
+<span class="sd">    sample-dependent step.</span>
+
+<span class="sd">    The point of doing this is comparability.  A model is a function of genomic</span>
+<span class="sd">    features, so evaluating it on the *reference* gTensor puts its components on</span>
+<span class="sd">    the reference locus axis — which lets :meth:`TopographyUMAP.transform` take</span>
+<span class="sd">    the strict path instead of the lossy aggregate one, even when the model was</span>
+<span class="sd">    trained on a completely different regions bed.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    model : TopographyModel</span>
+<span class="sd">        A trained model, e.g. from ``mu.load_model(...)``.</span>
+<span class="sd">    dataset : gTensor Dataset</span>
+<span class="sd">        The axis to evaluate on.  Load it with ``with_state=False`` so the</span>
+<span class="sd">        previous model&#39;s corpus state is shed (``mu.gt.load_dataset(path,</span>
+<span class="sd">        with_samples=False, with_state=False)``).</span>
+<span class="sd">    source : str, optional</span>
+<span class="sd">        Cell type / source for multi-source models.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    The dataset with ``component_distributions_locus`` added, dims</span>
+<span class="sd">    ``(component, locus)`` and ``component`` coordinates taken from</span>
+<span class="sd">    ``model.component_names``.  Suitable for</span>
+<span class="sd">    :meth:`TopographyUMAP.transform` and for ``mutopia.plot.track_plot``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">mutopia.gtensor.gtensor</span><span class="w"> </span><span class="kn">import</span> <span class="n">dims_except_for</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">mutopia.gtensor.interfaces</span><span class="w"> </span><span class="kn">import</span> <span class="n">CorpusInterface</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">mutopia.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">ParContext</span>
+
+    <span class="n">GT</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">GT</span>
+    <span class="n">ds</span> <span class="o">=</span> <span class="n">CorpusInterface</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
+
+    <span class="c1"># A prior model&#39;s state must go, and so must the dims it left behind: the</span>
+    <span class="c1"># pan-cancer models convolve each feature over neighbouring bins, leaving a</span>
+    <span class="c1"># 51-long `feature` coordinate that would otherwise be handed to a model</span>
+    <span class="c1"># expecting its own unconvolved features.  This mirrors what</span>
+    <span class="c1"># `GtensorInterface.init_state` does before rebuilding.</span>
+    <span class="k">if</span> <span class="n">GT</span><span class="o">.</span><span class="n">has_corpusstate</span><span class="p">(</span><span class="n">ds</span><span class="p">):</span>
+        <span class="n">ds</span><span class="o">.</span><span class="n">corpus</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">corpus</span><span class="o">.</span><span class="n">drop_vars</span><span class="p">(</span><span class="n">ds</span><span class="o">.</span><span class="n">sections</span><span class="o">.</span><span class="n">groups</span><span class="p">[</span><span class="s2">&quot;State&quot;</span><span class="p">])</span>
+    <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;component&quot;</span><span class="p">,</span> <span class="s2">&quot;feature&quot;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">ds</span><span class="o">.</span><span class="n">dims</span><span class="p">:</span>
+            <span class="n">ds</span><span class="o">.</span><span class="n">corpus</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">corpus</span><span class="o">.</span><span class="n">drop_dims</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span>
+
+    <span class="c1"># `factor_model.get_normalizers` looks its rate offset up by corpus name and</span>
+    <span class="c1"># the model only knows the corpora it was trained on.  The offset is constant</span>
+    <span class="c1"># per component, so it cancels under the row-normalization every consumer</span>
+    <span class="c1"># applies -- it changes the absolute rate scale, never the topography.</span>
+    <span class="n">normalizers</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">factor_model_</span><span class="p">,</span> <span class="s2">&quot;_normalizers&quot;</span><span class="p">,</span> <span class="p">{})</span>
+    <span class="k">if</span> <span class="n">normalizers</span> <span class="ow">and</span> <span class="n">GT</span><span class="o">.</span><span class="n">get_name</span><span class="p">(</span><span class="n">ds</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">normalizers</span><span class="p">:</span>
+        <span class="n">borrowed</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">normalizers</span><span class="p">))</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;dataset </span><span class="si">%r</span><span class="s2"> is not one of the model&#39;s corpora </span><span class="si">%s</span><span class="s2">; borrowing the &quot;</span>
+            <span class="s2">&quot;rate normalizer from </span><span class="si">%r</span><span class="s2"> (constant per component, cancels under &quot;</span>
+            <span class="s2">&quot;row-normalization)&quot;</span><span class="p">,</span> <span class="n">GT</span><span class="o">.</span><span class="n">get_name</span><span class="p">(</span><span class="n">ds</span><span class="p">),</span> <span class="nb">list</span><span class="p">(</span><span class="n">normalizers</span><span class="p">),</span> <span class="n">borrowed</span>
+        <span class="p">)</span>
+        <span class="n">ds</span><span class="o">.</span><span class="n">corpus</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">corpus</span><span class="o">.</span><span class="n">assign_attrs</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">borrowed</span><span class="p">)</span>
+
+    <span class="c1"># The modality predict kernels are numba functions compiled for float32</span>
+    <span class="c1"># arguments, and `Regions/exposures` is float64 in some gTensors -- which</span>
+    <span class="c1"># fails typing with &quot;No matching definition for argument type(s)&quot;.  Match the</span>
+    <span class="c1"># dtype the rest of the model&#39;s numerics already use.</span>
+    <span class="n">exposures</span> <span class="o">=</span> <span class="s2">&quot;Regions/exposures&quot;</span>
+    <span class="k">if</span> <span class="n">exposures</span> <span class="ow">in</span> <span class="n">ds</span><span class="o">.</span><span class="n">corpus</span><span class="o">.</span><span class="n">data_vars</span> <span class="ow">and</span> <span class="n">ds</span><span class="o">.</span><span class="n">corpus</span><span class="p">[</span><span class="n">exposures</span><span class="p">]</span><span class="o">.</span><span class="n">dtype</span> <span class="o">!=</span> <span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">:</span>
+        <span class="n">ds</span><span class="o">.</span><span class="n">corpus</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">corpus</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span>
+            <span class="o">**</span><span class="p">{</span><span class="n">exposures</span><span class="p">:</span> <span class="n">ds</span><span class="o">.</span><span class="n">corpus</span><span class="p">[</span><span class="n">exposures</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)}</span>
+        <span class="p">)</span>
+
+    <span class="n">state</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">sub</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">factor_model_</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">sub</span><span class="o">.</span><span class="n">prepare_corpusstate</span><span class="p">(</span><span class="n">ds</span><span class="p">))</span>
+    <span class="n">ds</span><span class="o">.</span><span class="n">corpus</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">corpus</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="o">**</span><span class="p">{</span><span class="sa">f</span><span class="s2">&quot;State/</span><span class="si">{</span><span class="n">k</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">state</span><span class="o">.</span><span class="n">items</span><span class="p">()})</span>
+
+    <span class="k">with</span> <span class="n">ParContext</span><span class="p">(</span><span class="n">threads</span><span class="p">)</span> <span class="k">as</span> <span class="n">par</span><span class="p">:</span>
+        <span class="n">GT</span><span class="o">.</span><span class="n">update_state</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">factor_model_</span><span class="p">,</span> <span class="n">from_scratch</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">par_context</span><span class="o">=</span><span class="n">par</span><span class="p">)</span>
+        <span class="n">X</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">model</span><span class="o">.</span><span class="n">factor_model_</span><span class="o">.</span><span class="n">_get_log_mutation_rate_tensor</span><span class="p">(</span>
+                <span class="n">ds</span><span class="p">,</span> <span class="n">par_context</span><span class="o">=</span><span class="n">par</span><span class="p">,</span> <span class="n">with_context</span><span class="o">=</span><span class="kc">False</span>
+            <span class="p">)</span>
+            <span class="o">.</span><span class="n">pipe</span><span class="p">(</span><span class="k">lambda</span> <span class="n">X</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">X</span> <span class="o">-</span> <span class="n">X</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">skipna</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mf">0.0</span><span class="p">))</span>
+            <span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="n">rates</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="p">(</span><span class="n">X</span> <span class="o">*</span> <span class="n">GT</span><span class="o">.</span><span class="n">get_freqs</span><span class="p">(</span><span class="n">ds</span><span class="p">))</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="n">dims_except_for</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">dims</span><span class="p">,</span> <span class="s2">&quot;locus&quot;</span><span class="p">,</span> <span class="s2">&quot;component&quot;</span><span class="p">))</span>
+        <span class="o">/</span> <span class="n">GT</span><span class="o">.</span><span class="n">get_regions</span><span class="p">(</span><span class="n">ds</span><span class="p">)</span><span class="o">.</span><span class="n">length</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">&quot;source&quot;</span> <span class="ow">in</span> <span class="n">rates</span><span class="o">.</span><span class="n">dims</span><span class="p">:</span>
+        <span class="n">rates</span> <span class="o">=</span> <span class="n">rates</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">,</span> <span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="k">if</span> <span class="n">source</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">(</span>
+            <span class="n">rates</span><span class="o">.</span><span class="n">isel</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="k">if</span> <span class="n">rates</span><span class="o">.</span><span class="n">sizes</span><span class="p">[</span><span class="s2">&quot;source&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">rates</span>
+        <span class="p">)</span>
+    <span class="n">rates</span> <span class="o">=</span> <span class="n">rates</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="s2">&quot;component&quot;</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
+
+    <span class="n">out</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">corpus</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">CorpusInterface</span><span class="p">)</span> <span class="k">else</span> <span class="n">ds</span>
+    <span class="n">out</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">rates</span><span class="o">.</span><span class="n">assign_coords</span><span class="p">(</span><span class="n">component</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">component_names</span><span class="p">))</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Added key: &quot;</span><span class="si">%s</span><span class="s1">&quot; (</span><span class="si">%s</span><span class="s1">)&#39;</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">out</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">sizes</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">out</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_var_names</span><span class="p">(</span><span class="n">dataset</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Variable names of a gTensor.</span>
+
+<span class="sd">    ``mu.gt.load_dataset`` may hand back a ``CorpusInterface`` proxy, which</span>
+<span class="sd">    forwards attributes but defines no ``__contains__`` -- so ``key in dataset``</span>
+<span class="sd">    silently falls back to the iteration protocol and indexes with integers.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="nb">set</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="s2">&quot;data_vars&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="p">))</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_bin_key</span><span class="p">(</span><span class="n">chrom</span><span class="p">,</span> <span class="n">start</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Join (chrom, start) into a single hashable key array.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">char</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">char</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">chrom</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">str</span><span class="p">),</span> <span class="s2">&quot;:&quot;</span><span class="p">),</span>
+                       <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">))</span>
+
+
+<div class="viewcode-block" id="TopographyUMAP">
+<a class="viewcode-back" href="../../../api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TopographyUMAP</span><span class="p">(</span><span class="n">BaseEstimator</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Reference UMAP of component topographies, with projection of new components.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    n_neighbors, min_dist, random_state, negative_sample_rate, metric, n_components</span>
+<span class="sd">        Passed straight to :class:`umap.UMAP`.  The defaults are the parameters</span>
+<span class="sd">        the pan-cancer reference space was built with.</span>
+<span class="sd">    cluster_n_neighbors : int, default=10</span>
+<span class="sd">        Neighbours used for the k-NN cluster vote.  The vote happens in the full</span>
+<span class="sd">        feature space, matching how the reference clusters were defined.</span>
+<span class="sd">    on_grid_mismatch : {&quot;error&quot;, &quot;aggregate&quot;}, default=&quot;error&quot;</span>
+<span class="sd">        What to do when an incoming dataset&#39;s locus axis does not reproduce the</span>
+<span class="sd">        reference axis.  ``&quot;error&quot;`` raises and explains.  ``&quot;aggregate&quot;`` falls</span>
+<span class="sd">        back to a second, lossy reference space in which mesoscale-split loci are</span>
+<span class="sd">        pooled into unique ``(chrom, start)`` bins -- see</span>
+<span class="sd">        :meth:`_aggregate_space` for the measured cost.</span>
+<span class="sd">    min_bin_coverage : float, default=0.9</span>
+<span class="sd">        Under ``&quot;aggregate&quot;``, the minimum fraction of aggregated reference bins</span>
+<span class="sd">        that must receive data before the projection is refused.</span>
+<span class="sd">    outlier_quantile : float, default=0.99</span>
+<span class="sd">        Quantile of the reference&#39;s own local-outlier-factor scores used as the</span>
+<span class="sd">        ``is_outlier`` threshold.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    reducer_ : umap.UMAP</span>
+<span class="sd">        The fitted reducer.  ``reducer_.embedding_`` is the reference layout.</span>
+<span class="sd">    X_ref_ : ndarray of shape (n_reference, n_bins)</span>
+<span class="sd">    embedding_ : ndarray of shape (n_reference, n_components)</span>
+<span class="sd">    components_ : ndarray of str</span>
+<span class="sd">    metadata_ : DataFrame indexed by component</span>
+<span class="sd">    bin_chrom_, bin_start_, bin_length_ : ndarray</span>
+<span class="sd">        The reference locus axis.  Note that ``(chrom, start)`` is *not* unique:</span>
+<span class="sd">        mesoscale features split a bin into several loci sharing coordinates.  The</span>
+<span class="sd">        axis is matched positionally -- see :meth:`_axis_matches`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">n_neighbors</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+        <span class="n">min_dist</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
+        <span class="n">random_state</span><span class="o">=</span><span class="mi">101</span><span class="p">,</span>
+        <span class="n">negative_sample_rate</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+        <span class="n">metric</span><span class="o">=</span><span class="s2">&quot;cosine&quot;</span><span class="p">,</span>
+        <span class="n">n_components</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="n">cluster_n_neighbors</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+        <span class="n">on_grid_mismatch</span><span class="o">=</span><span class="s2">&quot;error&quot;</span><span class="p">,</span>
+        <span class="n">min_bin_coverage</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span>
+        <span class="n">outlier_quantile</span><span class="o">=</span><span class="mf">0.99</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_neighbors</span> <span class="o">=</span> <span class="n">n_neighbors</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">min_dist</span> <span class="o">=</span> <span class="n">min_dist</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">random_state</span> <span class="o">=</span> <span class="n">random_state</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">negative_sample_rate</span> <span class="o">=</span> <span class="n">negative_sample_rate</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">metric</span> <span class="o">=</span> <span class="n">metric</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_components</span> <span class="o">=</span> <span class="n">n_components</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cluster_n_neighbors</span> <span class="o">=</span> <span class="n">cluster_n_neighbors</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">on_grid_mismatch</span> <span class="o">=</span> <span class="n">on_grid_mismatch</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">min_bin_coverage</span> <span class="o">=</span> <span class="n">min_bin_coverage</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">outlier_quantile</span> <span class="o">=</span> <span class="n">outlier_quantile</span>
+
+    <span class="c1"># ------------------------------------------------------------------ params</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">umap_params</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">n_neighbors</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">n_neighbors</span><span class="p">,</span>
+            <span class="n">min_dist</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">min_dist</span><span class="p">,</span>
+            <span class="n">random_state</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">random_state</span><span class="p">,</span>
+            <span class="n">negative_sample_rate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">negative_sample_rate</span><span class="p">,</span>
+            <span class="n">metric</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">metric</span><span class="p">,</span>
+            <span class="n">n_components</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">n_components</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="c1"># ---------------------------------------------------------- feature build</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_unpack</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Pull the rate matrix and genomic grid out of a gTensor.&quot;&quot;&quot;</span>
+        <span class="n">available</span> <span class="o">=</span> <span class="n">_var_names</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">_LOCUS_KEY</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">available</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;The dataset has no `</span><span class="si">{</span><span class="n">_LOCUS_KEY</span><span class="si">}</span><span class="s2">`. &quot;</span>
+                <span class="s2">&quot;Run `model.annot_component_distributions(data)` first.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">da</span> <span class="o">=</span> <span class="n">dataset</span><span class="p">[</span><span class="n">_LOCUS_KEY</span><span class="p">]</span>
+        <span class="k">if</span> <span class="s2">&quot;source&quot;</span> <span class="ow">in</span> <span class="n">da</span><span class="o">.</span><span class="n">dims</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">source</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">da</span> <span class="o">=</span> <span class="n">da</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">,</span> <span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">da</span><span class="o">.</span><span class="n">sizes</span><span class="p">[</span><span class="s2">&quot;source&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">da</span> <span class="o">=</span> <span class="n">da</span><span class="o">.</span><span class="n">isel</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;The dataset has </span><span class="si">{</span><span class="n">da</span><span class="o">.</span><span class="n">sizes</span><span class="p">[</span><span class="s1">&#39;source&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> sources &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">da</span><span class="p">[</span><span class="s1">&#39;source&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">)</span><span class="si">}</span><span class="s2">); pass `source=` to pick one.&quot;</span>
+                <span class="p">)</span>
+        <span class="n">da</span> <span class="o">=</span> <span class="n">da</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="s2">&quot;component&quot;</span><span class="p">,</span> <span class="s2">&quot;locus&quot;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;Regions/chrom&quot;</span><span class="p">,</span> <span class="s2">&quot;Regions/start&quot;</span><span class="p">,</span> <span class="s2">&quot;Regions/length&quot;</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">available</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;The dataset has no `</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">`; it is not a gTensor.&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">da</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dataset</span><span class="p">[</span><span class="s2">&quot;Regions/chrom&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">str</span><span class="p">),</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dataset</span><span class="p">[</span><span class="s2">&quot;Regions/start&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">),</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dataset</span><span class="p">[</span><span class="s2">&quot;Regions/length&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="nb">str</span><span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">da</span><span class="p">[</span><span class="s2">&quot;component&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">]),</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_axis_matches</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chrom</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">length</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Does an incoming locus axis reproduce the reference axis exactly?</span>
+
+<span class="sd">        The reference axis cannot be keyed by genomic coordinate: mesoscale</span>
+<span class="sd">        features split a bin into several loci that share ``(chrom, start, end)``</span>
+<span class="sd">        and are not separable by any stored per-locus column -- ``(chrom, start,</span>
+<span class="sd">        length, GeneStrand, ReplicationStrand)`` still leaves duplicate rows.  The</span>
+<span class="sd">        axis is therefore identified *positionally*, which is sound because it is</span>
+<span class="sd">        fully determined by the regions bed plus the mesoscale feature set, and is</span>
+<span class="sd">        byte-identical across every cohort in the reference.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">chrom</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">bin_chrom_</span><span class="p">)</span>
+            <span class="ow">and</span> <span class="n">np</span><span class="o">.</span><span class="n">array_equal</span><span class="p">(</span><span class="n">chrom</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bin_chrom_</span><span class="p">)</span>
+            <span class="ow">and</span> <span class="n">np</span><span class="o">.</span><span class="n">array_equal</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bin_start_</span><span class="p">)</span>
+            <span class="ow">and</span> <span class="n">np</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span><span class="n">length</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bin_length_</span><span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_collapse</span><span class="p">(</span><span class="n">rates</span><span class="p">,</span> <span class="n">codes</span><span class="p">,</span> <span class="n">length</span><span class="p">,</span> <span class="n">n_out</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Length-weighted pooling of rate densities into ``n_out`` groups.</span>
+
+<span class="sd">        ``rates`` is a density (already divided by ``Regions/length``), so a</span>
+<span class="sd">        group&#39;s density is the length-weighted mean of its members.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">acc</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">rates</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">n_out</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="n">weight</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_out</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">add</span><span class="o">.</span><span class="n">at</span><span class="p">(</span><span class="n">weight</span><span class="p">,</span> <span class="n">codes</span><span class="p">,</span> <span class="n">length</span><span class="p">)</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">add</span><span class="o">.</span><span class="n">at</span><span class="p">(</span><span class="n">acc</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">codes</span><span class="p">,</span> <span class="p">(</span><span class="n">rates</span> <span class="o">*</span> <span class="n">length</span><span class="p">)</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
+        <span class="n">covered</span> <span class="o">=</span> <span class="n">weight</span> <span class="o">&gt;</span> <span class="mi">0</span>
+        <span class="n">acc</span><span class="p">[:,</span> <span class="n">covered</span><span class="p">]</span> <span class="o">/=</span> <span class="n">weight</span><span class="p">[</span><span class="n">covered</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">acc</span><span class="p">,</span> <span class="n">covered</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_aggregate_space</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Reference space collapsed to unique ``(chrom, start)`` bins.</span>
+
+<span class="sd">        Built lazily and cached.  This is a *lossy* fallback: against the raw</span>
+<span class="sd">        axis, pairwise cosine distances correlate r=0.89 and only 61% of</span>
+<span class="sd">        components keep the same nearest neighbour, because the mesoscale splits</span>
+<span class="sd">        carry real signal.  Use it only when the incoming axis cannot match.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_agg_&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">umap</span> <span class="o">=</span> <span class="n">_require_umap</span><span class="p">()</span>
+            <span class="n">keys</span> <span class="o">=</span> <span class="n">_bin_key</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">bin_chrom_</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bin_start_</span><span class="p">)</span>
+            <span class="n">uniq</span><span class="p">,</span> <span class="n">codes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">keys</span><span class="p">,</span> <span class="n">return_inverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">X</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_collapse</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">X_ref_</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span> <span class="n">codes</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bin_length_</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">uniq</span><span class="p">))</span>
+            <span class="n">X</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_normalize</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+
+            <span class="k">with</span> <span class="n">warnings</span><span class="o">.</span><span class="n">catch_warnings</span><span class="p">():</span>
+                <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">,</span> <span class="n">message</span><span class="o">=</span><span class="s2">&quot;.*n_jobs value.*&quot;</span><span class="p">)</span>
+                <span class="n">reducer</span> <span class="o">=</span> <span class="n">umap</span><span class="o">.</span><span class="n">UMAP</span><span class="p">(</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">umap_params</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+            <span class="n">reducer</span><span class="o">.</span><span class="n">embedding_</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ascontiguousarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">embedding_</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+            <span class="n">lof</span><span class="p">,</span> <span class="n">threshold</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_lof</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_agg_</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+                <span class="n">bins</span><span class="o">=</span><span class="n">uniq</span><span class="p">,</span>
+                <span class="n">codes</span><span class="o">=</span><span class="n">codes</span><span class="p">,</span>
+                <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">,</span>
+                <span class="n">reducer</span><span class="o">=</span><span class="n">reducer</span><span class="p">,</span>
+                <span class="n">nn</span><span class="o">=</span><span class="n">NearestNeighbors</span><span class="p">(</span><span class="n">metric</span><span class="o">=</span><span class="s2">&quot;cosine&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">),</span>
+                <span class="n">lof</span><span class="o">=</span><span class="n">lof</span><span class="p">,</span>
+                <span class="n">threshold</span><span class="o">=</span><span class="n">threshold</span><span class="p">,</span>
+                <span class="n">cohort_spread</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_cohort_spread</span><span class="p">(</span><span class="n">X</span><span class="p">),</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_agg_</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_regrid</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rates</span><span class="p">,</span> <span class="n">chrom</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">length</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Align an incoming rate matrix to the reference space.</span>
+
+<span class="sd">        Returns ``(X, space)`` where ``space`` is ``&quot;strict&quot;`` or ``&quot;aggregate&quot;``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_axis_matches</span><span class="p">(</span><span class="n">chrom</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">length</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">rates</span><span class="p">,</span> <span class="s2">&quot;strict&quot;</span>
+
+        <span class="n">n_ref</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">bin_chrom_</span><span class="p">)</span>
+        <span class="n">detail</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;the dataset has </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">chrom</span><span class="p">)</span><span class="si">}</span><span class="s2"> loci on </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">chrom</span><span class="p">))</span><span class="si">}</span><span class="s2">, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;the reference has </span><span class="si">{</span><span class="n">n_ref</span><span class="si">}</span><span class="s2"> on </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">bin_chrom_</span><span class="p">))</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">on_grid_mismatch</span> <span class="o">==</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;This dataset&#39;s locus axis does not match the reference axis (</span><span class="si">{</span><span class="n">detail</span><span class="si">}</span><span class="s2">). &quot;</span>
+                <span class="s2">&quot;The reference feature space is defined on a specific ordered locus axis -- &quot;</span>
+                <span class="s2">&quot;the same regions bed and the same mesoscale features -- because &quot;</span>
+                <span class="s2">&quot;mesoscale-split loci share genomic coordinates and cannot be matched by &quot;</span>
+                <span class="s2">&quot;position in the genome. Rebuild the gTensor against the reference regions &quot;</span>
+                <span class="s2">&quot;bed, or pass `on_grid_mismatch=&#39;aggregate&#39;` to fall back to a lossy &quot;</span>
+                <span class="s2">&quot;projection onto unique (chrom, start) bins.&quot;</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">on_grid_mismatch</span> <span class="o">!=</span> <span class="s2">&quot;aggregate&quot;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;on_grid_mismatch must be &#39;error&#39; or &#39;aggregate&#39;, got </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">on_grid_mismatch</span><span class="si">!r}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">agg</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_aggregate_space</span><span class="p">()</span>
+        <span class="n">index</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Index</span><span class="p">(</span><span class="n">agg</span><span class="p">[</span><span class="s2">&quot;bins&quot;</span><span class="p">])</span>
+        <span class="n">target</span> <span class="o">=</span> <span class="n">index</span><span class="o">.</span><span class="n">get_indexer</span><span class="p">(</span><span class="n">_bin_key</span><span class="p">(</span><span class="n">chrom</span><span class="p">,</span> <span class="n">start</span><span class="p">))</span>
+        <span class="n">keep</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="n">target</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">keep</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No genomic bin in this dataset overlaps the reference (</span><span class="si">{</span><span class="n">detail</span><span class="si">}</span><span class="s2">).&quot;</span><span class="p">)</span>
+
+        <span class="n">X</span><span class="p">,</span> <span class="n">covered</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_collapse</span><span class="p">(</span>
+            <span class="n">rates</span><span class="p">[:,</span> <span class="n">keep</span><span class="p">],</span> <span class="n">target</span><span class="p">[</span><span class="n">keep</span><span class="p">],</span> <span class="n">length</span><span class="p">[</span><span class="n">keep</span><span class="p">],</span> <span class="nb">len</span><span class="p">(</span><span class="n">agg</span><span class="p">[</span><span class="s2">&quot;bins&quot;</span><span class="p">])</span>
+        <span class="p">)</span>
+        <span class="n">coverage</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">covered</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span>
+        <span class="k">if</span> <span class="n">coverage</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_bin_coverage</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Only </span><span class="si">{</span><span class="n">coverage</span><span class="si">:</span><span class="s2">.1%</span><span class="si">}</span><span class="s2"> of the </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">agg</span><span class="p">[</span><span class="s1">&#39;bins&#39;</span><span class="p">])</span><span class="si">}</span><span class="s2"> reference bins are covered by &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;this dataset (minimum </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">min_bin_coverage</span><span class="si">:</span><span class="s2">.0%</span><span class="si">}</span><span class="s2">); </span><span class="si">{</span><span class="n">detail</span><span class="si">}</span><span class="s2">.&quot;</span>
+            <span class="p">)</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Projecting through the aggregated reference space (</span><span class="si">{</span><span class="n">coverage</span><span class="si">:</span><span class="s2">.1%</span><span class="si">}</span><span class="s2"> of &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">agg</span><span class="p">[</span><span class="s1">&#39;bins&#39;</span><span class="p">])</span><span class="si">}</span><span class="s2"> bins covered). This is lossy: collapsing mesoscale-split &quot;</span>
+            <span class="s2">&quot;loci changes the geometry the reference was built on (pairwise cosine &quot;</span>
+            <span class="s2">&quot;distances correlate r=0.89 with the raw axis; 61% nearest-neighbour &quot;</span>
+            <span class="s2">&quot;agreement). Treat the cluster call and coordinates as indicative only.&quot;</span><span class="p">,</span>
+            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">X</span><span class="p">,</span> <span class="s2">&quot;aggregate&quot;</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_normalize</span><span class="p">(</span><span class="n">X</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Row-normalize to the reference scale.</span>
+
+<span class="sd">        Normalization happens *after* restriction to the reference bins, which is</span>
+<span class="sd">        the order the reference itself was built in.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">total</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">keepdims</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">total</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="n">bad</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="n">total</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">bad</span><span class="p">)</span><span class="si">}</span><span class="s2"> component(s) have zero total rate over the reference bins.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">ascontiguousarray</span><span class="p">(</span><span class="n">X</span> <span class="o">/</span> <span class="n">total</span> <span class="o">*</span> <span class="n">_ROW_SCALE</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+<div class="viewcode-block" id="TopographyUMAP.build_features">
+<a class="viewcode-back" href="../../../api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.build_features">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">build_features</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dataset</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Turn a gTensor into a reference-aligned feature matrix.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        X : ndarray of shape (n_components, n_bins), float32</span>
+<span class="sd">        components : ndarray of str</span>
+<span class="sd">        space : {&quot;strict&quot;, &quot;aggregate&quot;}</span>
+<span class="sd">            Which reference space ``X`` lives in.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">check_is_fitted</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;X_ref_&quot;</span><span class="p">)</span>
+        <span class="n">rates</span><span class="p">,</span> <span class="n">chrom</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">length</span><span class="p">,</span> <span class="n">components</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_unpack</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">)</span>
+        <span class="n">X</span><span class="p">,</span> <span class="n">space</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_regrid</span><span class="p">(</span><span class="n">rates</span><span class="p">,</span> <span class="n">chrom</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">length</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_normalize</span><span class="p">(</span><span class="n">X</span><span class="p">),</span> <span class="n">components</span><span class="p">,</span> <span class="n">space</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_as_matrix</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Accept either a gTensor or a pre-built (X, components) pair.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+            <span class="n">X</span><span class="p">,</span> <span class="n">components</span> <span class="o">=</span> <span class="n">data</span>
+            <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ascontiguousarray</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+            <span class="n">space</span> <span class="o">=</span> <span class="s2">&quot;strict&quot;</span> <span class="k">if</span> <span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">X_ref_</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">else</span> <span class="s2">&quot;aggregate&quot;</span>
+            <span class="k">return</span> <span class="n">X</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">components</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">str</span><span class="p">),</span> <span class="n">space</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">build_features</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_space</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">space</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;The (reducer, neighbour index, reference matrix, lof, threshold) for a space.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">space</span> <span class="o">==</span> <span class="s2">&quot;strict&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">reducer_</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">nn_</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">X_ref_</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">lof_</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">outlier_threshold_</span>
+        <span class="n">agg</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_aggregate_space</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">agg</span><span class="p">[</span><span class="s2">&quot;reducer&quot;</span><span class="p">],</span> <span class="n">agg</span><span class="p">[</span><span class="s2">&quot;nn&quot;</span><span class="p">],</span> <span class="n">agg</span><span class="p">[</span><span class="s2">&quot;X&quot;</span><span class="p">],</span> <span class="n">agg</span><span class="p">[</span><span class="s2">&quot;lof&quot;</span><span class="p">],</span> <span class="n">agg</span><span class="p">[</span><span class="s2">&quot;threshold&quot;</span><span class="p">]</span>
+
+    <span class="c1"># ------------------------------------------------------------------- fit</span>
+
+<div class="viewcode-block" id="TopographyUMAP.fit">
+<a class="viewcode-back" href="../../../api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.fit">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">metadata</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">embedding</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Fit the reference space.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        data : gTensor Dataset, or (X, components) tuple</span>
+<span class="sd">            When a tuple is passed, ``bins`` must give the</span>
+<span class="sd">            ``(chrom, start, length)`` locus axis its columns correspond to.</span>
+<span class="sd">        metadata : DataFrame, optional</span>
+<span class="sd">            Indexed by component; ``tumor_type``/``class``/``cluster_id``/</span>
+<span class="sd">            ``cluster_name`` columns are carried into the outputs.</span>
+<span class="sd">        embedding : ndarray, optional</span>
+<span class="sd">            Pin the reference layout to these coordinates instead of the fitted</span>
+<span class="sd">            ones.  Used to preserve a published layout that a current</span>
+<span class="sd">            ``umap-learn`` no longer reproduces bit-for-bit; ``transform``</span>
+<span class="sd">            optimizes new points against ``embedding_`` held fixed, so any fixed</span>
+<span class="sd">            layout of the reference points defines a valid projection.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">umap</span> <span class="o">=</span> <span class="n">_require_umap</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">bins</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">bins</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">3</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;`bins=(chrom, start, length)` is required when fitting from a matrix.&quot;</span>
+                <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bin_chrom_</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">bins</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">str</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bin_start_</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">bins</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bin_length_</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">bins</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+            <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ascontiguousarray</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+            <span class="n">components</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">str</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">rates</span><span class="p">,</span> <span class="n">chrom</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">length</span><span class="p">,</span> <span class="n">components</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_unpack</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bin_chrom_</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bin_start_</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bin_length_</span> <span class="o">=</span> <span class="n">chrom</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">length</span>
+            <span class="n">X</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_normalize</span><span class="p">(</span><span class="n">rates</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_agg_</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">X_ref_</span> <span class="o">=</span> <span class="n">X</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">components_</span> <span class="o">=</span> <span class="n">components</span>
+
+        <span class="n">meta</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">Index</span><span class="p">(</span><span class="n">components</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;component&quot;</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">metadata</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">_METADATA_FIELDS</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">metadata</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                    <span class="n">meta</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="n">field</span><span class="p">]</span><span class="o">.</span><span class="n">reindex</span><span class="p">(</span><span class="n">components</span><span class="p">)</span><span class="o">.</span><span class="n">values</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">metadata_</span> <span class="o">=</span> <span class="n">meta</span>
+
+        <span class="k">with</span> <span class="n">warnings</span><span class="o">.</span><span class="n">catch_warnings</span><span class="p">():</span>
+            <span class="c1"># umap warns that a fixed random_state disables its parallelism.</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">,</span> <span class="n">message</span><span class="o">=</span><span class="s2">&quot;.*n_jobs value.*&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">reducer_</span> <span class="o">=</span> <span class="n">umap</span><span class="o">.</span><span class="n">UMAP</span><span class="p">(</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">umap_params</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">embedding</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># numba&#39;s optimize_layout kernels are typed for C-contiguous float32;</span>
+            <span class="c1"># a pandas `.values` slice is often F-ordered and fails to type.</span>
+            <span class="n">embedding</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ascontiguousarray</span><span class="p">(</span><span class="n">embedding</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">embedding</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">reducer_</span><span class="o">.</span><span class="n">embedding_</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;pinned embedding has shape </span><span class="si">{</span><span class="n">embedding</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">, expected &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">reducer_</span><span class="o">.</span><span class="n">embedding_</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">reducer_</span><span class="o">.</span><span class="n">embedding_</span> <span class="o">=</span> <span class="n">embedding</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">embedding_</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">reducer_</span><span class="o">.</span><span class="n">embedding_</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">nn_</span> <span class="o">=</span> <span class="n">NearestNeighbors</span><span class="p">(</span><span class="n">metric</span><span class="o">=</span><span class="s2">&quot;cosine&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">reference_nn_distance_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nn_</span><span class="o">.</span><span class="n">kneighbors</span><span class="p">(</span>
+            <span class="n">X</span><span class="p">,</span> <span class="n">n_neighbors</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">return_distance</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)[</span><span class="mi">0</span><span class="p">][:,</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lof_</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">outlier_threshold_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_lof</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cohort_spread_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cohort_spread</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_cohort_spread</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Within-cohort median pairwise cosine distance, across reference cohorts.</span>
+
+<span class="sd">        A cohort&#39;s components should span a range of topographies.  A *set* of</span>
+<span class="sd">        components that are all near-identical to each other has not resolved</span>
+<span class="sd">        distinct topographic processes -- its members will each land near</span>
+<span class="sd">        whatever reference point is closest to the centroid, and every</span>
+<span class="sd">        per-component statistic will look reassuringly normal.  This is the only</span>
+<span class="sd">        diagnostic that catches that, and it needs the whole set at once.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="s2">&quot;tumor_type&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">metadata_</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.metrics.pairwise</span><span class="w"> </span><span class="kn">import</span> <span class="n">cosine_distances</span>
+
+        <span class="n">tumor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">metadata_</span><span class="p">[</span><span class="s2">&quot;tumor_type&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+        <span class="n">spreads</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">pd</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">tumor</span><span class="p">):</span>
+            <span class="n">mask</span> <span class="o">=</span> <span class="n">tumor</span> <span class="o">==</span> <span class="n">t</span>
+            <span class="k">if</span> <span class="n">mask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">&lt;</span> <span class="mi">3</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">D</span> <span class="o">=</span> <span class="n">cosine_distances</span><span class="p">(</span><span class="n">X</span><span class="p">[</span><span class="n">mask</span><span class="p">])</span>
+            <span class="n">spreads</span><span class="p">[</span><span class="n">t</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">D</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">triu_indices</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">mask</span><span class="o">.</span><span class="n">sum</span><span class="p">()),</span> <span class="n">k</span><span class="o">=</span><span class="mi">1</span><span class="p">)]))</span>
+        <span class="k">return</span> <span class="n">spreads</span> <span class="ow">or</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="TopographyUMAP.set_spread">
+<a class="viewcode-back" href="../../../api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.set_spread">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_spread</span><span class="p">(</span><span class="n">X</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Median pairwise cosine distance within a set of components.&quot;&quot;&quot;</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.metrics.pairwise</span><span class="w"> </span><span class="kn">import</span> <span class="n">cosine_distances</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">X</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;nan&quot;</span><span class="p">)</span>
+        <span class="n">D</span> <span class="o">=</span> <span class="n">cosine_distances</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">))</span>
+        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">D</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">triu_indices</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">X</span><span class="p">),</span> <span class="n">k</span><span class="o">=</span><span class="mi">1</span><span class="p">)]))</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_check_spread</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">space</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Warn when a projected set is less topographically diverse than any cohort.&quot;&quot;&quot;</span>
+        <span class="n">spreads</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cohort_spread_</span> <span class="k">if</span> <span class="n">space</span> <span class="o">==</span> <span class="s2">&quot;strict&quot;</span>
+                   <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">_aggregate_space</span><span class="p">()[</span><span class="s2">&quot;cohort_spread&quot;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">spreads</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">X</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;nan&quot;</span><span class="p">),</span> <span class="kc">False</span>
+        <span class="n">observed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">set_spread</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="n">floor</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">spreads</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+        <span class="n">degenerate</span> <span class="o">=</span> <span class="n">observed</span> <span class="o">&lt;</span> <span class="n">floor</span>
+        <span class="k">if</span> <span class="n">degenerate</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;These </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">X</span><span class="p">)</span><span class="si">}</span><span class="s2"> components are mutually more similar (median pairwise &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;cosine distance </span><span class="si">{</span><span class="n">observed</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">) than the components of any reference &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;cohort (</span><span class="si">{</span><span class="n">floor</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2"> is the lowest of </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">spreads</span><span class="p">)</span><span class="si">}</span><span class="s2">). They carry little &quot;</span>
+                <span class="s2">&quot;distinct topographic signal, so each will land near whatever reference &quot;</span>
+                <span class="s2">&quot;point is closest to the centroid and its nearest-neighbour label will be &quot;</span>
+                <span class="s2">&quot;arbitrary. Treat this projection as uninformative.&quot;</span><span class="p">,</span>
+                <span class="n">stacklevel</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">observed</span><span class="p">,</span> <span class="n">degenerate</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_fit_lof</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Local outlier factor over the reference, plus its flagging threshold.</span>
+
+<span class="sd">        Distance to the nearest reference component is *not* a usable novelty</span>
+<span class="sd">        score here: the features are non-negative and high-dimensional, so a bland</span>
+<span class="sd">        profile sits near the centroid and lands closer to the reference than many</span>
+<span class="sd">        genuine components are to each other (a uniform profile scores ~0.14 while</span>
+<span class="sd">        the reference&#39;s own 99th-percentile neighbour distance is ~0.32).  LOF</span>
+<span class="sd">        compares a point&#39;s local density to its neighbours&#39; and does separate them.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">lof</span> <span class="o">=</span> <span class="n">LocalOutlierFactor</span><span class="p">(</span>
+            <span class="n">n_neighbors</span><span class="o">=</span><span class="nb">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cluster_n_neighbors</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">X</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">metric</span><span class="o">=</span><span class="s2">&quot;cosine&quot;</span><span class="p">,</span>
+            <span class="n">novelty</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="n">threshold</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="o">-</span><span class="n">lof</span><span class="o">.</span><span class="n">score_samples</span><span class="p">(</span><span class="n">X</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">outlier_quantile</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">lof</span><span class="p">,</span> <span class="n">threshold</span>
+
+    <span class="c1"># -------------------------------------------------------------- projection</span>
+
+<div class="viewcode-block" id="TopographyUMAP.transform">
+<a class="viewcode-back" href="../../../api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.transform">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Project components into the reference layout.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        DataFrame indexed by component with the embedding coordinates, the</span>
+<span class="sd">        predicted cluster, the nearest reference component and its cosine</span>
+<span class="sd">        distance, and a local-outlier-factor novelty score with its flag.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">check_is_fitted</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;reducer_&quot;</span><span class="p">)</span>
+        <span class="n">X</span><span class="p">,</span> <span class="n">components</span><span class="p">,</span> <span class="n">space</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_as_matrix</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">)</span>
+        <span class="n">reducer</span><span class="p">,</span> <span class="n">nn</span><span class="p">,</span> <span class="n">X_ref</span><span class="p">,</span> <span class="n">lof</span><span class="p">,</span> <span class="n">threshold</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_space</span><span class="p">(</span><span class="n">space</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="n">X_ref</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;feature matrix has </span><span class="si">{</span><span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2"> bins, the </span><span class="si">{</span><span class="n">space</span><span class="si">}</span><span class="s2"> reference space &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;has </span><span class="si">{</span><span class="n">X_ref</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">warnings</span><span class="o">.</span><span class="n">catch_warnings</span><span class="p">():</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">,</span> <span class="n">message</span><span class="o">=</span><span class="s2">&quot;.*n_jobs value.*&quot;</span><span class="p">)</span>
+            <span class="n">coords</span> <span class="o">=</span> <span class="n">reducer</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">atleast_2d</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">))</span>
+
+        <span class="n">dist</span><span class="p">,</span> <span class="n">idx</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">kneighbors</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">n_neighbors</span><span class="o">=</span><span class="nb">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cluster_n_neighbors</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">components_</span><span class="p">)))</span>
+
+        <span class="n">out</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+            <span class="n">coords</span><span class="p">[:,</span> <span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_components</span><span class="p">],</span>
+            <span class="n">index</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">Index</span><span class="p">(</span><span class="n">components</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;component&quot;</span><span class="p">),</span>
+            <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;UMAP</span><span class="si">{</span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_components</span><span class="p">)],</span>
+        <span class="p">)</span>
+        <span class="n">out</span><span class="p">[</span><span class="s2">&quot;nn_component&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">components_</span><span class="p">[</span><span class="n">idx</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]]</span>
+        <span class="n">out</span><span class="p">[</span><span class="s2">&quot;nn_distance&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dist</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span>
+        <span class="n">out</span><span class="p">[</span><span class="s2">&quot;outlier_score&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="n">lof</span><span class="o">.</span><span class="n">score_samples</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="n">out</span><span class="p">[</span><span class="s2">&quot;is_outlier&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">out</span><span class="p">[</span><span class="s2">&quot;outlier_score&quot;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">threshold</span>
+        <span class="n">spread</span><span class="p">,</span> <span class="n">degenerate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_spread</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">space</span><span class="p">)</span>
+        <span class="n">out</span><span class="p">[</span><span class="s2">&quot;set_spread&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">spread</span>
+        <span class="n">out</span><span class="p">[</span><span class="s2">&quot;set_is_degenerate&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">degenerate</span>
+
+        <span class="k">if</span> <span class="s2">&quot;cluster_id&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">metadata_</span><span class="p">:</span>
+            <span class="n">labels</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">metadata_</span><span class="p">[</span><span class="s2">&quot;cluster_id&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+            <span class="n">votes</span><span class="p">,</span> <span class="n">frac</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_vote</span><span class="p">(</span><span class="n">labels</span><span class="p">,</span> <span class="n">idx</span><span class="p">)</span>
+            <span class="n">out</span><span class="p">[</span><span class="s2">&quot;cluster_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">votes</span>
+            <span class="n">out</span><span class="p">[</span><span class="s2">&quot;cluster_support&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">frac</span>
+            <span class="k">if</span> <span class="s2">&quot;cluster_name&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">metadata_</span><span class="p">:</span>
+                <span class="n">names</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">labels</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">metadata_</span><span class="p">[</span><span class="s2">&quot;cluster_name&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)))</span>
+                <span class="n">out</span><span class="p">[</span><span class="s2">&quot;cluster_name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">names</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">votes</span><span class="p">]</span>
+        <span class="k">if</span> <span class="s2">&quot;class&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">metadata_</span><span class="p">:</span>
+            <span class="n">out</span><span class="p">[</span><span class="s2">&quot;nn_class&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">metadata_</span><span class="p">[</span><span class="s2">&quot;class&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)[</span><span class="n">idx</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]]</span>
+
+        <span class="k">return</span> <span class="n">out</span></div>
+
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_vote</span><span class="p">(</span><span class="n">labels</span><span class="p">,</span> <span class="n">idx</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Plurality vote over neighbour labels, plus the winner&#39;s support.&quot;&quot;&quot;</span>
+        <span class="n">votes</span><span class="p">,</span> <span class="n">support</span> <span class="o">=</span> <span class="p">[],</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">idx</span><span class="p">:</span>
+            <span class="n">vals</span><span class="p">,</span> <span class="n">counts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">labels</span><span class="p">[</span><span class="n">row</span><span class="p">],</span> <span class="n">return_counts</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">winner</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">counts</span><span class="p">)]</span>
+            <span class="n">votes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">winner</span><span class="p">)</span>
+            <span class="n">support</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">counts</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">row</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">votes</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">support</span><span class="p">)</span>
+
+<div class="viewcode-block" id="TopographyUMAP.features_from_model">
+<a class="viewcode-back" href="../../../api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.features_from_model">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">features_from_model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">dataset</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">threads</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Reference-aligned features for a trained model, via :func:`annot_component_rates`.</span>
+
+<span class="sd">        Use when the model was trained on a different regions bed than the</span>
+<span class="sd">        reference: evaluating it on a reference-axis gTensor keeps the projection</span>
+<span class="sd">        on the strict path.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">annotated</span> <span class="o">=</span> <span class="n">annot_component_rates</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dataset</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">,</span> <span class="n">threads</span><span class="o">=</span><span class="n">threads</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">build_features</span><span class="p">(</span><span class="n">annotated</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TopographyUMAP.transform_model">
+<a class="viewcode-back" href="../../../api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.transform_model">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">transform_model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">dataset</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">threads</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Project a trained model&#39;s components, evaluating it on ``dataset``&#39;s axis.</span>
+
+<span class="sd">        &gt;&gt;&gt; ref = mu.load_reference_umap()</span>
+<span class="sd">        &gt;&gt;&gt; model = mu.load_model(&quot;my_cohort.model.pkl&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; grid = mu.gt.load_dataset(reference_nc, with_samples=False, with_state=False)</span>
+<span class="sd">        &gt;&gt;&gt; ref.transform_model(model, grid)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">X</span><span class="p">,</span> <span class="n">components</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">features_from_model</span><span class="p">(</span>
+            <span class="n">model</span><span class="p">,</span> <span class="n">dataset</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">,</span> <span class="n">threads</span><span class="o">=</span><span class="n">threads</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">transform</span><span class="p">((</span><span class="n">X</span><span class="p">,</span> <span class="n">components</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="TopographyUMAP.kneighbors_model">
+<a class="viewcode-back" href="../../../api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.kneighbors_model">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">kneighbors_model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">dataset</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">threads</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Nearest reference components for a trained model&#39;s components.&quot;&quot;&quot;</span>
+        <span class="n">X</span><span class="p">,</span> <span class="n">components</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">features_from_model</span><span class="p">(</span>
+            <span class="n">model</span><span class="p">,</span> <span class="n">dataset</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">,</span> <span class="n">threads</span><span class="o">=</span><span class="n">threads</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">kneighbors</span><span class="p">((</span><span class="n">X</span><span class="p">,</span> <span class="n">components</span><span class="p">),</span> <span class="n">k</span><span class="o">=</span><span class="n">k</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TopographyUMAP.predict_cluster">
+<a class="viewcode-back" href="../../../api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.predict_cluster">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">predict_cluster</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;k-NN vote for the topography cluster, in the full feature space.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">)[</span><span class="s2">&quot;cluster_id&quot;</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="TopographyUMAP.kneighbors">
+<a class="viewcode-back" href="../../../api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.kneighbors">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">kneighbors</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Nearest reference components for each input component (long form).</span>
+
+<span class="sd">        This is the most robust readout -- it depends only on cosine distance in</span>
+<span class="sd">        the original feature space, not on UMAP&#39;s approximate ``transform``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">check_is_fitted</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;nn_&quot;</span><span class="p">)</span>
+        <span class="n">X</span><span class="p">,</span> <span class="n">components</span><span class="p">,</span> <span class="n">space</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_as_matrix</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">)</span>
+        <span class="n">nn</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_space</span><span class="p">(</span><span class="n">space</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">k</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">components_</span><span class="p">))</span>
+        <span class="n">dist</span><span class="p">,</span> <span class="n">idx</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">kneighbors</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">n_neighbors</span><span class="o">=</span><span class="n">k</span><span class="p">)</span>
+
+        <span class="n">rows</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+            <span class="s2">&quot;component&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">components</span><span class="p">,</span> <span class="n">k</span><span class="p">),</span>
+            <span class="s2">&quot;rank&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">tile</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">k</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">components</span><span class="p">)),</span>
+            <span class="s2">&quot;ref_component&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">components_</span><span class="p">[</span><span class="n">idx</span><span class="o">.</span><span class="n">ravel</span><span class="p">()],</span>
+            <span class="s2">&quot;cosine_distance&quot;</span><span class="p">:</span> <span class="n">dist</span><span class="o">.</span><span class="n">ravel</span><span class="p">(),</span>
+        <span class="p">})</span>
+        <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">_METADATA_FIELDS</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">metadata_</span><span class="p">:</span>
+                <span class="n">rows</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">metadata_</span><span class="p">[</span><span class="n">field</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)[</span><span class="n">idx</span><span class="o">.</span><span class="n">ravel</span><span class="p">()]</span>
+        <span class="k">return</span> <span class="n">rows</span></div>
+
+
+    <span class="c1"># ---------------------------------------------------------- serialization</span>
+
+<div class="viewcode-block" id="TopographyUMAP.write_coordinates">
+<a class="viewcode-back" href="../../../api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.write_coordinates">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">write_coordinates</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Write the coordinates-only fixture read by :func:`load_reference_coordinates`.&quot;&quot;&quot;</span>
+        <span class="n">check_is_fitted</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;embedding_&quot;</span><span class="p">)</span>
+        <span class="n">frame</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">metadata_</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">embedding_</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+            <span class="n">frame</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;UMAP</span><span class="si">{</span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">embedding_</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">path</span><span class="p">)),</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">frame</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;wrote </span><span class="si">%s</span><span class="s2"> (</span><span class="si">%.1f</span><span class="s2"> kB)&quot;</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">getsize</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="o">/</span> <span class="mf">1e3</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">path</span></div>
+
+
+<div class="viewcode-block" id="TopographyUMAP.save">
+<a class="viewcode-back" href="../../../api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.save">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">provenance</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float16</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Write the reference space to a compressed ``.npz``.</span>
+
+<span class="sd">        The fitted :class:`umap.UMAP` is deliberately *not* pickled -- it carries a</span>
+<span class="sd">        ``pynndescent`` index with numba-typed internals whose unpickling is</span>
+<span class="sd">        fragile across umap/numba versions.  :func:`load_reference_umap`</span>
+<span class="sd">        reconstructs the reducer by refitting on the stored matrix, which is</span>
+<span class="sd">        cheap at reference scale and version-robust.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">check_is_fitted</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;reducer_&quot;</span><span class="p">)</span>
+        <span class="n">payload</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">X_ref</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">X_ref_</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">dtype</span><span class="p">),</span>
+            <span class="n">embedding_ref</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">embedding_</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">),</span>
+            <span class="n">bin_chrom</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">bin_chrom_</span><span class="p">,</span>
+            <span class="n">bin_start</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">bin_start_</span><span class="p">,</span>
+            <span class="n">bin_length</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">bin_length_</span><span class="p">,</span>
+            <span class="n">component</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">components_</span><span class="p">,</span>
+            <span class="n">params</span><span class="o">=</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">get_params</span><span class="p">()}),</span>
+            <span class="n">provenance</span><span class="o">=</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">provenance</span> <span class="ow">or</span> <span class="p">{}),</span>
+        <span class="p">)</span>
+        <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">_METADATA_FIELDS</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">metadata_</span><span class="p">:</span>
+                <span class="n">payload</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">metadata_</span><span class="p">[</span><span class="n">field</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">path</span><span class="p">)),</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">savez_compressed</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="o">**</span><span class="n">payload</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;wrote </span><span class="si">%s</span><span class="s2"> (</span><span class="si">%.1f</span><span class="s2"> MB)&quot;</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">getsize</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="o">/</span> <span class="mf">1e6</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">path</span></div>
+
+
+<div class="viewcode-block" id="TopographyUMAP.load">
+<a class="viewcode-back" href="../../../api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.load">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">verify</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-3</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Rebuild a reference space from a ``.npz`` written by :meth:`save`.&quot;&quot;&quot;</span>
+        <span class="n">art</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">allow_pickle</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">params</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">art</span><span class="p">[</span><span class="s2">&quot;params&quot;</span><span class="p">]))</span>
+        <span class="n">est</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="o">**</span><span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">params</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="bp">cls</span><span class="p">()</span><span class="o">.</span><span class="n">get_params</span><span class="p">()})</span>
+
+        <span class="n">metadata</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+            <span class="p">{</span><span class="n">f</span><span class="p">:</span> <span class="n">art</span><span class="p">[</span><span class="n">f</span><span class="p">]</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">_METADATA_FIELDS</span> <span class="k">if</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">art</span><span class="o">.</span><span class="n">files</span><span class="p">},</span>
+            <span class="n">index</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">Index</span><span class="p">(</span><span class="n">art</span><span class="p">[</span><span class="s2">&quot;component&quot;</span><span class="p">],</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;component&quot;</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="n">stored</span> <span class="o">=</span> <span class="n">art</span><span class="p">[</span><span class="s2">&quot;embedding_ref&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="n">est</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+            <span class="p">(</span><span class="n">art</span><span class="p">[</span><span class="s2">&quot;X_ref&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">),</span> <span class="n">art</span><span class="p">[</span><span class="s2">&quot;component&quot;</span><span class="p">]),</span>
+            <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span>
+            <span class="n">bins</span><span class="o">=</span><span class="p">(</span><span class="n">art</span><span class="p">[</span><span class="s2">&quot;bin_chrom&quot;</span><span class="p">],</span> <span class="n">art</span><span class="p">[</span><span class="s2">&quot;bin_start&quot;</span><span class="p">],</span> <span class="n">art</span><span class="p">[</span><span class="s2">&quot;bin_length&quot;</span><span class="p">]),</span>
+            <span class="n">embedding</span><span class="o">=</span><span class="n">stored</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">verify</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">warnings</span><span class="o">.</span><span class="n">catch_warnings</span><span class="p">():</span>
+                <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">,</span> <span class="n">message</span><span class="o">=</span><span class="s2">&quot;.*n_jobs value.*&quot;</span><span class="p">)</span>
+                <span class="n">umap</span> <span class="o">=</span> <span class="n">_require_umap</span><span class="p">()</span>
+                <span class="n">refit</span> <span class="o">=</span> <span class="n">umap</span><span class="o">.</span><span class="n">UMAP</span><span class="p">(</span><span class="o">**</span><span class="n">est</span><span class="o">.</span><span class="n">umap_params</span><span class="p">)</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">est</span><span class="o">.</span><span class="n">X_ref_</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span><span class="n">refit</span><span class="p">,</span> <span class="n">stored</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="n">atol</span><span class="p">):</span>
+                <span class="n">delta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">refit</span> <span class="o">-</span> <span class="n">stored</span><span class="p">)</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+                <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                    <span class="s2">&quot;This umap-learn/numba build does not reproduce the stored reference &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;layout (max coordinate delta </span><span class="si">{</span><span class="n">delta</span><span class="si">:</span><span class="s2">.3g</span><span class="si">}</span><span class="s2">); the stored layout is used. &quot;</span>
+                    <span class="s2">&quot;Projections remain valid -- transform() optimizes new points against &quot;</span>
+                    <span class="s2">&quot;the fixed reference layout -- but a refit would differ.&quot;</span><span class="p">,</span>
+                    <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+                <span class="p">)</span>
+        <span class="n">est</span><span class="o">.</span><span class="n">provenance_</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">art</span><span class="p">[</span><span class="s2">&quot;provenance&quot;</span><span class="p">]))</span>
+        <span class="k">return</span> <span class="n">est</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="load_reference_coordinates">
+<a class="viewcode-back" href="../../../api/topography_umap.html#mutopia.analysis.topography_umap.load_reference_coordinates">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">load_reference_coordinates</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The canonical reference layout as a DataFrame -- coordinates only.</span>
+
+<span class="sd">    The full artifact carries an 11 MB feature matrix and needs ``umap-learn`` to</span>
+<span class="sd">    rebuild its reducer, which is a lot to pay for drawing the backdrop of a plot</span>
+<span class="sd">    or asserting against fixed coordinates in a test.  This reads a small TSV with</span>
+<span class="sd">    pandas alone.</span>
+
+<span class="sd">    Use it to plot the reference space or to check published coordinates; use</span>
+<span class="sd">    :func:`load_reference_umap` when you need to *project* new components.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    DataFrame indexed by component, with ``tumor_type``, ``class``, ``cluster_id``,</span>
+<span class="sd">    ``cluster_name``, ``UMAP1`` and ``UMAP2``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">path</span> <span class="ow">or</span> <span class="n">REFERENCE_COORDINATES</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;No reference coordinates at </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">. They ship with the package; if this &quot;</span>
+            <span class="s2">&quot;is a source checkout, build them with &quot;</span>
+            <span class="s2">&quot;`data/pancan/build_reference_artifact.py`.&quot;</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;cluster_id&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">})</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s2">&quot;component&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="load_reference_umap">
+<a class="viewcode-back" href="../../../api/topography_umap.html#mutopia.analysis.topography_umap.load_reference_umap">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">load_reference_umap</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">verify</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">download</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Load the pan-cancer topography UMAP reference.</span>
+
+<span class="sd">    The ~11 MB feature matrix is a release asset, not a committed file, so the</span>
+<span class="sd">    first call downloads it and caches it under ``~/.cache/mutopia`` (override</span>
+<span class="sd">    with ``MUTOPIA_CACHE_DIR``).  Subsequent calls are local.  A source checkout</span>
+<span class="sd">    that has already built the artifact in place uses that copy instead.</span>
+
+<span class="sd">    If you only need the layout -- to draw it, or to check coordinates -- use</span>
+<span class="sd">    :func:`load_reference_coordinates`, which ships in the wheel and needs</span>
+<span class="sd">    neither the download nor ``umap-learn``.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    path : str, optional</span>
+<span class="sd">        Explicit artifact to load, bypassing discovery and download.</span>
+<span class="sd">    verify : bool, default=False</span>
+<span class="sd">        Refit UMAP on the reference matrix and warn if this environment does not</span>
+<span class="sd">        reproduce the stored layout.  Off by default because it doubles load time.</span>
+<span class="sd">    download : bool, default=True</span>
+<span class="sd">        Whether to fetch the artifact when it is not already present.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">TopographyUMAP</span><span class="o">.</span><span class="n">load</span><span class="p">(</span>
+        <span class="n">_ensure_artifact</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">download</span><span class="o">=</span><span class="n">download</span><span class="p">),</span> <span class="n">verify</span><span class="o">=</span><span class="n">verify</span>
+    <span class="p">)</span></div>
+
+</pre></div>
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          
+          
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2026, Allen W. Lynch
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer no-toc">
+      
+      
+      
+    </aside>
+  </div>
+</div><script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../_static/copybutton.js?v=7a06b15b"></script>
+    <script src="../../../_static/design-tabs.js?v=f930bc37"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    </body>
+</html>

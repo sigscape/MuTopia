@@ -6,6 +6,7 @@ API Reference
 
    gtensor
    model
+   topography_umap
    plot
    track_plot/track_plot
    track_plot/tracks

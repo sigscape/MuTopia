@@ -218,6 +218,7 @@
 <li class="toctree-l1 has-children"><a class="reference internal" href="api/index.html">API Reference</a><input aria-label="Toggle navigation of API Reference" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="api/gtensor.html">GTensor API</a></li>
 <li class="toctree-l2"><a class="reference internal" href="api/model.html">TopographyModel API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api/topography_umap.html">Topography UMAP API</a></li>
 <li class="toctree-l2"><a class="reference internal" href="api/plot.html">Plot API</a></li>
 <li class="toctree-l2"><a class="reference internal" href="api/track_plot/track_plot.html">mutopia.plot.track_plot</a></li>
 <li class="toctree-l2"><a class="reference internal" href="api/track_plot/track_plot.html#module-mutopia.plot.track_plot.track_plot">track_plot API</a></li>
@@ -262,7 +263,7 @@
           
 <section class="genindex-section">
   <h1 id="index">Index</h1>
-  <div class="genindex-jumpbox"><a href="#A"><strong>A</strong></a> | <a href="#B"><strong>B</strong></a> | <a href="#C"><strong>C</strong></a> | <a href="#D"><strong>D</strong></a> | <a href="#E"><strong>E</strong></a> | <a href="#F"><strong>F</strong></a> | <a href="#G"><strong>G</strong></a> | <a href="#H"><strong>H</strong></a> | <a href="#I"><strong>I</strong></a> | <a href="#L"><strong>L</strong></a> | <a href="#M"><strong>M</strong></a> | <a href="#N"><strong>N</strong></a> | <a href="#O"><strong>O</strong></a> | <a href="#P"><strong>P</strong></a> | <a href="#R"><strong>R</strong></a> | <a href="#S"><strong>S</strong></a> | <a href="#T"><strong>T</strong></a> | <a href="#U"><strong>U</strong></a> | <a href="#V"><strong>V</strong></a> | <a href="#X"><strong>X</strong></a></div>
+  <div class="genindex-jumpbox"><a href="#A"><strong>A</strong></a> | <a href="#B"><strong>B</strong></a> | <a href="#C"><strong>C</strong></a> | <a href="#D"><strong>D</strong></a> | <a href="#E"><strong>E</strong></a> | <a href="#F"><strong>F</strong></a> | <a href="#G"><strong>G</strong></a> | <a href="#H"><strong>H</strong></a> | <a href="#I"><strong>I</strong></a> | <a href="#K"><strong>K</strong></a> | <a href="#L"><strong>L</strong></a> | <a href="#M"><strong>M</strong></a> | <a href="#N"><strong>N</strong></a> | <a href="#O"><strong>O</strong></a> | <a href="#P"><strong>P</strong></a> | <a href="#R"><strong>R</strong></a> | <a href="#S"><strong>S</strong></a> | <a href="#T"><strong>T</strong></a> | <a href="#U"><strong>U</strong></a> | <a href="#V"><strong>V</strong></a> | <a href="#W"><strong>W</strong></a> | <a href="#X"><strong>X</strong></a></div>
 </section>
 <section id="A" class="genindex-section">
   <h2>A</h2>
@@ -271,6 +272,8 @@
         <li><a href="api/model.html#mutopia.model.base.TopographyModel.alpha_">alpha_ (mutopia.model.base.TopographyModel property)</a>
 </li>
         <li><a href="api/model.html#mutopia.model.base.TopographyModel.annot_component_distributions">annot_component_distributions() (mutopia.model.base.TopographyModel method)</a>
+</li>
+        <li><a href="api/topography_umap.html#mutopia.analysis.topography_umap.annot_component_rates">annot_component_rates() (in module mutopia.analysis.topography_umap)</a>
 </li>
         <li><a href="api/model.html#mutopia.model.base.TopographyModel.annot_components">annot_components() (mutopia.model.base.TopographyModel method)</a>
 </li>
@@ -303,6 +306,10 @@
         <li><a href="api/track_plot/track_plot.html#mutopia.plot.track_plot.track_plot.bar_plot">bar_plot() (in module mutopia.plot.track_plot.track_plot)</a>
 </li>
     </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.build_features">build_features() (mutopia.analysis.topography_umap.TopographyUMAP method)</a>
+</li>
+    </ul></td>
   </tr></table>
 </section>
 
@@ -316,11 +323,13 @@
 </li>
         <li><a href="api/track_plot/transforms.html#mutopia.plot.track_plot.transforms.clip">clip() (in module mutopia.plot.track_plot.transforms)</a>
 </li>
-    </ul></td>
-    <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="api/track_plot/track_plot.html#mutopia.plot.track_plot.track_plot.columns">columns() (in module mutopia.plot.track_plot.track_plot)</a>
 </li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="api/model.html#mutopia.model.base.TopographyModel.component_names">component_names (mutopia.model.base.TopographyModel property)</a>
+</li>
+        <li><a href="api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.components_">components_ (mutopia.analysis.topography_umap.TopographyUMAP attribute)</a>
 </li>
         <li><a href="api/modes/sbs.html#mutopia.modalities.sbs.sbs.SBSMode.coords">coords (mutopia.modalities.sbs.sbs.SBSMode property)</a>
 </li>
@@ -356,6 +365,8 @@
 </li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.embedding_">embedding_ (mutopia.analysis.topography_umap.TopographyUMAP attribute)</a>
+</li>
         <li><a href="api/gtensor.html#mutopia.gtensor.gtensor.equal_size_quantiles">equal_size_quantiles() (in module mutopia.gtensor.gtensor)</a>
 </li>
         <li><a href="api/gtensor.html#mutopia.gtensor.gtensor.excel_report">excel_report() (in module mutopia.gtensor.gtensor)</a>
@@ -369,6 +380,8 @@
   <table style="width: 100%" class="indextable genindextable"><tr>
     <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="api/track_plot/transforms.html#mutopia.plot.track_plot.transforms.feature_matrix">feature_matrix() (in module mutopia.plot.track_plot.transforms)</a>
+</li>
+        <li><a href="api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.features_from_model">features_from_model() (mutopia.analysis.topography_umap.TopographyUMAP method)</a>
 </li>
         <li><a href="api/gtensor.html#mutopia.gtensor.gtensor.fetch_component">fetch_component() (in module mutopia.gtensor.gtensor)</a>
 </li>
@@ -384,9 +397,11 @@
 </li>
         <li><a href="api/track_plot/track_plot.html#mutopia.plot.track_plot.track_plot.fill_plot">fill_plot() (in module mutopia.plot.track_plot.track_plot)</a>
 </li>
-        <li><a href="api/model.html#mutopia.model.base.TopographyModel.fit">fit() (mutopia.model.base.TopographyModel method)</a>
+        <li><a href="api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.fit">fit() (mutopia.analysis.topography_umap.TopographyUMAP method)</a>
 
         <ul>
+          <li><a href="api/model.html#mutopia.model.base.TopographyModel.fit">(mutopia.model.base.TopographyModel method)</a>
+</li>
           <li><a href="api/track_plot/transforms.html#mutopia.plot.track_plot.transforms.TopographyTransformer.fit">(mutopia.plot.track_plot.transforms.TopographyTransformer method)</a>
 </li>
         </ul></li>
@@ -446,6 +461,20 @@
   </tr></table>
 </section>
 
+<section id="K" class="genindex-section">
+  <h2>K</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.kneighbors">kneighbors() (mutopia.analysis.topography_umap.TopographyUMAP method)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.kneighbors_model">kneighbors_model() (mutopia.analysis.topography_umap.TopographyUMAP method)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
 <section id="L" class="genindex-section">
   <h2>L</h2>
   <table style="width: 100%" class="indextable genindextable"><tr>
@@ -458,15 +487,21 @@
 </li>
         <li><a href="api/track_plot/track_plot.html#mutopia.plot.track_plot.track_plot.line_plot">line_plot() (in module mutopia.plot.track_plot.track_plot)</a>
 </li>
-    </ul></td>
-    <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="api/gtensor.html#mutopia.gtensor.gtensor.list_components">list_components() (in module mutopia.gtensor.gtensor)</a>
 </li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="api/gtensor.html#mutopia.gtensor.gtensor.list_sources">list_sources() (in module mutopia.gtensor.gtensor)</a>
+</li>
+        <li><a href="api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.load">load() (mutopia.analysis.topography_umap.TopographyUMAP class method)</a>
 </li>
         <li><a href="api/modes/sbs.html#mutopia.modalities.sbs.sbs.SBSMode.load_components">load_components() (mutopia.modalities.sbs.sbs.SBSMode method)</a>
 </li>
         <li><a href="api/gtensor.html#mutopia.gtensor.gtensor.load_dataset">load_dataset() (in module mutopia.gtensor.gtensor)</a>
+</li>
+        <li><a href="api/topography_umap.html#mutopia.analysis.topography_umap.load_reference_coordinates">load_reference_coordinates() (in module mutopia.analysis.topography_umap)</a>
+</li>
+        <li><a href="api/topography_umap.html#mutopia.analysis.topography_umap.load_reference_umap">load_reference_umap() (in module mutopia.analysis.topography_umap)</a>
 </li>
     </ul></td>
   </tr></table>
@@ -481,6 +516,8 @@
         <li><a href="api/track_plot/track_plot.html#mutopia.plot.track_plot.track_plot.make_view">make_view() (in module mutopia.plot.track_plot.track_plot)</a>
 </li>
         <li><a href="api/gtensor.html#mutopia.gtensor.gtensor.match_dims">match_dims() (in module mutopia.gtensor.gtensor)</a>
+</li>
+        <li><a href="api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.metadata_">metadata_ (mutopia.analysis.topography_umap.TopographyUMAP attribute)</a>
 </li>
         <li><a href="api/track_plot/transforms.html#mutopia.plot.track_plot.transforms.minmax_scale">minmax_scale() (in module mutopia.plot.track_plot.transforms)</a>
 </li>
@@ -625,6 +662,8 @@
 </li>
         <li><a href="api/track_plot/track_plot.html#mutopia.plot.track_plot.track_plot.plot_view">plot_view() (in module mutopia.plot.track_plot.track_plot)</a>
 </li>
+        <li><a href="api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.predict_cluster">predict_cluster() (mutopia.analysis.topography_umap.TopographyUMAP method)</a>
+</li>
     </ul></td>
   </tr></table>
 </section>
@@ -633,6 +672,8 @@
   <h2>R</h2>
   <table style="width: 100%" class="indextable genindextable"><tr>
     <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.reducer_">reducer_ (mutopia.analysis.topography_umap.TopographyUMAP attribute)</a>
+</li>
         <li><a href="api/gtensor.html#mutopia.gtensor.gtensor.rename_components">rename_components() (in module mutopia.gtensor.gtensor)</a>
 </li>
     </ul></td>
@@ -651,8 +692,12 @@
     <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="api/model.html#mutopia.model.base.TopographyModel.sample_params">sample_params() (mutopia.model.base.TopographyModel method)</a>
 </li>
-        <li><a href="api/model.html#mutopia.model.base.TopographyModel.save">save() (mutopia.model.base.TopographyModel method)</a>
+        <li><a href="api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.save">save() (mutopia.analysis.topography_umap.TopographyUMAP method)</a>
+
+        <ul>
+          <li><a href="api/model.html#mutopia.model.base.TopographyModel.save">(mutopia.model.base.TopographyModel method)</a>
 </li>
+        </ul></li>
         <li><a href="api/modes/sbs.html#mutopia.modalities.sbs.sbs.SBSMode">SBSMode (class in mutopia.modalities.sbs.sbs)</a>
 </li>
         <li><a href="api/track_plot/track_plot.html#mutopia.plot.track_plot.track_plot.scale_bar">scale_bar() (in module mutopia.plot.track_plot.track_plot)</a>
@@ -663,11 +708,19 @@
 </li>
         <li><a href="api/track_plot/transforms.html#mutopia.plot.track_plot.transforms.select">select() (in module mutopia.plot.track_plot.transforms)</a>
 </li>
-        <li><a href="api/model.html#mutopia.model.base.TopographyModel.set_fit_request">set_fit_request() (mutopia.model.base.TopographyModel method)</a>
+        <li><a href="api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.set_fit_request">set_fit_request() (mutopia.analysis.topography_umap.TopographyUMAP method)</a>
+
+        <ul>
+          <li><a href="api/model.html#mutopia.model.base.TopographyModel.set_fit_request">(mutopia.model.base.TopographyModel method)</a>
 </li>
+        </ul></li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="api/model.html#mutopia.model.base.TopographyModel.set_score_request">set_score_request() (mutopia.model.base.TopographyModel method)</a>
+</li>
+        <li><a href="api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.set_spread">set_spread() (mutopia.analysis.topography_umap.TopographyUMAP static method)</a>
+</li>
+        <li><a href="api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.set_transform_request">set_transform_request() (mutopia.analysis.topography_umap.TopographyUMAP method)</a>
 </li>
         <li><a href="api/model.html#mutopia.model.base.TopographyModel.setup_corpus">setup_corpus() (mutopia.model.base.TopographyModel method)</a>
 </li>
@@ -699,13 +752,21 @@
           <li><a href="api/modes/sbs.html#mutopia.modalities.sbs.sbs.SBSMode.TopographyModel">(mutopia.modalities.sbs.sbs.SBSMode property)</a>
 </li>
         </ul></li>
+        <li><a href="api/track_plot/transforms.html#mutopia.plot.track_plot.transforms.TopographyTransformer">TopographyTransformer (class in mutopia.plot.track_plot.transforms)</a>
+</li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
-        <li><a href="api/track_plot/transforms.html#mutopia.plot.track_plot.transforms.TopographyTransformer">TopographyTransformer (class in mutopia.plot.track_plot.transforms)</a>
+        <li><a href="api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP">TopographyUMAP (class in mutopia.analysis.topography_umap)</a>
 </li>
         <li><a href="api/gtensor.html#mutopia.gtensor.gtensor.train_test_split">train_test_split() (in module mutopia.gtensor.gtensor)</a>
 </li>
-        <li><a href="api/track_plot/transforms.html#mutopia.plot.track_plot.transforms.TopographyTransformer.transform">transform() (mutopia.plot.track_plot.transforms.TopographyTransformer method)</a>
+        <li><a href="api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.transform">transform() (mutopia.analysis.topography_umap.TopographyUMAP method)</a>
+
+        <ul>
+          <li><a href="api/track_plot/transforms.html#mutopia.plot.track_plot.transforms.TopographyTransformer.transform">(mutopia.plot.track_plot.transforms.TopographyTransformer method)</a>
+</li>
+        </ul></li>
+        <li><a href="api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.transform_model">transform_model() (mutopia.analysis.topography_umap.TopographyUMAP method)</a>
 </li>
     </ul></td>
   </tr></table>
@@ -714,6 +775,10 @@
 <section id="U" class="genindex-section">
   <h2>U</h2>
   <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.umap_params">umap_params (mutopia.analysis.topography_umap.TopographyUMAP property)</a>
+</li>
+    </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="api/gtensor.html#mutopia.gtensor.gtensor.unstack_regions">unstack_regions() (in module mutopia.gtensor.gtensor)</a>
 </li>
@@ -735,6 +800,16 @@
   </tr></table>
 </section>
 
+<section id="W" class="genindex-section">
+  <h2>W</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.write_coordinates">write_coordinates() (mutopia.analysis.topography_umap.TopographyUMAP method)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
 <section id="X" class="genindex-section">
   <h2>X</h2>
   <table style="width: 100%" class="indextable genindextable"><tr>
@@ -743,6 +818,8 @@
 </li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="api/topography_umap.html#mutopia.analysis.topography_umap.TopographyUMAP.X_ref_">X_ref_ (mutopia.analysis.topography_umap.TopographyUMAP attribute)</a>
+</li>
         <li><a href="api/track_plot/track_plot.html#mutopia.plot.track_plot.track_plot.xaxis_plot">xaxis_plot() (in module mutopia.plot.track_plot.track_plot)</a>
 </li>
     </ul></td>
