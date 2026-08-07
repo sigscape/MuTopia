@@ -25,7 +25,9 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-      - run: pip install -e '.[testing]'
+      # Must match tests.yml: without the umap extra the TopographyUMAP suite
+      # skips, and the release gate would pass without exercising it.
+      - run: pip install -e '.[testing,umap]'
       - uses: actions/cache@v4
         with:
           path: tests/fixtures
