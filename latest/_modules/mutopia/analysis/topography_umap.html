@@ -394,6 +394,19 @@
 <span class="n">_METADATA_FIELDS</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;tumor_type&quot;</span><span class="p">,</span> <span class="s2">&quot;class&quot;</span><span class="p">,</span> <span class="s2">&quot;name&quot;</span><span class="p">,</span> <span class="s2">&quot;cluster_id&quot;</span><span class="p">,</span> <span class="s2">&quot;cluster_name&quot;</span><span class="p">)</span>
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">_as_unicode</span><span class="p">(</span><span class="n">values</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Coerce a label column to a fixed-width unicode array.</span>
+
+<span class="sd">    ``Series.values.astype(str)`` is not enough: under pandas 3 a string column</span>
+<span class="sd">    comes back as a ``StringArray``, and ``astype(str)`` on that yields an</span>
+<span class="sd">    *object* ndarray.  ``np.savez_compressed`` then stores it as a pickle, and</span>
+<span class="sd">    :meth:`TopographyUMAP.load` refuses it with ``allow_pickle=False``.</span>
+<span class="sd">    Building from a list of Python strings pins the dtype to ``&lt;U`` on every</span>
+<span class="sd">    pandas version.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="nb">str</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">values</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">str_</span><span class="p">)</span>
+
+
 <span class="k">def</span><span class="w"> </span><span class="nf">_require_umap</span><span class="p">():</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="kn">import</span><span class="w"> </span><span class="nn">umap</span>
@@ -1139,13 +1152,13 @@
             <span class="n">bin_chrom</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">bin_chrom_</span><span class="p">,</span>
             <span class="n">bin_start</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">bin_start_</span><span class="p">,</span>
             <span class="n">bin_length</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">bin_length_</span><span class="p">,</span>
-            <span class="n">component</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">components_</span><span class="p">,</span>
+            <span class="n">component</span><span class="o">=</span><span class="n">_as_unicode</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">components_</span><span class="p">),</span>
             <span class="n">params</span><span class="o">=</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">get_params</span><span class="p">()}),</span>
             <span class="n">provenance</span><span class="o">=</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">provenance</span> <span class="ow">or</span> <span class="p">{}),</span>
         <span class="p">)</span>
         <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">_METADATA_FIELDS</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">metadata_</span><span class="p">:</span>
-                <span class="n">payload</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">metadata_</span><span class="p">[</span><span class="n">field</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+                <span class="n">payload</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="n">_as_unicode</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">metadata_</span><span class="p">[</span><span class="n">field</span><span class="p">])</span>
         <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">path</span><span class="p">)),</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="n">np</span><span class="o">.</span><span class="n">savez_compressed</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="o">**</span><span class="n">payload</span><span class="p">)</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;wrote </span><span class="si">%s</span><span class="s2"> (</span><span class="si">%.1f</span><span class="s2"> MB)&quot;</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">getsize</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="o">/</span> <span class="mf">1e6</span><span class="p">)</span>
