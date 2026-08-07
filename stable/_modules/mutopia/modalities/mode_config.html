@@ -219,6 +219,7 @@
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../../api/index.html">API Reference</a><input aria-label="Toggle navigation of API Reference" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../../api/gtensor.html">GTensor API</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../api/model.html">TopographyModel API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/topography_umap.html">Topography UMAP API</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../api/plot.html">Plot API</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../api/track_plot/track_plot.html">mutopia.plot.track_plot</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../../api/track_plot/track_plot.html#module-mutopia.plot.track_plot.track_plot">track_plot API</a></li>
@@ -403,6 +404,135 @@
                 <span class="s2">&quot;dtype&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">MODE_ID</span><span class="p">,</span>
             <span class="p">},</span>
         <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ModeConfig.component_spectra">
+<a class="viewcode-back" href="../../../api/modes/modes.html#mutopia.modalities.mode_config.ModeConfig.component_spectra">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">component_spectra</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">source</span><span class="p">,</span> <span class="n">normalization</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;none&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">xr</span><span class="o">.</span><span class="n">DataArray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Per-component reference spectra, from a fitted model or a gTensor.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        source : TopographyModel or gTensor Dataset</span>
+<span class="sd">            A fitted model — spectra are read straight off its context model, so</span>
+<span class="sd">            no dataset is needed — or a dataset already annotated with</span>
+<span class="sd">            ``Spectra/spectra`` by ``model.annot_components``.</span>
+<span class="sd">        normalization : {&quot;global&quot;, &quot;weighted&quot;, &quot;none&quot;}, default=&quot;none&quot;</span>
+<span class="sd">            ``&quot;none&quot;`` gives a per-context mutation *rate*, which is the</span>
+<span class="sd">            convention the bundled signature database uses (see</span>
+<span class="sd">            :meth:`match_components`).  ``&quot;global&quot;`` weights by the context</span>
+<span class="sd">            distribution, giving a COSMIC-style probability over the 96 channels.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        xarray.DataArray with dims ``(component, context)``.  Modalities whose</span>
+<span class="sd">        spectra carry extra state (SBS mesoscale ``genome_state``) return the</span>
+<span class="sd">        baseline state, which is the one comparable to a reference database.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+        <span class="n">spectra</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="s2">&quot;factor_model_&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">spectra</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>                       <span class="c1"># a fitted model</span>
+            <span class="n">context_model</span> <span class="o">=</span> <span class="n">source</span><span class="o">.</span><span class="n">factor_model_</span><span class="o">.</span><span class="n">models</span><span class="p">[</span><span class="s2">&quot;context_model&quot;</span><span class="p">]</span>
+            <span class="n">spectra</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span>
+                <span class="p">[</span><span class="n">context_model</span><span class="o">.</span><span class="n">format_component</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">normalization</span><span class="p">)</span>
+                 <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">source</span><span class="o">.</span><span class="n">n_components</span><span class="p">)],</span>
+                <span class="n">dim</span><span class="o">=</span><span class="s2">&quot;component&quot;</span><span class="p">,</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">assign_coords</span><span class="p">(</span><span class="n">component</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">source</span><span class="o">.</span><span class="n">component_names</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>                                          <span class="c1"># a gTensor</span>
+            <span class="n">names</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="s2">&quot;data_vars&quot;</span><span class="p">,</span> <span class="n">source</span><span class="p">))</span>
+            <span class="k">if</span> <span class="s2">&quot;Spectra/spectra&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">names</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span>
+                    <span class="s2">&quot;The dataset has no `Spectra/spectra`. Run &quot;</span>
+                    <span class="s2">&quot;`model.annot_components(data)` first, or pass the model itself.&quot;</span>
+                <span class="p">)</span>
+            <span class="n">spectra</span> <span class="o">=</span> <span class="n">source</span><span class="p">[</span><span class="s2">&quot;Spectra/spectra&quot;</span><span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">dim</span><span class="p">,</span> <span class="n">baseline</span> <span class="ow">in</span> <span class="p">((</span><span class="s2">&quot;genome_state&quot;</span><span class="p">,</span> <span class="s2">&quot;Baseline&quot;</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;source&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)):</span>
+            <span class="k">if</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">spectra</span><span class="o">.</span><span class="n">dims</span><span class="p">:</span>
+                <span class="n">spectra</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">spectra</span><span class="o">.</span><span class="n">sel</span><span class="p">({</span><span class="n">dim</span><span class="p">:</span> <span class="n">baseline</span><span class="p">},</span> <span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="k">if</span> <span class="n">baseline</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                    <span class="ow">and</span> <span class="n">baseline</span> <span class="ow">in</span> <span class="n">spectra</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+                    <span class="k">else</span> <span class="n">spectra</span><span class="o">.</span><span class="n">isel</span><span class="p">({</span><span class="n">dim</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span> <span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="p">)</span>
+
+        <span class="c1"># `format_component` returns log-space values; exponentiate relative to</span>
+        <span class="c1"># each component&#39;s max for numerical safety before normalizing.</span>
+        <span class="n">spectra</span> <span class="o">=</span> <span class="n">spectra</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="s2">&quot;component&quot;</span><span class="p">,</span> <span class="s2">&quot;context&quot;</span><span class="p">)</span>
+        <span class="n">spectra</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">spectra</span> <span class="o">-</span> <span class="n">spectra</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="s2">&quot;context&quot;</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">spectra</span> <span class="o">/</span> <span class="n">spectra</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="s2">&quot;context&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ModeConfig.match_components">
+<a class="viewcode-back" href="../../../api/modes/modes.html#mutopia.modalities.mode_config.ModeConfig.match_components">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">match_components</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">source</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">reference</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">top_k</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
+        <span class="n">normalization</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;none&quot;</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Match component spectra against the modality&#39;s reference database.</span>
+
+<span class="sd">        Cosine similarity between each component&#39;s spectrum and each reference</span>
+<span class="sd">        signature.  This is a *spectrum* comparison and says nothing about where a</span>
+<span class="sd">        component sits in the genome — pair it with</span>
+<span class="sd">        ``mutopia.analysis.TopographyUMAP`` for the topographic half.</span>
+
+<span class="sd">        Both sides are compared as per-context mutation **rates**, with the</span>
+<span class="sd">        trinucleotide composition of the genome divided out.  That is the</span>
+<span class="sd">        convention the bundled database uses: its SBS1 places 98% of its mass on</span>
+<span class="sd">        ``N[C&gt;T]G``, and only after multiplying by the genome&#39;s trinucleotide</span>
+<span class="sd">        frequencies does it return to COSMIC&#39;s published ~87%.  Published COSMIC</span>
+<span class="sd">        profiles are genome-specific precisely because they bake that composition</span>
+<span class="sd">        in; comparing a model rate against such a profile directly would</span>
+<span class="sd">        systematically favour signatures concentrated in common contexts.  Hence</span>
+<span class="sd">        the ``normalization=&quot;none&quot;`` default — do not change it to ``&quot;global&quot;``</span>
+<span class="sd">        without converting the database to match.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        source : TopographyModel or gTensor Dataset</span>
+<span class="sd">        *reference : str</span>
+<span class="sd">            Reference signature names to compare against.  Defaults to the whole</span>
+<span class="sd">            database (:attr:`available_components`).</span>
+<span class="sd">        top_k : int, default=3</span>
+<span class="sd">            Matches to report per component.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        pandas.DataFrame</span>
+<span class="sd">            Long form: ``component``, ``rank``, ``reference``, ``cosine_similarity``.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; import mutopia.analysis as mu</span>
+<span class="sd">        &gt;&gt;&gt; model = mu.load_model(&quot;cohort.model.pkl&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; mu.modalities.SBS.match_components(model, top_k=1)</span>
+<span class="sd">        &gt;&gt;&gt; mu.modalities.SBS.match_components(model, &quot;SBS4&quot;, &quot;SBS6&quot;, top_k=2)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+
+        <span class="n">spectra</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">component_spectra</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">normalization</span><span class="o">=</span><span class="n">normalization</span><span class="p">)</span>
+        <span class="n">names</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">reference</span><span class="p">)</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">available_components</span>
+        <span class="n">ref</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">load_components</span><span class="p">(</span><span class="o">*</span><span class="n">names</span><span class="p">)</span><span class="o">.</span><span class="n">reindex</span><span class="p">(</span><span class="n">context</span><span class="o">=</span><span class="n">spectra</span><span class="p">[</span><span class="s2">&quot;context&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+
+        <span class="n">A</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">spectra</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="n">B</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">ref</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="n">B</span> <span class="o">=</span> <span class="n">B</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">B</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">keepdims</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">A</span> <span class="o">=</span> <span class="n">A</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">keepdims</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">sim</span> <span class="o">=</span> <span class="n">A</span> <span class="o">@</span> <span class="n">B</span><span class="o">.</span><span class="n">T</span>
+
+        <span class="n">k</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">top_k</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">names</span><span class="p">))</span>
+        <span class="n">order</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="o">-</span><span class="n">sim</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)[:,</span> <span class="p">:</span><span class="n">k</span><span class="p">]</span>
+        <span class="n">components</span> <span class="o">=</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">spectra</span><span class="p">[</span><span class="s2">&quot;component&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+            <span class="s2">&quot;component&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">components</span><span class="p">,</span> <span class="n">k</span><span class="p">),</span>
+            <span class="s2">&quot;rank&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">tile</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">k</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">components</span><span class="p">)),</span>
+            <span class="s2">&quot;reference&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">names</span><span class="p">)[</span><span class="n">order</span><span class="o">.</span><span class="n">ravel</span><span class="p">()],</span>
+            <span class="s2">&quot;cosine_similarity&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">take_along_axis</span><span class="p">(</span><span class="n">sim</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">ravel</span><span class="p">(),</span>
+        <span class="p">})</span></div>
 
 
 <div class="viewcode-block" id="ModeConfig.get_context_frequencies">
